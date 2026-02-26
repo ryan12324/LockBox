@@ -13,3 +13,4 @@ export * from './encryption.js';
 export * from './hkdf.js';
 export * from './kdf.js';
 export * from './keys.js';
+export * from './breach.js';
