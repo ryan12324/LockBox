@@ -31,6 +31,10 @@ export default function Vault() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [panelState, setPanelState] = useState<{ mode: 'view' | 'edit' | 'add'; item: VaultItem | null } | null>(null);
+  const [showNewFolder, setShowNewFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [editingFolder, setEditingFolder] = useState<{ id: string; name: string } | null>(null);
+  const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
 
   const loadVault = useCallback(async () => {
     if (!session || !userKey) return;
@@ -91,6 +95,41 @@ export default function Vault() {
 
   const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳' }[type] ?? '📄');
 
+  async function handleCreateFolder() {
+    if (!session || !newFolderName.trim()) return;
+    try {
+      await api.vault.createFolder({ name: newFolderName.trim() }, session.token);
+      setNewFolderName('');
+      setShowNewFolder(false);
+      loadVault();
+    } catch (err) {
+      console.error('Failed to create folder:', err);
+    }
+  }
+
+  async function handleRenameFolder() {
+    if (!session || !editingFolder || !editingFolder.name.trim()) return;
+    try {
+      await api.vault.updateFolder(editingFolder.id, { name: editingFolder.name.trim() }, session.token);
+      setEditingFolder(null);
+      loadVault();
+    } catch (err) {
+      console.error('Failed to rename folder:', err);
+    }
+  }
+
+  async function handleDeleteFolder(id: string) {
+    if (!session) return;
+    try {
+      await api.vault.deleteFolder(id, session.token);
+      setDeletingFolderId(null);
+      if (selectedFolder === id) setSelectedFolder(null);
+      loadVault();
+    } catch (err) {
+      console.error('Failed to delete folder:', err);
+    }
+  }
+
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       {/* Sidebar */}
@@ -127,21 +166,74 @@ export default function Vault() {
             </button>
           ))}
 
-          {folders.length > 0 && (
-            <>
-              <div className="pt-2 pb-1">
-                <p className="px-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Folders</p>
+          {/* Folders */}
+          <div className="pt-2 pb-1 flex items-center justify-between">
+            <p className="px-3 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Folders</p>
+            <button
+              onClick={() => setShowNewFolder(true)}
+              className="px-2 text-gray-400 hover:text-indigo-500 transition-colors text-sm"
+              title="New folder"
+            >
+              +
+            </button>
+          </div>
+
+          {showNewFolder && (
+            <div className="flex gap-1 px-2 mb-1">
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName(''); } }}
+                placeholder="Folder name"
+                className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                autoFocus
+              />
+              <button onClick={handleCreateFolder} className="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">✓</button>
+              <button onClick={() => { setShowNewFolder(false); setNewFolderName(''); }} className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">✕</button>
+            </div>
+          )}
+
+          {folders.map((folder) =>
+            editingFolder?.id === folder.id ? (
+              <div key={folder.id} className="flex gap-1 px-2 mb-1">
+                <input
+                  type="text"
+                  value={editingFolder.name}
+                  onChange={(e) => setEditingFolder({ ...editingFolder, name: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleRenameFolder(); if (e.key === 'Escape') setEditingFolder(null); }}
+                  className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  autoFocus
+                />
+                <button onClick={handleRenameFolder} className="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">✓</button>
+                <button onClick={() => setEditingFolder(null)} className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">✕</button>
               </div>
-              {folders.map((folder) => (
+            ) : deletingFolderId === folder.id ? (
+              <div key={folder.id} className="px-3 py-2">
+                <p className="text-xs text-gray-700 dark:text-gray-300 mb-2">Delete "{folder.name}"? Items will be moved to root.</p>
+                <div className="flex gap-2">
+                  <button onClick={() => handleDeleteFolder(folder.id)} className="px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded">Delete</button>
+                  <button onClick={() => setDeletingFolderId(null)} className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div key={folder.id} className="group flex items-center">
                 <button
-                  key={folder.id}
                   onClick={() => { setSelectedFolder(folder.id); setSelectedType(null); setShowFavorites(false); }}
-                  className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  className="flex-1 text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 truncate"
                 >
                   📁 {folder.name}
                 </button>
-              ))}
-            </>
+                <div className="hidden group-hover:flex gap-0.5 pr-1 shrink-0">
+                  <button onClick={() => setEditingFolder({ id: folder.id, name: folder.name })} className="p-1 text-gray-400 hover:text-indigo-500 transition-colors" title="Rename">
+                    ✎
+                  </button>
+                  <button onClick={() => setDeletingFolderId(folder.id)} className="p-1 text-gray-400 hover:text-red-500 transition-colors" title="Delete">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ),
           )}
         </nav>
 

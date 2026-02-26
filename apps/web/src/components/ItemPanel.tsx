@@ -53,6 +53,9 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
   const [showPassword, setShowPassword] = useState(false);
   const [showCvv, setShowCvv] = useState(false);
   const [showCardNumber, setShowCardNumber] = useState(false);
+  const [localFolders, setLocalFolders] = useState<Folder[]>(folders);
+  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState('');
   const [totpRemaining, setTotpRemaining] = useState(0);
@@ -88,6 +91,9 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
     setShowCvv(false);
     setShowCardNumber(false);
     setError('');
+    setLocalFolders(folders);
+    setCreatingFolder(false);
+    setNewFolderName('');
   }, [mode, item]);
 
   // TOTP generation
@@ -225,6 +231,19 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
     }
   };
 
+  async function handleCreateFolder() {
+    if (!session || !newFolderName.trim()) return;
+    try {
+      const res = await api.vault.createFolder({ name: newFolderName.trim() }, session.token) as { folder: Folder };
+      setLocalFolders((prev) => [...prev, res.folder]);
+      setFolderId(res.folder.id);
+      setCreatingFolder(false);
+      setNewFolderName('');
+    } catch (err) {
+      console.error('Failed to create folder:', err);
+    }
+  }
+
   const typeIcon = (t: string) => ({ login: '🔑', note: '📝', card: '💳' }[t] ?? '📄');
 
   return (
@@ -326,15 +345,38 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Folder</label>
                   <select
-                    value={folderId}
-                    onChange={(e) => setFolderId(e.target.value)}
+                    value={creatingFolder ? '__new__' : folderId}
+                    onChange={(e) => {
+                      if (e.target.value === '__new__') {
+                        setCreatingFolder(true);
+                      } else {
+                        setCreatingFolder(false);
+                        setFolderId(e.target.value);
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="">No folder</option>
-                    {folders.map(f => (
+                    {localFolders.map(f => (
                       <option key={f.id} value={f.id}>{f.name}</option>
                     ))}
+                    <option value="__new__">+ New folder...</option>
                   </select>
+                  {creatingFolder && (
+                    <div className="flex gap-1 mt-2">
+                      <input
+                        type="text"
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName(''); } }}
+                        placeholder="Folder name"
+                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        autoFocus
+                      />
+                      <button onClick={handleCreateFolder} className="px-2.5 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">✓</button>
+                      <button onClick={() => { setCreatingFolder(false); setNewFolderName(''); }} className="px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">✕</button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-end pb-2">
                   <label className="flex items-center gap-2 cursor-pointer">
