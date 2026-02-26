@@ -10,6 +10,7 @@ import Settings from './pages/Settings.js';
 import ImportExport from './pages/ImportExport.js';
 import AISettings from './pages/AISettings.js';
 import Health from './pages/Health.js';
+import Chat from './pages/Chat.js';
 
 const AUTO_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -97,6 +98,7 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+            <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
       <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />
     </Routes>
   );

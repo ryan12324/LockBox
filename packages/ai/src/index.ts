@@ -84,3 +84,24 @@ export type { DuplicateGroup } from './categorize/categorizer.js';
 // Contextual alerts
 export { ContextualAlertEngine } from './security/contextual.js';
 export type { BreachData } from './security/contextual.js';
+
+// Credential Lifecycle
+export { LifecycleTracker, DEFAULT_ROTATION_INTERVALS } from './lifecycle/tracker.js';
+export type { ItemCategory, LifecycleOptions } from './lifecycle/tracker.js';
+
+// Security Copilot
+export { SecurityCopilot } from './copilot/engine.js';
+export type { CopilotOptions, ScoreHistory } from './copilot/engine.js';
+export { CopilotScheduler } from './copilot/scheduler.js';
+export type { SchedulerOptions } from './copilot/scheduler.js';
+
+// Agent
+export { AGENT_TOOLS, getToolDefinitions } from './agent/tools.js';
+export type { AgentTool } from './agent/tools.js';
+export { ToolExecutor } from './agent/executor.js';
+export type { AgentContext } from './agent/executor.js';
+export { SafetyGate } from './agent/safety.js';
+export type { SafetyConfig, SafetyCheckResult, ValidationResult, AuditEntry } from './agent/safety.js';
+export { VaultAgent } from './agent/vault-agent.js';
+export type { VaultAgentOptions } from './agent/vault-agent.js';
+export { SYSTEM_PROMPT } from './prompts/system.js';

@@ -171,6 +171,13 @@ export default function Vault() {
             ⭐ Favorites
           </button>
           <button
+            onClick={() => navigate('/chat')}
+            className="w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-white/70 hover:bg-white/[0.06] hover:text-white transition-colors"
+          >
+            <span className="text-lg">✨</span>
+            <span className="text-sm font-medium">Assistant</span>
+          </button>
+          <button
             onClick={() => navigate('/health')}
             className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-white/[0.08] text-white/70"
           >

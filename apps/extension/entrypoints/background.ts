@@ -14,7 +14,7 @@ import { totp as generateTOTP, parseOtpAuthUri } from '@lockbox/totp';
 import { checkBatch } from '@lockbox/crypto';
 import { analyzeVaultHealth, analyzeItem } from '@lockbox/ai';
 import { generatePassword, generatePassphrase } from '@lockbox/generator';
-import { PhishingDetector, SecurityAlertEngine, SemanticSearch, KeywordEmbeddingProvider } from '@lockbox/ai';
+import { PhishingDetector, SecurityAlertEngine, SemanticSearch, KeywordEmbeddingProvider, SecurityCopilot } from '@lockbox/ai';
 import type { SearchResult, SecurityAlert } from '@lockbox/ai';
 import type { VaultItem, LoginItem, KdfConfig, Folder } from '@lockbox/types';
 import { api } from '../lib/api.js';
@@ -133,6 +133,7 @@ function getMatchingItems(url: string): VaultItem[] {
 const LOCK_ALARM = 'lockbox-auto-lock';
 const SYNC_ALARM = 'lockbox-sync';
 const BREACH_ALARM = 'lockbox-breach-check';
+const COPILOT_ALARM = 'lockbox-copilot';
 let lastActivity = Date.now();
 
 function scheduleAutoLock(timeoutMinutes: number) {
@@ -142,8 +143,8 @@ function scheduleAutoLock(timeoutMinutes: number) {
 function schedulePeriodSync() {
   chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 5 });
   chrome.alarms.create(BREACH_ALARM, { periodInMinutes: 24 * 60 });
+  chrome.alarms.create(COPILOT_ALARM, { periodInMinutes: 24 * 60 });
 }
-
 async function runBreachCheck(): Promise<{ breachedCount: number; results: Map<string, any> }> {
   if (!userKey) return { breachedCount: 0, results: new Map() };
   const loginItems: Array<{id: string, password: string}> = [];
@@ -531,9 +532,26 @@ export default defineBackground(() => {
       }
     } else if (alarm.name === BREACH_ALARM) {
       await runBreachCheck();
+    } else if (alarm.name === COPILOT_ALARM) {
+      if (userKey) {
+        try {
+          const logins = Array.from(vaultItems.values()).filter((i): i is LoginItem => i.type === 'login');
+          const copilot = new SecurityCopilot();
+          const posture = await copilot.evaluate(logins, {});
+          await chrome.storage.local.set({ 'copilot-posture': posture });
+          
+          if (posture.score < 50 || posture.criticalActions.length > 0) {
+            chrome.action.setBadgeText({ text: '!' });
+            chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
+          } else {
+            chrome.action.setBadgeText({ text: '' });
+          }
+        } catch (err) {
+          console.error('[Lockbox] Copilot evaluation failed:', err);
+        }
+      }
     }
   });
-
   // On startup: check if we have a stored session
   chrome.runtime.onStartup.addListener(async () => {
     // Session token is in chrome.storage.session which is cleared on browser close

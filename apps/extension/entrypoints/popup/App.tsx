@@ -15,9 +15,8 @@ import type {
   VaultItemType,
 } from '@lockbox/types';
 import { getApiBaseUrl, setApiBaseUrl } from '../../lib/storage.js';
-import { loadFeatureFlags, saveFeatureFlags, getProviderConfig, setProviderConfig, testProviderConnection } from '@lockbox/ai';
-import type { SearchResult, SecurityAlert } from '@lockbox/ai';
-import { detectPasswordRules, generateCompliant } from '@lockbox/generator';
+import { loadFeatureFlags, saveFeatureFlags, getProviderConfig, setProviderConfig, testProviderConnection, SecurityCopilot, LifecycleTracker } from '@lockbox/ai';
+import type { SearchResult, SecurityAlert, RotationSchedule } from '@lockbox/ai';
 import type { PasswordRules, PasswordFieldMetadata } from '@lockbox/generator';
 import type { VaultHealthSummary, PasswordHealthReport, AIFeatureFlags, AIProviderConfig, AIProvider } from '@lockbox/types';
 type Tab = 'site' | 'vault' | 'generator' | 'totp';
@@ -28,8 +27,8 @@ type ViewState =
   | { view: 'add' }
   | { view: 'edit'; item: VaultItem }
   | { view: 'health'; filterBreached?: boolean }
-  | { view: 'ai-settings' };
-/** Send a message to the background service worker. */
+  | { view: 'ai-settings' }
+  | { view: 'chat' };
 async function sendMessage<T>(message: object): Promise<T> {
   return chrome.runtime.sendMessage(message) as Promise<T>;
 }
@@ -1721,6 +1720,31 @@ export default function App() {
   const [healthScore, setHealthScore] = useState<number | null>(null);
   const [breachedCount, setBreachedCount] = useState<number>(0);
   const [phishingWarning, setPhishingWarning] = useState<{ url: string; result: { safe: boolean; score: number; reasons: string[] } } | null>(null);
+
+  const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; id: string }>>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [securityScore, setSecurityScore] = useState<number | null>(null);
+  const [rotationMap, setRotationMap] = useState<Map<string, 'overdue' | 'due-soon'>>(new Map());
+
+  const handleChatSend = () => {
+    if (!chatInput.trim() || chatLoading) return;
+    const userMsg = { role: 'user' as const, content: chatInput.trim(), id: crypto.randomUUID() };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setChatLoading(true);
+    
+    // Placeholder response — will be replaced with real VaultAgent integration
+    setTimeout(() => {
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Chat requires an AI provider. Configure one in AI Settings to enable the assistant.',
+        id: crypto.randomUUID(),
+      }]);
+      setChatLoading(false);
+    }, 500);
+  };
+
   useEffect(() => {
     // Check if API URL is configured, then check unlock state
     getApiBaseUrl()
@@ -1741,13 +1765,36 @@ export default function App() {
   const loadVault = useCallback(() => {
     if (!unlocked) return;
     sendMessage<{ items: VaultItem[]; folders: Folder[] }>({ type: 'get-vault' })
-      .then(({ items, folders: f }) => {
+      .then(async ({ items, folders: f }) => {
         setAllItems(items);
         setFolders(f ?? []);
+        
         sendMessage<{ success: boolean; summary?: VaultHealthSummary }>({ type: 'run-health-analysis' })
           .then(res => { if (res.success && res.summary) setHealthScore(res.summary.overallScore); });
         sendMessage<{ success: boolean; breachedCount?: number }>({ type: 'get-breach-status' })
           .then(res => { if (res.success && res.breachedCount !== undefined) setBreachedCount(res.breachedCount); });
+
+        try {
+          const logins = items.filter(i => i.type === 'login') as LoginItem[];
+          
+          // Compute rotation schedules
+          const tracker = new LifecycleTracker();
+          const due = tracker.getDueItems(logins);
+          const map = new Map<string, 'overdue' | 'due-soon'>();
+          for (const schedule of due) {
+            if (schedule.status === 'overdue' || schedule.status === 'due-soon') {
+              map.set(schedule.itemId, schedule.status);
+            }
+          }
+          setRotationMap(map);
+
+          // Evaluate security posture
+          const copilot = new SecurityCopilot();
+          const posture = await copilot.evaluate(logins, {});
+          setSecurityScore(posture.score);
+        } catch (err) {
+          console.error('Failed to run AI features:', err);
+        }
       })
       .catch(console.error);
   }, [unlocked]);
@@ -1878,6 +1925,63 @@ export default function App() {
       </div>
     );
   }
+  if (viewState.view === 'chat') {
+    return (
+      <div className="flex flex-col h-[480px]">
+        {/* Header */}
+        <div className="flex items-center space-x-2 p-3 border-b border-white/[0.08]">
+          <button onClick={() => setViewState({ view: 'tabs' })} className="text-white/60 hover:text-white border-0 bg-transparent cursor-pointer p-1">←</button>
+          <span className="text-sm font-medium text-white">✨ Assistant</span>
+        </div>
+        
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-3">
+          {chatMessages.length === 0 && (
+            <div className="text-center text-white/40 text-xs mt-8">
+              <p className="text-2xl mb-2">✨</p>
+              <p>Ask me anything about your vault.</p>
+              <p className="mt-1">Try "find my GitHub password" or "generate a strong password"</p>
+            </div>
+          )}
+          {chatMessages.map(msg => (
+            <div key={msg.id} className={msg.role === 'user' 
+              ? 'ml-auto max-w-[85%] px-3 py-2 bg-indigo-600/80 text-white text-xs rounded-xl rounded-br-sm'
+              : 'mr-auto max-w-[85%] px-3 py-2 bg-white/[0.07] border border-white/[0.12] text-white text-xs rounded-xl rounded-bl-sm'
+            }>
+              {msg.content}
+            </div>
+          ))}
+          {chatLoading && (
+            <div className="mr-auto px-3 py-2 bg-white/[0.07] border border-white/[0.12] rounded-xl rounded-bl-sm">
+              <div className="flex space-x-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-1.5 h-1.5 rounded-full bg-white/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Input */}
+        <div className="p-3 border-t border-white/[0.08] flex space-x-2">
+          <input
+            value={chatInput}
+            onChange={e => setChatInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleChatSend()}
+            placeholder="Ask anything..."
+            className="flex-1 px-3 py-2 text-xs bg-white/[0.06] border border-white/[0.12] rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
+          />
+          <button
+            onClick={handleChatSend}
+            disabled={!chatInput.trim() || chatLoading}
+            className="px-3 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white text-xs rounded-lg font-medium transition-colors disabled:opacity-40 cursor-pointer"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'site', label: '🌐 Site' },
@@ -1923,17 +2027,36 @@ export default function App() {
               )}
             </div>
           )}
+
+          {unlocked && securityScore !== null && (
+            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+              securityScore >= 80 ? 'bg-emerald-500/20 text-emerald-400' :
+              securityScore >= 50 ? 'bg-amber-500/20 text-amber-400' :
+              'bg-red-500/20 text-red-400'
+            }`}>
+              {securityScore}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
           {unlocked && (
-            <button
-              onClick={() => setViewState({ view: 'ai-settings' })}
-              title="AI Settings"
-              className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
-            >
-              🤖
-            </button>
+            <>
+              <button
+                onClick={() => setViewState({ view: 'chat' })}
+                className="p-1.5 rounded-lg text-white/50 hover:bg-white/[0.06] hover:text-white transition-colors"
+                title="Assistant"
+              >
+                <span className="text-sm">✨</span>
+              </button>
+              <button
+                onClick={() => setViewState({ view: 'ai-settings' })}
+                title="AI Settings"
+                className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
+              >
+                🤖
+              </button>
+            </>
           )}
           <button
             onClick={handleLock}
@@ -1944,7 +2067,6 @@ export default function App() {
           </button>
         </div>
       </div>
-
       {/* Phishing Warning */}
       {phishingWarning && (
         <div className="px-3 py-2 bg-red-600/20 border-b border-red-400/30 flex items-center gap-2">
@@ -1984,6 +2106,7 @@ export default function App() {
             folders={folders}
             onSelectItem={(item) => setViewState({ view: 'detail', item })}
             onAddItem={() => setViewState({ view: 'add' })}
+            rotationMap={rotationMap}
           />
         )}
         {activeTab === 'generator' && <GeneratorTab />}
