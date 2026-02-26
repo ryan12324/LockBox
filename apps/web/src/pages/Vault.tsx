@@ -161,6 +161,12 @@ export default function Vault() {
           >
             ⭐ Favorites
           </button>
+          <button
+            onClick={() => navigate('/health')}
+            className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-white/[0.08] text-white/70"
+          >
+            🛡️ Security
+          </button>
 
           <div className="pt-2 pb-1">
             <p className="px-3 text-xs font-semibold text-white/30 uppercase tracking-wider">Types</p>
