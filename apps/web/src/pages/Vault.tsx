@@ -35,6 +35,7 @@ export default function Vault() {
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolder, setEditingFolder] = useState<{ id: string; name: string } | null>(null);
   const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
+  const [corruptItems, setCorruptItems] = useState<EncryptedItem[]>([]);
 
   const loadVault = useCallback(async () => {
     if (!session || !userKey) return;
@@ -43,18 +44,23 @@ export default function Vault() {
       const res = await api.vault.list(session.token) as { items: EncryptedItem[]; folders: Folder[] };
       setFolders(res.folders);
 
-      const decrypted = await Promise.all(
+      const decrypted: VaultItem[] = [];
+      const corrupt: EncryptedItem[] = [];
+
+      await Promise.all(
         res.items
           .filter((i) => !i.deletedAt)
           .map(async (i) => {
             try {
-              return await decryptVaultItem(i.encryptedData, userKey, i.id, i.revisionDate);
+              const d = await decryptVaultItem(i.encryptedData, userKey, i.id, i.revisionDate);
+              decrypted.push(d);
             } catch {
-              return null;
+              corrupt.push(i);
             }
           }),
       );
-      setItems(decrypted.filter(Boolean) as VaultItem[]);
+      setItems(decrypted);
+      setCorruptItems(corrupt);
     } catch (err) {
       console.error('Failed to load vault:', err);
     } finally {
@@ -290,7 +296,7 @@ export default function Vault() {
             <div className="flex items-center justify-center h-32 text-gray-500 dark:text-gray-400">
               Loading vault...
             </div>
-          ) : filteredItems.length === 0 ? (
+          ) : filteredItems.length === 0 && corruptItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
               <div className="text-5xl mb-4">{search ? '🔍' : '🔐'}</div>
               <p className="text-lg font-medium">
@@ -326,6 +332,32 @@ export default function Vault() {
                     </button>
                   )}
                   {item.favorite && <span className="text-yellow-500">⭐</span>}
+                </div>
+              ))}
+              {corruptItems.map((ci) => (
+                <div
+                  key={ci.id}
+                  className="bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800 p-4 flex items-center gap-4"
+                >
+                  <div className="text-2xl">⚠️</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 dark:text-white">Undecryptable item</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">Type: {ci.type} · Created: {new Date(ci.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!session) return;
+                      try {
+                        await api.vault.deleteItem(ci.id, session.token);
+                        loadVault();
+                      } catch (err) {
+                        console.error('Failed to delete corrupt item:', err);
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors"
+                  >
+                    Delete
+                  </button>
                 </div>
               ))}
             </div>
