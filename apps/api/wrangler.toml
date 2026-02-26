@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "lockbox-vault"
-database_id = "placeholder-replace-at-deploy"
+database_id = "a62712d1-c9c6-4ebe-a805-fb6f1e69cb4a"
 migrations_dir = "drizzle"
 
 [durable_objects]
