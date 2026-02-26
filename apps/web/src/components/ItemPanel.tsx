@@ -139,9 +139,27 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
 
   const handleSave = async () => {
     if (!session || !userKey) return;
+
+    // Validation
     if (!name.trim()) {
       setError('Name is required');
       return;
+    }
+    if (type === 'login') {
+      if (!username.trim() && !password.trim()) {
+        setError('Username or password is required');
+        return;
+      }
+    }
+    if (type === 'card') {
+      if (!number.trim()) {
+        setError('Card number is required');
+        return;
+      }
+      if (!expMonth || !expYear.trim()) {
+        setError('Expiration date is required');
+        return;
+      }
     }
 
     setLoading(true);
