@@ -51,12 +51,12 @@ vaultRoutes.post('/items', async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body) return c.json({ error: 'Invalid JSON' }, 400);
 
-  const { type, encryptedData, folderId, tags, favorite } = body as Record<string, unknown>;
+  const { id: clientId, type, encryptedData, folderId, tags, favorite, revisionDate: clientRevisionDate } = body as Record<string, unknown>;
   if (!type || !encryptedData) return c.json({ error: 'Missing required fields' }, 400);
 
   const db = createDb(c.env.DB);
   const now = new Date().toISOString();
-  const id = crypto.randomUUID();
+  const id = (clientId as string) || crypto.randomUUID();
 
   await db.insert(vaultItems).values({
     id,
@@ -66,7 +66,7 @@ vaultRoutes.post('/items', async (c) => {
     folderId: (folderId as string) ?? null,
     tags: tags ? JSON.stringify(tags) : null,
     favorite: favorite ? 1 : 0,
-    revisionDate: now,
+    revisionDate: (clientRevisionDate as string) || now,
     createdAt: now,
   });
 
@@ -92,7 +92,7 @@ vaultRoutes.put('/items/:id', async (c) => {
     .get();
   if (!existing) return c.json({ error: 'Not found' }, 404);
 
-  const { encryptedData, folderId, tags, favorite } = body as Record<string, unknown>;
+  const { encryptedData, folderId, tags, favorite, revisionDate: clientRevisionDate } = body as Record<string, unknown>;
   const now = new Date().toISOString();
 
   await db
@@ -102,7 +102,7 @@ vaultRoutes.put('/items/:id', async (c) => {
       folderId: folderId !== undefined ? (folderId as string | null) : existing.folderId,
       tags: tags !== undefined ? JSON.stringify(tags) : existing.tags,
       favorite: favorite !== undefined ? (favorite ? 1 : 0) : existing.favorite,
-      revisionDate: now,
+      revisionDate: (clientRevisionDate as string) || now,
     })
     .where(eq(vaultItems.id, itemId));
 
