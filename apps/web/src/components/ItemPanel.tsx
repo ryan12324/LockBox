@@ -138,7 +138,10 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
   }
 
   const handleSave = async () => {
-    if (!session || !userKey) return;
+    if (!session || !userKey) {
+      setError('Session expired — please log in again');
+      return;
+    }
 
     // Validation
     if (!name.trim()) {
@@ -166,67 +169,104 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
     setError('');
 
     try {
-      const now = new Date().toISOString();
       const isAdd = currentMode === 'add';
-      const itemId = isAdd ? crypto.randomUUID() : item!.id;
-      
-      const baseItem = {
-        id: itemId,
-        type,
-        name,
-        folderId: folderId || undefined,
-        tags: item?.tags || [],
-        favorite,
-        createdAt: isAdd ? now : item!.createdAt,
-        updatedAt: now,
-        revisionDate: now,
-      };
 
-      let vaultItem: VaultItem;
-      
-      if (type === 'login') {
-        vaultItem = {
-          ...baseItem,
-          type: 'login',
-          username,
-          password,
-          uris: uris.filter(u => u.trim()),
-          totp: totpSecret || undefined,
-        } as LoginItem;
-      } else if (type === 'note') {
-        vaultItem = {
-          ...baseItem,
-          type: 'note',
-          content,
-        } as SecureNoteItem;
-      } else {
-        vaultItem = {
-          ...baseItem,
-          type: 'card',
-          cardholderName,
-          number,
-          expMonth,
-          expYear,
-          cvv,
-          brand: brand || undefined,
-        } as CardItem;
+      // Build the vault item (id/revisionDate filled after server responds for new items)
+      function buildVaultItem(id: string, revisionDate: string, createdAt: string): VaultItem {
+        const baseItem = {
+          id,
+          type,
+          name,
+          folderId: folderId || undefined,
+          tags: item?.tags || [],
+          favorite,
+          createdAt,
+          updatedAt: revisionDate,
+          revisionDate,
+        };
+
+        if (type === 'login') {
+          return {
+            ...baseItem,
+            type: 'login',
+            username,
+            password,
+            uris: uris.filter(u => u.trim()),
+            totp: totpSecret || undefined,
+          } as LoginItem;
+        } else if (type === 'note') {
+          return {
+            ...baseItem,
+            type: 'note',
+            content,
+          } as SecureNoteItem;
+        } else {
+          return {
+            ...baseItem,
+            type: 'card',
+            cardholderName,
+            number,
+            expMonth,
+            expYear,
+            cvv,
+            brand: brand || undefined,
+          } as CardItem;
+        }
       }
-
-      const encryptedData = await encryptVaultItem(vaultItem, userKey, itemId, now);
 
       if (isAdd) {
-        await api.vault.createItem(
-          { type, encryptedData, folderId: folderId || undefined, tags: [], favorite },
+        // Two-step create: the server generates its own id + revisionDate,
+        // so we must create first with temporary encryption, then re-encrypt
+        // with the server's values so AAD matches on future decrypts.
+        const tempId = crypto.randomUUID();
+        const tempDate = new Date().toISOString();
+        const tempItem = buildVaultItem(tempId, tempDate, tempDate);
+        const tempEncrypted = await encryptVaultItem(tempItem, userKey, tempId, tempDate);
+
+        const createRes = await api.vault.createItem(
+          { type, encryptedData: tempEncrypted, folderId: folderId || undefined, tags: [], favorite },
+          session.token
+        ) as { item: { id: string; revisionDate: string; createdAt: string } };
+
+        // Re-encrypt with the server-assigned id + revisionDate for correct AAD
+        const serverId = createRes.item.id;
+        const serverRevisionDate = createRes.item.revisionDate;
+        const serverCreatedAt = createRes.item.createdAt ?? serverRevisionDate;
+        const finalItem = buildVaultItem(serverId, serverRevisionDate, serverCreatedAt);
+        const finalEncrypted = await encryptVaultItem(finalItem, userKey, serverId, serverRevisionDate);
+
+        await api.vault.updateItem(
+          serverId,
+          { encryptedData: finalEncrypted, folderId: folderId || undefined, tags: [], favorite },
           session.token
         );
       } else {
+        // Two-step update: server overrides revisionDate, so we update first
+        // with temporary encryption, then re-encrypt with the server's revisionDate.
+        const itemId = item!.id;
+        const tempDate = new Date().toISOString();
+        const tempItem = buildVaultItem(itemId, tempDate, item!.createdAt);
+        const tempEncrypted = await encryptVaultItem(tempItem, userKey, itemId, tempDate);
+
+        const updateRes = await api.vault.updateItem(
+          itemId,
+          { encryptedData: tempEncrypted, folderId: folderId || undefined, tags: item!.tags, favorite },
+          session.token
+        ) as { item: { id: string; revisionDate: string; createdAt: string } };
+
+        // Re-encrypt with the server's actual revisionDate for correct AAD
+        const serverRevisionDate = updateRes.item.revisionDate;
+        const serverCreatedAt = updateRes.item.createdAt ?? item!.createdAt;
+        const finalItem = buildVaultItem(itemId, serverRevisionDate, serverCreatedAt);
+        const finalEncrypted = await encryptVaultItem(finalItem, userKey, itemId, serverRevisionDate);
+
         await api.vault.updateItem(
           itemId,
-          { encryptedData, folderId: folderId || undefined, tags: item!.tags, favorite },
+          { encryptedData: finalEncrypted, folderId: folderId || undefined, tags: item!.tags, favorite },
           session.token
         );
       }
-      
+
       onSave();
     } catch (err) {
       console.error('Failed to save item:', err);
