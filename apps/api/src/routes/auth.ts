@@ -43,7 +43,7 @@ async function hashAuthHash(authHash: string, email: string): Promise<string> {
     {
       name: 'PBKDF2',
       hash: 'SHA-256',
-      salt,
+      salt: salt as Uint8Array<ArrayBuffer>,
       iterations: PBKDF2_SERVER_ITERATIONS,
     },
     keyMaterial,
