@@ -33,3 +33,29 @@ export type {
 
 // Type guards
 export { isLoginItem, isSecureNoteItem, isCardItem } from './guards';
+
+// AI types
+export type {
+  AIProvider,
+  AIProviderConfig,
+  AIFeatureFlags,
+  PasswordIssue,
+  PasswordHealthReport,
+  VaultHealthSummary,
+  BreachCheckResult,
+  AgentToolCall,
+  AgentToolResult,
+  AgentEvent,
+  SecurityPosture,
+  SecurityAction,
+  PhishingResult,
+  SecurityAlert,
+  SearchResult,
+  DuplicateGroup,
+  FormMetadata,
+  FieldMetadata,
+  FieldClassification,
+  FormClassification,
+  PasswordRules,
+  RotationSchedule,
+} from './ai';
