@@ -48,12 +48,33 @@ export const api = {
     me: (token: string) => request('/api/auth/me', { token }),
   },
   vault: {
-    list: (token: string) => request('/api/vault', { token }),
+    list: (token: string, params?: Record<string, string>) => {
+      const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+      return request(`/api/vault${qs}`, { token });
+    },
+    createItem: (body: object, token: string) =>
+      request('/api/vault/items', { method: 'POST', body: JSON.stringify(body), token }),
+    updateItem: (id: string, body: object, token: string) =>
+      request(`/api/vault/items/${id}`, { method: 'PUT', body: JSON.stringify(body), token }),
+    deleteItem: (id: string, token: string) =>
+      request(`/api/vault/items/${id}`, { method: 'DELETE', token }),
+    restoreItem: (id: string, token: string) =>
+      request(`/api/vault/items/${id}/restore`, { method: 'POST', token }),
+    permanentDelete: (id: string, token: string) =>
+      request(`/api/vault/items/${id}/permanent`, { method: 'DELETE', token }),
+    createFolder: (body: object, token: string) =>
+      request('/api/vault/folders', { method: 'POST', body: JSON.stringify(body), token }),
+    updateFolder: (id: string, body: object, token: string) =>
+      request(`/api/vault/folders/${id}`, { method: 'PUT', body: JSON.stringify(body), token }),
+    deleteFolder: (id: string, token: string) =>
+      request(`/api/vault/folders/${id}`, { method: 'DELETE', token }),
   },
   sync: {
     pull: (token: string, since?: string) => {
       const qs = since ? `?since=${encodeURIComponent(since)}` : '';
       return request(`/api/sync${qs}`, { token });
     },
+    push: (body: object, token: string) =>
+      request('/api/sync/push', { method: 'POST', body: JSON.stringify(body), token }),
   },
 };
