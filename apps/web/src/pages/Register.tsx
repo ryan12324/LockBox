@@ -98,26 +98,26 @@ export default function Register() {
     }
   }
 
-  const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-blue-500', 'bg-green-500'];
+  const strengthColors = ['bg-red-500/80', 'bg-orange-500/80', 'bg-yellow-500/80', 'bg-blue-500/80', 'bg-green-500/80'];
   const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">🔐 Lockbox</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Create your secure vault</p>
+          <h1 className="text-3xl font-bold text-white">🔐 Lockbox</h1>
+          <p className="mt-2 text-white/50">Create your secure vault</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 space-y-5">
+        <form onSubmit={handleSubmit} className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-8 space-y-5">
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-red-700 dark:text-red-400 text-sm">
+            <div className="bg-red-500/10 border border-red-400/20 rounded-lg p-3 text-red-300 backdrop-blur-sm text-sm">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-white/70 mb-1">
               Email
             </label>
             <input
@@ -126,13 +126,13 @@ export default function Register() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-white/[0.2]"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-white/70 mb-1">
               Master Password
             </label>
             <input
@@ -141,7 +141,7 @@ export default function Register() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-white/[0.2]"
               placeholder="Strong master password"
             />
             {strength && (
@@ -150,11 +150,11 @@ export default function Register() {
                   {[0, 1, 2, 3, 4].map((i) => (
                     <div
                       key={i}
-                      className={`h-1.5 flex-1 rounded-full ${i <= strength.score ? strengthColors[strength.score] : 'bg-gray-200 dark:bg-gray-600'}`}
+                      className={`h-1.5 flex-1 rounded-full ${i <= strength.score ? strengthColors[strength.score] : 'bg-white/10'}`}
                     />
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-white/40 mt-1">
                   {strengthLabels[strength.score]}
                   {strength.feedback.length > 0 && ` — ${strength.feedback[0]}`}
                 </p>
@@ -163,7 +163,7 @@ export default function Register() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-white/70 mb-1">
               Confirm Password
             </label>
             <input
@@ -172,26 +172,26 @@ export default function Register() {
               required
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-white/[0.2]"
               placeholder="Confirm master password"
             />
           </div>
 
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-amber-700 dark:text-amber-400 text-xs">
+          <div className="bg-amber-500/10 border border-amber-400/20 rounded-lg p-3 text-amber-300 backdrop-blur-sm text-xs">
             ⚠️ Your master password cannot be recovered. An emergency kit PDF will be downloaded — store it safely.
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
+            className="w-full py-2.5 px-4 bg-indigo-600/80 hover:bg-indigo-500/90 disabled:opacity-40 text-white backdrop-blur-sm font-medium rounded-lg transition-colors"
           >
             {loading ? 'Creating vault...' : 'Create Vault'}
           </button>
 
-          <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-center text-sm text-white/50">
             Already have an account?{' '}
-            <Link to="/login" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+            <Link to="/login" className="text-indigo-300 hover:text-indigo-200 hover:underline">
               Sign in
             </Link>
           </p>
