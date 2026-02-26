@@ -78,6 +78,7 @@ syncRoutes.post('/push', async (c) => {
       folderId?: string;
       tags?: string[];
       favorite?: boolean;
+      revisionDate?: string;
     }>;
   };
 
@@ -92,7 +93,7 @@ syncRoutes.post('/push', async (c) => {
     const now = new Date().toISOString();
 
     if (change.operation === 'create') {
-      const id = crypto.randomUUID();
+      const id = change.itemId || crypto.randomUUID();
       await db.insert(vaultItems).values({
         id,
         userId,
@@ -101,10 +102,10 @@ syncRoutes.post('/push', async (c) => {
         folderId: change.folderId ?? null,
         tags: change.tags ? JSON.stringify(change.tags) : null,
         favorite: change.favorite ? 1 : 0,
-        revisionDate: now,
+        revisionDate: (change.revisionDate as string) || now,
         createdAt: now,
       });
-      results.push({ itemId: id, status: 'ok', serverRevisionDate: now });
+      results.push({ itemId: id, status: 'ok', serverRevisionDate: (change.revisionDate as string) || now });
     } else if (change.operation === 'update' && change.itemId) {
       const existing = await db
         .select()
@@ -124,11 +125,11 @@ syncRoutes.post('/push', async (c) => {
           folderId: change.folderId !== undefined ? change.folderId : existing.folderId,
           tags: change.tags !== undefined ? JSON.stringify(change.tags) : existing.tags,
           favorite: change.favorite !== undefined ? (change.favorite ? 1 : 0) : existing.favorite,
-          revisionDate: now,
+          revisionDate: (change.revisionDate as string) || now,
         })
         .where(eq(vaultItems.id, change.itemId));
 
-      results.push({ itemId: change.itemId, status: 'ok', serverRevisionDate: now });
+      results.push({ itemId: change.itemId, status: 'ok', serverRevisionDate: (change.revisionDate as string) || now });
     } else if (change.operation === 'delete' && change.itemId) {
       const existing = await db
         .select()
