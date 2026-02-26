@@ -12,7 +12,7 @@
 import { deriveKey, decryptUserKey, makeAuthHash, fromBase64 } from '@lockbox/crypto';
 import { totp as generateTOTP, parseOtpAuthUri } from '@lockbox/totp';
 import { generatePassword, generatePassphrase } from '@lockbox/generator';
-import type { VaultItem, LoginItem, KdfConfig } from '@lockbox/types';
+import type { VaultItem, LoginItem, KdfConfig, Folder } from '@lockbox/types';
 import { api } from '../lib/api.js';
 import {
   getSessionToken,
@@ -27,6 +27,7 @@ let masterKey: Uint8Array | null = null;
 let userKey: Uint8Array | null = null;
 let vaultItems: Map<string, VaultItem> = new Map();
 let lastSyncTimestamp: string | null = null;
+let folders: Folder[] = [];
 
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
 
@@ -46,6 +47,22 @@ async function decryptVaultItem(
   }
 }
 
+async function encryptVaultItem(
+  item: VaultItem,
+  itemId: string,
+  revisionDate: string,
+): Promise<string | null> {
+  if (!userKey) return null;
+  try {
+    const { encryptString, toUtf8 } = await import('@lockbox/crypto');
+    const plaintext = JSON.stringify(item);
+    const aad = toUtf8(`${itemId}:${revisionDate}`);
+    return encryptString(plaintext, userKey.slice(0, 32), aad);
+  } catch {
+    return null;
+  }
+}
+
 // ─── Vault loading ────────────────────────────────────────────────────────────
 
 async function loadVault(token: string): Promise<void> {
@@ -58,9 +75,11 @@ async function loadVault(token: string): Promise<void> {
         revisionDate: string;
         deletedAt: string | null;
       }>;
+      folders: Folder[];
     };
 
     vaultItems.clear();
+    folders = res.folders ?? [];
     for (const item of res.items) {
       if (item.deletedAt) continue;
       const decrypted = await decryptVaultItem(item.encryptedData, item.id, item.revisionDate);
@@ -120,6 +139,7 @@ function lock() {
   masterKey = null;
   userKey = null;
   vaultItems.clear();
+  folders = [];
   lastSyncTimestamp = null;
   chrome.alarms.clear(LOCK_ALARM);
 }
@@ -135,7 +155,14 @@ type Message =
   | { type: 'generate-password'; opts: Parameters<typeof generatePassword>[0] }
   | { type: 'generate-passphrase'; opts: Parameters<typeof generatePassphrase>[0] }
   | { type: 'activity' }
-  | { type: 'is-unlocked' };
+  | { type: 'is-unlocked' }
+  | { type: 'create-item'; itemData: object; itemType: string }
+  | { type: 'update-item'; id: string; itemData: object }
+  | { type: 'delete-item'; id: string }
+  | { type: 'get-folders' }
+  | { type: 'create-folder'; name: string }
+  | { type: 'update-folder'; id: string; name: string }
+  | { type: 'delete-folder'; id: string };
 
 async function handleMessage(
   message: Message,
@@ -196,7 +223,7 @@ async function handleMessage(
 
     case 'get-vault': {
       if (!userKey) return { items: [], locked: true };
-      return { items: Array.from(vaultItems.values()), locked: false };
+      return { items: Array.from(vaultItems.values()), folders, locked: false };
     }
 
     case 'get-totp': {
@@ -229,6 +256,133 @@ async function handleMessage(
 
     case 'is-unlocked': {
       return { unlocked: userKey !== null };
+    }
+
+    // ─── Vault item CRUD ───────────────────────────────────────────────────
+
+    case 'create-item': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const now = new Date().toISOString();
+        const itemId = crypto.randomUUID();
+        const itemType = message.itemType as VaultItem['type'];
+        const vaultItem: VaultItem = {
+          ...(message.itemData as VaultItem),
+          id: itemId,
+          type: itemType,
+          createdAt: now,
+          updatedAt: now,
+          revisionDate: now,
+        };
+        const encryptedData = await encryptVaultItem(vaultItem, itemId, now);
+        if (!encryptedData) return { success: false, error: 'Encryption failed' };
+        await api.vault.createItem({
+          id: itemId,
+          type: itemType,
+          encryptedData,
+          folderId: vaultItem.folderId,
+          tags: vaultItem.tags ?? [],
+          favorite: vaultItem.favorite ?? false,
+          revisionDate: now,
+        }, token);
+        vaultItems.set(itemId, vaultItem);
+        return { success: true, item: vaultItem };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to create item' };
+      }
+    }
+
+    case 'update-item': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const existing = vaultItems.get(message.id);
+        if (!existing) return { success: false, error: 'Item not found' };
+        const now = new Date().toISOString();
+        const vaultItem: VaultItem = {
+          ...(message.itemData as VaultItem),
+          id: message.id,
+          type: existing.type,
+          createdAt: existing.createdAt,
+          updatedAt: now,
+          revisionDate: now,
+        };
+        const encryptedData = await encryptVaultItem(vaultItem, message.id, now);
+        if (!encryptedData) return { success: false, error: 'Encryption failed' };
+        await api.vault.updateItem(message.id, {
+          encryptedData,
+          folderId: vaultItem.folderId,
+          tags: vaultItem.tags ?? [],
+          favorite: vaultItem.favorite ?? false,
+          revisionDate: now,
+        }, token);
+        vaultItems.set(message.id, vaultItem);
+        return { success: true, item: vaultItem };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to update item' };
+      }
+    }
+
+    case 'delete-item': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.vault.deleteItem(message.id, token);
+        vaultItems.delete(message.id);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to delete item' };
+      }
+    }
+
+    // ─── Folder CRUD ──────────────────────────────────────────────────────
+
+    case 'get-folders': {
+      return { folders };
+    }
+
+    case 'create-folder': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.vault.createFolder({ name: message.name }, token) as { folder: Folder };
+        folders.push(res.folder);
+        return { success: true, folder: res.folder };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to create folder' };
+      }
+    }
+
+    case 'update-folder': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.vault.updateFolder(message.id, { name: message.name }, token);
+        const idx = folders.findIndex(f => f.id === message.id);
+        if (idx >= 0) folders[idx] = { ...folders[idx], name: message.name };
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to update folder' };
+      }
+    }
+
+    case 'delete-folder': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.vault.deleteFolder(message.id, token);
+        folders = folders.filter(f => f.id !== message.id);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to delete folder' };
+      }
     }
 
     default:

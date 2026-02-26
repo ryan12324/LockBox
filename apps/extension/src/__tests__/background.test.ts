@@ -74,7 +74,14 @@ type MessageType =
   | 'generate-password'
   | 'generate-passphrase'
   | 'activity'
-  | 'is-unlocked';
+  | 'is-unlocked'
+  | 'create-item'
+  | 'update-item'
+  | 'delete-item'
+  | 'get-folders'
+  | 'create-folder'
+  | 'update-folder'
+  | 'delete-folder';
 
 const VALID_MESSAGE_TYPES: MessageType[] = [
   'unlock',
@@ -86,6 +93,13 @@ const VALID_MESSAGE_TYPES: MessageType[] = [
   'generate-passphrase',
   'activity',
   'is-unlocked',
+  'create-item',
+  'update-item',
+  'delete-item',
+  'get-folders',
+  'create-folder',
+  'update-folder',
+  'delete-folder',
 ];
 
 describe('background message types', () => {
@@ -99,10 +113,17 @@ describe('background message types', () => {
     expect(VALID_MESSAGE_TYPES).toContain('generate-passphrase');
     expect(VALID_MESSAGE_TYPES).toContain('activity');
     expect(VALID_MESSAGE_TYPES).toContain('is-unlocked');
+    expect(VALID_MESSAGE_TYPES).toContain('create-item');
+    expect(VALID_MESSAGE_TYPES).toContain('update-item');
+    expect(VALID_MESSAGE_TYPES).toContain('delete-item');
+    expect(VALID_MESSAGE_TYPES).toContain('get-folders');
+    expect(VALID_MESSAGE_TYPES).toContain('create-folder');
+    expect(VALID_MESSAGE_TYPES).toContain('update-folder');
+    expect(VALID_MESSAGE_TYPES).toContain('delete-folder');
   });
 
-  it('has 9 message types total', () => {
-    expect(VALID_MESSAGE_TYPES).toHaveLength(9);
+  it('has 16 message types total', () => {
+    expect(VALID_MESSAGE_TYPES).toHaveLength(16);
   });
 });
 
