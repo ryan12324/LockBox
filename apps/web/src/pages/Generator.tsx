@@ -50,26 +50,26 @@ export default function Generator() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+    <div className="min-h-screen p-6">
       <div className="max-w-lg mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(-1)} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+          <button onClick={() => navigate(-1)} className="text-white/40 hover:text-white/70">
             ← Back
           </button>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Password Generator</h1>
+          <h1 className="text-2xl font-bold text-white">Password Generator</h1>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 space-y-6">
+        <div className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6 space-y-6">
           {/* Tab toggle */}
-          <div className="flex rounded-lg bg-gray-100 dark:bg-gray-700 p-1">
+          <div className="flex rounded-lg bg-white/[0.06] p-1">
             {(['password', 'passphrase'] as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors capitalize ${
                   tab === t
-                    ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400'
+                    ? 'bg-white/[0.12] text-white shadow-sm'
+                    : 'text-white/40'
                 }`}
               >
                 {t}
@@ -78,12 +78,12 @@ export default function Generator() {
           </div>
 
           {/* Generated output */}
-          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+          <div className="bg-white/[0.04] rounded-lg p-4 border border-white/[0.06]">
             <p
               data-testid="generated-password"
-              className="font-mono text-lg text-gray-900 dark:text-white break-all min-h-[2rem]"
+              className="font-mono text-lg text-white break-all min-h-[2rem]"
             >
-              {generated || <span className="text-gray-400">Click generate to create a password</span>}
+              {generated || <span className="text-white/30">Click generate to create a password</span>}
             </p>
             {strength && generated && (
               <div className="mt-3">
@@ -91,11 +91,11 @@ export default function Generator() {
                   {[0, 1, 2, 3, 4].map((i) => (
                     <div
                       key={i}
-                      className={`h-1.5 flex-1 rounded-full ${i <= strength.score ? strengthColors[strength.score] : 'bg-gray-200 dark:bg-gray-600'}`}
+                      className={`h-1.5 flex-1 rounded-full ${i <= strength.score ? strengthColors[strength.score] : 'bg-white/10'}`}
                     />
                   ))}
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <p className="text-xs text-white/40 mt-1">
                   {strengthLabels[strength.score]} · {Math.round(strength.entropy)} bits entropy
                 </p>
               </div>
@@ -106,7 +106,7 @@ export default function Generator() {
           {tab === 'password' ? (
             <div className="space-y-4">
               <div>
-                <label className="flex justify-between text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="flex justify-between text-sm font-medium text-white/70 mb-2">
                   <span>Length</span>
                   <span className="font-mono">{length}</span>
                 </label>
@@ -128,12 +128,12 @@ export default function Generator() {
                 { label: 'Exclude ambiguous (0O1lI)', value: excludeAmbiguous, set: setExcludeAmbiguous },
               ].map(({ label, value, set }) => (
                 <label key={label} className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
+                  <span className="text-sm text-white/70">{label}</span>
                   <input
                     type="checkbox"
                     checked={value}
                     onChange={(e) => set(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 rounded"
+                    className="w-4 h-4 text-indigo-500 rounded border-white/20 bg-white/10"
                   />
                 </label>
               ))}
@@ -141,7 +141,7 @@ export default function Generator() {
           ) : (
             <div className="space-y-4">
               <div>
-                <label className="flex justify-between text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label className="flex justify-between text-sm font-medium text-white/70 mb-2">
                   <span>Word Count</span>
                   <span className="font-mono">{wordCount}</span>
                 </label>
@@ -156,7 +156,7 @@ export default function Generator() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-white/70 mb-1">
                   Separator
                 </label>
                 <input
@@ -164,7 +164,7 @@ export default function Generator() {
                   value={separator}
                   onChange={(e) => setSeparator(e.target.value)}
                   maxLength={3}
-                  className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center font-mono"
+                  className="w-20 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white text-center font-mono"
                 />
               </div>
 
@@ -173,12 +173,12 @@ export default function Generator() {
                 { label: 'Include a number', value: includeNumber, set: setIncludeNumber },
               ].map(({ label, value, set }) => (
                 <label key={label} className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm text-gray-700 dark:text-gray-300">{label}</span>
+                  <span className="text-sm text-white/70">{label}</span>
                   <input
                     type="checkbox"
                     checked={value}
                     onChange={(e) => set(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 rounded"
+                    className="w-4 h-4 text-indigo-500 rounded border-white/20 bg-white/10"
                   />
                 </label>
               ))}
@@ -189,14 +189,14 @@ export default function Generator() {
           <div className="flex gap-3">
             <button
               onClick={generate}
-              className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+              className="flex-1 py-2.5 bg-indigo-600/80 hover:bg-indigo-500/90 text-white font-medium rounded-lg backdrop-blur-sm transition-colors"
             >
               🎲 Generate
             </button>
             {generated && (
               <button
                 onClick={copyToClipboard}
-                className="px-4 py-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg transition-colors"
+                className="px-4 py-2.5 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 font-medium rounded-lg transition-colors"
               >
                 {copied ? '✓ Copied' : '📋 Copy'}
               </button>
