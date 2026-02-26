@@ -39,7 +39,7 @@ jobs:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
 
       - name: Deploy to Pages
-        run: bunx wrangler pages deploy dist --project-name=lockbox-web
+        run: bunx wrangler pages deploy --commit-dirty=true
         working-directory: apps/web
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

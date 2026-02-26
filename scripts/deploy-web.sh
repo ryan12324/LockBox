@@ -100,7 +100,7 @@ ok "Build complete"
 # ── 5. Deploy to Cloudflare Pages ────────────────────────────────────
 info "Deploying to Cloudflare Pages..."
 cd "$WEB_DIR"
-if ! DEPLOY_OUTPUT=$($WRANGLER pages deploy dist --project-name="$PROJECT_NAME" 2>&1); then
+if ! DEPLOY_OUTPUT=$($WRANGLER pages deploy --commit-dirty=true 2>&1); then
   echo "$DEPLOY_OUTPUT"
   fail "Pages deploy failed. See output above."
 fi
