@@ -12,9 +12,9 @@ import ImportExport from './pages/ImportExport.js';
 const AUTO_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session, isLocked } = useAuthStore();
+  const { session, userKey, isLocked } = useAuthStore();
   if (!session) return <Navigate to="/login" replace />;
-  if (isLocked) return <Navigate to="/unlock" replace />;
+  if (isLocked || !userKey) return <Navigate to="/unlock" replace />;
   return <>{children}</>;
 }
 

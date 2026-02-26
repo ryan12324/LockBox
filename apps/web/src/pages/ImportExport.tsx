@@ -98,11 +98,13 @@ export default function ImportExport() {
           revisionDate,
         );
         await api.vault.createItem({
+          id: itemId,
           type: item.type,
           encryptedData,
           folderId: item.folderId,
           tags: item.tags,
           favorite: item.favorite,
+          revisionDate,
         }, session.token);
         successCount++;
       } catch (err) {
