@@ -7,12 +7,96 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { generatePassword, generatePassphrase, evaluateStrength } from '@lockbox/generator';
 import { totp as generateTOTP, getRemainingSeconds } from '@lockbox/totp';
 import type { VaultItem, LoginItem } from '@lockbox/types';
+import { getApiBaseUrl, setApiBaseUrl } from '../../lib/storage.js';
 
 type Tab = 'site' | 'vault' | 'generator' | 'totp';
 
 /** Send a message to the background service worker. */
 async function sendMessage<T>(message: object): Promise<T> {
   return chrome.runtime.sendMessage(message) as Promise<T>;
+}
+
+// ─── Setup Screen ──────────────────────────────────────────────────────────
+
+function SetupView({ onComplete }: { onComplete: () => void }) {
+  const [url, setUrl] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+
+    const trimmed = url.trim().replace(/\/+$/, '');
+    if (!trimmed) {
+      setError('Please enter your vault URL');
+      return;
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      setError('Invalid URL. Example: https://lockbox-api.you.workers.dev');
+      return;
+    }
+
+    if (parsed.protocol !== 'https:') {
+      setError('URL must use HTTPS');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await setApiBaseUrl(parsed.origin);
+      onComplete();
+    } catch {
+      setError('Failed to save URL');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔐</div>
+        <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>Lockbox</h1>
+        <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>Connect to your server</p>
+      </div>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {error && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '8px 12px', fontSize: '12px', color: '#dc2626' }}>
+            {error}
+          </div>
+        )}
+
+        <div>
+          <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '4px' }}>Vault URL</label>
+          <input
+            type="url"
+            required
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://lockbox-api.you.workers.dev"
+            style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '13px', outline: 'none' }}
+          />
+          <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+            The URL of your self-hosted Lockbox vault
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          disabled={saving}
+          style={{ padding: '10px', background: saving ? '#94a3b8' : '#4f46e5', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer' }}
+        >
+          {saving ? 'Saving...' : 'Continue'}
+        </button>
+      </form>
+    </div>
+  );
 }
 
 // ─── Locked State ─────────────────────────────────────────────────────────────
@@ -392,6 +476,7 @@ function TotpTab({ items }: { items: VaultItem[] }) {
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const [apiConfigured, setApiConfigured] = useState<boolean | null>(null);
   const [unlocked, setUnlocked] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('site');
   const [allItems, setAllItems] = useState<VaultItem[]>([]);
@@ -399,13 +484,18 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if already unlocked
-    sendMessage<{ unlocked: boolean }>({ type: 'is-unlocked' })
-      .then(({ unlocked: isUnlocked }) => {
-        setUnlocked(isUnlocked);
+    // Check if API URL is configured, then check unlock state
+    getApiBaseUrl().then((url) => {
+      if (!url) {
+        setApiConfigured(false);
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+        return;
+      }
+      setApiConfigured(true);
+      return sendMessage<{ unlocked: boolean }>({ type: 'is-unlocked' })
+        .then(({ unlocked: isUnlocked }) => setUnlocked(isUnlocked))
+        .finally(() => setLoading(false));
+    }).catch(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -440,6 +530,10 @@ export default function App() {
         Loading...
       </div>
     );
+  }
+
+  if (!apiConfigured) {
+    return <SetupView onComplete={() => setApiConfigured(true)} />;
   }
 
   if (!unlocked) {
