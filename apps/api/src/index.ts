@@ -8,6 +8,7 @@ import { authRoutes } from './routes/auth.js';
 import { vaultRoutes } from './routes/vault.js';
 import { syncRoutes } from './routes/sync.js';
 import { wsRoutes } from './routes/ws.js';
+import { aiRoutes } from './routes/ai.js';
 import { corsMiddleware, securityHeaders, requestSizeLimit } from './middleware/security.js';
 import { VaultSyncHub } from './sync-hub.js';
 
@@ -32,6 +33,7 @@ app.route('/api/auth', authRoutes);
 app.route('/api/vault', vaultRoutes);
 app.route('/api/sync', syncRoutes);
 app.route('/api/sync', wsRoutes);
+app.route('/api/ai', aiRoutes);
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));

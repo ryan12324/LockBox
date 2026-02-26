@@ -7,7 +7,7 @@ export default defineConfig({
     name: 'Lockbox Password Manager',
     description: 'Zero-knowledge self-hosted password manager',
     version: '0.0.1',
-    permissions: ['storage', 'activeTab', 'alarms', 'scripting'],
+    permissions: ['storage', 'activeTab', 'alarms', 'scripting', 'webNavigation'],
     host_permissions: ['<all_urls>'],
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",

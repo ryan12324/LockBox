@@ -5,17 +5,19 @@ import { encryptVaultItem } from '../lib/crypto.js';
 import type { VaultItem, LoginItem, SecureNoteItem, CardItem, Folder, VaultItemType } from '@lockbox/types';
 import { totp, getRemainingSeconds, base32Decode, parseOtpAuthUri } from '@lockbox/totp';
 import { generatePassword } from '@lockbox/generator';
-
+import { SecurityAlertEngine } from '@lockbox/ai';
+import type { SecurityAlert } from '@lockbox/ai';
 interface ItemPanelProps {
   mode: 'view' | 'edit' | 'add';
   item: VaultItem | null;
   folders: Folder[];
+  items: VaultItem[];
   onSave: () => void;
   onDelete: () => void;
   onClose: () => void;
 }
 
-export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClose }: ItemPanelProps) {
+export default function ItemPanel({ mode, item, folders, items, onSave, onDelete, onClose }: ItemPanelProps) {
   const { session, userKey } = useAuthStore();
   
   const [currentMode, setCurrentMode] = useState(mode);
@@ -28,7 +30,8 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
   const [name, setName] = useState(item?.name || '');
   const [folderId, setFolderId] = useState(item?.folderId || '');
   const [favorite, setFavorite] = useState(item?.favorite || false);
-  
+  const [tags, setTags] = useState<string[]>(item?.tags || []);
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   // Login State
   const loginItem = item?.type === 'login' ? (item as LoginItem) : null;
   const [username, setUsername] = useState(loginItem?.username || '');
@@ -59,7 +62,8 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState('');
   const [totpRemaining, setTotpRemaining] = useState(0);
-
+  const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   // Sync state if item changes
   useEffect(() => {
     setCurrentMode(mode);
@@ -67,7 +71,7 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
     setName(item?.name || '');
     setFolderId(item?.folderId || '');
     setFavorite(item?.favorite || false);
-    
+    setTags(item?.tags || []);
     if (item?.type === 'login') {
       const l = item as LoginItem;
       setUsername(l.username || '');
@@ -130,6 +134,42 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
     return () => clearInterval(intervalId);
   }, [currentMode, type, totpSecret]);
 
+  // Tags generation
+  useEffect(() => {
+    if (currentMode !== 'view') {
+      import('@lockbox/ai').then((ai: any) => {
+        if (typeof ai.suggestTags === 'function') {
+           // Provide all necessary data for suggestion
+           const data = { name, uris, type };
+           Promise.resolve(ai.suggestTags(data)).then(res => setSuggestedTags(res || []));
+        } else {
+           setSuggestedTags(['personal', 'work', 'finance', 'shopping']);
+        }
+      }).catch(() => {
+        setSuggestedTags(['personal', 'work', 'finance', 'shopping']);
+      });
+    }
+  }, [currentMode, name, uris, type]);
+
+  // Security Alerts
+  useEffect(() => {
+    if (currentMode === 'view' && type === 'login' && uris.length > 0 && uris[0]) {
+      try {
+        const engine = new SecurityAlertEngine();
+        const loginItems = items.filter(i => i.type === 'login') as LoginItem[];
+        const newAlerts = engine.checkUrl(uris[0], loginItems);
+        // Only keep alerts for this item specifically or global ones for the url
+        // Wait, checkUrl returns alerts for matching items. We want only alerts for THIS item
+        // or general URL alerts like phishing/http.
+        const relevantAlerts = newAlerts.filter(a => !a.itemId || a.itemId === item?.id);
+        setAlerts(relevantAlerts);
+      } catch (err) {
+        console.warn('Failed to run security alerts:', err);
+      }
+    } else {
+      setAlerts([]);
+    }
+  }, [currentMode, type, uris, items, item]);
   async function copyToClipboard(text: string, field: string) {
     if (!text) return;
     await navigator.clipboard.writeText(text);
@@ -178,7 +218,7 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
         type,
         name,
         folderId: folderId || undefined,
-        tags: item?.tags || [],
+        tags: tags,
         favorite,
         createdAt: isAdd ? now : item!.createdAt,
         updatedAt: now,
@@ -228,7 +268,7 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
         // Send revisionDate so server stores the same value used in AAD
         await api.vault.updateItem(
           itemId,
-          { encryptedData, folderId: folderId || undefined, tags: item!.tags, favorite, revisionDate: now },
+          { encryptedData, folderId: folderId || undefined, tags, favorite, revisionDate: now },
           session.token
         );
       }
@@ -413,6 +453,28 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                     <span className="text-sm font-medium text-white/70">Favorite</span>
                   </label>
                 </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Tags</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {tags.map(t => (
+                    <span key={t} className="px-2 py-1 text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full flex items-center gap-1">
+                      {t}
+                      <button type="button" onClick={() => setTags(tags.filter(x => x !== t))} className="hover:text-white">✕</button>
+                    </span>
+                  ))}
+                </div>
+                {suggestedTags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <span className="text-xs text-white/40 self-center">Suggested:</span>
+                    {suggestedTags.filter(t => !tags.includes(t)).map(t => (
+                      <button type="button" key={t} onClick={() => setTags([...tags, t])} className="px-2 py-1 text-xs bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 rounded-full text-indigo-300 transition-colors">
+                        + {t}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -789,6 +851,63 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {alerts.length > 0 && (
+                <div className="space-y-3 pt-4 border-t border-white/[0.1]">
+                  <span className="block text-xs font-semibold text-white/30 uppercase mb-2">Security Alerts</span>
+                  {alerts.filter(a => !dismissedAlerts.has(a.title)).map((alert, i) => {
+                    const isCritical = alert.severity === 'critical';
+                    const isWarning = alert.severity === 'warning';
+                    return (
+                      <div key={i} className={`p-4 rounded-xl border flex items-start gap-3 backdrop-blur-md ${
+                        isCritical ? 'bg-red-500/10 border-red-500/30 text-red-100' :
+                        isWarning ? 'bg-amber-500/10 border-amber-500/30 text-amber-100' :
+                        'bg-blue-500/10 border-blue-500/30 text-blue-100'
+                      }`}>
+                        <div className="text-xl">
+                          {isCritical ? '🛡️' : isWarning ? '⚠️' : 'ℹ️'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start gap-2">
+                            <h4 className={`font-medium text-sm ${
+                              isCritical ? 'text-red-300' : isWarning ? 'text-amber-300' : 'text-blue-300'
+                            }`}>{alert.title}</h4>
+                            {alert.dismissible && (
+                              <button 
+                                onClick={() => setDismissedAlerts(prev => new Set([...prev, alert.title]))}
+                                className="text-white/40 hover:text-white/80 p-1 -mr-2 -mt-2"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-sm mt-1 opacity-80 leading-relaxed">{alert.message}</p>
+                          {alert.action && (
+                            <button
+                              onClick={() => {
+                                if (alert.action?.type === 'generate-password') {
+                                  setCurrentMode('edit');
+                                  setType('login');
+                                  const pw = generatePassword({ length: 20, uppercase: true, lowercase: true, digits: true, symbols: true });
+                                  setPassword(pw);
+                                  setShowPassword(true);
+                                }
+                              }}
+                              className={`mt-3 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                isCritical ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200' :
+                                isWarning ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200' :
+                                'bg-blue-500/20 hover:bg-blue-500/30 text-blue-200'
+                              }`}
+                            >
+                              {alert.action.label}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

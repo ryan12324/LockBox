@@ -14,6 +14,8 @@ import { totp as generateTOTP, parseOtpAuthUri } from '@lockbox/totp';
 import { checkBatch } from '@lockbox/crypto';
 import { analyzeVaultHealth, analyzeItem } from '@lockbox/ai';
 import { generatePassword, generatePassphrase } from '@lockbox/generator';
+import { PhishingDetector, SecurityAlertEngine, SemanticSearch, KeywordEmbeddingProvider } from '@lockbox/ai';
+import type { SearchResult, SecurityAlert } from '@lockbox/ai';
 import type { VaultItem, LoginItem, KdfConfig, Folder } from '@lockbox/types';
 import { api } from '../lib/api.js';
 import {
@@ -31,6 +33,8 @@ let vaultItems: Map<string, VaultItem> = new Map();
 let lastSyncTimestamp: string | null = null;
 let folders: Folder[] = [];
 let cachedBreachStatus: { breachedCount: number; results: Map<string, any> } = { breachedCount: 0, results: new Map() };
+const phishingDetector = new PhishingDetector();
+let searchEngine: SemanticSearch | null = null;
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
 
 async function decryptVaultItem(
@@ -90,6 +94,7 @@ async function loadVault(token: string): Promise<void> {
       }
     }
     lastSyncTimestamp = new Date().toISOString();
+    searchEngine = null; // Reset search index when vault is reloaded
   } catch (err) {
     console.error('[Lockbox] Failed to load vault:', err);
   }
@@ -166,6 +171,7 @@ function lock() {
   folders = [];
   lastSyncTimestamp = null;
   cachedBreachStatus = { breachedCount: 0, results: new Map() };
+  searchEngine = null;
   chrome.alarms.clear(LOCK_ALARM);
   chrome.alarms.clear(BREACH_ALARM);
 }
@@ -191,7 +197,10 @@ type Message =
   | { type: 'delete-folder'; id: string }
   | { type: 'run-health-analysis' }
   | { type: 'run-breach-check' }
-  | { type: 'get-breach-status' };
+  | { type: 'get-breach-status' }
+  | { type: 'search-vault'; query: string }
+  | { type: 'get-phishing-status'; tabId: number }
+  | { type: 'check-url-security'; url: string };
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -438,6 +447,45 @@ async function handleMessage(
     case 'get-breach-status': {
       return { success: true, ...cachedBreachStatus };
     }
+
+    case 'search-vault': {
+      if (!userKey) return { results: [] };
+      try {
+        if (!searchEngine) {
+          const provider = new KeywordEmbeddingProvider();
+          await provider.initialize();
+          searchEngine = new SemanticSearch(provider);
+          await searchEngine.index(Array.from(vaultItems.values()));
+        }
+        const results = await searchEngine.search(message.query, { limit: 10 });
+        return { results: results.map(r => ({ item: r.item, score: r.score, matchType: r.matchType })) };
+      } catch {
+        return { results: [] };
+      }
+    }
+
+    case 'get-phishing-status': {
+      try {
+        const data = await chrome.storage.session.get(`phishing_${message.tabId}`);
+        const status = data[`phishing_${message.tabId}`] ?? null;
+        return status;
+      } catch {
+        return null;
+      }
+    }
+
+    case 'check-url-security': {
+      if (!userKey) return { alerts: [] };
+      try {
+        const engine = new SecurityAlertEngine();
+        const logins = Array.from(vaultItems.values()).filter((i): i is LoginItem => i.type === 'login');
+        const alerts = engine.checkUrl(message.url, logins);
+        return { alerts };
+      } catch {
+        return { alerts: [] };
+      }
+    }
+
     default:
       return { error: 'Unknown message type' };
   }
@@ -452,6 +500,23 @@ export default defineBackground(() => {
       .then(sendResponse)
       .catch((err) => sendResponse({ error: err.message }));
     return true; // Keep message channel open for async response
+  });
+
+  // WebNavigation phishing check
+  chrome.webNavigation.onCompleted.addListener(async (details) => {
+    if (details.frameId !== 0) return;
+    const result = phishingDetector.analyzeUrl(details.url);
+    if (!result.safe) {
+      await chrome.storage.session.set({
+        [`phishing_${details.tabId}`]: { url: details.url, result },
+      });
+      chrome.tabs.sendMessage(details.tabId, {
+        type: 'phishing-warning',
+        url: details.url,
+        score: result.score,
+        reasons: result.reasons,
+      }).catch(() => {});
+    }
   });
 
   // Alarm listener

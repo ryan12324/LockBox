@@ -16,6 +16,9 @@ import type {
 } from '@lockbox/types';
 import { getApiBaseUrl, setApiBaseUrl } from '../../lib/storage.js';
 import { loadFeatureFlags, saveFeatureFlags, getProviderConfig, setProviderConfig, testProviderConnection } from '@lockbox/ai';
+import type { SearchResult, SecurityAlert } from '@lockbox/ai';
+import { detectPasswordRules, generateCompliant } from '@lockbox/generator';
+import type { PasswordRules, PasswordFieldMetadata } from '@lockbox/generator';
 import type { VaultHealthSummary, PasswordHealthReport, AIFeatureFlags, AIProviderConfig, AIProvider } from '@lockbox/types';
 type Tab = 'site' | 'vault' | 'generator' | 'totp';
 
@@ -1233,6 +1236,8 @@ function VaultTab({
   const [search, setSearch] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [semanticResults, setSemanticResults] = useState<SearchResult[] | null>(null);
+  const [searchingRemote, setSearchingRemote] = useState(false);
 
   async function copyToClipboard(text: string, id: string) {
     await navigator.clipboard.writeText(text);
@@ -1240,18 +1245,39 @@ function VaultTab({
     setTimeout(() => setCopied(null), 2000);
   }
 
-  const filtered = items.filter((i) => {
-    if (search) {
-      const q = search.toLowerCase();
-      if (
-        !i.name.toLowerCase().includes(q) &&
-        !(i.type === 'login' && (i as LoginItem).username?.toLowerCase().includes(q))
-      )
-        return false;
+  // Debounced semantic search
+  useEffect(() => {
+    if (!search || search.length < 2) {
+      setSemanticResults(null);
+      return;
     }
-    if (selectedFolderId && i.folderId !== selectedFolderId) return false;
-    return true;
-  });
+    setSearchingRemote(true);
+    const timer = setTimeout(() => {
+      sendMessage<{ results: SearchResult[] }>({ type: 'search-vault', query: search })
+        .then(res => setSemanticResults(res.results ?? null))
+        .catch(() => setSemanticResults(null))
+        .finally(() => setSearchingRemote(false));
+    }, 300);
+    return () => { clearTimeout(timer); setSearchingRemote(false); };
+  }, [search]);
+
+  // Use semantic results when available, fall back to local filter
+  const filtered = semanticResults && search.length >= 2
+    ? semanticResults
+      .map(r => r.item)
+      .filter(i => !selectedFolderId || i.folderId === selectedFolderId)
+    : items.filter((i) => {
+        if (search) {
+          const q = search.toLowerCase();
+          if (
+            !i.name.toLowerCase().includes(q) &&
+            !(i.type === 'login' && (i as LoginItem).username?.toLowerCase().includes(q))
+          )
+            return false;
+        }
+        if (selectedFolderId && i.folderId !== selectedFolderId) return false;
+        return true;
+      });
 
   return (
     <div className="flex flex-col h-full">
@@ -1259,7 +1285,7 @@ function VaultTab({
         <div className="flex gap-1">
           <input
             type="text"
-            placeholder="Search vault..."
+            placeholder="Search vault (semantic)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1 px-3 py-1.5 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
@@ -1272,6 +1298,10 @@ function VaultTab({
             +
           </button>
         </div>
+        {searchingRemote && <div className="text-[10px] text-indigo-300/60 px-1">Searching...</div>}
+        {semanticResults && search.length >= 2 && !searchingRemote && (
+          <div className="text-[10px] text-indigo-300/60 px-1">🔍 {semanticResults.length} semantic result{semanticResults.length !== 1 ? 's' : ''}</div>
+        )}
         {folders.length > 0 && (
           <select
             value={selectedFolderId ?? ''}
@@ -1416,6 +1446,8 @@ function GeneratorTab() {
   const [wordCount, setWordCount] = useState(5);
   const [generated, setGenerated] = useState('');
   const [copied, setCopied] = useState(false);
+  const [detectedRules, setDetectedRules] = useState<PasswordRules | null>(null);
+  const [detectingRules, setDetectingRules] = useState(false);
 
   const generate = useCallback(() => {
     if (mode === 'password') {
@@ -1514,6 +1546,72 @@ function GeneratorTab() {
           />
         </div>
       )}
+
+      {/* Smart generation section */}
+      <div className="border-t border-white/[0.08] pt-2 mt-1">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-1.5">Smart Generation</div>
+        <div className="flex gap-1.5">
+          <button
+            onClick={async () => {
+              setDetectingRules(true);
+              try {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab?.id) {
+                  const results = await chrome.tabs.sendMessage(tab.id, { type: 'get-password-field-metadata' });
+                  if (results) {
+                    const metadata: PasswordFieldMetadata = {
+                      minLength: results.minLength,
+                      maxLength: results.maxLength,
+                      pattern: results.pattern,
+                      title: results.title,
+                      ariaDescription: results.ariaDescription,
+                      nearbyText: results.nearbyText,
+                    };
+                    setDetectedRules(detectPasswordRules(metadata));
+                  } else {
+                    setDetectedRules(detectPasswordRules({}));
+                  }
+                } else {
+                  setDetectedRules(detectPasswordRules({}));
+                }
+              } catch {
+                setDetectedRules(detectPasswordRules({}));
+              } finally {
+                setDetectingRules(false);
+              }
+            }}
+            disabled={detectingRules}
+            className={`flex-1 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${detectingRules ? 'bg-white/40 cursor-not-allowed text-white/50' : 'bg-white/[0.08] hover:bg-white/[0.14] text-white/70'}`}
+          >
+            {detectingRules ? 'Detecting...' : '🔍 Detect Site Rules'}
+          </button>
+          {detectedRules && (
+            <button
+              onClick={() => {
+                const pw = generateCompliant(detectedRules);
+                setGenerated(pw);
+              }}
+              className="flex-1 py-1.5 text-xs bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-md font-semibold transition-colors cursor-pointer"
+            >
+              ✨ Generate Compliant
+            </button>
+          )}
+        </div>
+        {detectedRules && (
+          <div className="mt-1.5 p-2 bg-white/[0.04] border border-white/[0.06] rounded-md">
+            <div className="text-[10px] text-white/50">
+              Length: {detectedRules.minLength}–{detectedRules.maxLength}
+              {detectedRules.requireUppercase && ' · A-Z'}
+              {detectedRules.requireLowercase && ' · a-z'}
+              {detectedRules.requireDigit && ' · 0-9'}
+              {detectedRules.requireSpecial && ' · !@#'}
+              {detectedRules.allowedSpecialChars && ` (${detectedRules.allowedSpecialChars})`}
+              {detectedRules.forbiddenChars && ` · Forbidden: ${detectedRules.forbiddenChars}`}
+            </div>
+            <div className="text-[10px] text-white/30 mt-0.5">Source: {detectedRules.source}</div>
+          </div>
+        )}
+      </div>
 
       <div className="flex gap-1.5 mt-1">
         <button
@@ -1622,6 +1720,7 @@ export default function App() {
   const [viewState, setViewState] = useState<ViewState>({ view: 'tabs' });
   const [healthScore, setHealthScore] = useState<number | null>(null);
   const [breachedCount, setBreachedCount] = useState<number>(0);
+  const [phishingWarning, setPhishingWarning] = useState<{ url: string; result: { safe: boolean; score: number; reasons: string[] } } | null>(null);
   useEffect(() => {
     // Check if API URL is configured, then check unlock state
     getApiBaseUrl()
@@ -1668,6 +1767,20 @@ export default function App() {
       }
     });
   }, [unlocked, loadVault]);
+
+  // Check phishing status for current tab
+  useEffect(() => {
+    if (!unlocked) return;
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
+      if (tabs[0]?.id) {
+        const status = await sendMessage<{ url: string; result: { safe: boolean; score: number; reasons: string[] } } | null>({
+          type: 'get-phishing-status',
+          tabId: tabs[0].id,
+        });
+        if (status) setPhishingWarning(status);
+      }
+    });
+  }, [unlocked]);
 
   async function handleLock() {
     await sendMessage({ type: 'lock' });
@@ -1831,6 +1944,23 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {/* Phishing Warning */}
+      {phishingWarning && (
+        <div className="px-3 py-2 bg-red-600/20 border-b border-red-400/30 flex items-center gap-2">
+          <span className="text-sm">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-red-300">Phishing Risk ({Math.round(phishingWarning.result.score * 100)}%)</div>
+            <div className="text-[10px] text-red-300/70 truncate">{phishingWarning.result.reasons[0] ?? 'Suspicious site'}</div>
+          </div>
+          <button
+            onClick={() => setPhishingWarning(null)}
+            className="text-red-300/60 hover:text-red-200 text-xs bg-transparent border-0 cursor-pointer p-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-white/[0.1] bg-white/[0.02]">

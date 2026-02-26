@@ -64,3 +64,23 @@ export type {
   ClassificationResult,
 } from './autofill/classifier.js';
 export type { AutofillDecision } from './autofill/detector.js';
+
+// Security
+export { PhishingDetector } from './security/phishing.js';
+export type { PhishingResult, PhishingCheck } from './security/phishing.js';
+export { SecurityAlertEngine } from './security/alerts.js';
+export type { SecurityAlert, AlertSeverity, AlertType } from './security/alerts.js';
+
+// Search
+export { KeywordEmbeddingProvider, cosineSimilarity } from './search/embeddings.js';
+export type { EmbeddingProvider, ProgressCallback } from './search/embeddings.js';
+export { SemanticSearch } from './search/semantic.js';
+export type { SearchResult, SearchOptions } from './search/semantic.js';
+
+ // Categorization
+export { suggestTags, suggestFolder, detectDuplicates } from './categorize/categorizer.js';
+export type { DuplicateGroup } from './categorize/categorizer.js';
+
+// Contextual alerts
+export { ContextualAlertEngine } from './security/contextual.js';
+export type { BreachData } from './security/contextual.js';
