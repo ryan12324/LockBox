@@ -16,7 +16,7 @@ import androidx.room.RoomDatabase
  */
 @Database(
     entities = [VaultItemEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class VaultDatabase : RoomDatabase() {

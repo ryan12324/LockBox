@@ -137,7 +137,6 @@ describe('StoragePlugin interface', () => {
         id: 'item-123',
         encryptedData: 'base64-encrypted-blob',
         type: 'login',
-        iv: 'base64-iv',
         revisionDate: '2024-01-01T00:00:00.000Z',
         syncStatus: 'synced',
       })
@@ -180,7 +179,6 @@ describe('StoragePlugin interface', () => {
             id: 'item-1',
             encryptedData: 'blob-1',
             type: 'login',
-            iv: 'iv-1',
             revisionDate: '2024-01-01T00:00:00.000Z',
             syncStatus: 'synced',
           },

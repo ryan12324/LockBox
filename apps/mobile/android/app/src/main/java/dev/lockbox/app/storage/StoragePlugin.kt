@@ -26,7 +26,6 @@ data class VaultItemEntity(
     @PrimaryKey val id: String,
     val encryptedData: String,
     val type: String,
-    val iv: String,
     val revisionDate: String,
     val syncStatus: String, // 'synced' | 'pending_create' | 'pending_update' | 'pending_delete'
     val folderId: String? = null,
@@ -58,7 +57,6 @@ class StoragePlugin : Plugin() {
         val id = call.getString("id") ?: return call.reject("id is required")
         val encryptedData = call.getString("encryptedData") ?: return call.reject("encryptedData is required")
         val type = call.getString("type") ?: return call.reject("type is required")
-        val iv = call.getString("iv") ?: return call.reject("iv is required")
         val revisionDate = call.getString("revisionDate") ?: return call.reject("revisionDate is required")
         val syncStatus = call.getString("syncStatus") ?: return call.reject("syncStatus is required")
         val folderId = call.getString("folderId")
@@ -72,7 +70,6 @@ class StoragePlugin : Plugin() {
                     id = id,
                     encryptedData = encryptedData,
                     type = type,
-                    iv = iv,
                     revisionDate = revisionDate,
                     syncStatus = syncStatus,
                     folderId = folderId,
@@ -216,7 +213,6 @@ class StoragePlugin : Plugin() {
                             id = obj.getString("id"),
                             encryptedData = obj.getString("encryptedData"),
                             type = obj.getString("type"),
-                            iv = obj.getString("iv"),
                             revisionDate = obj.getString("revisionDate"),
                             syncStatus = obj.getString("syncStatus"),
                             folderId = obj.optString("folderId", null),
@@ -291,7 +287,6 @@ class StoragePlugin : Plugin() {
         obj.put("id", entity.id)
         obj.put("encryptedData", entity.encryptedData)
         obj.put("type", entity.type)
-        obj.put("iv", entity.iv)
         obj.put("revisionDate", entity.revisionDate)
         obj.put("syncStatus", entity.syncStatus)
         obj.put("folderId", entity.folderId ?: JSObject.NULL)

@@ -20,7 +20,6 @@ export interface StoredVaultItem {
   id: string;
   encryptedData: string;
   type: string;
-  iv: string;
   folderId?: string;
   tags: string[];
   favorite: boolean;
@@ -61,7 +60,6 @@ export interface StoragePlugin {
     id: string;
     encryptedData: string;
     type: string;
-    iv: string;
     folderId?: string;
     tags?: string[];
     favorite?: boolean;
@@ -92,7 +90,6 @@ export interface StoragePlugin {
     id: string;
     encryptedData: string;
     type: string;
-    iv: string;
     folderId?: string;
     tags?: string[];
     favorite?: boolean;

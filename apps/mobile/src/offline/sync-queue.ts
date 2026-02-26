@@ -25,7 +25,6 @@ export interface SyncVaultItem {
   id: string;
   type: string;
   encryptedData: string;
-  iv: string;
   revisionDate: string;
   folderId?: string;
   tags: string[];
@@ -46,18 +45,18 @@ export interface PushPayload {
     id: string;
     type: string;
     encryptedData: string;
-    iv: string;
     folderId?: string;
     tags?: string[];
     favorite?: boolean;
+    revisionDate?: string;
   }>;
   updated: Array<{
     id: string;
     encryptedData: string;
-    iv: string;
     folderId?: string;
     tags?: string[];
     favorite?: boolean;
+    revisionDate?: string;
   }>;
   deleted: string[];
 }
@@ -86,20 +85,20 @@ export function buildPushPayload(pendingItems: StoredVaultItem[]): PushPayload {
           id: item.id,
           type: item.type,
           encryptedData: item.encryptedData,
-          iv: item.iv,
           folderId: item.folderId,
           tags: item.tags.length > 0 ? item.tags : undefined,
           favorite: item.favorite || undefined,
+          revisionDate: item.revisionDate,
         });
         break;
       case 'pending_update':
         updated.push({
           id: item.id,
           encryptedData: item.encryptedData,
-          iv: item.iv,
           folderId: item.folderId,
           tags: item.tags.length > 0 ? item.tags : undefined,
           favorite: item.favorite || undefined,
+          revisionDate: item.revisionDate,
         });
         break;
       case 'pending_delete':
@@ -132,7 +131,6 @@ export async function mergeSyncResponse(
       id: item.id,
       encryptedData: item.encryptedData,
       type: item.type,
-      iv: item.iv,
       folderId: item.folderId,
       tags: item.tags,
       favorite: item.favorite,
@@ -158,7 +156,6 @@ export async function mergeSyncResponse(
       id: serverItem.id,
       encryptedData: serverItem.encryptedData,
       type: serverItem.type,
-      iv: serverItem.iv,
       folderId: serverItem.folderId,
       tags: serverItem.tags,
       favorite: serverItem.favorite,

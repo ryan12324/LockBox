@@ -21,7 +21,6 @@ function makeStoredItem(overrides: Partial<StoredVaultItem> = {}): StoredVaultIt
     id: 'item-1',
     encryptedData: 'encrypted-blob',
     type: 'login',
-    iv: 'base64-iv',
     tags: [],
     favorite: false,
     revisionDate: '2024-01-01T00:00:00.000Z',
@@ -35,7 +34,6 @@ function makeSyncItem(overrides: Partial<SyncVaultItem> = {}): SyncVaultItem {
     id: 'item-1',
     type: 'login',
     encryptedData: 'server-encrypted-blob',
-    iv: 'server-iv',
     revisionDate: '2024-06-01T00:00:00.000Z',
     tags: [],
     favorite: false,
@@ -115,19 +113,17 @@ describe('buildPushPayload', () => {
     expect(payload.deleted).toHaveLength(1);
   });
 
-  it('includes encryptedData and iv in created items', () => {
+  it('includes encryptedData in created items', () => {
     const items = [
       makeStoredItem({
         id: 'item-1',
         syncStatus: 'pending_create',
         encryptedData: 'my-encrypted-blob',
-        iv: 'my-iv',
         type: 'login',
       }),
     ];
     const payload = buildPushPayload(items);
     expect(payload.created[0].encryptedData).toBe('my-encrypted-blob');
-    expect(payload.created[0].iv).toBe('my-iv');
     expect(payload.created[0].type).toBe('login');
   });
 
