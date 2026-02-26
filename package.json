@@ -13,7 +13,8 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "deploy:api": "./scripts/deploy-backend.sh"
+    "deploy:api": "./scripts/deploy-backend.sh",
+    "deploy:web": "./scripts/deploy-web.sh"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.0.0",

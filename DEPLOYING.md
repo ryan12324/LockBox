@@ -40,7 +40,7 @@ The API is the only server-side component. Everything else is a client that talk
 
 ---
 
-## Quick Start: 1-Click Backend Deploy
+## Quick Start: 1-Click Deploy
 
 The fastest way to get the API running on your own Cloudflare account:
 
@@ -73,6 +73,41 @@ When it finishes, you'll see your API URL:
 
 Save that URL — you'll need it for every client.
 
+### 1-Click Web Vault Deploy
+
+Once the API is running, deploy the web vault with one command:
+
+```bash
+bun run deploy:web
+```
+
+This runs `scripts/deploy-web.sh`, which will:
+
+1. Prompt you to log in to Cloudflare (if not already authenticated)
+2. Ask for your API URL (or read it from `VITE_API_URL` env var / `.env.local`)
+3. Install dependencies and build all packages
+4. Deploy the web vault to Cloudflare Pages
+
+When it finishes, you'll see your Pages URL:
+
+```
+✓ Deployed to Cloudflare Pages
+
+  Web Vault: https://lockbox-web.pages.dev
+  API:       https://lockbox-api.YOUR_SUBDOMAIN.workers.dev
+```
+
+**Tip:** Save the API URL so you don't have to enter it every time:
+
+```bash
+echo "VITE_API_URL=https://lockbox-api.YOUR_SUBDOMAIN.workers.dev" > .env.local
+```
+
+You can also pass the API URL directly:
+
+```bash
+VITE_API_URL=https://lockbox-api.YOUR_SUBDOMAIN.workers.dev bun run deploy:web
+```
 ---
 
 ## GitHub Actions CI/CD

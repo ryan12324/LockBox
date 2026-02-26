@@ -185,14 +185,23 @@ You'll get your API URL:
   API URL: https://lockbox-api.YOUR_SUBDOMAIN.workers.dev
 ```
 
-### Build a Client
-
-Point any client at your API and build:
+### Deploy the Web Vault (1 minute)
 
 ```bash
-# Web vault
-VITE_API_URL=https://lockbox-api.YOUR_SUBDOMAIN.workers.dev bun run build --filter=@lockbox/web
+bun run deploy:web
+```
 
+The script will:
+
+1. ✅ Ask for your API URL (or read from `VITE_API_URL` / `.env.local`)
+2. ✅ Builds everything
+3. ✅ Deploys to Cloudflare Pages
+
+Your web vault will be live at `https://lockbox-web.pages.dev`.
+
+### Build Other Clients
+
+```bash
 # Browser extension
 VITE_API_URL=https://lockbox-api.YOUR_SUBDOMAIN.workers.dev bun run build --filter=@lockbox/extension
 ```
