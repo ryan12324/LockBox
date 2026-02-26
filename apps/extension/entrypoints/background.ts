@@ -11,6 +11,8 @@
 
 import { deriveKey, decryptUserKey, makeAuthHash, fromBase64 } from '@lockbox/crypto';
 import { totp as generateTOTP, parseOtpAuthUri } from '@lockbox/totp';
+import { checkBatch } from '@lockbox/crypto';
+import { analyzeVaultHealth, analyzeItem } from '@lockbox/ai';
 import { generatePassword, generatePassphrase } from '@lockbox/generator';
 import type { VaultItem, LoginItem, KdfConfig, Folder } from '@lockbox/types';
 import { api } from '../lib/api.js';
@@ -28,7 +30,7 @@ let userKey: Uint8Array | null = null;
 let vaultItems: Map<string, VaultItem> = new Map();
 let lastSyncTimestamp: string | null = null;
 let folders: Folder[] = [];
-
+let cachedBreachStatus: { breachedCount: number; results: Map<string, any> } = { breachedCount: 0, results: new Map() };
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
 
 async function decryptVaultItem(
@@ -125,6 +127,7 @@ function getMatchingItems(url: string): VaultItem[] {
 
 const LOCK_ALARM = 'lockbox-auto-lock';
 const SYNC_ALARM = 'lockbox-sync';
+const BREACH_ALARM = 'lockbox-breach-check';
 let lastActivity = Date.now();
 
 function scheduleAutoLock(timeoutMinutes: number) {
@@ -133,15 +136,38 @@ function scheduleAutoLock(timeoutMinutes: number) {
 
 function schedulePeriodSync() {
   chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 5 });
+  chrome.alarms.create(BREACH_ALARM, { periodInMinutes: 24 * 60 });
 }
 
+async function runBreachCheck(): Promise<{ breachedCount: number; results: Map<string, any> }> {
+  if (!userKey) return { breachedCount: 0, results: new Map() };
+  const loginItems: Array<{id: string, password: string}> = [];
+  for (const item of vaultItems.values()) {
+    if (item.type === 'login') {
+      const login = item as LoginItem;
+      if (login.password) {
+        loginItems.push({ id: login.id, password: login.password });
+      }
+    }
+  }
+  if (loginItems.length === 0) return { breachedCount: 0, results: new Map() };
+  const results = await checkBatch(loginItems);
+  let breachedCount = 0;
+  for (const [, result] of results) {
+    if (result.found) breachedCount++;
+  }
+  cachedBreachStatus = { breachedCount, results };
+  return cachedBreachStatus;
+}
 function lock() {
   masterKey = null;
   userKey = null;
   vaultItems.clear();
   folders = [];
   lastSyncTimestamp = null;
+  cachedBreachStatus = { breachedCount: 0, results: new Map() };
   chrome.alarms.clear(LOCK_ALARM);
+  chrome.alarms.clear(BREACH_ALARM);
 }
 
 // ─── Message handlers ─────────────────────────────────────────────────────────
@@ -162,8 +188,10 @@ type Message =
   | { type: 'get-folders' }
   | { type: 'create-folder'; name: string }
   | { type: 'update-folder'; id: string; name: string }
-  | { type: 'delete-folder'; id: string };
-
+  | { type: 'delete-folder'; id: string }
+  | { type: 'run-health-analysis' }
+  | { type: 'run-breach-check' }
+  | { type: 'get-breach-status' };
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -385,6 +413,31 @@ async function handleMessage(
       }
     }
 
+    case 'run-health-analysis': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      try {
+        const items = Array.from(vaultItems.values());
+        const logins = items.filter(i => i.type === 'login') as import('@lockbox/types').LoginItem[];
+        const summary = await analyzeVaultHealth(logins);
+        const reports = await Promise.all(logins.map(login => analyzeItem(login, logins)));
+        return { success: true, summary, reports };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Health analysis failed' };
+      }
+    }
+
+    case 'run-breach-check': {
+      try {
+        const result = await runBreachCheck();
+        return { success: true, ...result };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Breach check failed' };
+      }
+    }
+
+    case 'get-breach-status': {
+      return { success: true, ...cachedBreachStatus };
+    }
     default:
       return { error: 'Unknown message type' };
   }
@@ -411,6 +464,8 @@ export default defineBackground(() => {
       if (token && userKey) {
         await loadVault(token);
       }
+    } else if (alarm.name === BREACH_ALARM) {
+      await runBreachCheck();
     }
   });
 

@@ -15,15 +15,17 @@ import type {
   VaultItemType,
 } from '@lockbox/types';
 import { getApiBaseUrl, setApiBaseUrl } from '../../lib/storage.js';
-
+import { loadFeatureFlags, saveFeatureFlags, getProviderConfig, setProviderConfig, testProviderConnection } from '@lockbox/ai';
+import type { VaultHealthSummary, PasswordHealthReport, AIFeatureFlags, AIProviderConfig, AIProvider } from '@lockbox/types';
 type Tab = 'site' | 'vault' | 'generator' | 'totp';
 
 type ViewState =
   | { view: 'tabs' }
   | { view: 'detail'; item: VaultItem }
   | { view: 'add' }
-  | { view: 'edit'; item: VaultItem };
-
+  | { view: 'edit'; item: VaultItem }
+  | { view: 'health'; filterBreached?: boolean }
+  | { view: 'ai-settings' };
 /** Send a message to the background service worker. */
 async function sendMessage<T>(message: object): Promise<T> {
   return chrome.runtime.sendMessage(message) as Promise<T>;
@@ -949,6 +951,271 @@ function AddEditView({
     </div>
   );
 }
+// ─── Health Summary View ────────────────────────────────────────────────────────
+
+function HealthSummaryView({ onBack, filterBreached, allItems }: { onBack: () => void, filterBreached?: boolean, allItems: VaultItem[] }) {
+  const [summary, setSummary] = useState<VaultHealthSummary | null>(null);
+  const [reports, setReports] = useState<PasswordHealthReport[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const analyze = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await sendMessage<{ success: boolean; summary?: VaultHealthSummary; reports?: PasswordHealthReport[]; error?: string }>({
+        type: 'run-health-analysis'
+      });
+      if (result.success && result.summary && result.reports) {
+        setSummary(result.summary);
+        setReports(result.reports);
+      } else {
+        setError(result.error || 'Failed to analyze vault health');
+      }
+    } catch (err) {
+      setError('Error connecting to background service');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    analyze();
+  }, [analyze]);
+
+  const score = summary?.overallScore ?? 100;
+  const scoreColor = score < 40 ? 'text-red-400' : score < 70 ? 'text-amber-400' : score < 90 ? 'text-indigo-400' : 'text-emerald-400';
+  const scoreBg = score < 40 ? 'bg-red-400/20' : score < 70 ? 'bg-amber-400/20' : score < 90 ? 'bg-indigo-400/20' : 'bg-emerald-400/20';
+  const strokeColor = score < 40 ? '#f87171' : score < 70 ? '#fbbf24' : score < 90 ? '#818cf8' : '#34d399';
+
+  const displayReports = filterBreached
+    ? reports.filter(r => r.issues.some(i => i.type === 'breached'))
+    : reports.filter(r => r.issues.length > 0).sort((a, b) => b.issues.length - a.issues.length);
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.1]">
+        <div className="flex items-center gap-2">
+          <button onClick={onBack} className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors">
+            ←
+          </button>
+          <span className="text-sm font-semibold text-white">Security Health</span>
+        </div>
+        <button onClick={analyze} disabled={loading} className={`px-3 py-1.5 text-xs text-white rounded-md transition-colors ${loading ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90 cursor-pointer'}`}>
+          {loading ? 'Analyzing...' : 'Analyze Now'}
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-4">
+        {error && <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs">{error}</div>}
+
+        {loading && !summary ? (
+          <div className="text-center text-white/40 text-sm mt-10">Scanning vault...</div>
+        ) : summary && (
+          <>
+            <div className="flex items-center justify-center py-4">
+              <div className="relative flex items-center justify-center w-[80px] h-[80px]">
+                <svg className="absolute inset-0 w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-white/10" />
+                  <circle cx="50" cy="50" r="40" stroke={strokeColor} strokeWidth="8" fill="transparent" strokeDasharray={`${(score / 100) * 251.2} 251.2`} className="transition-all duration-1000 ease-out" />
+                </svg>
+                <div className="flex flex-col items-center justify-center z-10">
+                  <span className={`text-xl font-bold ${scoreColor}`}>{score}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white/[0.04] border border-white/[0.06] rounded-lg p-3 flex flex-col">
+                <span className="text-xs text-white/40 uppercase tracking-wider mb-1">Weak</span>
+                <span className="text-lg font-bold text-white">{summary.weak}</span>
+              </div>
+              <div className="bg-white/[0.04] border border-white/[0.06] rounded-lg p-3 flex flex-col">
+                <span className="text-xs text-white/40 uppercase tracking-wider mb-1">Reused</span>
+                <span className="text-lg font-bold text-white">{summary.reused}</span>
+              </div>
+              <div className="bg-white/[0.04] border border-white/[0.06] rounded-lg p-3 flex flex-col">
+                <span className="text-xs text-white/40 uppercase tracking-wider mb-1">Old</span>
+                <span className="text-lg font-bold text-white">{summary.old}</span>
+              </div>
+              <div className="bg-white/[0.04] border border-white/[0.06] rounded-lg p-3 flex flex-col">
+                <span className="text-xs text-white/40 uppercase tracking-wider mb-1">Breached</span>
+                <span className="text-lg font-bold text-red-400">{summary.breached}</span>
+              </div>
+            </div>
+
+            <div className="mt-2">
+              <h3 className="text-sm font-semibold text-white mb-2">{filterBreached ? 'Breached Items' : 'Top Issues'}</h3>
+              {displayReports.length === 0 ? (
+                <div className="text-center text-xs text-white/40 py-4 bg-white/[0.02] rounded-lg border border-white/[0.06]">No issues found!</div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {displayReports.slice(0, filterBreached ? undefined : 10).map((report, idx) => (
+                    <div key={idx} className="bg-white/[0.04] border border-white/[0.06] rounded-lg p-2.5">
+                      <div className="text-sm font-medium text-white mb-1.5 truncate">{allItems.find(i => i.id === report.itemId)?.name || 'Unknown Item'}</div>
+                      <div className="flex flex-wrap gap-1">
+                        {report.issues.map((i, iidx) => (
+                          <span key={iidx} className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${i.type === 'breached' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                            {i.type.toUpperCase()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── AI Settings View ─────────────────────────────────────────────────────────
+
+function AISettingsView({ onBack }: { onBack: () => void }) {
+  const [flags, setFlags] = useState<AIFeatureFlags | null>(null);
+  const [provider, setProvider] = useState<AIProvider>('openrouter');
+  const [apiKey, setApiKey] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [savedProvider, setSavedProvider] = useState<AIProviderConfig | undefined>(undefined);
+
+  useEffect(() => {
+    setFlags(loadFeatureFlags());
+    const config = getProviderConfig('openrouter');
+    if (config) {
+      setProvider(config.provider);
+      setSavedProvider(config);
+    } else {
+      const otherConfigs = ['openai', 'anthropic', 'google', 'ollama', 'vercel'].map(p => getProviderConfig(p as AIProvider)).filter(Boolean);
+      if (otherConfigs.length > 0) {
+        setProvider(otherConfigs[0]!.provider);
+        setSavedProvider(otherConfigs[0]);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (flags) {
+      saveFeatureFlags(flags);
+    }
+  }, [flags]);
+
+  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const p = e.target.value as AIProvider;
+    setProvider(p);
+    const config = getProviderConfig(p);
+    setSavedProvider(config);
+    setApiKey('');
+    setTestResult(null);
+  };
+
+  const handleTestAndSave = async () => {
+    if (provider !== 'ollama' && !apiKey && !savedProvider?.apiKey) {
+      setTestResult({ success: false, error: 'API key is required' });
+      return;
+    }
+
+    setTesting(true);
+    setTestResult(null);
+    const config: AIProviderConfig = { provider, apiKey: apiKey || savedProvider?.apiKey, enabled: true };
+
+    try {
+      const result = await testProviderConnection(config);
+      setTestResult(result);
+      if (result.success) {
+        setProviderConfig(config);
+        setSavedProvider(config);
+        setApiKey('');
+      }
+    } catch (err) {
+      setTestResult({ success: false, error: err instanceof Error ? err.message : 'Test failed' });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const toggleFlag = (key: keyof AIFeatureFlags) => {
+    if (!flags) return;
+    setFlags({ ...flags, [key]: !flags[key] });
+  };
+
+  const inputClass = "w-full px-3 py-2 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60";
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.1]">
+        <button onClick={onBack} className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors">
+          ←
+        </button>
+        <span className="text-sm font-semibold text-white">AI Settings</span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5">
+        <div>
+          <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-2">Features</h3>
+          <div className="flex flex-col gap-2">
+            {flags && [
+              { key: 'passwordHealth', label: 'Password Health', desc: 'Local security analysis' },
+              { key: 'breachMonitoring', label: 'Breach Monitoring', desc: 'Background HIBP checks' },
+              { key: 'smartAutofill', label: 'Smart Autofill', desc: 'ML form field detection' }
+            ].map((f) => (
+              <label key={f.key} className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={flags[f.key as keyof AIFeatureFlags] as boolean} onChange={() => toggleFlag(f.key as keyof AIFeatureFlags)} className="mt-1" />
+                <div>
+                  <div className="text-sm text-white font-medium">{f.label}</div>
+                  <div className="text-xs text-white/40">{f.desc}</div>
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-white/[0.1] pt-4">
+          <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-2">LLM Provider</h3>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="block text-xs font-medium text-white/70 mb-1">Provider</label>
+              <select value={provider} onChange={handleProviderChange} className={inputClass}>
+                <option value="openrouter" className="bg-slate-900">OpenRouter</option>
+                <option value="openai" className="bg-slate-900">OpenAI</option>
+                <option value="anthropic" className="bg-slate-900">Anthropic</option>
+                <option value="google" className="bg-slate-900">Google</option>
+                <option value="ollama" className="bg-slate-900">Ollama (Local)</option>
+                <option value="vercel" className="bg-slate-900">Workers AI / Vercel</option>
+              </select>
+            </div>
+
+            {provider !== 'ollama' && (
+              <div>
+                <label className="block text-xs font-medium text-white/70 mb-1">API Key {savedProvider?.apiKey && '(Saved)'}</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder={savedProvider?.apiKey ? "••••••••••••" : "sk-..."}
+                  className={inputClass}
+                />
+              </div>
+            )}
+
+            {testResult && (
+              <div className={`p-2 rounded-md text-xs border ${testResult.success ? 'bg-emerald-500/10 border-emerald-400/20 text-emerald-300' : 'bg-red-500/10 border-red-400/20 text-red-300'}`}>
+                {testResult.success ? '✓ Connection successful' : `✕ ${testResult.error}`}
+              </div>
+            )}
+
+            <button onClick={handleTestAndSave} disabled={testing} className={`px-3 py-2 text-xs text-white rounded-md font-semibold transition-colors ${testing ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90 cursor-pointer'}`}>
+              {testing ? 'Testing...' : 'Test & Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Vault Tab ────────────────────────────────────────────────────────────────
 
@@ -1353,7 +1620,8 @@ export default function App() {
   const [siteItems, setSiteItems] = useState<VaultItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewState, setViewState] = useState<ViewState>({ view: 'tabs' });
-
+  const [healthScore, setHealthScore] = useState<number | null>(null);
+  const [breachedCount, setBreachedCount] = useState<number>(0);
   useEffect(() => {
     // Check if API URL is configured, then check unlock state
     getApiBaseUrl()
@@ -1377,10 +1645,13 @@ export default function App() {
       .then(({ items, folders: f }) => {
         setAllItems(items);
         setFolders(f ?? []);
+        sendMessage<{ success: boolean; summary?: VaultHealthSummary }>({ type: 'run-health-analysis' })
+          .then(res => { if (res.success && res.summary) setHealthScore(res.summary.overallScore); });
+        sendMessage<{ success: boolean; breachedCount?: number }>({ type: 'get-breach-status' })
+          .then(res => { if (res.success && res.breachedCount !== undefined) setBreachedCount(res.breachedCount); });
       })
       .catch(console.error);
   }, [unlocked]);
-
   useEffect(() => {
     if (!unlocked) return;
 
@@ -1479,6 +1750,22 @@ export default function App() {
     );
   }
 
+  if (viewState.view === 'health') {
+    return (
+      <div className="flex flex-col h-[480px]">
+        <HealthSummaryView onBack={() => setViewState({ view: 'tabs' })} filterBreached={'filterBreached' in viewState ? viewState.filterBreached : undefined} allItems={allItems} />
+      </div>
+    );
+  }
+
+  if (viewState.view === 'ai-settings') {
+    return (
+      <div className="flex flex-col h-[480px]">
+        <AISettingsView onBack={() => setViewState({ view: 'tabs' })} />
+      </div>
+    );
+  }
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'site', label: '🌐 Site' },
     { id: 'vault', label: '🔒 Vault' },
@@ -1490,14 +1777,59 @@ export default function App() {
     <div className="flex flex-col h-[480px]">
       {/* Header */}
       <div className="flex justify-between items-center px-3 py-2.5 border-b border-white/[0.1] bg-indigo-600/20 backdrop-blur-xl">
-        <span className="text-sm font-bold text-white">🔐 Lockbox</span>
-        <button
-          onClick={handleLock}
-          title="Lock vault"
-          className="bg-white/[0.12] hover:bg-white/[0.2] border-0 rounded p-1.5 text-white text-xs cursor-pointer transition-colors"
-        >
-          Lock
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-bold text-white">🔐 Lockbox</span>
+          
+          {unlocked && (
+            <div 
+              className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition-opacity"
+              title="Vault Health Score"
+              onClick={() => setViewState({ view: 'health' })}
+            >
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center border-2 text-[10px] font-bold ${
+                healthScore === null ? 'border-white/20 text-white/50' :
+                healthScore < 40 ? 'border-red-400 text-red-400' :
+                healthScore < 70 ? 'border-amber-400 text-amber-400' :
+                healthScore < 90 ? 'border-indigo-400 text-indigo-400' :
+                'border-emerald-400 text-emerald-400'
+              }`}>
+                {healthScore ?? '-'}
+              </div>
+              
+              {breachedCount > 0 && (
+                <div 
+                  className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer hover:bg-red-600 transition-colors"
+                  title="Breached passwords found"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setViewState({ view: 'health', filterBreached: true });
+                  }}
+                >
+                  {breachedCount}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1">
+          {unlocked && (
+            <button
+              onClick={() => setViewState({ view: 'ai-settings' })}
+              title="AI Settings"
+              className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
+            >
+              🤖
+            </button>
+          )}
+          <button
+            onClick={handleLock}
+            title="Lock vault"
+            className="bg-white/[0.12] hover:bg-white/[0.2] border-0 rounded p-1.5 text-white text-xs cursor-pointer transition-colors"
+          >
+            Lock
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
