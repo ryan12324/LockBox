@@ -1,0 +1,1 @@
+{"version":3,"file":"passphrase.d.ts","sourceRoot":"","sources":["passphrase.ts"],"names":[],"mappings":"AAEA,MAAM,WAAW,iBAAiB;IAChC,SAAS,EAAE,MAAM,CAAC;IAClB,SAAS,EAAE,MAAM,CAAC;IAClB,UAAU,CAAC,EAAE,OAAO,CAAC;IACrB,aAAa,CAAC,EAAE,OAAO,CAAC;CACzB;AAeD,wBAAgB,kBAAkB,CAAC,IAAI,CAAC,EAAE,OAAO,CAAC,iBAAiB,CAAC,GAAG,MAAM,CAiC5E"}
