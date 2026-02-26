@@ -8,6 +8,9 @@ export default defineConfig({
     version: '0.0.1',
     permissions: ['storage', 'activeTab', 'alarms', 'scripting'],
     host_permissions: ['<all_urls>'],
+    content_security_policy: {
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+    },
   },
   vite: () => ({
     resolve: {
