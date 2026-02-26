@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Autofill service configuration for LockboxAutofillService.
+  This XML is referenced in AndroidManifest.xml via meta-data.
+-->
+<autofill-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="dev.lockbox.app.MainActivity" />

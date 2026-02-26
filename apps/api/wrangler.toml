@@ -1,0 +1,25 @@
+name = "lockbox-api"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lockbox-vault"
+database_id = "placeholder-replace-at-deploy"
+migrations_dir = "drizzle"
+
+[durable_objects]
+bindings = [{ name = "SYNC_HUB", class_name = "VaultSyncHub" }]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["VaultSyncHub"]
+
+[[ratelimits]]
+name = "AUTH_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 60

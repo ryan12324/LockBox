@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="boxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="lockGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="shackleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#6366f1" flood-opacity="0.3"/>
+    </filter>
+    <filter id="innerShadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="56" y="56" width="400" height="400" rx="80" ry="80" fill="url(#boxGrad)" filter="url(#shadow)"/>
+
+  <!-- Subtle grid pattern for texture -->
+  <rect x="56" y="56" width="400" height="400" rx="80" ry="80" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+
+  <!-- Lock body -->
+  <rect x="176" y="248" width="160" height="130" rx="20" ry="20" fill="url(#lockGrad)" filter="url(#innerShadow)"/>
+
+  <!-- Shackle (lock loop) -->
+  <path d="M 208 248 L 208 196 C 208 160 240 132 256 132 C 272 132 304 160 304 196 L 304 248"
+        fill="none" stroke="url(#shackleGrad)" stroke-width="28" stroke-linecap="round"/>
+
+  <!-- Keyhole -->
+  <circle cx="256" cy="300" r="16" fill="#6366f1"/>
+  <rect x="250" y="306" width="12" height="28" rx="4" fill="#6366f1"/>
+
+  <!-- Sparkle accents -->
+  <circle cx="132" cy="132" r="4" fill="rgba(255,255,255,0.5)"/>
+  <circle cx="380" cy="120" r="3" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="400" cy="380" r="5" fill="rgba(255,255,255,0.3)"/>
+</svg>

@@ -1,0 +1,38 @@
+{
+  "name": "@lockbox/extension",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Browser extension",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "test": "vitest run",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.37",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^9.0.0",
+    "jsdom": "^28.1.0",
+    "typescript": "^5.3.0",
+    "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@lockbox/crypto": "*",
+    "@lockbox/types": "*",
+    "@lockbox/totp": "*",
+    "@lockbox/generator": "*",
+    "@wxt-dev/module-react": "^1.1.5",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "wxt": "^0.20.18",
+    "zustand": "^5.0.11"
+  }
+}

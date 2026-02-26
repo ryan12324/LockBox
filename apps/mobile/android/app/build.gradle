@@ -1,0 +1,92 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-kapt'
+
+android {
+    namespace 'dev.lockbox.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "dev.lockbox.app"
+        minSdkVersion 26  // Required for AutofillService API
+        targetSdkVersion 34
+        versionCode 1
+        versionName "0.0.1"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        javaCompileOptions {
+            annotationProcessorOptions {
+                arguments += ["room.schemaLocation": "$projectDir/schemas"]
+            }
+        }
+    }
+
+    signingConfigs {
+        release {
+            def ksFile = System.getenv('LOCKBOX_KEYSTORE_FILE')
+            if (ksFile) {
+                storeFile file(ksFile)
+                storePassword System.getenv('LOCKBOX_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('LOCKBOX_KEY_ALIAS')
+                keyPassword System.getenv('LOCKBOX_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            def ksFile = System.getenv('LOCKBOX_KEYSTORE_FILE')
+            if (ksFile) {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            debuggable true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    // Capacitor core
+    implementation project(':capacitor-android')
+    implementation project(':capacitor-network')
+
+    // AndroidX
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+
+    // Biometric (BiometricPrompt — NOT deprecated FingerprintManager)
+    implementation 'androidx.biometric:biometric:1.1.0'
+
+    // Room (encrypted local storage)
+    implementation 'androidx.room:room-runtime:2.6.1'
+    implementation 'androidx.room:room-ktx:2.6.1'
+    kapt 'androidx.room:room-compiler:2.6.1'
+
+    // Security — encrypted SharedPreferences for biometric key storage
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
+    // Coroutines
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // JSON parsing
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.room:room-testing:2.6.1'
+}

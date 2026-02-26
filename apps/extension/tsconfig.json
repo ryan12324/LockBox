@@ -1,0 +1,11 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["chrome", "wxt/browser"]
+  },
+  "include": ["src", "lib", "entrypoints", ".wxt/wxt.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}
