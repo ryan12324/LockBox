@@ -6,7 +6,7 @@
 
 import { Hono } from 'hono';
 import { eq, and, ne } from 'drizzle-orm';
-import { argon2id } from 'hash-wasm';
+
 import { createDb } from '../db/index.js';
 import { users, sessions } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -16,13 +16,11 @@ type Variables = { userId: string };
 
 export const authRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
-// Argon2id parameters for server-side auth hash hashing
-const ARGON2_PARAMS = {
-  iterations: 3,
-  memorySize: 65536, // 64 MiB
-  parallelism: 4,
-  hashLength: 32,
-} as const;
+// PBKDF2 parameters for server-side auth hash hashing.
+// The auth hash is already high-entropy (derived client-side via Argon2id),
+// so PBKDF2 here is defense-in-depth for stored credentials.
+const PBKDF2_SERVER_ITERATIONS = 100_000;
+const HASH_LENGTH = 32;
 
 /** Derive a deterministic 16-byte salt from an email address using SHA-256. */
 async function emailToArgonSalt(email: string): Promise<Uint8Array> {
@@ -31,17 +29,30 @@ async function emailToArgonSalt(email: string): Promise<Uint8Array> {
   return new Uint8Array(hashBuffer).slice(0, 16);
 }
 
-/** Hash the client's authHash with Argon2id for server-side storage. */
+/** Hash the client's authHash with PBKDF2-SHA256 for server-side storage. */
 async function hashAuthHash(authHash: string, email: string): Promise<string> {
   const salt = await emailToArgonSalt(email);
-  const passwordBytes = new TextEncoder().encode(authHash);
-  const hash = await argon2id({
-    password: passwordBytes,
-    salt,
-    ...ARGON2_PARAMS,
-    outputType: 'hex',
-  });
-  return hash as string;
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(authHash),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits'],
+  );
+  const derivedBits = await crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt,
+      iterations: PBKDF2_SERVER_ITERATIONS,
+    },
+    keyMaterial,
+    HASH_LENGTH * 8,
+  );
+  // Return hex string
+  return Array.from(new Uint8Array(derivedBits))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /** Generate a cryptographically random session token (base64, 32 bytes). */
