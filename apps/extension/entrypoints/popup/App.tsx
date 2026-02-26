@@ -73,44 +73,27 @@ function SetupView({ onComplete }: { onComplete: () => void }) {
   }
 
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔐</div>
-        <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>Lockbox</h1>
-        <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+    <div className="p-6 flex flex-col gap-4">
+      <div className="text-center">
+        <div className="text-[32px] mb-2">🔐</div>
+        <h1 className="text-lg font-bold text-white">Lockbox</h1>
+        <p className="text-[13px] text-white/50 mt-1">
           Connect to your server
         </p>
       </div>
 
       <form
         onSubmit={handleSubmit}
-        style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+        className="flex flex-col gap-3"
       >
         {error && (
-          <div
-            style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '6px',
-              padding: '8px 12px',
-              fontSize: '12px',
-              color: '#dc2626',
-            }}
-          >
+          <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs">
             {error}
           </div>
         )}
 
         <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: 500,
-              color: '#374151',
-              marginBottom: '4px',
-            }}
-          >
+          <label className="block text-xs font-medium text-white/80 mb-1">
             Vault URL
           </label>
           <input
@@ -119,16 +102,9 @@ function SetupView({ onComplete }: { onComplete: () => void }) {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://lockbox-api.you.workers.dev"
-            style={{
-              width: '100%',
-              padding: '8px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '13px',
-              outline: 'none',
-            }}
+            className="w-full px-3 py-2 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
           />
-          <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px' }}>
+          <p className="text-[11px] text-white/40 mt-1">
             The URL of your self-hosted Lockbox vault
           </p>
         </div>
@@ -136,16 +112,7 @@ function SetupView({ onComplete }: { onComplete: () => void }) {
         <button
           type="submit"
           disabled={saving}
-          style={{
-            padding: '10px',
-            background: saving ? '#94a3b8' : '#4f46e5',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: saving ? 'not-allowed' : 'pointer',
-          }}
+          className={`px-3 py-2 text-white text-sm font-medium rounded-md backdrop-blur-sm transition-colors ${saving ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90'}`}
         >
           {saving ? 'Saving...' : 'Continue'}
         </button>
@@ -185,44 +152,27 @@ function LockedView({ onUnlock }: { onUnlock: () => void }) {
   }
 
   return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔐</div>
-        <h1 style={{ fontSize: '18px', fontWeight: 700, color: '#1e293b' }}>Lockbox</h1>
-        <p style={{ fontSize: '13px', color: '#64748b', marginTop: '4px' }}>
+    <div className="p-6 flex flex-col gap-4">
+      <div className="text-center">
+        <div className="text-[32px] mb-2">🔐</div>
+        <h1 className="text-lg font-bold text-white">Lockbox</h1>
+        <p className="text-[13px] text-white/50 mt-1">
           Sign in to your vault
         </p>
       </div>
 
       <form
         onSubmit={handleUnlock}
-        style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}
+        className="flex flex-col gap-3"
       >
         {error && (
-          <div
-            style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '6px',
-              padding: '8px 12px',
-              fontSize: '12px',
-              color: '#dc2626',
-            }}
-          >
+          <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs">
             {error}
           </div>
         )}
 
         <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: 500,
-              color: '#374151',
-              marginBottom: '4px',
-            }}
-          >
+          <label className="block text-xs font-medium text-white/80 mb-1">
             Email
           </label>
           <input
@@ -231,27 +181,12 @@ function LockedView({ onUnlock }: { onUnlock: () => void }) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            style={{
-              width: '100%',
-              padding: '8px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '13px',
-              outline: 'none',
-            }}
+            className="w-full px-3 py-2 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
           />
         </div>
 
         <div>
-          <label
-            style={{
-              display: 'block',
-              fontSize: '12px',
-              fontWeight: 500,
-              color: '#374151',
-              marginBottom: '4px',
-            }}
-          >
+          <label className="block text-xs font-medium text-white/80 mb-1">
             Master Password
           </label>
           <input
@@ -260,30 +195,14 @@ function LockedView({ onUnlock }: { onUnlock: () => void }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Master password"
-            style={{
-              width: '100%',
-              padding: '8px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '13px',
-              outline: 'none',
-            }}
+            className="w-full px-3 py-2 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
           />
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          style={{
-            padding: '10px',
-            background: loading ? '#94a3b8' : '#4f46e5',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
+          className={`px-3 py-2 text-white text-sm font-medium rounded-md backdrop-blur-sm transition-colors ${loading ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90'}`}
         >
           {loading ? 'Unlocking...' : 'Unlock Vault'}
         </button>
@@ -364,68 +283,26 @@ function ItemDetailView({
     fieldId: string,
     opts?: { hidden?: boolean; toggle?: () => void; shown?: boolean }
   ) => (
-    <div style={{ marginBottom: '8px' }}>
-      <div
-        style={{
-          fontSize: '10px',
-          fontWeight: 600,
-          color: '#94a3b8',
-          textTransform: 'uppercase' as const,
-          letterSpacing: '0.05em',
-          marginBottom: '2px',
-        }}
-      >
+    <div className="mb-2">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
         {label}
       </div>
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '6px 8px',
-          background: '#f8fafc',
-          borderRadius: '4px',
-        }}
-      >
-        <span
-          style={{
-            fontSize: '12px',
-            fontFamily: opts?.hidden ? 'inherit' : 'monospace',
-            color: '#1e293b',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap' as const,
-            maxWidth: '220px',
-          }}
-        >
+      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
+        <span className={`text-xs ${opts?.hidden && !opts?.shown ? '' : 'font-mono'} text-white truncate max-w-[220px]`}>
           {opts?.hidden && !opts?.shown ? '••••••••••••' : value}
         </span>
-        <div style={{ display: 'flex', gap: '2px', flexShrink: 0 }}>
+        <div className="flex gap-1 shrink-0">
           {opts?.toggle && (
             <button
               onClick={opts.toggle}
-              style={{
-                padding: '2px 4px',
-                fontSize: '10px',
-                border: '1px solid #e2e8f0',
-                borderRadius: '3px',
-                background: 'white',
-                cursor: 'pointer',
-              }}
+              className="p-1.5 text-white/30 hover:text-white/60 rounded transition-colors cursor-pointer"
             >
               {opts?.shown ? '🙈' : '👁️'}
             </button>
           )}
           <button
             onClick={() => copyField(value, fieldId)}
-            style={{
-              padding: '2px 4px',
-              fontSize: '10px',
-              border: '1px solid #e2e8f0',
-              borderRadius: '3px',
-              background: copied === fieldId ? '#dcfce7' : 'white',
-              cursor: 'pointer',
-            }}
+            className="p-1.5 text-white/30 hover:text-white/60 rounded transition-colors cursor-pointer"
           >
             {copied === fieldId ? '✓' : '📋'}
           </button>
@@ -435,67 +312,34 @@ function ItemDetailView({
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '10px 12px',
-          borderBottom: '1px solid #e2e8f0',
-        }}
-      >
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.1]">
         <button
           onClick={onBack}
-          style={{
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer',
-            fontSize: '14px',
-            padding: '2px',
-            color: '#64748b',
-          }}
+          className="border-0 bg-transparent cursor-pointer text-sm p-0.5 text-white/50 hover:text-white/80 transition-colors"
         >
           ←
         </button>
-        <span style={{ fontSize: '18px' }}>{typeIcon(item.type)}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: '14px',
-              fontWeight: 600,
-              color: '#1e293b',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap' as const,
-            }}
-          >
+        <span className="text-lg">{typeIcon(item.type)}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-white truncate">
             {item.name}
           </div>
-          {folder && <div style={{ fontSize: '10px', color: '#94a3b8' }}>📁 {folder.name}</div>}
+          {folder && <div className="text-[10px] text-white/40">📁 {folder.name}</div>}
         </div>
         <button
           onClick={onEdit}
-          style={{
-            padding: '4px 10px',
-            fontSize: '11px',
-            border: '1px solid #e2e8f0',
-            borderRadius: '4px',
-            background: 'white',
-            cursor: 'pointer',
-            color: '#4f46e5',
-            fontWeight: 500,
-          }}
+          className="px-3 py-1.5 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 text-sm rounded-md transition-colors cursor-pointer"
         >
           Edit
         </button>
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
+      <div className="flex-1 overflow-y-auto p-3">
         {item.favorite && (
-          <div style={{ fontSize: '11px', color: '#eab308', marginBottom: '8px' }}>⭐ Favorite</div>
+          <div className="text-[11px] text-amber-400 mb-2">⭐ Favorite</div>
         )}
 
         {/* Login fields */}
@@ -509,59 +353,21 @@ function ItemDetailView({
                 shown: showPassword,
               })}
             {login.totp && totpCode && (
-              <div style={{ marginBottom: '8px' }}>
-                <div
-                  style={{
-                    fontSize: '10px',
-                    fontWeight: 600,
-                    color: '#94a3b8',
-                    textTransform: 'uppercase' as const,
-                    letterSpacing: '0.05em',
-                    marginBottom: '2px',
-                  }}
-                >
+              <div className="mb-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
                   TOTP Code
                 </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '6px 8px',
-                    background: '#f8fafc',
-                    borderRadius: '4px',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: 700,
-                      fontFamily: 'monospace',
-                      color: '#4f46e5',
-                      letterSpacing: '0.1em',
-                    }}
-                  >
+                <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
+                  <span className="font-mono text-[18px] tracking-widest text-indigo-300 font-bold">
                     {totpCode.slice(0, 3)} {totpCode.slice(3)}
                   </span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span
-                      style={{
-                        fontSize: '10px',
-                        color: totpRemaining <= 5 ? '#ef4444' : '#64748b',
-                      }}
-                    >
+                  <div className="flex items-center gap-1">
+                    <span className={`text-[10px] ${totpRemaining <= 5 ? 'text-red-400' : 'text-white/30'}`}>
                       {totpRemaining}s
                     </span>
                     <button
                       onClick={() => copyField(totpCode, 'totp')}
-                      style={{
-                        padding: '2px 4px',
-                        fontSize: '10px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '3px',
-                        background: copied === 'totp' ? '#dcfce7' : 'white',
-                        cursor: 'pointer',
-                      }}
+                      className="p-1.5 text-white/30 hover:text-white/60 rounded transition-colors cursor-pointer"
                     >
                       {copied === 'totp' ? '✓' : '📋'}
                     </button>
@@ -572,58 +378,24 @@ function ItemDetailView({
             {login.uris
               ?.filter((u) => u.trim())
               .map((uri, idx) => (
-                <div key={idx} style={{ marginBottom: '4px' }}>
+                <div key={idx} className="mb-1">
                   {idx === 0 && (
-                    <div
-                      style={{
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        color: '#94a3b8',
-                        textTransform: 'uppercase' as const,
-                        letterSpacing: '0.05em',
-                        marginBottom: '2px',
-                      }}
-                    >
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
                       URIs
                     </div>
                   )}
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '6px 8px',
-                      background: '#f8fafc',
-                      borderRadius: '4px',
-                    }}
-                  >
+                  <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
                     <a
                       href={uri.startsWith('http') ? uri : `https://${uri}`}
                       target="_blank"
                       rel="noreferrer"
-                      style={{
-                        fontSize: '12px',
-                        color: '#4f46e5',
-                        textDecoration: 'none',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap' as const,
-                        maxWidth: '250px',
-                      }}
+                      className="text-xs text-indigo-300 no-underline truncate max-w-[250px]"
                     >
                       {uri}
                     </a>
                     <button
                       onClick={() => copyField(uri, `uri-${idx}`)}
-                      style={{
-                        padding: '2px 4px',
-                        fontSize: '10px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '3px',
-                        background: copied === `uri-${idx}` ? '#dcfce7' : 'white',
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                      }}
+                      className="p-1.5 text-white/30 hover:text-white/60 rounded transition-colors shrink-0 cursor-pointer"
                     >
                       {copied === `uri-${idx}` ? '✓' : '📋'}
                     </button>
@@ -636,30 +408,10 @@ function ItemDetailView({
         {/* Note field */}
         {note && (
           <div>
-            <div
-              style={{
-                fontSize: '10px',
-                fontWeight: 600,
-                color: '#94a3b8',
-                textTransform: 'uppercase' as const,
-                letterSpacing: '0.05em',
-                marginBottom: '4px',
-              }}
-            >
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
               Note
             </div>
-            <div
-              style={{
-                padding: '8px',
-                background: '#f8fafc',
-                borderRadius: '4px',
-                fontSize: '12px',
-                color: '#1e293b',
-                whiteSpace: 'pre-wrap' as const,
-                maxHeight: '200px',
-                overflowY: 'auto',
-              }}
-            >
+            <div className="p-3 bg-white/[0.04] rounded-md border border-white/[0.06] text-xs text-white/80 whitespace-pre-wrap max-h-[200px] overflow-y-auto">
               {note.content}
             </div>
           </div>
@@ -675,34 +427,17 @@ function ItemDetailView({
                 toggle: () => setShowCardNumber(!showCardNumber),
                 shown: showCardNumber,
               })}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <div style={{ flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: '10px',
-                    fontWeight: 600,
-                    color: '#94a3b8',
-                    textTransform: 'uppercase' as const,
-                    letterSpacing: '0.05em',
-                    marginBottom: '2px',
-                  }}
-                >
+            <div className="flex gap-2 mb-2">
+              <div className="flex-1">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
                   Expires
                 </div>
-                <div
-                  style={{
-                    padding: '6px 8px',
-                    background: '#f8fafc',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: '#1e293b',
-                  }}
-                >
+                <div className="p-3 bg-white/[0.04] rounded-md border border-white/[0.06] text-xs text-white/80">
                   {card.expMonth}/{card.expYear}
                 </div>
               </div>
               {card.cvv && (
-                <div style={{ flex: 1 }}>
+                <div className="flex-1">
                   {fieldRow('CVV', card.cvv, 'cvv', {
                     hidden: true,
                     toggle: () => setShowCvv(!showCvv),
@@ -713,27 +448,10 @@ function ItemDetailView({
             </div>
             {card.brand && (
               <div>
-                <div
-                  style={{
-                    fontSize: '10px',
-                    fontWeight: 600,
-                    color: '#94a3b8',
-                    textTransform: 'uppercase' as const,
-                    letterSpacing: '0.05em',
-                    marginBottom: '2px',
-                  }}
-                >
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
                   Brand
                 </div>
-                <div
-                  style={{
-                    padding: '6px 8px',
-                    background: '#f8fafc',
-                    borderRadius: '4px',
-                    fontSize: '12px',
-                    color: '#1e293b',
-                  }}
-                >
+                <div className="p-3 bg-white/[0.04] rounded-md border border-white/[0.06] text-xs text-white/80">
                   {card.brand}
                 </div>
               </div>
@@ -742,45 +460,23 @@ function ItemDetailView({
         )}
 
         {/* Delete */}
-        <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #e2e8f0' }}>
+        <div className="mt-4 pt-3 border-t border-white/[0.1]">
           {confirmDelete ? (
-            <div
-              style={{
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '6px',
-                padding: '10px',
-              }}
-            >
-              <div style={{ fontSize: '12px', color: '#dc2626', marginBottom: '8px' }}>
+            <div className="bg-red-500/10 border border-red-400/20 rounded-md p-2.5">
+              <div className="text-xs text-red-300 mb-2">
                 Delete this item? This cannot be undone.
               </div>
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div className="flex gap-1.5">
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    background: '#dc2626',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: deleting ? 'not-allowed' : 'pointer',
-                  }}
+                  className={`px-3 py-1.5 text-[11px] text-white rounded-md transition-colors ${deleting ? 'bg-red-500/50 cursor-not-allowed' : 'bg-red-500/80 hover:bg-red-400/90 cursor-pointer'}`}
                 >
                   {deleting ? 'Deleting...' : 'Delete'}
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
-                  style={{
-                    padding: '6px 12px',
-                    fontSize: '11px',
-                    background: 'white',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
+                  className="px-3 py-1.5 text-[11px] bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -789,16 +485,7 @@ function ItemDetailView({
           ) : (
             <button
               onClick={() => setConfirmDelete(true)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                fontSize: '12px',
-                color: '#dc2626',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: '6px',
-                cursor: 'pointer',
-              }}
+              className="w-full p-2 text-xs text-red-300 bg-red-500/10 border border-red-400/20 rounded-md cursor-pointer hover:bg-red-500/20 transition-colors"
             >
               Delete Item
             </button>
@@ -947,124 +634,49 @@ function AddEditView({
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '6px 8px',
-    border: '1px solid #d1d5db',
-    borderRadius: '4px',
-    fontSize: '12px',
-    outline: 'none',
-    boxSizing: 'border-box',
-  };
-  const labelStyle: React.CSSProperties = {
-    display: 'block',
-    fontSize: '11px',
-    fontWeight: 500,
-    color: '#374151',
-    marginBottom: '2px',
-  };
+  const inputClass = "w-full px-3 py-2 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60";
+  const labelClass = "block text-xs font-medium text-white/80 mb-1";
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '10px 12px',
-          borderBottom: '1px solid #e2e8f0',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.1]">
+        <div className="flex items-center gap-2">
           <button
             onClick={onCancel}
-            style={{
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              fontSize: '14px',
-              padding: '2px',
-              color: '#64748b',
-            }}
+            className="border-0 bg-transparent cursor-pointer text-sm p-0.5 text-white/50 hover:text-white/80 transition-colors"
           >
             ←
           </button>
-          <span style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
+          <span className="text-sm font-semibold text-white">
             {isEdit ? 'Edit Item' : 'New Item'}
           </span>
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
-          style={{
-            padding: '5px 14px',
-            fontSize: '12px',
-            background: saving ? '#94a3b8' : '#4f46e5',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            fontWeight: 600,
-          }}
+          className={`px-3 py-1.5 text-white text-xs font-semibold rounded-md transition-colors ${saving ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90 cursor-pointer'}`}
         >
           {saving ? 'Saving...' : 'Save'}
         </button>
       </div>
 
       {/* Content */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '12px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px',
-        }}
-      >
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
         {error && (
-          <div
-            style={{
-              background: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '4px',
-              padding: '6px 10px',
-              fontSize: '11px',
-              color: '#dc2626',
-            }}
-          >
+          <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs">
             {error}
           </div>
         )}
 
         {/* Type selector (add mode only) */}
         {!isEdit && (
-          <div
-            style={{
-              display: 'flex',
-              gap: '3px',
-              background: '#f1f5f9',
-              padding: '3px',
-              borderRadius: '6px',
-            }}
-          >
+          <div className="flex gap-1 p-1 bg-white/[0.04] rounded-lg border border-white/[0.06]">
             {(['login', 'note', 'card'] as VaultItemType[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setType(t)}
-                style={{
-                  flex: 1,
-                  padding: '5px',
-                  fontSize: '11px',
-                  border: 'none',
-                  borderRadius: '4px',
-                  background: type === t ? 'white' : 'transparent',
-                  color: type === t ? '#1e293b' : '#64748b',
-                  cursor: 'pointer',
-                  fontWeight: type === t ? 600 : 400,
-                  boxShadow: type === t ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                }}
+                className={`flex-1 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${type === t ? 'bg-white/[0.12] text-white font-semibold shadow-sm' : 'bg-transparent text-white/50 hover:text-white/80'}`}
               >
                 {typeIcon(t)} {t.charAt(0).toUpperCase() + t.slice(1)}
               </button>
@@ -1074,19 +686,19 @@ function AddEditView({
 
         {/* Common fields */}
         <div>
-          <label style={labelStyle}>Name</label>
+          <label className={labelClass}>Name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. My Bank"
-            style={inputStyle}
+            className={inputClass}
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Folder</label>
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <label className={labelClass}>Folder</label>
             <select
               value={creatingFolder ? '__new__' : folderId}
               onChange={(e) => {
@@ -1097,18 +709,18 @@ function AddEditView({
                   setFolderId(e.target.value);
                 }
               }}
-              style={{ ...inputStyle, padding: '5px 8px' }}
+              className={inputClass}
             >
-              <option value="">No folder</option>
+              <option value="" className="bg-slate-900">No folder</option>
               {localFolders.map((f) => (
-                <option key={f.id} value={f.id}>
+                <option key={f.id} value={f.id} className="bg-slate-900">
                   {f.name}
                 </option>
               ))}
-              <option value="__new__">+ New folder…</option>
+              <option value="__new__" className="bg-slate-900">+ New folder…</option>
             </select>
             {creatingFolder && (
-              <div style={{ display: 'flex', gap: '3px', marginTop: '4px' }}>
+              <div className="flex gap-1 mt-1">
                 <input
                   type="text"
                   value={newFolderName}
@@ -1121,20 +733,12 @@ function AddEditView({
                     }
                   }}
                   placeholder="Folder name"
-                  style={{ ...inputStyle, flex: 1 }}
+                  className={`${inputClass} flex-1`}
                   autoFocus
                 />
                 <button
                   onClick={handleCreateFolder}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '11px',
-                    background: '#4f46e5',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                  }}
+                  className="px-2.5 py-1.5 text-xs bg-indigo-600/80 text-white rounded-md hover:bg-indigo-500/90 cursor-pointer transition-colors"
                 >
                   ✓
                 </button>
@@ -1143,36 +747,19 @@ function AddEditView({
                     setCreatingFolder(false);
                     setNewFolderName('');
                   }}
-                  style={{
-                    padding: '4px 6px',
-                    fontSize: '11px',
-                    color: '#94a3b8',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
+                  className="px-2 py-1.5 text-xs bg-transparent text-white/50 hover:text-white/80 cursor-pointer transition-colors"
                 >
                   ✕
                 </button>
               </div>
             )}
           </div>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              gap: '4px',
-              paddingBottom: '4px',
-              cursor: 'pointer',
-              fontSize: '11px',
-              color: '#374151',
-              whiteSpace: 'nowrap' as const,
-            }}
-          >
+          <label className="flex items-end gap-1 pb-1 cursor-pointer text-xs text-white/80 whitespace-nowrap">
             <input
               type="checkbox"
               checked={favorite}
               onChange={(e) => setFavorite(e.target.checked)}
+              className="mb-1"
             />
             ⭐
           </label>
@@ -1182,37 +769,27 @@ function AddEditView({
         {type === 'login' && (
           <>
             <div>
-              <label style={labelStyle}>Username</label>
+              <label className={labelClass}>Username</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                style={inputStyle}
+                className={inputClass}
               />
             </div>
             <div>
-              <label style={labelStyle}>Password</label>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <div style={{ flex: 1, position: 'relative' }}>
+              <label className={labelClass}>Password</label>
+              <div className="flex gap-1">
+                <div className="flex-1 relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    style={{ ...inputStyle, paddingRight: '28px' }}
+                    className={`${inputClass} pr-8`}
                   />
                   <button
                     onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: '4px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      border: 'none',
-                      background: 'none',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                      padding: '2px',
-                    }}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 border-0 bg-transparent cursor-pointer text-xs p-1 text-white/50 hover:text-white/80 transition-colors"
                   >
                     {showPassword ? '🙈' : '👁️'}
                   </button>
@@ -1230,34 +807,26 @@ function AddEditView({
                     );
                     setShowPassword(true);
                   }}
-                  style={{
-                    padding: '4px 8px',
-                    fontSize: '10px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '4px',
-                    background: 'white',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap' as const,
-                  }}
+                  className="px-2 py-1.5 text-[10px] bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors whitespace-nowrap cursor-pointer"
                 >
                   Gen
                 </button>
               </div>
             </div>
             <div>
-              <label style={labelStyle}>TOTP Secret</label>
+              <label className={labelClass}>TOTP Secret</label>
               <input
                 type="text"
                 value={totpSecret}
                 onChange={(e) => setTotpSecret(e.target.value)}
                 placeholder="Base32 or otpauth:// URI"
-                style={inputStyle}
+                className={inputClass}
               />
             </div>
             <div>
-              <label style={labelStyle}>URIs</label>
+              <label className={labelClass}>URIs</label>
               {uris.map((uri, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: '3px', marginBottom: '3px' }}>
+                <div key={idx} className="flex gap-1 mb-1">
                   <input
                     type="text"
                     value={uri}
@@ -1267,18 +836,11 @@ function AddEditView({
                       setUris(u);
                     }}
                     placeholder="https://example.com"
-                    style={{ ...inputStyle, flex: 1 }}
+                    className={`${inputClass} flex-1`}
                   />
                   <button
                     onClick={() => setUris(uris.filter((_, i) => i !== idx))}
-                    style={{
-                      padding: '2px 6px',
-                      fontSize: '11px',
-                      color: '#dc2626',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
+                    className="px-2 py-0.5 text-xs text-red-400 bg-transparent hover:text-red-300 cursor-pointer transition-colors"
                   >
                     ✕
                   </button>
@@ -1286,14 +848,7 @@ function AddEditView({
               ))}
               <button
                 onClick={() => setUris([...uris, ''])}
-                style={{
-                  fontSize: '11px',
-                  color: '#4f46e5',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '2px 0',
-                }}
+                className="text-xs text-indigo-300 bg-transparent hover:text-indigo-200 cursor-pointer transition-colors py-0.5"
               >
                 + Add URI
               </button>
@@ -1304,12 +859,12 @@ function AddEditView({
         {/* Note fields */}
         {type === 'note' && (
           <div>
-            <label style={labelStyle}>Secure Note</label>
+            <label className={labelClass}>Secure Note</label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={6}
-              style={{ ...inputStyle, resize: 'vertical' as const }}
+              className={`${inputClass} resize-y`}
             />
           </div>
         )}
@@ -1318,74 +873,74 @@ function AddEditView({
         {type === 'card' && (
           <>
             <div>
-              <label style={labelStyle}>Cardholder Name</label>
+              <label className={labelClass}>Cardholder Name</label>
               <input
                 type="text"
                 value={cardholderName}
                 onChange={(e) => setCardholderName(e.target.value)}
-                style={inputStyle}
+                className={inputClass}
               />
             </div>
             <div>
-              <label style={labelStyle}>Card Number</label>
+              <label className={labelClass}>Card Number</label>
               <input
                 type="text"
                 value={number}
                 onChange={(e) => setNumber(e.target.value)}
-                style={inputStyle}
+                className={inputClass}
               />
             </div>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>Month</label>
+            <div className="flex gap-1.5">
+              <div className="flex-1">
+                <label className={labelClass}>Month</label>
                 <select
                   value={expMonth}
                   onChange={(e) => setExpMonth(e.target.value)}
-                  style={{ ...inputStyle, padding: '5px 8px' }}
+                  className={inputClass}
                 >
                   {Array.from({ length: 12 }, (_, i) => {
                     const m = (i + 1).toString().padStart(2, '0');
                     return (
-                      <option key={m} value={m}>
+                      <option key={m} value={m} className="bg-slate-900">
                         {m}
                       </option>
                     );
                   })}
                 </select>
               </div>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>Year</label>
+              <div className="flex-1">
+                <label className={labelClass}>Year</label>
                 <input
                   type="text"
                   value={expYear}
                   onChange={(e) => setExpYear(e.target.value)}
                   placeholder="YYYY"
-                  style={inputStyle}
+                  className={inputClass}
                 />
               </div>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>CVV</label>
+              <div className="flex-1">
+                <label className={labelClass}>CVV</label>
                 <input
                   type="password"
                   value={cvv}
                   onChange={(e) => setCvv(e.target.value)}
-                  style={inputStyle}
+                  className={inputClass}
                 />
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Brand</label>
+              <label className={labelClass}>Brand</label>
               <select
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
-                style={{ ...inputStyle, padding: '5px 8px' }}
+                className={inputClass}
               >
-                <option value="">Select...</option>
-                <option value="Visa">Visa</option>
-                <option value="Mastercard">Mastercard</option>
-                <option value="Amex">American Express</option>
-                <option value="Discover">Discover</option>
-                <option value="Other">Other</option>
+                <option value="" className="bg-slate-900">Select...</option>
+                <option value="Visa" className="bg-slate-900">Visa</option>
+                <option value="Mastercard" className="bg-slate-900">Mastercard</option>
+                <option value="Amex" className="bg-slate-900">American Express</option>
+                <option value="Discover" className="bg-slate-900">Discover</option>
+                <option value="Other" className="bg-slate-900">Other</option>
               </select>
             </div>
           </>
@@ -1432,44 +987,20 @@ function VaultTab({
   });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div
-        style={{
-          padding: '8px 12px',
-          borderBottom: '1px solid #e2e8f0',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '4px',
-        }}
-      >
-        <div style={{ display: 'flex', gap: '4px' }}>
+    <div className="flex flex-col h-full">
+      <div className="flex flex-col gap-1 p-3 border-b border-white/[0.1]">
+        <div className="flex gap-1">
           <input
             type="text"
             placeholder="Search vault..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            style={{
-              flex: 1,
-              padding: '6px 10px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '12px',
-              outline: 'none',
-            }}
+            className="flex-1 px-3 py-1.5 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
           />
           <button
             onClick={onAddItem}
             title="Add item"
-            style={{
-              padding: '6px 10px',
-              background: '#4f46e5',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '12px',
-              cursor: 'pointer',
-              fontWeight: 700,
-            }}
+            className="px-3 py-1.5 bg-indigo-600/80 text-white border-0 rounded-md text-xs font-bold hover:bg-indigo-500/90 cursor-pointer backdrop-blur-sm transition-colors"
           >
             +
           </button>
@@ -1478,29 +1009,20 @@ function VaultTab({
           <select
             value={selectedFolderId ?? ''}
             onChange={(e) => setSelectedFolderId(e.target.value || null)}
-            style={{
-              width: '100%',
-              padding: '4px 8px',
-              border: '1px solid #d1d5db',
-              borderRadius: '4px',
-              fontSize: '11px',
-              outline: 'none',
-              color: '#374151',
-              background: 'white',
-            }}
+            className="w-full px-2 py-1 border border-white/[0.12] rounded-md bg-white/[0.06] text-white/80 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
           >
-            <option value="">All folders</option>
+            <option value="" className="bg-slate-900">All folders</option>
             {folders.map((f) => (
-              <option key={f.id} value={f.id}>
+              <option key={f.id} value={f.id} className="bg-slate-900">
                 📁 {f.name}
               </option>
             ))}
           </select>
         )}
       </div>
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+          <div className="p-6 text-center text-white/40 text-[13px]">
             {search || selectedFolderId ? 'No matching items' : 'No items in vault'}
           </div>
         ) : (
@@ -1508,70 +1030,31 @@ function VaultTab({
             <div
               key={item.id}
               onClick={() => onSelectItem(item)}
-              style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
+              className="p-2.5 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.04] transition-colors"
             >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    minWidth: 0,
-                    flex: 1,
-                  }}
-                >
-                  <span style={{ fontSize: '14px', flexShrink: 0 }}>{typeIcon(item.type)}</span>
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: '13px',
-                        fontWeight: 500,
-                        color: '#1e293b',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap' as const,
-                      }}
-                    >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="text-sm shrink-0">{typeIcon(item.type)}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[13px] font-medium text-white truncate">
                       {item.name}
                     </div>
                     {item.type === 'login' && (
-                      <div
-                        style={{
-                          fontSize: '11px',
-                          color: '#64748b',
-                          marginTop: '1px',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap' as const,
-                        }}
-                      >
+                      <div className="text-[11px] text-white/50 mt-[1px] truncate">
                         {(item as LoginItem).username}
                       </div>
                     )}
                   </div>
                 </div>
                 {item.type === 'login' && (
-                  <div style={{ display: 'flex', gap: '3px', flexShrink: 0, marginLeft: '4px' }}>
+                  <div className="flex gap-1 shrink-0 ml-1">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         copyToClipboard((item as LoginItem).username, `u-${item.id}`);
                       }}
                       title="Copy username"
-                      style={{
-                        padding: '3px 6px',
-                        fontSize: '10px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '4px',
-                        background: copied === `u-${item.id}` ? '#dcfce7' : 'white',
-                        cursor: 'pointer',
-                      }}
+                      className={`px-1.5 py-0.5 text-[10px] rounded transition-colors cursor-pointer ${copied === `u-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
                     >
                       {copied === `u-${item.id}` ? '✓' : '👤'}
                     </button>
@@ -1581,20 +1064,13 @@ function VaultTab({
                         copyToClipboard((item as LoginItem).password, `p-${item.id}`);
                       }}
                       title="Copy password"
-                      style={{
-                        padding: '3px 6px',
-                        fontSize: '10px',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '4px',
-                        background: copied === `p-${item.id}` ? '#dcfce7' : 'white',
-                        cursor: 'pointer',
-                      }}
+                      className={`px-1.5 py-0.5 text-[10px] rounded transition-colors cursor-pointer ${copied === `p-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
                     >
                       {copied === `p-${item.id}` ? '✓' : '🔑'}
                     </button>
                   </div>
                 )}
-                {item.favorite && <span style={{ fontSize: '10px', marginLeft: '2px' }}>⭐</span>}
+                {item.favorite && <span className="text-[10px] ml-0.5">⭐</span>}
               </div>
             </div>
           ))
@@ -1617,56 +1093,38 @@ function SiteTab({ items }: { items: VaultItem[] }) {
 
   if (items.length === 0) {
     return (
-      <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-        <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔍</div>
+      <div className="p-6 text-center text-white/40 text-[13px]">
+        <div className="text-2xl mb-2">🔍</div>
         No saved passwords for this site
       </div>
     );
   }
 
   return (
-    <div style={{ overflowY: 'auto' }}>
+    <div className="overflow-y-auto">
       {items.map((item) => (
-        <div key={item.id} style={{ padding: '12px', borderBottom: '1px solid #f1f5f9' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b', marginBottom: '6px' }}>
+        <div key={item.id} className="p-3 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors">
+          <div className="text-[13px] font-semibold text-white mb-1.5 truncate">
             {item.name}
           </div>
           {item.type === 'login' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <span style={{ fontSize: '12px', color: '#64748b' }}>
+            <div className="flex flex-col gap-1">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/50 truncate pr-2">
                   {(item as LoginItem).username}
                 </span>
                 <button
                   onClick={() => copyToClipboard((item as LoginItem).username, `u-${item.id}`)}
-                  style={{
-                    padding: '3px 8px',
-                    fontSize: '11px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '4px',
-                    background: copied === `u-${item.id}` ? '#dcfce7' : 'white',
-                    cursor: 'pointer',
-                  }}
+                  className={`px-2 py-1 text-[11px] rounded transition-colors cursor-pointer shrink-0 ${copied === `u-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
                 >
                   {copied === `u-${item.id}` ? '✓ Copied' : 'Copy User'}
                 </button>
               </div>
-              <div
-                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-              >
-                <span style={{ fontSize: '12px', color: '#64748b' }}>••••••••</span>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-white/50">••••••••</span>
                 <button
                   onClick={() => copyToClipboard((item as LoginItem).password, `p-${item.id}`)}
-                  style={{
-                    padding: '3px 8px',
-                    fontSize: '11px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '4px',
-                    background: copied === `p-${item.id}` ? '#dcfce7' : 'white',
-                    cursor: 'pointer',
-                  }}
+                  className={`px-2 py-1 text-[11px] rounded transition-colors cursor-pointer shrink-0 ${copied === `p-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
                 >
                   {copied === `p-${item.id}` ? '✓ Copied' : 'Copy Pass'}
                 </button>
@@ -1714,81 +1172,51 @@ function GeneratorTab() {
   }
 
   return (
-    <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      <div style={{ display: 'flex', gap: '4px' }}>
+    <div className="p-3 flex flex-col gap-2.5">
+      <div className="flex gap-1">
         {(['password', 'passphrase'] as const).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
-            style={{
-              flex: 1,
-              padding: '6px',
-              fontSize: '12px',
-              border: '1px solid #e2e8f0',
-              borderRadius: '6px',
-              background: mode === m ? '#4f46e5' : 'white',
-              color: mode === m ? 'white' : '#374151',
-              cursor: 'pointer',
-              fontWeight: mode === m ? 600 : 400,
-            }}
+            className={`flex-1 py-1.5 text-xs rounded-md transition-colors cursor-pointer ${mode === m ? 'bg-indigo-600/80 text-white font-semibold shadow-sm' : 'bg-transparent text-white/50 hover:text-white/80'}`}
           >
             {m === 'password' ? 'Password' : 'Passphrase'}
           </button>
         ))}
       </div>
 
-      <div
-        style={{
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          borderRadius: '6px',
-          padding: '10px',
-          fontFamily: 'monospace',
-          fontSize: '13px',
-          wordBreak: 'break-all' as const,
-          minHeight: '40px',
-          color: '#1e293b',
-        }}
-      >
+      <div className="bg-white/[0.04] border border-white/[0.06] rounded-md p-2.5 font-mono text-[13px] break-all min-h-[40px] text-indigo-300">
         {generated}
       </div>
 
       {strength && (
         <div>
-          <div
-            style={{
-              height: '4px',
-              background: '#e2e8f0',
-              borderRadius: '2px',
-              overflow: 'hidden',
-            }}
-          >
+          <div className="h-1 bg-white/[0.1] rounded-full overflow-hidden">
             <div
+              className="h-full transition-all duration-300"
               style={{
-                height: '100%',
                 width: `${(strength.score + 1) * 20}%`,
                 background: strengthColors[strength.score],
-                transition: 'width 0.3s',
               }}
             />
           </div>
-          <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
+          <div className="text-[10px] text-white/40 mt-1">
             Entropy: {strength.entropy.toFixed(0)} bits
           </div>
         </div>
       )}
 
       {mode === 'password' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={{ fontSize: '12px', color: '#374151' }}>Length: {length}</label>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex justify-between items-center">
+            <label className="text-xs text-white/80">Length: {length}</label>
             <input
               type="range"
               min={8}
               max={64}
               value={length}
               onChange={(e) => setLength(Number(e.target.value))}
-              style={{ width: '120px' }}
+              className="w-[120px] accent-indigo-500"
             />
           </div>
           {[
@@ -1799,62 +1227,37 @@ function GeneratorTab() {
           ].map(({ label, value, set }) => (
             <label
               key={label}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                fontSize: '12px',
-                color: '#374151',
-                cursor: 'pointer',
-              }}
+              className="flex justify-between items-center text-xs text-white/80 cursor-pointer"
             >
               {label}
-              <input type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} />
+              <input type="checkbox" checked={value} onChange={(e) => set(e.target.checked)} className="accent-indigo-500" />
             </label>
           ))}
         </div>
       ) : (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <label style={{ fontSize: '12px', color: '#374151' }}>Words: {wordCount}</label>
+        <div className="flex justify-between items-center">
+          <label className="text-xs text-white/80">Words: {wordCount}</label>
           <input
             type="range"
             min={3}
             max={10}
             value={wordCount}
             onChange={(e) => setWordCount(Number(e.target.value))}
-            style={{ width: '120px' }}
+            className="w-[120px] accent-indigo-500"
           />
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '6px' }}>
+      <div className="flex gap-1.5 mt-1">
         <button
           onClick={generate}
-          style={{
-            flex: 1,
-            padding: '8px',
-            fontSize: '12px',
-            border: '1px solid #e2e8f0',
-            borderRadius: '6px',
-            background: 'white',
-            cursor: 'pointer',
-          }}
+          className="flex-1 py-2 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors cursor-pointer"
         >
           ↻ Regenerate
         </button>
         <button
           onClick={copy}
-          style={{
-            flex: 1,
-            padding: '8px',
-            fontSize: '12px',
-            border: 'none',
-            borderRadius: '6px',
-            background: copied ? '#22c55e' : '#4f46e5',
-            color: 'white',
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
+          className={`flex-1 py-2 text-xs text-white rounded-md font-semibold transition-colors cursor-pointer ${copied ? 'bg-emerald-500/80 hover:bg-emerald-400/90' : 'bg-indigo-600/80 hover:bg-indigo-500/90'}`}
         >
           {copied ? '✓ Copied' : 'Copy'}
         </button>
@@ -1894,44 +1297,20 @@ function TotpItem({ item }: { item: LoginItem }) {
   }
 
   return (
-    <div
-      style={{
-        padding: '10px 12px',
-        borderBottom: '1px solid #f1f5f9',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}
-    >
+    <div className="p-3 border-b border-white/[0.06] flex justify-between items-center hover:bg-white/[0.02] transition-colors">
       <div>
-        <div style={{ fontSize: '12px', fontWeight: 500, color: '#1e293b' }}>{item.name}</div>
-        <div
-          style={{
-            fontSize: '20px',
-            fontWeight: 700,
-            fontFamily: 'monospace',
-            color: '#4f46e5',
-            letterSpacing: '0.1em',
-            marginTop: '2px',
-          }}
-        >
+        <div className="text-xs font-medium text-white/80">{item.name}</div>
+        <div className="text-[20px] font-bold font-mono text-indigo-300 tracking-[0.1em] mt-0.5">
           {code.slice(0, 3)} {code.slice(3)}
         </div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-        <div style={{ fontSize: '11px', color: remaining <= 5 ? '#ef4444' : '#64748b' }}>
+      <div className="flex flex-col items-center gap-1">
+        <div className={`text-[11px] ${remaining <= 5 ? 'text-red-400' : 'text-white/40'}`}>
           {remaining}s
         </div>
         <button
           onClick={copy}
-          style={{
-            padding: '4px 8px',
-            fontSize: '11px',
-            border: '1px solid #e2e8f0',
-            borderRadius: '4px',
-            background: copied ? '#dcfce7' : 'white',
-            cursor: 'pointer',
-          }}
+          className={`px-2 py-1 text-[11px] rounded transition-colors cursor-pointer ${copied ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
         >
           {copied ? '✓' : 'Copy'}
         </button>
@@ -1947,15 +1326,15 @@ function TotpTab({ items }: { items: VaultItem[] }) {
 
   if (totpItems.length === 0) {
     return (
-      <div style={{ padding: '24px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-        <div style={{ fontSize: '24px', marginBottom: '8px' }}>🔑</div>
+      <div className="p-6 text-center text-white/40 text-[13px]">
+        <div className="text-2xl mb-2">🔑</div>
         No TOTP codes configured
       </div>
     );
   }
 
   return (
-    <div style={{ overflowY: 'auto' }}>
+    <div className="overflow-y-auto">
       {totpItems.map((item) => (
         <TotpItem key={item.id} item={item} />
       ))}
@@ -2045,16 +1424,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '200px',
-          color: '#94a3b8',
-          fontSize: '13px',
-        }}
-      >
+      <div className="flex items-center justify-center h-[200px] text-white/40 text-[13px]">
         Loading...
       </div>
     );
@@ -2071,7 +1441,7 @@ export default function App() {
   // Overlay views (detail / add / edit)
   if (viewState.view === 'detail') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '480px' }}>
+      <div className="flex flex-col h-[480px]">
         <ItemDetailView
           item={viewState.item}
           folders={folders}
@@ -2085,7 +1455,7 @@ export default function App() {
 
   if (viewState.view === 'add') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '480px' }}>
+      <div className="flex flex-col h-[480px]">
         <AddEditView
           editItem={null}
           folders={folders}
@@ -2098,7 +1468,7 @@ export default function App() {
 
   if (viewState.view === 'edit') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '480px' }}>
+      <div className="flex flex-col h-[480px]">
         <AddEditView
           editItem={viewState.item}
           folders={folders}
@@ -2117,53 +1487,26 @@ export default function App() {
   ];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '480px' }}>
+    <div className="flex flex-col h-[480px]">
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '10px 12px',
-          borderBottom: '1px solid #e2e8f0',
-          background: '#4f46e5',
-        }}
-      >
-        <span style={{ fontSize: '14px', fontWeight: 700, color: 'white' }}>🔐 Lockbox</span>
+      <div className="flex justify-between items-center px-3 py-2.5 border-b border-white/[0.1] bg-indigo-600/20 backdrop-blur-xl">
+        <span className="text-sm font-bold text-white">🔐 Lockbox</span>
         <button
           onClick={handleLock}
           title="Lock vault"
-          style={{
-            background: 'rgba(255,255,255,0.2)',
-            border: 'none',
-            borderRadius: '4px',
-            padding: '4px 8px',
-            color: 'white',
-            fontSize: '12px',
-            cursor: 'pointer',
-          }}
+          className="bg-white/[0.12] hover:bg-white/[0.2] border-0 rounded p-1.5 text-white text-xs cursor-pointer transition-colors"
         >
           Lock
         </button>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0' }}>
+      <div className="flex border-b border-white/[0.1] bg-white/[0.02]">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            style={{
-              flex: 1,
-              padding: '8px 4px',
-              fontSize: '11px',
-              border: 'none',
-              borderBottom: activeTab === tab.id ? '2px solid #4f46e5' : '2px solid transparent',
-              background: 'white',
-              color: activeTab === tab.id ? '#4f46e5' : '#64748b',
-              cursor: 'pointer',
-              fontWeight: activeTab === tab.id ? 600 : 400,
-            }}
+            className={`flex-1 py-2 text-[11px] border-0 bg-transparent cursor-pointer transition-colors ${activeTab === tab.id ? 'border-b-2 border-indigo-400 text-indigo-300 font-semibold' : 'border-b-2 border-transparent text-white/50 hover:text-white/80'}`}
           >
             {tab.label}
           </button>
@@ -2171,7 +1514,7 @@ export default function App() {
       </div>
 
       {/* Tab content */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
+      <div className="flex-1 overflow-hidden flex flex-col">
         {activeTab === 'site' && <SiteTab items={siteItems} />}
         {activeTab === 'vault' && (
           <VaultTab
