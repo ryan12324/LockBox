@@ -96,6 +96,20 @@ export default function Settings() {
             </div>
           </section>
 
+          {/* AI & Intelligence */}
+          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">AI & Intelligence</h2>
+            <p className="text-sm text-white/50 mb-3">
+              Configure AI-powered features: password health, breach monitoring, smart autofill, and chat assistant.
+            </p>
+            <button
+              onClick={() => navigate('/settings/ai')}
+              className="w-full py-2 text-sm text-indigo-300 hover:text-indigo-200 hover:underline text-left"
+            >
+              Configure AI Features →
+            </button>
+          </section>
+
           {/* Security */}
           <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
             <h2 className="text-lg font-semibold text-white mb-4">Security</h2>

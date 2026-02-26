@@ -8,6 +8,8 @@ import Vault from './pages/Vault.js';
 import Generator from './pages/Generator.js';
 import Settings from './pages/Settings.js';
 import ImportExport from './pages/ImportExport.js';
+import AISettings from './pages/AISettings.js';
+import Health from './pages/Health.js';
 
 const AUTO_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -76,6 +78,22 @@ export default function App() {
         element={
           <ProtectedRoute>
             <ImportExport />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/health"
+        element={
+          <ProtectedRoute>
+            <Health />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings/ai"
+        element={
+          <ProtectedRoute>
+            <AISettings />
           </ProtectedRoute>
         }
       />
