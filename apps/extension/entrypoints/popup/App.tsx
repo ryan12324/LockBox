@@ -77,7 +77,7 @@ function SetupView({ onComplete }: { onComplete: () => void }) {
       <div className="text-center">
         <div className="text-[32px] mb-2">🔐</div>
         <h1 className="text-lg font-bold text-white">Lockbox</h1>
-        <p className="text-[13px] text-white/50 mt-1">
+        <p className="text-sm text-white/50 mt-1">
           Connect to your server
         </p>
       </div>
@@ -104,7 +104,7 @@ function SetupView({ onComplete }: { onComplete: () => void }) {
             placeholder="https://lockbox-api.you.workers.dev"
             className="w-full px-3 py-2 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
           />
-          <p className="text-[11px] text-white/40 mt-1">
+          <p className="text-xs text-white/40 mt-1">
             The URL of your self-hosted Lockbox vault
           </p>
         </div>
@@ -156,7 +156,7 @@ function LockedView({ onUnlock }: { onUnlock: () => void }) {
       <div className="text-center">
         <div className="text-[32px] mb-2">🔐</div>
         <h1 className="text-lg font-bold text-white">Lockbox</h1>
-        <p className="text-[13px] text-white/50 mt-1">
+        <p className="text-sm text-white/50 mt-1">
           Sign in to your vault
         </p>
       </div>
@@ -284,7 +284,7 @@ function ItemDetailView({
     opts?: { hidden?: boolean; toggle?: () => void; shown?: boolean }
   ) => (
     <div className="mb-2">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
+      <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
         {label}
       </div>
       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
@@ -317,7 +317,7 @@ function ItemDetailView({
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.1]">
         <button
           onClick={onBack}
-          className="border-0 bg-transparent cursor-pointer text-sm p-0.5 text-white/50 hover:text-white/80 transition-colors"
+          className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors"
         >
           ←
         </button>
@@ -326,7 +326,7 @@ function ItemDetailView({
           <div className="text-sm font-semibold text-white truncate">
             {item.name}
           </div>
-          {folder && <div className="text-[10px] text-white/40">📁 {folder.name}</div>}
+          {folder && <div className="text-xs text-white/40">📁 {folder.name}</div>}
         </div>
         <button
           onClick={onEdit}
@@ -339,7 +339,7 @@ function ItemDetailView({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3">
         {item.favorite && (
-          <div className="text-[11px] text-amber-400 mb-2">⭐ Favorite</div>
+          <div className="text-xs text-amber-400 mb-2">⭐ Favorite</div>
         )}
 
         {/* Login fields */}
@@ -354,7 +354,7 @@ function ItemDetailView({
               })}
             {login.totp && totpCode && (
               <div className="mb-2">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
                   TOTP Code
                 </div>
                 <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
@@ -362,7 +362,7 @@ function ItemDetailView({
                     {totpCode.slice(0, 3)} {totpCode.slice(3)}
                   </span>
                   <div className="flex items-center gap-1">
-                    <span className={`text-[10px] ${totpRemaining <= 5 ? 'text-red-400' : 'text-white/30'}`}>
+                    <span className={`text-xs ${totpRemaining <= 5 ? 'text-red-400' : 'text-white/30'}`}>
                       {totpRemaining}s
                     </span>
                     <button
@@ -380,7 +380,7 @@ function ItemDetailView({
               .map((uri, idx) => (
                 <div key={idx} className="mb-1">
                   {idx === 0 && (
-                    <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
                       URIs
                     </div>
                   )}
@@ -408,7 +408,7 @@ function ItemDetailView({
         {/* Note field */}
         {note && (
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
+            <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
               Note
             </div>
             <div className="p-3 bg-white/[0.04] rounded-md border border-white/[0.06] text-xs text-white/80 whitespace-pre-wrap max-h-[200px] overflow-y-auto">
@@ -429,7 +429,7 @@ function ItemDetailView({
               })}
             <div className="flex gap-2 mb-2">
               <div className="flex-1">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
                   Expires
                 </div>
                 <div className="p-3 bg-white/[0.04] rounded-md border border-white/[0.06] text-xs text-white/80">
@@ -448,7 +448,7 @@ function ItemDetailView({
             </div>
             {card.brand && (
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/30 px-3 mb-0.5">
+                <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
                   Brand
                 </div>
                 <div className="p-3 bg-white/[0.04] rounded-md border border-white/[0.06] text-xs text-white/80">
@@ -470,13 +470,13 @@ function ItemDetailView({
                 <button
                   onClick={handleDelete}
                   disabled={deleting}
-                  className={`px-3 py-1.5 text-[11px] text-white rounded-md transition-colors ${deleting ? 'bg-red-500/50 cursor-not-allowed' : 'bg-red-500/80 hover:bg-red-400/90 cursor-pointer'}`}
+                  className={`px-3 py-1.5 text-xs text-white rounded-md transition-colors ${deleting ? 'bg-red-500/50 cursor-not-allowed' : 'bg-red-500/80 hover:bg-red-400/90 cursor-pointer'}`}
                 >
                   {deleting ? 'Deleting...' : 'Delete'}
                 </button>
                 <button
                   onClick={() => setConfirmDelete(false)}
-                  className="px-3 py-1.5 text-[11px] bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors cursor-pointer"
+                  className="px-3 py-1.5 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -644,7 +644,7 @@ function AddEditView({
         <div className="flex items-center gap-2">
           <button
             onClick={onCancel}
-            className="border-0 bg-transparent cursor-pointer text-sm p-0.5 text-white/50 hover:text-white/80 transition-colors"
+            className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors"
           >
             ←
           </button>
@@ -807,7 +807,7 @@ function AddEditView({
                     );
                     setShowPassword(true);
                   }}
-                  className="px-2 py-1.5 text-[10px] bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors whitespace-nowrap cursor-pointer"
+                  className="px-2 py-1.5 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors whitespace-nowrap cursor-pointer"
                 >
                   Gen
                 </button>
@@ -1009,7 +1009,7 @@ function VaultTab({
           <select
             value={selectedFolderId ?? ''}
             onChange={(e) => setSelectedFolderId(e.target.value || null)}
-            className="w-full px-2 py-1 border border-white/[0.12] rounded-md bg-white/[0.06] text-white/80 text-[11px] focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
+            className="w-full px-2 py-1 border border-white/[0.12] rounded-md bg-white/[0.06] text-white/80 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500/60"
           >
             <option value="" className="bg-slate-900">All folders</option>
             {folders.map((f) => (
@@ -1022,7 +1022,7 @@ function VaultTab({
       </div>
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
-          <div className="p-6 text-center text-white/40 text-[13px]">
+          <div className="p-6 text-center text-white/40 text-sm">
             {search || selectedFolderId ? 'No matching items' : 'No items in vault'}
           </div>
         ) : (
@@ -1030,17 +1030,17 @@ function VaultTab({
             <div
               key={item.id}
               onClick={() => onSelectItem(item)}
-              className="p-2.5 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.04] transition-colors"
+              className="p-3 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.04] transition-colors"
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <span className="text-sm shrink-0">{typeIcon(item.type)}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-medium text-white truncate">
+                    <div className="text-sm font-medium text-white truncate">
                       {item.name}
                     </div>
                     {item.type === 'login' && (
-                      <div className="text-[11px] text-white/50 mt-[1px] truncate">
+                      <div className="text-xs text-white/50 mt-[1px] truncate">
                         {(item as LoginItem).username}
                       </div>
                     )}
@@ -1054,7 +1054,7 @@ function VaultTab({
                         copyToClipboard((item as LoginItem).username, `u-${item.id}`);
                       }}
                       title="Copy username"
-                      className={`px-1.5 py-0.5 text-[10px] rounded transition-colors cursor-pointer ${copied === `u-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
+                      className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${copied === `u-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
                     >
                       {copied === `u-${item.id}` ? '✓' : '👤'}
                     </button>
@@ -1064,13 +1064,13 @@ function VaultTab({
                         copyToClipboard((item as LoginItem).password, `p-${item.id}`);
                       }}
                       title="Copy password"
-                      className={`px-1.5 py-0.5 text-[10px] rounded transition-colors cursor-pointer ${copied === `p-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
+                      className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${copied === `p-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
                     >
                       {copied === `p-${item.id}` ? '✓' : '🔑'}
                     </button>
                   </div>
                 )}
-                {item.favorite && <span className="text-[10px] ml-0.5">⭐</span>}
+                {item.favorite && <span className="text-xs ml-0.5">⭐</span>}
               </div>
             </div>
           ))
@@ -1093,7 +1093,7 @@ function SiteTab({ items }: { items: VaultItem[] }) {
 
   if (items.length === 0) {
     return (
-      <div className="p-6 text-center text-white/40 text-[13px]">
+      <div className="p-6 text-center text-white/40 text-sm">
         <div className="text-2xl mb-2">🔍</div>
         No saved passwords for this site
       </div>
@@ -1104,7 +1104,7 @@ function SiteTab({ items }: { items: VaultItem[] }) {
     <div className="overflow-y-auto">
       {items.map((item) => (
         <div key={item.id} className="p-3 border-b border-white/[0.06] hover:bg-white/[0.02] transition-colors">
-          <div className="text-[13px] font-semibold text-white mb-1.5 truncate">
+          <div className="text-sm font-semibold text-white mb-1.5 truncate">
             {item.name}
           </div>
           {item.type === 'login' && (
@@ -1115,7 +1115,7 @@ function SiteTab({ items }: { items: VaultItem[] }) {
                 </span>
                 <button
                   onClick={() => copyToClipboard((item as LoginItem).username, `u-${item.id}`)}
-                  className={`px-2 py-1 text-[11px] rounded transition-colors cursor-pointer shrink-0 ${copied === `u-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
+                  className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer shrink-0 ${copied === `u-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
                 >
                   {copied === `u-${item.id}` ? '✓ Copied' : 'Copy User'}
                 </button>
@@ -1124,7 +1124,7 @@ function SiteTab({ items }: { items: VaultItem[] }) {
                 <span className="text-xs text-white/50">••••••••</span>
                 <button
                   onClick={() => copyToClipboard((item as LoginItem).password, `p-${item.id}`)}
-                  className={`px-2 py-1 text-[11px] rounded transition-colors cursor-pointer shrink-0 ${copied === `p-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
+                  className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer shrink-0 ${copied === `p-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
                 >
                   {copied === `p-${item.id}` ? '✓ Copied' : 'Copy Pass'}
                 </button>
@@ -1185,7 +1185,7 @@ function GeneratorTab() {
         ))}
       </div>
 
-      <div className="bg-white/[0.04] border border-white/[0.06] rounded-md p-2.5 font-mono text-[13px] break-all min-h-[40px] text-indigo-300">
+      <div className="bg-white/[0.04] border border-white/[0.06] rounded-md p-2.5 font-mono text-sm break-all min-h-[40px] text-indigo-300">
         {generated}
       </div>
 
@@ -1200,7 +1200,7 @@ function GeneratorTab() {
               }}
             />
           </div>
-          <div className="text-[10px] text-white/40 mt-1">
+          <div className="text-xs text-white/40 mt-1">
             Entropy: {strength.entropy.toFixed(0)} bits
           </div>
         </div>
@@ -1305,12 +1305,12 @@ function TotpItem({ item }: { item: LoginItem }) {
         </div>
       </div>
       <div className="flex flex-col items-center gap-1">
-        <div className={`text-[11px] ${remaining <= 5 ? 'text-red-400' : 'text-white/40'}`}>
+        <div className={`text-xs ${remaining <= 5 ? 'text-red-400' : 'text-white/40'}`}>
           {remaining}s
         </div>
         <button
           onClick={copy}
-          className={`px-2 py-1 text-[11px] rounded transition-colors cursor-pointer ${copied ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
+          className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${copied ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
         >
           {copied ? '✓' : 'Copy'}
         </button>
@@ -1326,7 +1326,7 @@ function TotpTab({ items }: { items: VaultItem[] }) {
 
   if (totpItems.length === 0) {
     return (
-      <div className="p-6 text-center text-white/40 text-[13px]">
+      <div className="p-6 text-center text-white/40 text-sm">
         <div className="text-2xl mb-2">🔑</div>
         No TOTP codes configured
       </div>
@@ -1424,7 +1424,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[200px] text-white/40 text-[13px]">
+      <div className="flex items-center justify-center h-[200px] text-white/40 text-sm">
         Loading...
       </div>
     );
@@ -1506,7 +1506,7 @@ export default function App() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2 text-[11px] border-0 bg-transparent cursor-pointer transition-colors ${activeTab === tab.id ? 'border-b-2 border-indigo-400 text-indigo-300 font-semibold' : 'border-b-2 border-transparent text-white/50 hover:text-white/80'}`}
+            className={`flex-1 py-2.5 text-xs border-0 bg-transparent cursor-pointer transition-colors ${activeTab === tab.id ? 'border-b-2 border-indigo-400 text-indigo-300 font-semibold' : 'border-b-2 border-transparent text-white/50 hover:text-white/80'}`}
           >
             {tab.label}
           </button>

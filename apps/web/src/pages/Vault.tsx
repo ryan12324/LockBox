@@ -39,7 +39,6 @@ export default function Vault() {
 
   const loadVault = useCallback(async () => {
     if (!session || !userKey) {
-      console.warn('[Vault] loadVault skipped — session:', !!session, 'userKey:', !!userKey);
       return;
     }
     setLoading(true);
@@ -58,18 +57,7 @@ export default function Vault() {
               const d = await decryptVaultItem(i.encryptedData, userKey, i.id, i.revisionDate);
               decrypted.push(d);
             } catch (decryptErr) {
-              console.error('[Vault] Decrypt failed for item:', {
-                itemId: i.id,
-                revisionDate: i.revisionDate,
-                encryptedDataLength: i.encryptedData?.length,
-                encryptedDataPrefix: i.encryptedData?.slice(0, 30),
-                hasDot: i.encryptedData?.includes('.'),
-                userKeyType: Object.prototype.toString.call(userKey),
-                userKeyLength: userKey?.length,
-                userKeyFirst4: userKey ? Array.from(userKey.slice(0, 4)) : null,
-                error: decryptErr instanceof Error ? decryptErr.message : String(decryptErr),
-                errorName: decryptErr instanceof Error ? decryptErr.name : typeof decryptErr,
-              });
+              console.error('Failed to decrypt item:', i.id);
               corrupt.push(i);
             }
           }),

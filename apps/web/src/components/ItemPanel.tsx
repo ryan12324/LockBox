@@ -216,12 +216,6 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
       }
 
       // Encrypt with itemId + revisionDate as AAD
-      console.info('[ItemPanel] Encrypting item:', {
-        itemId,
-        revisionDate: now,
-        userKeyLength: userKey.length,
-        userKeyFirst4: Array.from(userKey.slice(0, 4)),
-      });
       const encryptedData = await encryptVaultItem(vaultItem, userKey, itemId, now);
 
       if (isAdd) {
