@@ -17,3 +17,9 @@ coverage/
 .wrangler/
 .output/
 .wxt/
+
+# TypeScript build artifacts (emitted alongside source by tsc)
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
