@@ -274,18 +274,18 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity"
         onClick={onClose}
       />
       
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] bg-white dark:bg-gray-800 shadow-xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0">
+      <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] backdrop-blur-2xl bg-white/[0.08] shadow-[0_16px_48px_rgba(0,0,0,0.35)] border-l border-white/[0.1] z-50 flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0">
         
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-white/[0.1]">
           <div className="flex items-center gap-3">
             <span className="text-2xl">{typeIcon(type)}</span>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate max-w-[200px]">
+            <h2 className="text-lg font-semibold text-white truncate max-w-[200px]">
               {currentMode === 'add' 
                 ? `New ${type.charAt(0).toUpperCase() + type.slice(1)}` 
                 : (name || 'Unnamed Item')}
@@ -295,7 +295,7 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
             {currentMode === 'view' ? (
               <button
                 onClick={() => setCurrentMode('edit')}
-                className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
               >
                 Edit
               </button>
@@ -303,14 +303,14 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
               <>
                 <button
                   onClick={currentMode === 'add' ? onClose : () => setCurrentMode('view')}
-                  className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors disabled:opacity-50"
                   disabled={loading}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 text-sm bg-indigo-600/80 hover:bg-indigo-500/90 text-white backdrop-blur-sm rounded-lg transition-colors disabled:opacity-50"
                   disabled={loading}
                 >
                   {loading ? 'Saving...' : 'Save'}
@@ -319,7 +319,7 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
             )}
             <button
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg transition-colors"
+              className="p-1.5 text-white/30 hover:text-white/60 rounded-lg transition-colors"
             >
               ✕
             </button>
@@ -329,21 +329,21 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {error && (
-            <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm rounded-lg">
+            <div className="p-3 bg-red-500/10 text-red-300 border border-red-400/20 text-sm rounded-lg">
               {error}
             </div>
           )}
 
           {currentMode === 'add' && (
-            <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+            <div className="flex bg-white/[0.06] p-1 rounded-lg">
               {(['login', 'note', 'card'] as VaultItemType[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
                   className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
                     type === t
-                      ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                      ? 'bg-white/[0.12] text-white shadow-sm'
+                      : 'text-white/40 hover:text-white/70'
                   }`}
                 >
                   {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -356,18 +356,18 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
           {currentMode !== 'view' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">Name</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                   placeholder="e.g. My Bank"
                 />
               </div>
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Folder</label>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Folder</label>
                   <select
                     value={creatingFolder ? '__new__' : folderId}
                     onChange={(e) => {
@@ -378,7 +378,7 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                         setFolderId(e.target.value);
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                   >
                     <option value="">No folder</option>
                     {localFolders.map(f => (
@@ -394,11 +394,11 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                         onChange={(e) => setNewFolderName(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName(''); } }}
                         placeholder="Folder name"
-                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className="flex-1 px-2 py-1.5 text-sm border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                         autoFocus
                       />
-                      <button onClick={handleCreateFolder} className="px-2.5 py-1.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg">✓</button>
-                      <button onClick={() => { setCreatingFolder(false); setNewFolderName(''); }} className="px-2 py-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">✕</button>
+                      <button onClick={handleCreateFolder} className="px-2.5 py-1.5 text-xs bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg backdrop-blur-sm">✓</button>
+                      <button onClick={() => { setCreatingFolder(false); setNewFolderName(''); }} className="px-2 py-1.5 text-xs text-white/30 hover:text-white/60">✕</button>
                     </div>
                   )}
                 </div>
@@ -408,9 +408,9 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                       type="checkbox"
                       checked={favorite}
                       onChange={(e) => setFavorite(e.target.checked)}
-                      className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      className="rounded border-white/20 bg-white/10 text-indigo-500 focus:ring-indigo-500/60"
                     />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Favorite</span>
+                    <span className="text-sm font-medium text-white/70">Favorite</span>
                   </label>
                 </div>
               </div>
@@ -419,30 +419,30 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
 
           {/* Type Specific Fields - Edit/Add Mode */}
           {currentMode !== 'view' && type === 'login' && (
-            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">Username</label>
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">Password</label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <input
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
                     >
                       {showPassword ? '👁️‍🗨️' : '👁️'}
                     </button>
@@ -454,24 +454,24 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                       setPassword(pw);
                       setShowPassword(true);
                     }}
-                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors text-sm"
+                    className="px-3 py-2 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors text-sm"
                   >
                     Gen
                   </button>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Authenticator Key (TOTP)</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">Authenticator Key (TOTP)</label>
                 <input
                   type="text"
                   value={totpSecret}
                   onChange={(e) => setTotpSecret(e.target.value)}
                   placeholder="Base32 secret or otpauth:// URI"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URIs</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">URIs</label>
                 {uris.map((uri, idx) => (
                   <div key={idx} className="flex gap-2 mb-2">
                     <input
@@ -483,12 +483,12 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                         setUris(newUris);
                       }}
                       placeholder="https://example.com"
-                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                     />
                     <button
                       type="button"
                       onClick={() => setUris(uris.filter((_, i) => i !== idx))}
-                      className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg"
+                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
                     >
                       ✕
                     </button>
@@ -497,7 +497,7 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                 <button
                   type="button"
                   onClick={() => setUris([...uris, ''])}
-                  className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-sm text-indigo-300 hover:text-indigo-200 hover:underline"
                 >
                   + Add URI
                 </button>
@@ -506,46 +506,46 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
           )}
 
           {currentMode !== 'view' && type === 'note' && (
-            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Secure Note</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">Secure Note</label>
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={8}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-y"
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white resize-y"
                 />
               </div>
             </div>
           )}
 
           {currentMode !== 'view' && type === 'card' && (
-            <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Cardholder Name</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">Cardholder Name</label>
                 <input
                   type="text"
                   value={cardholderName}
                   onChange={(e) => setCardholderName(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Card Number</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">Card Number</label>
                 <input
                   type="text"
                   value={number}
                   onChange={(e) => setNumber(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                 />
               </div>
               <div className="flex gap-4">
                 <div className="w-1/3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Exp Month</label>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Exp Month</label>
                   <select
                     value={expMonth}
                     onChange={(e) => setExpMonth(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                   >
                     {Array.from({length: 12}, (_, i) => {
                       const m = (i + 1).toString().padStart(2, '0');
@@ -554,28 +554,28 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                   </select>
                 </div>
                 <div className="w-1/3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Exp Year</label>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Exp Year</label>
                   <input
                     type="text"
                     value={expYear}
                     onChange={(e) => setExpYear(e.target.value)}
                     placeholder="YYYY"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                   />
                 </div>
                 <div className="w-1/3">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">CVV</label>
+                  <label className="block text-sm font-medium text-white/70 mb-1">CVV</label>
                   <div className="relative">
                     <input
                       type={showCvv ? 'text' : 'password'}
                       value={cvv}
                       onChange={(e) => setCvv(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                     />
                     <button
                       type="button"
                       onClick={() => setShowCvv(!showCvv)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
                     >
                       {showCvv ? '👁️‍🗨️' : '👁️'}
                     </button>
@@ -583,11 +583,11 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Brand</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">Brand</label>
                 <select
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                 >
                   <option value="">Select Brand...</option>
                   <option value="Visa">Visa</option>
@@ -607,16 +607,16 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
               <div className="grid grid-cols-2 gap-4">
                 {folderId && (
                   <div>
-                    <span className="block text-xs font-semibold text-gray-500 uppercase">Folder</span>
-                    <span className="text-sm text-gray-900 dark:text-white">
+                    <span className="block text-xs font-semibold text-white/30 uppercase">Folder</span>
+                    <span className="text-sm text-white">
                       {folders.find(f => f.id === folderId)?.name || 'Unknown'}
                     </span>
                   </div>
                 )}
                 {favorite && (
                   <div>
-                    <span className="block text-xs font-semibold text-gray-500 uppercase">Favorite</span>
-                    <span className="text-sm text-yellow-500">⭐ Yes</span>
+                    <span className="block text-xs font-semibold text-white/30 uppercase">Favorite</span>
+                    <span className="text-sm text-amber-400">⭐ Yes</span>
                   </div>
                 )}
               </div>
@@ -625,12 +625,12 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                 <div className="space-y-4">
                   {username && (
                     <div>
-                      <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">Username</span>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                        <span className="text-sm font-mono text-gray-900 dark:text-white truncate">{username}</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Username</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm font-mono text-white truncate">{username}</span>
                         <button
                           onClick={() => copyToClipboard(username, 'user')}
-                          className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors"
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
                         >
                           {copiedField === 'user' ? '✓' : '📋'}
                         </button>
@@ -639,21 +639,21 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                   )}
                   {password && (
                     <div>
-                      <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">Password</span>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                        <span className="text-sm font-mono text-gray-900 dark:text-white truncate">
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Password</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm font-mono text-white truncate">
                           {showPassword ? password : '••••••••••••••••'}
                         </span>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setShowPassword(!showPassword)}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
                           >
                             {showPassword ? '👁️‍🗨️' : '👁️'}
                           </button>
                           <button
                             onClick={() => copyToClipboard(password, 'pass')}
-                            className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors"
+                            className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
                           >
                             {copiedField === 'pass' ? '✓' : '📋'}
                           </button>
@@ -663,16 +663,16 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                   )}
                   {totpSecret && (
                     <div>
-                      <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">Authenticator Code</span>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                        <span className="text-2xl font-mono tracking-widest text-indigo-600 dark:text-indigo-400">
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Authenticator Code</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-2xl font-mono tracking-widest text-indigo-300">
                           {totpCode || '------'}
                         </span>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-500">{totpRemaining}s</span>
+                          <span className="text-xs text-white/30">{totpRemaining}s</span>
                           <button
                             onClick={() => copyToClipboard(totpCode, 'totp')}
-                            className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors"
+                            className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
                           >
                             {copiedField === 'totp' ? '✓' : '📋'}
                           </button>
@@ -682,21 +682,21 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                   )}
                   {uris.length > 0 && uris.some(u => u.trim()) && (
                     <div>
-                      <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">URIs</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">URIs</span>
                       <div className="space-y-2">
                         {uris.filter(u => u.trim()).map((uri, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                          <div key={idx} className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                             <a 
                               href={uri.startsWith('http') ? uri : `https://${uri}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline truncate"
+                              className="text-sm text-indigo-300 hover:text-indigo-200 hover:underline truncate"
                             >
                               {uri}
                             </a>
                             <button
                               onClick={() => copyToClipboard(uri, `uri-${idx}`)}
-                              className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors"
+                              className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
                             >
                               {copiedField === `uri-${idx}` ? '✓' : '📋'}
                             </button>
@@ -710,8 +710,8 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
 
               {type === 'note' && (
                 <div>
-                  <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">Note Content</span>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg whitespace-pre-wrap text-sm text-gray-900 dark:text-white">
+                  <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Note Content</span>
+                  <div className="p-4 bg-white/[0.04] rounded-lg border border-white/[0.06] whitespace-pre-wrap text-sm text-white">
                     {content}
                   </div>
                 </div>
@@ -721,27 +721,27 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                 <div className="space-y-4">
                   {cardholderName && (
                     <div>
-                      <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">Cardholder Name</span>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm text-gray-900 dark:text-white">
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Cardholder Name</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white">
                         {cardholderName}
                       </div>
                     </div>
                   )}
                   {number && (
                     <div>
-                      <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">Card Number</span>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                        <span className="text-sm font-mono text-gray-900 dark:text-white">{showCardNumber ? number : '•••• •••• •••• ' + number.slice(-4)}</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Card Number</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm font-mono text-white">{showCardNumber ? number : '•••• •••• •••• ' + number.slice(-4)}</span>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setShowCardNumber(!showCardNumber)}
-                            className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
                           >
                             {showCardNumber ? '👁️‍🗨️' : '👁️'}
                           </button>
                           <button
                             onClick={() => copyToClipboard(number, 'cardnum')}
-                            className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors"
+                            className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
                           >
                             {copiedField === 'cardnum' ? '✓' : '📋'}
                           </button>
@@ -751,28 +751,28 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">Expiration</span>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm text-gray-900 dark:text-white">
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Expiration</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white">
                         {expMonth} / {expYear}
                       </div>
                     </div>
                     {cvv && (
                       <div>
-                        <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">CVV</span>
-                        <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg">
-                          <span className="text-sm font-mono text-gray-900 dark:text-white">
+                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">CVV</span>
+                        <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                          <span className="text-sm font-mono text-white">
                             {showCvv ? cvv : '•••'}
                           </span>
                           <div className="flex gap-2">
                             <button
                               onClick={() => setShowCvv(!showCvv)}
-                              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                              className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
                             >
                               {showCvv ? '👁️‍🗨️' : '👁️'}
                             </button>
                             <button
                               onClick={() => copyToClipboard(cvv, 'cvv')}
-                              className="p-1.5 text-gray-400 hover:text-indigo-600 transition-colors"
+                              className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
                             >
                               {copiedField === 'cvv' ? '✓' : '📋'}
                             </button>
@@ -783,8 +783,8 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                   </div>
                   {brand && (
                     <div>
-                      <span className="block text-xs font-semibold text-gray-500 uppercase mb-1">Brand</span>
-                      <div className="p-3 bg-gray-50 dark:bg-gray-900 rounded-lg text-sm text-gray-900 dark:text-white">
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Brand</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white">
                         {brand}
                       </div>
                     </div>
@@ -793,22 +793,22 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
               )}
 
               {/* Bottom Actions for View Mode */}
-              <div className="pt-6 mt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="pt-6 mt-6 border-t border-white/[0.1]">
                 {showConfirmDelete ? (
-                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                    <p className="text-sm text-red-800 dark:text-red-300 mb-3 font-medium">Are you sure you want to delete this item? This cannot be undone.</p>
+                  <div className="p-4 bg-red-500/10 border border-red-400/20 rounded-lg">
+                    <p className="text-sm text-red-300 mb-3 font-medium">Are you sure you want to delete this item? This cannot be undone.</p>
                     <div className="flex gap-3">
                       <button
                         onClick={handleDelete}
                         disabled={loading}
-                        className="px-3 py-1.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                        className="px-3 py-1.5 text-sm bg-red-500/80 hover:bg-red-400/90 text-white rounded-lg transition-colors disabled:opacity-50"
                       >
                         {loading ? 'Deleting...' : 'Yes, Delete'}
                       </button>
                       <button
                         onClick={() => setShowConfirmDelete(false)}
                         disabled={loading}
-                        className="px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors hover:bg-gray-50 dark:hover:bg-gray-700"
+                        className="px-3 py-1.5 text-sm bg-white/[0.06] border border-white/[0.12] text-white/70 rounded-lg transition-colors hover:bg-white/[0.1]"
                       >
                         Cancel
                       </button>
@@ -817,7 +817,7 @@ export default function ItemPanel({ mode, item, folders, onSave, onDelete, onClo
                 ) : (
                   <button
                     onClick={() => setShowConfirmDelete(true)}
-                    className="w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors font-medium"
+                    className="w-full px-4 py-2 text-sm text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors font-medium"
                   >
                     Delete Item
                   </button>
