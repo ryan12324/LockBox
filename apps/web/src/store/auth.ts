@@ -64,6 +64,16 @@ export const useAuthStore = create<AuthState>()(
       },
       // Only persist session — NEVER persist keys
       partialize: (state) => ({ session: state.session }) as AuthState,
+      // Defensive merge: protect memory-only keys from rehydration race conditions.
+      // Without this, async rehydration could theoretically replace the entire state
+      // (via set(merged, true)) and reset userKey/masterKey to null if the merge
+      // runs after setKeys() was called but before the component reads the keys.
+      merge: (persistedState, currentState) => ({
+        ...currentState,
+        ...(persistedState as object),
+        userKey: currentState.userKey,
+        masterKey: currentState.masterKey,
+      }),
     },
   ),
 );

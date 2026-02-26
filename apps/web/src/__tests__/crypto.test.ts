@@ -144,3 +144,133 @@ describe('encryptVaultItem / decryptVaultItem', () => {
     expect(login.uris).toHaveLength(2);
   });
 });
+
+describe('E2E: ItemPanel save → API round-trip → Vault decrypt', () => {
+  it('simulates the exact production create+load flow', async () => {
+    // Simulate the full flow:
+    // 1. ItemPanel.handleSave encrypts an item
+    // 2. Sends to server (we simulate with JSON round-trip)
+    // 3. Server stores values
+    // 4. Vault.loadVault fetches + decrypts
+    const userKey = makeTestKey();
+    const now = new Date().toISOString();
+    const itemId = crypto.randomUUID();
+
+    // ─── Step 1: ItemPanel.handleSave builds the vault item ───
+    const vaultItem: LoginItem = {
+      id: itemId,
+      type: 'login',
+      name: 'My Login',
+      username: 'testuser',
+      password: 'testpass123',
+      uris: ['https://example.com'],
+      totp: undefined,
+      tags: [],
+      favorite: false,
+      createdAt: now,
+      updatedAt: now,
+      revisionDate: now,
+    };
+
+    // ─── Step 2: Encrypt with AAD ───
+    const encryptedData = await encryptVaultItem(vaultItem, userKey, itemId, now);
+
+    // ─── Step 3: Simulate API call — serialize to JSON (as fetch would) ───
+    const requestBody = JSON.stringify({
+      id: itemId,
+      type: 'login',
+      encryptedData,
+      folderId: undefined,
+      tags: [],
+      favorite: false,
+      revisionDate: now,
+    });
+
+    // ─── Step 4: Server receives, stores, returns ───
+    const serverBody = JSON.parse(requestBody);
+    const serverNow = new Date().toISOString(); // server's own timestamp
+    const storedItem = {
+      id: (serverBody.id as string) || crypto.randomUUID(),
+      userId: 'user-123',
+      type: serverBody.type,
+      encryptedData: serverBody.encryptedData,
+      folderId: serverBody.folderId ?? null,
+      tags: serverBody.tags ? JSON.stringify(serverBody.tags) : null,
+      favorite: serverBody.favorite ? 1 : 0,
+      revisionDate: (serverBody.revisionDate as string) || serverNow,
+      createdAt: serverNow,
+      deletedAt: null,
+    };
+
+    // ─── Step 5: Vault.loadVault fetches items (simulate JSON round-trip) ───
+    const apiResponse = JSON.parse(JSON.stringify({ items: [storedItem], folders: [] }));
+    const item = apiResponse.items[0];
+
+    // ─── Step 6: Decrypt — exactly as Vault.tsx does ───
+    const decrypted = await decryptVaultItem(
+      item.encryptedData,
+      userKey,
+      item.id,
+      item.revisionDate,
+    );
+
+    expect(decrypted.name).toBe('My Login');
+    expect((decrypted as LoginItem).username).toBe('testuser');
+    expect((decrypted as LoginItem).password).toBe('testpass123');
+  });
+
+  it('simulates key derivation round-trip (register → unlock)', async () => {
+    const { generateUserKey, encryptUserKey, decryptUserKey, deriveKey, toBase64, fromBase64 } = await import('@lockbox/crypto');
+
+
+    const password = 'my-test-password-123';
+    const kdfConfig = { type: 'argon2id' as const, iterations: 3, memory: 65536, parallelism: 4 };
+
+    // ─── Registration ───
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const saltB64 = toBase64(salt);
+    const masterKey1 = await deriveKey(password, salt, kdfConfig);
+    const userKey1 = generateUserKey();
+    const encryptedUserKey = await encryptUserKey(userKey1, masterKey1);
+
+    // ─── Simulate server storage → JSON round-trip ───
+    const serverStored = JSON.parse(JSON.stringify({
+      encryptedUserKey,
+      kdfConfig,
+      salt: saltB64,
+    }));
+
+    // ─── Login / Unlock — re-derive keys from stored data ───
+    const salt2 = fromBase64(serverStored.salt);
+    const masterKey2 = await deriveKey(password, salt2, serverStored.kdfConfig);
+    const userKey2 = await decryptUserKey(serverStored.encryptedUserKey, masterKey2);
+
+    // Keys must match
+    expect(userKey1.length).toBe(userKey2.length);
+    expect(Array.from(userKey1)).toEqual(Array.from(userKey2));
+
+    // ─── Now verify vault item encrypt/decrypt works across key derivation ───
+    const now = new Date().toISOString();
+    const itemId = crypto.randomUUID();
+    const item: LoginItem = {
+      id: itemId,
+      type: 'login',
+      name: 'Cross-session Test',
+      username: 'user',
+      password: 'pass',
+      uris: [],
+      tags: [],
+      favorite: false,
+      createdAt: now,
+      updatedAt: now,
+      revisionDate: now,
+    };
+
+    // Encrypt with original key
+    const encrypted = await encryptVaultItem(item, userKey1, itemId, now);
+
+    // Decrypt with re-derived key
+    const decrypted = await decryptVaultItem(encrypted, userKey2, itemId, now);
+    expect(decrypted.name).toBe('Cross-session Test');
+  });
+});

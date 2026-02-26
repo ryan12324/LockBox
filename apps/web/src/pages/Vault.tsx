@@ -38,7 +38,10 @@ export default function Vault() {
   const [corruptItems, setCorruptItems] = useState<EncryptedItem[]>([]);
 
   const loadVault = useCallback(async () => {
-    if (!session || !userKey) return;
+    if (!session || !userKey) {
+      console.warn('[Vault] loadVault skipped — session:', !!session, 'userKey:', !!userKey);
+      return;
+    }
     setLoading(true);
     try {
       const res = await api.vault.list(session.token) as { items: EncryptedItem[]; folders: Folder[] };
@@ -54,7 +57,19 @@ export default function Vault() {
             try {
               const d = await decryptVaultItem(i.encryptedData, userKey, i.id, i.revisionDate);
               decrypted.push(d);
-            } catch {
+            } catch (decryptErr) {
+              console.error('[Vault] Decrypt failed for item:', {
+                itemId: i.id,
+                revisionDate: i.revisionDate,
+                encryptedDataLength: i.encryptedData?.length,
+                encryptedDataPrefix: i.encryptedData?.slice(0, 30),
+                hasDot: i.encryptedData?.includes('.'),
+                userKeyType: Object.prototype.toString.call(userKey),
+                userKeyLength: userKey?.length,
+                userKeyFirst4: userKey ? Array.from(userKey.slice(0, 4)) : null,
+                error: decryptErr instanceof Error ? decryptErr.message : String(decryptErr),
+                errorName: decryptErr instanceof Error ? decryptErr.name : typeof decryptErr,
+              });
               corrupt.push(i);
             }
           }),
