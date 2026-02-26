@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
 import type { VaultItem, Folder } from '@lockbox/types';
+import ItemPanel from '../components/ItemPanel.js';
 
 interface EncryptedItem {
   id: string;
@@ -29,6 +30,7 @@ export default function Vault() {
   const [showFavorites, setShowFavorites] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [panelState, setPanelState] = useState<{ mode: 'view' | 'edit' | 'add'; item: VaultItem | null } | null>(null);
 
   const loadVault = useCallback(async () => {
     if (!session || !userKey) return;
@@ -174,14 +176,20 @@ export default function Vault() {
       {/* Main content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Search bar */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex gap-3">
           <input
             type="search"
             placeholder="Search vault..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
+          <button
+            onClick={() => setPanelState({ mode: 'add', item: null })}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors"
+          >
+            + Add
+          </button>
         </div>
 
         {/* Item list */}
@@ -205,7 +213,8 @@ export default function Vault() {
               {filteredItems.map((item) => (
                 <div
                   key={item.id}
-                  className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-4 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors"
+                  onClick={() => setPanelState({ mode: 'view', item })}
+                  className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex items-center gap-4 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors cursor-pointer"
                 >
                   <div className="text-2xl">{typeIcon(item.type)}</div>
                   <div className="flex-1 min-w-0">
@@ -218,7 +227,7 @@ export default function Vault() {
                   </div>
                   {item.type === 'login' && (
                     <button
-                      onClick={() => copyToClipboard((item as { password?: string }).password ?? '', item.id)}
+                      onClick={(e) => { e.stopPropagation(); copyToClipboard((item as { password?: string }).password ?? '', item.id); }}
                       className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-gray-700 dark:text-gray-300 rounded-md transition-colors"
                     >
                       {copiedId === item.id ? '✓ Copied' : 'Copy Password'}
@@ -231,6 +240,17 @@ export default function Vault() {
           )}
         </div>
       </main>
+
+      {panelState && (
+        <ItemPanel
+          mode={panelState.mode}
+          item={panelState.item}
+          folders={folders}
+          onSave={() => { setPanelState(null); loadVault(); }}
+          onDelete={() => { setPanelState(null); loadVault(); }}
+          onClose={() => setPanelState(null)}
+        />
+      )}
     </div>
   );
 }
