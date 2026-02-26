@@ -17,6 +17,7 @@ type Bindings = {
   DB: D1Database;
   SYNC_HUB: DurableObjectNamespace;
   AUTH_LIMITER: RateLimit;
+  CORS_ORIGINS?: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();

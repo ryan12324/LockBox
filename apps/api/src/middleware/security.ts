@@ -4,20 +4,26 @@
 
 import { createMiddleware } from 'hono/factory';
 
-const ALLOWED_ORIGINS = ['https://vault.lockbox.dev'];
+type Env = { Bindings: { CORS_ORIGINS?: string } };
 
-function isAllowedOrigin(origin: string): boolean {
-  if (ALLOWED_ORIGINS.includes(origin)) return true;
+function parseAllowedOrigins(envValue?: string): string[] {
+  if (!envValue) return [];
+  return envValue.split(',').map((o) => o.trim()).filter(Boolean);
+}
+
+function isAllowedOrigin(origin: string, allowedOrigins: string[]): boolean {
+  if (allowedOrigins.includes(origin)) return true;
   if (origin.startsWith('chrome-extension://')) return true;
   if (origin.startsWith('moz-extension://')) return true;
   return false;
 }
 
 /** CORS middleware — allows web vault and browser extension origins. */
-export const corsMiddleware = createMiddleware(async (c, next) => {
+export const corsMiddleware = createMiddleware<Env>(async (c, next) => {
   const origin = c.req.header('Origin') ?? '';
+  const allowedOrigins = parseAllowedOrigins(c.env.CORS_ORIGINS);
 
-  if (isAllowedOrigin(origin)) {
+  if (isAllowedOrigin(origin, allowedOrigins)) {
     c.header('Access-Control-Allow-Origin', origin);
     c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');
