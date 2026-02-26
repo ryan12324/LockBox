@@ -57,7 +57,8 @@ describe('CORS middleware', () => {
       method: 'OPTIONS',
       headers: { Origin: 'https://lockbox-web.pages.dev' },
     }, TEST_ENV);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(204);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://lockbox-web.pages.dev');
   });
 
   it('no CORS headers when no Origin header', async () => {

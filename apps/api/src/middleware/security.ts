@@ -31,7 +31,7 @@ export const corsMiddleware = createMiddleware<Env>(async (c, next) => {
   }
 
   if (c.req.method === 'OPTIONS') {
-    return new Response(null, { status: 200 });
+    return c.body(null, 204);
   }
 
   await next();
