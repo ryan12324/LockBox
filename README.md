@@ -5,14 +5,15 @@
 <h1 align="center">Lockbox</h1>
 
 <p align="center">
-  <strong>Your passwords. Your server. Your rules.</strong><br/>
-  A self-hosted password manager that runs entirely on Cloudflare's free tier.
+  <strong>Your passwords. Your server. Your rules. Your AI.</strong><br/>
+  A self-hosted, AI-first password manager that runs entirely on Cloudflare's free tier.
 </p>
 
 <p align="center">
   <a href="#quick-start"><img src="https://img.shields.io/badge/deploy-1--click-6366f1?style=for-the-badge&logo=cloudflare&logoColor=white" alt="1-Click Deploy" /></a>&nbsp;
   <a href="#features"><img src="https://img.shields.io/badge/e2e-encrypted-10b981?style=for-the-badge&logo=letsencrypt&logoColor=white" alt="E2E Encrypted" /></a>&nbsp;
-  <a href="#architecture"><img src="https://img.shields.io/badge/100%25-open--source-f59e0b?style=for-the-badge&logo=github&logoColor=white" alt="Open Source" /></a>
+  <a href="#architecture"><img src="https://img.shields.io/badge/100%25-open--source-f59e0b?style=for-the-badge&logo=github&logoColor=white" alt="Open Source" /></a>&nbsp;
+  <a href="#ai-features"><img src="https://img.shields.io/badge/AI--first-BYOK-a855f7?style=for-the-badge&logo=openai&logoColor=white" alt="AI-First" /></a>
 </p>
 
 <br/>
@@ -27,9 +28,9 @@
 
 ## Why Lockbox?
 
-Most password managers ask you to trust _their_ servers with your most sensitive data. Lockbox flips that model — **you host everything yourself**, on infrastructure you control, for **$0/month**.
+Most password managers ask you to trust _their_ servers with your most sensitive data. Lockbox flips that model — **you host everything yourself**, on infrastructure you control, for **$0/month**. And with built-in AI features that run **on-device** or through your own API keys (BYOK), your vault gets smarter without ever compromising your privacy.
 
-No subscriptions. No data harvesting. No "we got breached" emails. Just a fast, modern password manager that **you** own end-to-end.
+No subscriptions. No data harvesting. No "we got breached" emails. Just a fast, modern, AI-powered password manager that **you** own end-to-end.
 
 <table>
 <tr>
@@ -87,7 +88,7 @@ No subscriptions. No data harvesting. No "we got breached" emails. Just a fast, 
 <td align="center" width="25%">
   <h3>🎲</h3>
   <strong>Smart Generator</strong><br/>
-  <sub>Generate strong passwords with real-time strength analysis powered by zxcvbn.</sub>
+  <sub>Site-aware password generation that detects requirements and ensures compliance.</sub>
 </td>
 <td align="center" width="25%">
   <h3>📦</h3>
@@ -105,7 +106,59 @@ No subscriptions. No data harvesting. No "we got breached" emails. Just a fast, 
   <sub>MIT licensed. Audit it. Fork it. Make it yours. No vendor lock-in, ever.</sub>
 </td>
 </tr>
+<tr>
+<td align="center" width="25%">
+  <h3>🧠</h3>
+  <strong>AI Health Dashboard</strong><br/>
+  <sub>Real-time vault health scoring, weak/reused password detection, and HIBP breach monitoring.</sub>
+</td>
+<td align="center" width="25%">
+  <h3>🔍</h3>
+  <strong>Semantic Search</strong><br/>
+  <sub>Find vault items with natural language — "my work email" or "streaming services".</sub>
+</td>
+<td align="center" width="25%">
+  <h3>🐟</h3>
+  <strong>Phishing Detection</strong><br/>
+  <sub>8-check URL analysis catches lookalike domains, suspicious TLDs, and homoglyph attacks.</sub>
+</td>
+<td align="center" width="25%">
+  <h3>✨</h3>
+  <strong>Vault Chat Assistant</strong><br/>
+  <sub>Autonomous AI agent that can search, create, edit, and organize your vault via chat.</sub>
+</td>
+</tr>
 </table>
+
+---
+
+## AI Features
+
+Lockbox ships with a full AI engine that keeps your data private. **No vault data ever leaves your device** — AI features run on-device or use your own API keys (BYOK).
+
+| Feature | What it does | Privacy |
+| --- | --- | --- |
+| **Health Dashboard** | Scores your vault (weak, reused, old passwords) with fix-it-now prioritization | On-device |
+| **Breach Monitoring** | Background HIBP k-anonymity checks with breach detail enrichment | On-device (k-anon hash prefix only) |
+| **Semantic Search** | Natural language vault search — "my work email" finds the right item | On-device (TF-IDF, pluggable embeddings) |
+| **Phishing Detection** | 8-check URL analysis: homoglyphs, lookalike domains, suspicious TLDs, punycode | On-device + optional API |
+| **Auto-Categorization** | 80+ domain mappings, automatic tag suggestions for new items | On-device |
+| **Contextual Alerts** | Per-item security warnings with breach context and rotation nudges | On-device |
+| **Smart Generation** | Detects site password rules and generates compliant passwords | On-device |
+| **Vault Chat Assistant** | Autonomous agent with 10 tools — search, create, edit, delete, rotate, organize | BYOK (your API key) |
+| **Security Copilot** | Proactive posture scoring with categorized actions and scheduled scans | On-device |
+| **Lifecycle Tracker** | Credential rotation schedules — flags overdue and due-soon passwords | On-device |
+
+### Bring Your Own Key (BYOK)
+
+The chat assistant and advanced LLM features support multiple providers:
+
+- **OpenRouter** / **Vercel AI Gateway** — unified gateway access
+- **OpenAI** / **Anthropic** / **Google** — direct provider APIs
+- **Ollama** — fully local, zero network calls
+- **Cloudflare Workers AI** — runs on your own Cloudflare account
+
+Configure in **Settings → AI** across web, extension, and mobile.
 
 ---
 
@@ -150,12 +203,13 @@ Lockbox is a monorepo with a clean separation between the API (the only server c
 
 ### Shared Packages
 
-| Package              | What it does                                                          |
-| -------------------- | --------------------------------------------------------------------- |
-| `@lockbox/crypto`    | Argon2id key derivation, AES-GCM encrypt/decrypt, zero-knowledge auth |
-| `@lockbox/generator` | Password generation with zxcvbn strength scoring                      |
-| `@lockbox/totp`      | TOTP code generation and validation                                   |
-| `@lockbox/types`     | Shared TypeScript types across all apps                               |
+| Package              | What it does                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| `@lockbox/crypto`    | Argon2id key derivation, AES-GCM encrypt/decrypt, zero-knowledge auth                 |
+| `@lockbox/generator` | Password generation with zxcvbn strength scoring + site-aware smart generation         |
+| `@lockbox/totp`      | TOTP code generation and validation                                                   |
+| `@lockbox/types`     | Shared TypeScript types across all apps                                               |
+| `@lockbox/ai`        | AI engine — health analysis, semantic search, phishing detection, vault agent, copilot |
 
 ---
 
@@ -257,6 +311,7 @@ cd apps/extension && bun run dev
 | **Crypto**        | Web Crypto API + [hash-wasm](https://github.com/nicolo-ribaudo/hash-wasm) (Argon2id) |
 | **Monorepo**      | [Turborepo](https://turbo.build/) + [Bun](https://bun.sh/) workspaces                |
 | **Testing**       | [Vitest](https://vitest.dev/)                                                        |
+| **AI Engine**     | `@lockbox/ai` — on-device health analysis, semantic search, agent tooling, BYOK LLM  |
 
 ---
 
@@ -268,6 +323,7 @@ Lockbox follows a **zero-knowledge architecture**:
 2. **Vault Encryption** — All vault items are encrypted client-side with AES-GCM before being sent to the server.
 3. **Server Blindness** — The API stores only ciphertext. Even if someone gains full database access, they see nothing useful.
 4. **No Recovery** — There's no "forgot password" flow. Your master password is the only way in. This is a feature, not a bug.
+5. **AI Privacy** — AI features run on-device. The chat assistant uses your own API keys (BYOK) — vault data is never sent to Lockbox servers.
 
 > **Self-hosting amplifies this** — the encrypted data lives on _your_ Cloudflare account, not a shared multi-tenant system.
 
@@ -283,6 +339,7 @@ lockbox/
 │   ├── extension/    # WXT browser extension
 │   └── mobile/       # Capacitor Android app
 ├── packages/
+│   ├── ai/           # AI engine (health, search, agent, copilot)
 │   ├── crypto/       # Encryption & key derivation
 │   ├── generator/    # Password generation
 │   ├── totp/         # TOTP (2FA) utilities
