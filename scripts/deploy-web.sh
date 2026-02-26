@@ -97,7 +97,17 @@ info "Building web vault (and shared packages)..."
 bun run build
 ok "Build complete"
 
-# ── 5. Deploy to Cloudflare Pages ────────────────────────────────────
+# ── 5. Ensure Pages project exists ────────────────────────────────
+info "Ensuring Pages project '$PROJECT_NAME' exists..."
+if ! $WRANGLER pages project list 2>/dev/null | grep -q "$PROJECT_NAME"; then
+  info "Creating Pages project '$PROJECT_NAME'..."
+  $WRANGLER pages project create "$PROJECT_NAME" --production-branch=main
+  ok "Pages project created"
+else
+  ok "Pages project '$PROJECT_NAME' already exists"
+fi
+
+# ── 6. Deploy to Cloudflare Pages ────────────────────────────────
 info "Deploying to Cloudflare Pages..."
 cd "$WEB_DIR"
 if ! DEPLOY_OUTPUT=$($WRANGLER pages deploy --commit-dirty=true 2>&1); then
@@ -107,7 +117,7 @@ fi
 echo "$DEPLOY_OUTPUT"
 ok "Deployed to Cloudflare Pages"
 
-# ── 6. Print summary ────────────────────────────────────────────────
+# ── 7. Print summary ────────────────────────────────────────────────
 PAGES_URL=$(echo "$DEPLOY_OUTPUT" | grep -oP 'https://[^\s]+\.pages\.dev' | head -1 || true)
 
 echo ""
