@@ -13,6 +13,9 @@
 #
 set -euo pipefail
 
+# Ensure bun is in PATH (common install location)
+export PATH="$HOME/.bun/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WEB_DIR="$ROOT_DIR/apps/web"
