@@ -26,6 +26,7 @@
 - Tailwind v4, indigo-600 primary, full dark mode (`dark:` variants)
 - Auth: `session` → sessionStorage; `userKey`/`masterKey` → memory-only, never persisted
 - Every feature must be implemented across all surfaces (web, extension, mobile) — no single-app features
+- Commit and push often
 
 ## Testing
 
