@@ -325,12 +325,21 @@ function injectOverlays(): void {
   for (const form of forms) {
     const { passwordField, usernameField } = form;
 
-    if (injectedFields.has(passwordField)) continue;
-    injectedFields.add(passwordField);
+    // Inject lock icon on the password field
+    if (!injectedFields.has(passwordField)) {
+      injectedFields.add(passwordField);
+      createLockIconOverlay(passwordField, () => {
+        handleAutofill(passwordField, usernameField).catch(console.error);
+      });
+    }
 
-    createLockIconOverlay(passwordField, () => {
-      handleAutofill(passwordField, usernameField).catch(console.error);
-    });
+    // Also inject lock icon on the username field so clicking it triggers autofill too
+    if (usernameField && !injectedFields.has(usernameField)) {
+      injectedFields.add(usernameField);
+      createLockIconOverlay(usernameField, () => {
+        handleAutofill(passwordField, usernameField).catch(console.error);
+      });
+    }
   }
 
   // Identity forms

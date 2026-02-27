@@ -46,12 +46,12 @@ export function fillForm(form: DetectedForm, username: string, password: string)
 }
 
 /**
- * Create a lock icon overlay for a password field.
+ * Create a lock icon overlay for an input field.
  * Uses position:fixed to avoid stacking-context issues with the input.
  * Shadow DOM isolates styles from the page.
  */
 export function createLockIconOverlay(
-  passwordField: HTMLInputElement,
+  field: HTMLInputElement,
   onClick: () => void,
 ): HTMLElement {
   const host = document.createElement('div');
@@ -60,7 +60,7 @@ export function createLockIconOverlay(
   // Position the icon inside the right edge of the input using fixed positioning.
   // This avoids stacking context / overflow:hidden issues with the parent.
   const positionIcon = () => {
-    const rect = passwordField.getBoundingClientRect();
+    const rect = field.getBoundingClientRect();
     const size = 24;
     host.style.cssText = `
       position: fixed;
