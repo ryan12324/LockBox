@@ -10,7 +10,7 @@ import { createDb } from '../db/index.js';
 import { vaultItems, folders, vaultItemVersions } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 
-export const VALID_TYPES = ['login', 'note', 'card', 'identity'] as const;
+export const VALID_TYPES = ['login', 'note', 'card', 'identity', 'passkey', 'document'] as const;
 
 type Bindings = { DB: D1Database };
 type Variables = { userId: string };

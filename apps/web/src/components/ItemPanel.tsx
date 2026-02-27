@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
 import { encryptVaultItem } from '../lib/crypto.js';
@@ -23,6 +24,7 @@ interface ItemPanelProps {
 
 export default function ItemPanel({ mode, item, folders, items, onSave, onDelete, onClose }: ItemPanelProps) {
   const { session, userKey } = useAuthStore();
+  const navigate = useNavigate();
   
   const [currentMode, setCurrentMode] = useState(mode);
   const [type, setType] = useState<VaultItemType>(item?.type || 'login');
@@ -1194,6 +1196,14 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                         </div>
                       </div>
                     </div>
+                  )}
+                  {password && (
+                    <button
+                      onClick={() => navigate('/health')}
+                      className="w-full px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white/80 rounded-lg transition-colors text-sm font-medium"
+                    >
+                      🔄 Rotate Password
+                    </button>
                   )}
                   {totpSecret && (
                     <div>

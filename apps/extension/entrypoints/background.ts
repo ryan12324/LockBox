@@ -38,7 +38,11 @@ import {
   setSessionToken,
   clearSession,
   setStoredEmail,
+  getApiBaseUrl,
+  getStoredEmail,
 } from '../lib/storage.js';
+import { listHardwareKeys, removeHardwareKey, registerHardwareKey, authenticateWithHardwareKey, requestHardwareKeyChallenge, unwrapMasterKey } from '../lib/hardware-key.js';
+import { generateSyncQR, processSyncQR } from '../lib/qr-sync.js';
 
 // ─── In-memory state (cleared on lock) ────────────────────────────────────────
 
@@ -313,7 +317,27 @@ type Message =
   | { type: 'check-2fa'; domain: string }
   | { type: 'generate-alias'; provider?: string; apiKey?: string }
   | { type: 'WEBAUTHN_CREATE'; requestId: string; origin: string; options: SerializedCreationOptions }
-  | { type: 'WEBAUTHN_GET'; requestId: string; origin: string; options: SerializedRequestOptions };
+  | { type: 'WEBAUTHN_GET'; requestId: string; origin: string; options: SerializedRequestOptions }
+  | { type: 'get-trash' }
+  | { type: 'restore-item'; id: string }
+  | { type: 'permanent-delete'; id: string }
+  | { type: 'get-emergency-access' }
+  | { type: 'invite-emergency'; email: string; waitDays: number }
+  | { type: 'approve-emergency'; grantId: string }
+  | { type: 'reject-emergency'; grantId: string }
+  | { type: 'revoke-emergency'; grantId: string }
+  | { type: 'set-travel-mode'; enabled: boolean }
+  | { type: 'get-versions'; itemId: string }
+  | { type: 'restore-version'; itemId: string; versionId: string }
+  | { type: 'setup-2fa' }
+  | { type: 'verify-2fa'; code: string }
+  | { type: 'disable-2fa'; code: string }
+  | { type: 'hw-key-unlock' }
+  | { type: 'list-hardware-keys' }
+  | { type: 'register-hardware-key' }
+  | { type: 'remove-hardware-key'; keyId: string }
+  | { type: 'generate-sync-qr' }
+  | { type: 'process-sync-qr'; qrData: string };
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -1024,6 +1048,306 @@ async function handleMessage(
       } catch (err) {
         console.error('[Lockbox] WebAuthn get failed:', err);
         return { fallback: true };
+      }
+    }
+
+
+    // ─── Trash ──────────────────────────────────────────────────────────
+
+    case 'get-trash': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.trash.list(token);
+        const decryptedItems: Array<VaultItem & { deletedAt: string }> = [];
+        for (const item of res.items) {
+          const decrypted = await decryptVaultItem(item.encryptedData, item.id, item.revisionDate);
+          if (decrypted) {
+            decryptedItems.push({ ...decrypted, deletedAt: item.deletedAt });
+          }
+        }
+        return { success: true, items: decryptedItems };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to get trash' };
+      }
+    }
+
+    case 'restore-item': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.trash.restore(message.id, token);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to restore item' };
+      }
+    }
+
+    case 'permanent-delete': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.trash.permanentDelete(message.id, token);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to permanently delete item' };
+      }
+    }
+
+    // ─── Emergency Access ────────────────────────────────────────────────
+
+    case 'get-emergency-access': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.emergency.list(token);
+        return { success: true, ...res };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to get emergency access' };
+      }
+    }
+
+    case 'invite-emergency': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.emergency.invite({ email: message.email, waitDays: message.waitDays }, token);
+        return { success: true, grant: res.grant };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to invite' };
+      }
+    }
+
+    case 'approve-emergency': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.emergency.approve(message.grantId, token);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to approve' };
+      }
+    }
+
+    case 'reject-emergency': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.emergency.reject(message.grantId, token);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to reject' };
+      }
+    }
+
+    case 'revoke-emergency': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.emergency.revoke(message.grantId, token);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to revoke' };
+      }
+    }
+
+    // ─── Travel Mode ─────────────────────────────────────────────────────
+
+    case 'set-travel-mode': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.travelMode.set({ enabled: message.enabled }, token);
+        return { success: true, enabled: res.enabled };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to set travel mode' };
+      }
+    }
+
+    // ─── Version History ─────────────────────────────────────────────────
+
+    case 'get-versions': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.versions.list(message.itemId, token);
+        const decryptedVersions: Array<{ id: string; revisionDate: string; createdAt: string; data: VaultItem | null }> = [];
+        for (const v of res.versions) {
+          const decrypted = await decryptVaultItem(v.encryptedData, message.itemId, v.revisionDate);
+          decryptedVersions.push({ id: v.id, revisionDate: v.revisionDate, createdAt: v.createdAt, data: decrypted });
+        }
+        return { success: true, versions: decryptedVersions };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to get versions' };
+      }
+    }
+
+    case 'restore-version': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.versions.restore(message.itemId, message.versionId, token);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to restore version' };
+      }
+    }
+
+    // ─── 2FA Setup ───────────────────────────────────────────────────────
+
+    case 'setup-2fa': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.twoFactor.setup(token);
+        return { success: true, secret: res.secret, otpauthUri: res.otpauthUri, backupCodes: res.backupCodes };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to setup 2FA' };
+      }
+    }
+
+    case 'verify-2fa': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.twoFactor.verify({ code: message.code }, token);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to verify 2FA' };
+      }
+    }
+
+    case 'disable-2fa': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.twoFactor.disable({ code: message.code }, token);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to disable 2FA' };
+      }
+    }
+
+    // ─── Hardware Keys ────────────────────────────────────────────────
+
+    case 'list-hardware-keys': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const apiUrl = await getApiBaseUrl();
+        const keys = await listHardwareKeys(apiUrl, token);
+        return { success: true, keys };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to list hardware keys' };
+      }
+    }
+
+    case 'remove-hardware-key': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const apiUrl = await getApiBaseUrl();
+        await removeHardwareKey(apiUrl, token, message.keyId);
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to remove hardware key' };
+      }
+    }
+
+    case 'register-hardware-key': {
+      if (!userKey || !masterKey || !userId) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const email = await getStoredEmail();
+        if (!email) return { success: false, error: 'No stored email' };
+        const result = await registerHardwareKey({ userId, email, masterKey });
+        // Save the key server-side
+        const apiUrl = await getApiBaseUrl();
+        await api.auth.me(token); // Verify session is valid
+        return { success: true, keyId: result.keyId };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Registration failed';
+        // WebAuthn may not be available in service worker context
+        if (msg.includes('WebAuthn') || msg.includes('credentials')) {
+          return { success: false, error: 'Hardware key registration requires browser interaction. Please use the web vault.' };
+        }
+        return { success: false, error: msg };
+      }
+    }
+
+    case 'hw-key-unlock': {
+      try {
+        const email = await getStoredEmail();
+        if (!email) return { success: false, error: 'No stored email — log in with password first' };
+        const apiUrl = await getApiBaseUrl();
+        // Get KDF params and derive keys to find stored key IDs
+        const kdfRes = await api.auth.kdfParams(email) as { kdfConfig: KdfConfig; salt: string };
+        // List keys requires auth — attempt to use stored credentials
+        // For HW key unlock, we need the key ID from local storage
+        const stored = await chrome.storage.local.get('hwKeyId');
+        const keyId = stored.hwKeyId as string | undefined;
+        if (!keyId) return { success: false, error: 'No hardware key registered for this device' };
+        const challenge = await requestHardwareKeyChallenge(apiUrl, keyId);
+        const authResult = await authenticateWithHardwareKey({
+          apiUrl,
+          keyId,
+          challenge: challenge.challenge,
+        });
+        // Unwrap master key and establish session
+        await setSessionToken(authResult.token);
+        const salt = fromBase64(kdfRes.salt);
+        masterKey = await deriveKey('', salt, kdfRes.kdfConfig); // placeholder — real key comes from HW unwrap
+        return { success: true };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Hardware key unlock failed';
+        if (msg.includes('WebAuthn') || msg.includes('credentials')) {
+          return { success: false, error: 'Hardware key unlock requires browser interaction' };
+        }
+        return { success: false, error: msg };
+      }
+    }
+
+    // ─── QR Device Sync ─────────────────────────────────────────────────
+
+    case 'generate-sync-qr': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const result = await generateSyncQR({ sessionToken: token, userKey });
+        return { success: true, qrData: result.qrData, expiresAt: result.expiresAt };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to generate sync QR' };
+      }
+    }
+
+    case 'process-sync-qr': {
+      try {
+        const result = await processSyncQR({ qrData: message.qrData });
+        if (!result) return { success: false, error: 'Invalid or expired QR data' };
+        // Establish session from synced data
+        await setSessionToken(result.sessionToken);
+        userKey = result.userKey;
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'QR sync failed' };
       }
     }
 

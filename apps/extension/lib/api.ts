@@ -152,6 +152,54 @@ export const api = {
       request<{ encryptedData: string }>(`/api/vault/items/${itemId}/attachments/${attachmentId}`, { token }),
   },
 
+  // ─── Trash ──────────────────────────────────────────────────
+  trash: {
+    list: (token: string) =>
+      request<{ items: Array<{ id: string; type: string; encryptedData: string; revisionDate: string; deletedAt: string }> }>('/api/vault/trash', { token }),
+    restore: (id: string, token: string) =>
+      request<{ success: boolean }>(`/api/vault/items/${id}/restore`, { method: 'POST', token }),
+    permanentDelete: (id: string, token: string) =>
+      request<{ success: boolean }>(`/api/vault/items/${id}/permanent`, { method: 'DELETE', token }),
+  },
+
+  // ─── Emergency Access ─────────────────────────────────────────
+  emergency: {
+    list: (token: string) =>
+      request<{ grantsAsGrantor: Array<{ id: string; granteeEmail: string; status: string; waitDays: number; createdAt: string }>; grantsAsGrantee: Array<{ id: string; grantorEmail: string; status: string; waitDays: number; createdAt: string }> }>('/api/emergency', { token }),
+    invite: (body: { email: string; waitDays: number }, token: string) =>
+      request<{ success: boolean; grant: { id: string; granteeEmail: string; status: string; waitDays: number } }>('/api/emergency', { method: 'POST', body: JSON.stringify(body), token }),
+    approve: (grantId: string, token: string) =>
+      request<{ success: boolean }>(`/api/emergency/${grantId}/approve`, { method: 'PUT', token }),
+    reject: (grantId: string, token: string) =>
+      request<{ success: boolean }>(`/api/emergency/${grantId}/reject`, { method: 'PUT', token }),
+    revoke: (grantId: string, token: string) =>
+      request<{ success: boolean }>(`/api/emergency/${grantId}/revoke`, { method: 'DELETE', token }),
+  },
+
+  // ─── Travel Mode ──────────────────────────────────────────────
+  travelMode: {
+    set: (body: { enabled: boolean }, token: string) =>
+      request<{ success: boolean; enabled: boolean }>('/api/settings/travel-mode', { method: 'PUT', body: JSON.stringify(body), token }),
+  },
+
+  // ─── 2FA ──────────────────────────────────────────────────────
+  twoFactor: {
+    setup: (token: string) =>
+      request<{ success: boolean; secret: string; otpauthUri: string; backupCodes: string[] }>('/api/auth/2fa/setup', { method: 'POST', token }),
+    verify: (body: { code: string }, token: string) =>
+      request<{ success: boolean }>('/api/auth/2fa/verify', { method: 'POST', body: JSON.stringify(body), token }),
+    disable: (body: { code: string }, token: string) =>
+      request<{ success: boolean }>('/api/auth/2fa/disable', { method: 'POST', body: JSON.stringify(body), token }),
+  },
+
+  // ─── Version History ──────────────────────────────────────────
+  versions: {
+    list: (itemId: string, token: string) =>
+      request<{ versions: Array<{ id: string; revisionDate: string; encryptedData: string; createdAt: string }> }>(`/api/vault/items/${itemId}/versions`, { token }),
+    restore: (itemId: string, versionId: string, token: string) =>
+      request<{ success: boolean }>(`/api/vault/items/${itemId}/versions/${versionId}/restore`, { method: 'PUT', token }),
+  },
+
   // ─── Email Aliases ──────────────────────────────────────────
   aliases: {
     generate: (body: { provider?: string; apiKey?: string }, token: string) =>

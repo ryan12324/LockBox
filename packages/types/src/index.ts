@@ -127,9 +127,3 @@ export type {
   DeviceSyncResponse,
 } from './device-sync.js';
 
-// Relay configuration types
-export type {
-  RelayConfig,
-  RelayStatus,
-  ApiEndpoint,
-} from './config.js';

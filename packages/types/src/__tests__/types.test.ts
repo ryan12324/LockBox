@@ -202,7 +202,6 @@ describe('Type Guards', () => {
         id: 'item-1',
         type: 'login',
         encryptedData: 'base64-encoded-ciphertext',
-        iv: 'base64-encoded-iv',
         revisionDate: '2024-01-01T00:00:00Z',
         tags: [],
         favorite: false,

@@ -11,6 +11,10 @@ import type {
   LoginItem,
   SecureNoteItem,
   CardItem,
+  IdentityItem,
+  PasskeyItem,
+  DocumentItem,
+  CustomField,
   Folder,
   VaultItemType,
 } from '@lockbox/types';
@@ -30,12 +34,16 @@ type ViewState =
   | { view: 'ai-settings' }
   | { view: 'chat' }
   | { view: 'hw-keys' }
-  | { view: 'qr-sync' };
+  | { view: 'qr-sync' }
+  | { view: 'trash' }
+  | { view: 'settings' }
+  | { view: 'emergency' }
+  | { view: 'history'; item: VaultItem };
 async function sendMessage<T>(message: object): Promise<T> {
   return chrome.runtime.sendMessage(message) as Promise<T>;
 }
 
-const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳' })[type] ?? '📄';
+const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🔑', document: '📄' })[type] ?? '📄';
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -253,12 +261,14 @@ function ItemDetailView({
   onEdit,
   onDelete,
   onBack,
+  onHistory,
 }: {
   item: VaultItem;
   folders: Folder[];
   onEdit: () => void;
   onDelete: () => void;
   onBack: () => void;
+  onHistory: () => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -270,10 +280,21 @@ function ItemDetailView({
   const [totpRemaining, setTotpRemaining] = useState(0);
   const [attachments, setAttachments] = useState<Array<{ id: string; fileName: string; fileSize: number; mimeType: string; createdAt: string }>>([]);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [showVersions, setShowVersions] = useState(false);
+  const [versions, setVersions] = useState<Array<{ id: string; revisionDate: string; createdAt: string; data: VaultItem | null }>>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
 
   const login = item.type === 'login' ? (item as LoginItem) : null;
   const note = item.type === 'note' ? (item as SecureNoteItem) : null;
   const card = item.type === 'card' ? (item as CardItem) : null;
+  const identity = item.type === 'identity' ? (item as IdentityItem) : null;
+  const passkey = item.type === 'passkey' ? (item as PasskeyItem) : null;
+  const doc = item.type === 'document' ? (item as DocumentItem) : null;
+  const [showSsn, setShowSsn] = useState(false);
+  const [showPassport, setShowPassport] = useState(false);
+  const [showLicense, setShowLicense] = useState(false);
+  const [showCustomHidden, setShowCustomHidden] = useState<Record<number, boolean>>({});
   const folder = folders.find((f) => f.id === item.folderId);
 
   async function copyField(text: string, field: string) {
@@ -402,12 +423,21 @@ function ItemDetailView({
           </div>
           {folder && <div className="text-xs text-white/40">📁 {folder.name}</div>}
         </div>
-        <button
-          onClick={onEdit}
-          className="px-3 py-1.5 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 text-sm rounded-md transition-colors cursor-pointer"
-        >
-          Edit
-        </button>
+        <div className="flex gap-1">
+          <button
+            onClick={onHistory}
+            title="Version History"
+            className="px-2 py-1.5 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 text-sm rounded-md transition-colors cursor-pointer"
+          >
+            📜
+          </button>
+          <button
+            onClick={onEdit}
+            className="px-3 py-1.5 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 text-sm rounded-md transition-colors cursor-pointer"
+          >
+            Edit
+          </button>
+        </div>
       </div>
 
       {/* Content */}
@@ -559,6 +589,177 @@ function ItemDetailView({
           </div>
         )}
 
+        {/* Identity fields */}
+        {identity && (
+          <>
+            {/* Personal */}
+            <div className="text-[10px] font-bold uppercase tracking-widest text-white/20 px-3 mt-2 mb-1">Personal</div>
+            {identity.firstName && fieldRow('First Name', identity.firstName, 'id-first')}
+            {identity.middleName && fieldRow('Middle Name', identity.middleName, 'id-middle')}
+            {identity.lastName && fieldRow('Last Name', identity.lastName, 'id-last')}
+            {identity.email && fieldRow('Email', identity.email, 'id-email')}
+            {identity.phone && fieldRow('Phone', identity.phone, 'id-phone')}
+            {identity.company && fieldRow('Company', identity.company, 'id-company')}
+
+            {/* Address */}
+            {(identity.address1 || identity.city || identity.state || identity.postalCode || identity.country) && (
+              <>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-white/20 px-3 mt-3 mb-1">Address</div>
+                {identity.address1 && fieldRow('Address 1', identity.address1, 'id-addr1')}
+                {identity.address2 && fieldRow('Address 2', identity.address2, 'id-addr2')}
+                {identity.city && fieldRow('City', identity.city, 'id-city')}
+                {identity.state && fieldRow('State', identity.state, 'id-state')}
+                {identity.postalCode && fieldRow('Postal Code', identity.postalCode, 'id-zip')}
+                {identity.country && fieldRow('Country', identity.country, 'id-country')}
+              </>
+            )}
+
+            {/* IDs */}
+            {(identity.ssn || identity.passportNumber || identity.licenseNumber) && (
+              <>
+                <div className="text-[10px] font-bold uppercase tracking-widest text-white/20 px-3 mt-3 mb-1">Identification</div>
+                {identity.ssn && fieldRow('SSN', identity.ssn, 'id-ssn', {
+                  hidden: true,
+                  toggle: () => setShowSsn(!showSsn),
+                  shown: showSsn,
+                })}
+                {identity.passportNumber && fieldRow('Passport', identity.passportNumber, 'id-passport', {
+                  hidden: true,
+                  toggle: () => setShowPassport(!showPassport),
+                  shown: showPassport,
+                })}
+                {identity.licenseNumber && fieldRow('License', identity.licenseNumber, 'id-license', {
+                  hidden: true,
+                  toggle: () => setShowLicense(!showLicense),
+                  shown: showLicense,
+                })}
+              </>
+            )}
+          </>
+        )}
+
+        {/* Passkey fields */}
+        {passkey && (
+          <>
+            {fieldRow('Relying Party', passkey.rpName, 'pk-rp')}
+            {fieldRow('RP ID', passkey.rpId, 'pk-rpid')}
+            {fieldRow('User', passkey.userName, 'pk-user')}
+          </>
+        )}
+
+        {/* Document fields */}
+        {doc && (
+          <>
+            {doc.description && fieldRow('Description', doc.description, 'doc-desc')}
+            {doc.mimeType && fieldRow('Type', doc.mimeType, 'doc-mime')}
+            {doc.size != null && (
+              <div className="mb-2">
+                <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">Size</div>
+                <div className="p-3 bg-white/[0.04] rounded-md border border-white/[0.06] text-xs text-white/80">
+                  {formatFileSize(doc.size)}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Custom fields */}
+        {item.customFields && item.customFields.length > 0 && (
+          <div className="mt-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
+              Custom Fields ({item.customFields.length})
+            </div>
+            <div className="flex flex-col gap-1">
+              {item.customFields.map((cf, idx) => (
+                <div key={idx} className="mb-1">
+                  {cf.type === 'boolean' ? (
+                    <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
+                      <span className="text-xs text-white/60">{cf.name}</span>
+                      <span className="text-xs text-white">{cf.value === 'true' ? '✓ Yes' : '✗ No'}</span>
+                    </div>
+                  ) : cf.type === 'hidden' ? (
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">{cf.name}</div>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
+                        <span className="text-xs font-mono text-white truncate max-w-[220px]">
+                          {showCustomHidden[idx] ? cf.value : '••••••••••••'}
+                        </span>
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            onClick={() => setShowCustomHidden((prev) => ({ ...prev, [idx]: !prev[idx] }))}
+                            className="p-1.5 text-white/30 hover:text-white/60 rounded transition-colors cursor-pointer"
+                          >
+                            {showCustomHidden[idx] ? '🙈' : '👁️'}
+                          </button>
+                          <button
+                            onClick={() => copyField(cf.value, `cf-${idx}`)}
+                            className="p-1.5 text-white/30 hover:text-white/60 rounded transition-colors cursor-pointer"
+                          >
+                            {copied === `cf-${idx}` ? '✓' : '📋'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    fieldRow(cf.name, cf.value, `cf-${idx}`)
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Version History (collapsible) */}
+        <div className="mt-3">
+          <button
+            onClick={() => {
+              setShowVersions(!showVersions);
+              if (!showVersions && versions.length === 0) {
+                setVersionsLoading(true);
+                sendMessage<{ success: boolean; versions?: typeof versions }>({ type: 'get-versions', itemId: item.id })
+                  .then(res => { if (res.success && res.versions) setVersions(res.versions); })
+                  .catch(() => {})
+                  .finally(() => setVersionsLoading(false));
+              }
+            }}
+            className="w-full flex items-center justify-between p-2.5 bg-white/[0.04] rounded-md border border-white/[0.06] text-xs text-white/70 hover:bg-white/[0.06] transition-colors cursor-pointer"
+          >
+            <span>📜 Version History</span>
+            <span className="text-white/30">{showVersions ? '▲' : '▼'}</span>
+          </button>
+          {showVersions && (
+            <div className="mt-1 flex flex-col gap-1">
+              {versionsLoading ? (
+                <div className="text-center text-white/40 text-xs py-3">Loading...</div>
+              ) : versions.length === 0 ? (
+                <div className="text-center text-xs text-white/40 py-3">No previous versions</div>
+              ) : (
+                versions.map((version, idx) => (
+                  <div key={version.id} className="flex items-center justify-between p-2 bg-white/[0.02] rounded border border-white/[0.04]">
+                    <div>
+                      <div className="text-[10px] text-white/60">{idx === 0 ? 'Latest' : `v${versions.length - idx}`}</div>
+                      <div className="text-[10px] text-white/30">{new Date(version.revisionDate).toLocaleString()}</div>
+                    </div>
+                    {idx > 0 && (
+                      <button
+                        onClick={async () => {
+                          setRestoringVersionId(version.id);
+                          await sendMessage<{ success: boolean }>({ type: 'restore-version', itemId: item.id, versionId: version.id }).catch(() => {});
+                          setRestoringVersionId(null);
+                        }}
+                        disabled={restoringVersionId === version.id}
+                        className={`px-2 py-0.5 text-[10px] rounded transition-colors cursor-pointer ${restoringVersionId === version.id ? 'bg-white/20 text-white/50' : 'bg-indigo-600/80 text-white hover:bg-indigo-500/90'}`}
+                      >
+                        {restoringVersionId === version.id ? '...' : 'Restore'}
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Delete */}
         <div className="mt-4 pt-3 border-t border-white/[0.1]">
           {confirmDelete ? (
@@ -640,6 +841,32 @@ function AddEditView({
   const [cvv, setCvv] = useState(cardItem?.cvv || '');
   const [brand, setBrand] = useState(cardItem?.brand || '');
 
+  // Identity fields
+  const identityItem = editItem?.type === 'identity' ? (editItem as IdentityItem) : null;
+  const [firstName, setFirstName] = useState(identityItem?.firstName || '');
+  const [middleName, setMiddleName] = useState(identityItem?.middleName || '');
+  const [lastName, setLastName] = useState(identityItem?.lastName || '');
+  const [identityEmail, setIdentityEmail] = useState(identityItem?.email || '');
+  const [identityPhone, setIdentityPhone] = useState(identityItem?.phone || '');
+  const [address1, setAddress1] = useState(identityItem?.address1 || '');
+  const [address2, setAddress2] = useState(identityItem?.address2 || '');
+  const [city, setCity] = useState(identityItem?.city || '');
+  const [state, setState] = useState(identityItem?.state || '');
+  const [postalCode, setPostalCode] = useState(identityItem?.postalCode || '');
+  const [country, setCountry] = useState(identityItem?.country || '');
+  const [company, setCompany] = useState(identityItem?.company || '');
+  const [ssn, setSsn] = useState(identityItem?.ssn || '');
+  const [passportNumber, setPassportNumber] = useState(identityItem?.passportNumber || '');
+  const [licenseNumber, setLicenseNumber] = useState(identityItem?.licenseNumber || '');
+
+  // Document fields
+  const docItem = editItem?.type === 'document' ? (editItem as DocumentItem) : null;
+  const [description, setDescription] = useState(docItem?.description || '');
+  const [docFile, setDocFile] = useState<File | null>(null);
+
+  // Custom fields
+  const [customFields, setCustomFields] = useState<CustomField[]>(editItem?.customFields || []);
+
   // Folder creation
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -681,13 +908,18 @@ function AddEditView({
     setError('');
 
     try {
+      const cfClean = customFields.filter((cf) => cf.name.trim());
+      const base = {
+        name,
+        folderId: folderId || undefined,
+        tags: editItem?.tags || [],
+        favorite,
+        customFields: cfClean.length > 0 ? cfClean : undefined,
+      };
       let itemData: object;
       if (type === 'login') {
         itemData = {
-          name,
-          folderId: folderId || undefined,
-          tags: editItem?.tags || [],
-          favorite,
+          ...base,
           username,
           password,
           uris: uris.filter((u) => u.trim()),
@@ -695,18 +927,12 @@ function AddEditView({
         };
       } else if (type === 'note') {
         itemData = {
-          name,
-          folderId: folderId || undefined,
-          tags: editItem?.tags || [],
-          favorite,
+          ...base,
           content,
         };
-      } else {
+      } else if (type === 'card') {
         itemData = {
-          name,
-          folderId: folderId || undefined,
-          tags: editItem?.tags || [],
-          favorite,
+          ...base,
           cardholderName,
           number,
           expMonth,
@@ -714,6 +940,35 @@ function AddEditView({
           cvv,
           brand: brand || undefined,
         };
+      } else if (type === 'identity') {
+        itemData = {
+          ...base,
+          firstName: firstName || undefined,
+          middleName: middleName || undefined,
+          lastName: lastName || undefined,
+          email: identityEmail || undefined,
+          phone: identityPhone || undefined,
+          address1: address1 || undefined,
+          address2: address2 || undefined,
+          city: city || undefined,
+          state: state || undefined,
+          postalCode: postalCode || undefined,
+          country: country || undefined,
+          company: company || undefined,
+          ssn: ssn || undefined,
+          passportNumber: passportNumber || undefined,
+          licenseNumber: licenseNumber || undefined,
+        };
+      } else if (type === 'document') {
+        itemData = {
+          ...base,
+          description: description || undefined,
+          fileName: docFile?.name || undefined,
+          mimeType: docFile?.type || undefined,
+          size: docFile?.size || undefined,
+        };
+      } else {
+        itemData = base;
       }
 
       let result: { success: boolean; error?: string };
@@ -772,8 +1027,8 @@ function AddEditView({
 
         {/* Type selector (add mode only) */}
         {!isEdit && (
-          <div className="flex gap-1 p-1 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-            {(['login', 'note', 'card'] as VaultItemType[]).map((t) => (
+          <div className="flex gap-1 p-1 bg-white/[0.04] rounded-lg border border-white/[0.06] flex-wrap">
+            {(['login', 'note', 'card', 'identity', 'document'] as VaultItemType[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setType(t)}
@@ -1068,6 +1323,183 @@ function AddEditView({
             </div>
           </>
         )}
+
+        {/* Identity fields */}
+        {type === 'identity' && (
+          <>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-white/20 mt-1 mb-0.5">Personal</div>
+            <div className="flex gap-1.5">
+              <div className="flex-1">
+                <label className={labelClass}>First Name</label>
+                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className={inputClass} />
+              </div>
+              <div className="flex-1">
+                <label className={labelClass}>Last Name</label>
+                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className={inputClass} />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>Middle Name</label>
+              <input type="text" value={middleName} onChange={(e) => setMiddleName(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Email</label>
+              <input type="email" value={identityEmail} onChange={(e) => setIdentityEmail(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Phone</label>
+              <input type="tel" value={identityPhone} onChange={(e) => setIdentityPhone(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Company</label>
+              <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className={inputClass} />
+            </div>
+
+            <div className="text-[10px] font-bold uppercase tracking-widest text-white/20 mt-2 mb-0.5">Address</div>
+            <div>
+              <label className={labelClass}>Address 1</label>
+              <input type="text" value={address1} onChange={(e) => setAddress1(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Address 2</label>
+              <input type="text" value={address2} onChange={(e) => setAddress2(e.target.value)} className={inputClass} />
+            </div>
+            <div className="flex gap-1.5">
+              <div className="flex-1">
+                <label className={labelClass}>City</label>
+                <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className={inputClass} />
+              </div>
+              <div className="flex-1">
+                <label className={labelClass}>State</label>
+                <input type="text" value={state} onChange={(e) => setState(e.target.value)} className={inputClass} />
+              </div>
+            </div>
+            <div className="flex gap-1.5">
+              <div className="flex-1">
+                <label className={labelClass}>Postal Code</label>
+                <input type="text" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className={inputClass} />
+              </div>
+              <div className="flex-1">
+                <label className={labelClass}>Country</label>
+                <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className={inputClass} />
+              </div>
+            </div>
+
+            <div className="text-[10px] font-bold uppercase tracking-widest text-white/20 mt-2 mb-0.5">Identification</div>
+            <div>
+              <label className={labelClass}>SSN</label>
+              <input type="password" value={ssn} onChange={(e) => setSsn(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Passport Number</label>
+              <input type="password" value={passportNumber} onChange={(e) => setPassportNumber(e.target.value)} className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>License Number</label>
+              <input type="password" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} className={inputClass} />
+            </div>
+          </>
+        )}
+
+        {/* Document fields */}
+        {type === 'document' && (
+          <>
+            <div>
+              <label className={labelClass}>Description</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className={`${inputClass} resize-y`}
+              />
+            </div>
+            {!isEdit && (
+              <div>
+                <label className={labelClass}>File</label>
+                <input
+                  type="file"
+                  onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                  className="w-full text-sm text-white/70 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border file:border-white/[0.12] file:text-sm file:bg-white/[0.06] file:text-white/70 file:cursor-pointer hover:file:bg-white/[0.12]"
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Custom fields editor */}
+        <div className="mt-2 pt-2 border-t border-white/[0.06]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-white/60">Custom Fields</span>
+            <button
+              onClick={() => setCustomFields([...customFields, { name: '', value: '', type: 'text' }])}
+              className="text-xs text-indigo-300 bg-transparent hover:text-indigo-200 cursor-pointer transition-colors"
+            >
+              + Add Field
+            </button>
+          </div>
+          {customFields.map((cf, idx) => (
+            <div key={idx} className="flex flex-col gap-1 mb-2 p-2 bg-white/[0.02] rounded-md border border-white/[0.06]">
+              <div className="flex gap-1">
+                <input
+                  type="text"
+                  value={cf.name}
+                  onChange={(e) => {
+                    const updated = [...customFields];
+                    updated[idx] = { ...updated[idx], name: e.target.value };
+                    setCustomFields(updated);
+                  }}
+                  placeholder="Field name"
+                  className={`${inputClass} flex-1`}
+                />
+                <select
+                  value={cf.type}
+                  onChange={(e) => {
+                    const updated = [...customFields];
+                    updated[idx] = { ...updated[idx], type: e.target.value as CustomField['type'], value: e.target.value === 'boolean' ? 'false' : updated[idx].value };
+                    setCustomFields(updated);
+                  }}
+                  className={`${inputClass} w-[80px]`}
+                >
+                  <option value="text" className="bg-slate-900">Text</option>
+                  <option value="hidden" className="bg-slate-900">Hidden</option>
+                  <option value="boolean" className="bg-slate-900">Bool</option>
+                </select>
+                <button
+                  onClick={() => setCustomFields(customFields.filter((_, i) => i !== idx))}
+                  className="px-2 py-0.5 text-xs text-red-400 bg-transparent hover:text-red-300 cursor-pointer transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              {cf.type === 'boolean' ? (
+                <label className="flex items-center gap-2 px-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={cf.value === 'true'}
+                    onChange={(e) => {
+                      const updated = [...customFields];
+                      updated[idx] = { ...updated[idx], value: e.target.checked ? 'true' : 'false' };
+                      setCustomFields(updated);
+                    }}
+                  />
+                  <span className="text-xs text-white/70">{cf.value === 'true' ? 'Yes' : 'No'}</span>
+                </label>
+              ) : (
+                <input
+                  type={cf.type === 'hidden' ? 'password' : 'text'}
+                  value={cf.value}
+                  onChange={(e) => {
+                    const updated = [...customFields];
+                    updated[idx] = { ...updated[idx], value: e.target.value };
+                    setCustomFields(updated);
+                  }}
+                  placeholder="Value"
+                  className={inputClass}
+                />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -2207,6 +2639,633 @@ function QRSyncView({ onBack }: { onBack: () => void }) {
   );
 }
 
+// ─── Trash View ──────────────────────────────────────────────────────────────────────────
+
+function TrashView({ onBack }: { onBack: () => void }) {
+  const [items, setItems] = useState<Array<VaultItem & { deletedAt: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    sendMessage<{ success: boolean; items?: Array<VaultItem & { deletedAt: string }>; error?: string }>({ type: 'get-trash' })
+      .then(res => {
+        if (res.success && res.items) setItems(res.items);
+        else setError(res.error ?? 'Failed to load trash');
+      })
+      .catch(() => setError('Failed to connect'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function daysRemaining(deletedAt: string): number {
+    const deleted = new Date(deletedAt).getTime();
+    const purgeDays = 30;
+    const purgeAt = deleted + purgeDays * 24 * 60 * 60 * 1000;
+    const remaining = Math.ceil((purgeAt - Date.now()) / (24 * 60 * 60 * 1000));
+    return Math.max(0, remaining);
+  }
+
+  async function handleRestore(id: string) {
+    setActionId(id);
+    try {
+      const res = await sendMessage<{ success: boolean; error?: string }>({ type: 'restore-item', id });
+      if (res.success) {
+        setItems(prev => prev.filter(i => i.id !== id));
+      } else {
+        setError(res.error ?? 'Failed to restore');
+      }
+    } catch {
+      setError('Failed to restore item');
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function handlePermanentDelete(id: string) {
+    setActionId(id);
+    try {
+      const res = await sendMessage<{ success: boolean; error?: string }>({ type: 'permanent-delete', id });
+      if (res.success) {
+        setItems(prev => prev.filter(i => i.id !== id));
+        setConfirmDeleteId(null);
+      } else {
+        setError(res.error ?? 'Failed to delete');
+      }
+    } catch {
+      setError('Failed to delete item');
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.1]">
+        <button onClick={onBack} className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors">
+          ←
+        </button>
+        <span className="text-sm font-semibold text-white">🗑️ Trash</span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {error && (
+          <div className="mx-3 mt-3 px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs">{error}</div>
+        )}
+
+        {loading ? (
+          <div className="text-center text-white/40 text-sm mt-10">Loading trash...</div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-6 text-center mt-6">
+            <div className="text-3xl mb-3">🗑️</div>
+            <p className="text-sm text-white/70 mb-1">No items in trash</p>
+            <p className="text-xs text-white/40">Deleted items appear here for 30 days before auto-purge.</p>
+          </div>
+        ) : (
+          items.map(item => (
+            <div key={item.id} className="p-3 border-b border-white/[0.06]">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="text-sm shrink-0">{typeIcon(item.type)}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-white truncate">{item.name}</div>
+                    <div className="text-[10px] text-white/40">
+                      {daysRemaining(item.deletedAt)} day{daysRemaining(item.deletedAt) !== 1 ? 's' : ''} until auto-purge
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-1 shrink-0 ml-2">
+                  <button
+                    onClick={() => handleRestore(item.id)}
+                    disabled={actionId === item.id}
+                    className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${actionId === item.id ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-indigo-600/80 text-white hover:bg-indigo-500/90'}`}
+                  >
+                    {actionId === item.id ? '...' : 'Restore'}
+                  </button>
+                  {confirmDeleteId === item.id ? (
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handlePermanentDelete(item.id)}
+                        disabled={actionId === item.id}
+                        className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${actionId === item.id ? 'bg-red-500/50 text-white/50 cursor-not-allowed' : 'bg-red-500/80 text-white hover:bg-red-400/90'}`}
+                      >
+                        {actionId === item.id ? '...' : 'Confirm'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-2 py-1 text-xs bg-white/[0.08] text-white/70 rounded hover:bg-white/[0.14] transition-colors cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDeleteId(item.id)}
+                      className="px-2 py-1 text-xs bg-red-500/10 text-red-300 rounded hover:bg-red-500/20 transition-colors cursor-pointer"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Settings View (2FA, Travel Mode, Email Aliases) ────────────────────────────────────
+
+function SettingsView({ onBack }: { onBack: () => void }) {
+  const [twoFaEnabled, setTwoFaEnabled] = useState(false);
+  const [twoFaSetupData, setTwoFaSetupData] = useState<{ secret: string; otpauthUri: string; backupCodes: string[] } | null>(null);
+  const [twoFaCode, setTwoFaCode] = useState('');
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
+  const [twoFaError, setTwoFaError] = useState('');
+  const [twoFaSuccess, setTwoFaSuccess] = useState('');
+  const [showBackupCodes, setShowBackupCodes] = useState(false);
+  const [disableCode, setDisableCode] = useState('');
+  const [showDisable, setShowDisable] = useState(false);
+  const [travelMode, setTravelMode] = useState(false);
+  const [travelLoading, setTravelLoading] = useState(false);
+  const [travelError, setTravelError] = useState('');
+  const [aliasProvider, setAliasProvider] = useState('simplelogin');
+  const [aliasApiKey, setAliasApiKey] = useState('');
+  const [aliasTesting, setAliasTesting] = useState(false);
+  const [aliasResult, setAliasResult] = useState<{ success: boolean; error?: string } | null>(null);
+
+  async function handleSetup2FA() {
+    setTwoFaLoading(true);
+    setTwoFaError('');
+    try {
+      const res = await sendMessage<{ success: boolean; secret?: string; otpauthUri?: string; backupCodes?: string[]; error?: string }>({ type: 'setup-2fa' });
+      if (res.success && res.otpauthUri) {
+        setTwoFaSetupData({ secret: res.secret!, otpauthUri: res.otpauthUri, backupCodes: res.backupCodes ?? [] });
+      } else {
+        setTwoFaError(res.error ?? 'Failed to setup 2FA');
+      }
+    } catch {
+      setTwoFaError('Failed to setup 2FA');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleVerify2FA() {
+    if (!twoFaCode.trim()) return;
+    setTwoFaLoading(true);
+    setTwoFaError('');
+    try {
+      const res = await sendMessage<{ success: boolean; error?: string }>({ type: 'verify-2fa', code: twoFaCode.trim() });
+      if (res.success) {
+        setTwoFaEnabled(true);
+        setTwoFaSetupData(null);
+        setTwoFaCode('');
+        setTwoFaSuccess('2FA enabled successfully');
+        if (twoFaSetupData?.backupCodes.length) setShowBackupCodes(true);
+      } else {
+        setTwoFaError(res.error ?? 'Invalid code');
+      }
+    } catch {
+      setTwoFaError('Verification failed');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleDisable2FA() {
+    if (!disableCode.trim()) return;
+    setTwoFaLoading(true);
+    setTwoFaError('');
+    try {
+      const res = await sendMessage<{ success: boolean; error?: string }>({ type: 'disable-2fa', code: disableCode.trim() });
+      if (res.success) {
+        setTwoFaEnabled(false);
+        setShowDisable(false);
+        setDisableCode('');
+        setTwoFaSuccess('2FA disabled');
+      } else {
+        setTwoFaError(res.error ?? 'Invalid code');
+      }
+    } catch {
+      setTwoFaError('Failed to disable 2FA');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleTravelToggle() {
+    setTravelLoading(true);
+    setTravelError('');
+    try {
+      const res = await sendMessage<{ success: boolean; enabled?: boolean; error?: string }>({ type: 'set-travel-mode', enabled: !travelMode });
+      if (res.success) {
+        setTravelMode(res.enabled ?? !travelMode);
+      } else {
+        setTravelError(res.error ?? 'Failed to update');
+      }
+    } catch {
+      setTravelError('Failed to update travel mode');
+    } finally {
+      setTravelLoading(false);
+    }
+  }
+
+  async function handleAliasSave() {
+    setAliasTesting(true);
+    setAliasResult(null);
+    try {
+      const res = await sendMessage<{ success: boolean; alias?: string; error?: string }>({
+        type: 'generate-alias',
+        provider: aliasProvider,
+        apiKey: aliasApiKey,
+      });
+      setAliasResult(res.success ? { success: true } : { success: false, error: res.error ?? 'Connection failed' });
+    } catch {
+      setAliasResult({ success: false, error: 'Test failed' });
+    } finally {
+      setAliasTesting(false);
+    }
+  }
+
+  const inputClass = 'w-full px-3 py-2 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60';
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.1]">
+        <button onClick={onBack} className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors">←</button>
+        <span className="text-sm font-semibold text-white">⚙️ Settings</span>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5">
+        {/* 2FA Section */}
+        <div>
+          <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-2">🔐 Two-Factor Authentication</h3>
+          {twoFaError && <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs mb-2">{twoFaError}</div>}
+          {twoFaSuccess && <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-400/20 rounded-md text-emerald-300 text-xs mb-2">{twoFaSuccess}</div>}
+          {twoFaEnabled ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                  <span className="text-emerald-400 text-sm">✓</span>
+                  <span className="text-xs text-white/80">2FA is enabled</span>
+                </div>
+              </div>
+              {showDisable ? (
+                <div className="flex flex-col gap-2 p-3 bg-red-500/10 border border-red-400/20 rounded-md">
+                  <div className="text-xs text-red-300">Enter your TOTP code to disable 2FA:</div>
+                  <input type="text" value={disableCode} onChange={(e) => setDisableCode(e.target.value)} placeholder="000000" maxLength={6} className={inputClass} />
+                  <div className="flex gap-1.5">
+                    <button onClick={handleDisable2FA} disabled={twoFaLoading} className={`flex-1 px-3 py-1.5 text-xs text-white rounded-md transition-colors ${twoFaLoading ? 'bg-red-500/50 cursor-not-allowed' : 'bg-red-500/80 hover:bg-red-400/90 cursor-pointer'}`}>
+                      {twoFaLoading ? 'Disabling...' : 'Disable 2FA'}
+                    </button>
+                    <button onClick={() => { setShowDisable(false); setDisableCode(''); }} className="px-3 py-1.5 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors cursor-pointer">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setShowDisable(true)} className="px-3 py-2 text-xs text-red-300 bg-red-500/10 border border-red-400/20 rounded-md cursor-pointer hover:bg-red-500/20 transition-colors">Disable 2FA</button>
+              )}
+              {showBackupCodes && twoFaSetupData && (
+                <div className="p-3 bg-white/[0.04] border border-white/[0.06] rounded-md">
+                  <div className="text-xs font-semibold text-white/80 mb-2">Backup Codes (save these securely)</div>
+                  <div className="grid grid-cols-2 gap-1">
+                    {twoFaSetupData.backupCodes.map((code, idx) => (
+                      <div key={idx} className="font-mono text-xs text-indigo-300 bg-white/[0.04] px-2 py-1 rounded">{code}</div>
+                    ))}
+                  </div>
+                  <button onClick={() => setShowBackupCodes(false)} className="mt-2 text-xs text-white/50 hover:text-white/80 bg-transparent border-0 cursor-pointer transition-colors">Hide codes</button>
+                </div>
+              )}
+            </div>
+          ) : twoFaSetupData ? (
+            <div className="flex flex-col gap-2">
+              <div className="p-3 bg-white/[0.04] border border-white/[0.06] rounded-md">
+                <div className="text-xs font-semibold text-white/80 mb-1">Scan with authenticator app:</div>
+                <div className="font-mono text-[10px] text-indigo-300 break-all bg-white/[0.04] p-2 rounded">{twoFaSetupData.otpauthUri}</div>
+                <div className="text-[10px] text-white/40 mt-1">Manual key: {twoFaSetupData.secret}</div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-white/80 mb-1">Verification Code</label>
+                <input type="text" value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value)} placeholder="Enter 6-digit code" maxLength={6} className={inputClass} />
+              </div>
+              <button onClick={handleVerify2FA} disabled={twoFaLoading || twoFaCode.length < 6} className={`px-3 py-2 text-xs text-white font-semibold rounded-md transition-colors ${twoFaLoading || twoFaCode.length < 6 ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90 cursor-pointer'}`}>
+                {twoFaLoading ? 'Verifying...' : 'Verify & Enable'}
+              </button>
+            </div>
+          ) : (
+            <button onClick={handleSetup2FA} disabled={twoFaLoading} className={`px-3 py-2 text-xs text-white font-semibold rounded-md transition-colors ${twoFaLoading ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90 cursor-pointer'}`}>
+              {twoFaLoading ? 'Setting up...' : 'Enable 2FA'}
+            </button>
+          )}
+        </div>
+
+        {/* Travel Mode Section */}
+        <div className="border-t border-white/[0.1] pt-4">
+          <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-2">✈️ Travel Mode</h3>
+          {travelError && <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs mb-2">{travelError}</div>}
+          <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-white/80 font-medium">Travel Mode</div>
+              <div className="text-[10px] text-white/40 mt-0.5">{travelMode ? 'Only travel-safe folders will sync' : 'All folders are synced'}</div>
+            </div>
+            <button onClick={handleTravelToggle} disabled={travelLoading} className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer border-0 ${travelMode ? 'bg-indigo-600/80' : 'bg-white/[0.12]'} ${travelLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${travelMode ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+          {travelMode && (
+            <div className="mt-2 px-3 py-2 bg-amber-500/10 border border-amber-400/20 rounded-md text-amber-300 text-xs">
+              ⚠️ Only travel-safe folders will sync while travel mode is active. Disable when you return.
+            </div>
+          )}
+        </div>
+
+        {/* Email Aliases Section */}
+        <div className="border-t border-white/[0.1] pt-4">
+          <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-2">✉️ Email Aliases</h3>
+          <div className="flex flex-col gap-2">
+            <div>
+              <label className="block text-xs font-medium text-white/70 mb-1">Provider</label>
+              <select value={aliasProvider} onChange={(e) => { setAliasProvider(e.target.value); setAliasResult(null); }} className={inputClass}>
+                <option value="simplelogin" className="bg-slate-900">SimpleLogin</option>
+                <option value="anonaddy" className="bg-slate-900">AnonAddy</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-white/70 mb-1">API Key</label>
+              <input type="password" value={aliasApiKey} onChange={(e) => setAliasApiKey(e.target.value)} placeholder="Enter API key" className={inputClass} />
+            </div>
+            {aliasResult && (
+              <div className={`p-2 rounded-md text-xs border ${aliasResult.success ? 'bg-emerald-500/10 border-emerald-400/20 text-emerald-300' : 'bg-red-500/10 border-red-400/20 text-red-300'}`}>
+                {aliasResult.success ? '✓ Connection successful' : `✕ ${aliasResult.error}`}
+              </div>
+            )}
+            <button onClick={handleAliasSave} disabled={aliasTesting} className={`px-3 py-2 text-xs text-white font-semibold rounded-md transition-colors ${aliasTesting ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90 cursor-pointer'}`}>
+              {aliasTesting ? 'Testing...' : 'Test & Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Emergency Access View ──────────────────────────────────────────────────────────────
+
+function EmergencyAccessView({ onBack }: { onBack: () => void }) {
+  const [grantsAsGrantor, setGrantsAsGrantor] = useState<Array<{ id: string; granteeEmail: string; status: string; waitDays: number; createdAt: string }>>([]);
+  const [grantsAsGrantee, setGrantsAsGrantee] = useState<Array<{ id: string; grantorEmail: string; status: string; waitDays: number; createdAt: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteWaitDays, setInviteWaitDays] = useState(7);
+  const [inviting, setInviting] = useState(false);
+
+  useEffect(() => {
+    sendMessage<{ success: boolean; grantsAsGrantor?: typeof grantsAsGrantor; grantsAsGrantee?: typeof grantsAsGrantee; error?: string }>({ type: 'get-emergency-access' })
+      .then(res => {
+        if (res.success) {
+          setGrantsAsGrantor(res.grantsAsGrantor ?? []);
+          setGrantsAsGrantee(res.grantsAsGrantee ?? []);
+        } else {
+          setError(res.error ?? 'Failed to load');
+        }
+      })
+      .catch(() => setError('Failed to connect'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleAction(grantId: string, action: 'approve-emergency' | 'reject-emergency' | 'revoke-emergency') {
+    setActionId(grantId);
+    setError('');
+    try {
+      const res = await sendMessage<{ success: boolean; error?: string }>({ type: action, grantId });
+      if (res.success) {
+        setGrantsAsGrantor(prev => prev.filter(g => g.id !== grantId));
+        setGrantsAsGrantee(prev => prev.filter(g => g.id !== grantId));
+      } else {
+        setError(res.error ?? 'Action failed');
+      }
+    } catch {
+      setError('Action failed');
+    } finally {
+      setActionId(null);
+    }
+  }
+
+  async function handleInvite() {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    setError('');
+    try {
+      const res = await sendMessage<{ success: boolean; grant?: { id: string; granteeEmail: string; status: string; waitDays: number }; error?: string }>({
+        type: 'invite-emergency',
+        email: inviteEmail.trim(),
+        waitDays: inviteWaitDays,
+      });
+      if (res.success && res.grant) {
+        setGrantsAsGrantor(prev => [...prev, { ...res.grant!, createdAt: new Date().toISOString() }]);
+        setInviteEmail('');
+        setShowInvite(false);
+      } else {
+        setError(res.error ?? 'Failed to invite');
+      }
+    } catch {
+      setError('Failed to invite');
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  const statusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      pending: 'bg-amber-500/20 text-amber-300',
+      accepted: 'bg-indigo-500/20 text-indigo-300',
+      confirmed: 'bg-emerald-500/20 text-emerald-300',
+      'recovery-initiated': 'bg-red-500/20 text-red-300',
+    };
+    return <span className={`text-[10px] px-1.5 py-0.5 rounded-sm font-medium ${styles[status] ?? 'bg-white/[0.08] text-white/50'}`}>{status.toUpperCase()}</span>;
+  };
+
+  const inputClass = 'w-full px-3 py-2 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/60';
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/[0.1]">
+        <div className="flex items-center gap-2">
+          <button onClick={onBack} className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors">←</button>
+          <span className="text-sm font-semibold text-white">🚨 Emergency Access</span>
+        </div>
+        <button onClick={() => setShowInvite(!showInvite)} className="px-3 py-1.5 text-xs text-white font-semibold rounded-md bg-indigo-600/80 hover:bg-indigo-500/90 transition-colors cursor-pointer">+ Invite</button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        {error && <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs">{error}</div>}
+        {showInvite && (
+          <div className="p-3 bg-white/[0.04] border border-white/[0.06] rounded-md flex flex-col gap-2">
+            <div className="text-xs font-semibold text-white/80">Invite Trusted Contact</div>
+            <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="Email address" className={inputClass} />
+            <div>
+              <label className="block text-xs font-medium text-white/70 mb-1">Wait period (days)</label>
+              <select value={inviteWaitDays} onChange={(e) => setInviteWaitDays(Number(e.target.value))} className={inputClass}>
+                {[1, 3, 7, 14, 30].map(d => <option key={d} value={d} className="bg-slate-900">{d} day{d !== 1 ? 's' : ''}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-1.5">
+              <button onClick={handleInvite} disabled={inviting} className={`flex-1 px-3 py-1.5 text-xs text-white rounded-md transition-colors ${inviting ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90 cursor-pointer'}`}>{inviting ? 'Inviting...' : 'Send Invite'}</button>
+              <button onClick={() => setShowInvite(false)} className="px-3 py-1.5 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors cursor-pointer">Cancel</button>
+            </div>
+          </div>
+        )}
+        {loading ? (
+          <div className="text-center text-white/40 text-sm mt-10">Loading...</div>
+        ) : (
+          <>
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-white/30 px-1 mb-2">My Trusted Contacts</h4>
+              {grantsAsGrantor.length === 0 ? (
+                <div className="text-center text-xs text-white/40 py-4 bg-white/[0.02] rounded-lg border border-white/[0.06]">No trusted contacts yet</div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {grantsAsGrantor.map(grant => (
+                    <div key={grant.id} className="p-3 bg-white/[0.04] border border-white/[0.06] rounded-md">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="text-xs text-white font-medium truncate">{grant.granteeEmail}</div>
+                        {statusBadge(grant.status)}
+                      </div>
+                      <div className="text-[10px] text-white/40 mb-2">Wait: {grant.waitDays} day{grant.waitDays !== 1 ? 's' : ''}</div>
+                      <div className="flex gap-1">
+                        {grant.status === 'pending' && (
+                          <>
+                            <button onClick={() => handleAction(grant.id, 'approve-emergency')} disabled={actionId === grant.id} className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${actionId === grant.id ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'}`}>Approve</button>
+                            <button onClick={() => handleAction(grant.id, 'reject-emergency')} disabled={actionId === grant.id} className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${actionId === grant.id ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'}`}>Reject</button>
+                          </>
+                        )}
+                        <button onClick={() => handleAction(grant.id, 'revoke-emergency')} disabled={actionId === grant.id} className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${actionId === grant.id ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-red-500/10 text-red-300 hover:bg-red-500/20'}`}>Revoke</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-white/30 px-1 mb-2">I'm a Contact For</h4>
+              {grantsAsGrantee.length === 0 ? (
+                <div className="text-center text-xs text-white/40 py-4 bg-white/[0.02] rounded-lg border border-white/[0.06]">No one has granted you access</div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {grantsAsGrantee.map(grant => (
+                    <div key={grant.id} className="p-3 bg-white/[0.04] border border-white/[0.06] rounded-md">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="text-xs text-white font-medium truncate">{grant.grantorEmail}</div>
+                        {statusBadge(grant.status)}
+                      </div>
+                      <div className="text-[10px] text-white/40">Wait: {grant.waitDays} day{grant.waitDays !== 1 ? 's' : ''}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Version History View ────────────────────────────────────────────────────────────────
+
+function VersionHistoryView({ item, onBack }: { item: VaultItem; onBack: () => void }) {
+  const [versions, setVersions] = useState<Array<{ id: string; revisionDate: string; createdAt: string; data: VaultItem | null }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+
+  useEffect(() => {
+    sendMessage<{ success: boolean; versions?: typeof versions; error?: string }>({ type: 'get-versions', itemId: item.id })
+      .then(res => {
+        if (res.success && res.versions) setVersions(res.versions);
+        else setError(res.error ?? 'Failed to load versions');
+      })
+      .catch(() => setError('Failed to connect'))
+      .finally(() => setLoading(false));
+  }, [item.id]);
+
+  function relativeTime(dateStr: string): string {
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diff = now - then;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString();
+  }
+
+  async function handleRestore(versionId: string) {
+    setRestoringId(versionId);
+    setError('');
+    try {
+      const res = await sendMessage<{ success: boolean; error?: string }>({ type: 'restore-version', itemId: item.id, versionId });
+      if (!res.success) setError(res.error ?? 'Failed to restore');
+    } catch {
+      setError('Failed to restore version');
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.1]">
+        <button onClick={onBack} className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors">←</button>
+        <span className="text-lg">{typeIcon(item.type)}</span>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-semibold text-white truncate">{item.name}</div>
+          <div className="text-[10px] text-white/40">Version History</div>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+        {error && <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs">{error}</div>}
+        {loading ? (
+          <div className="text-center text-white/40 text-sm mt-10">Loading versions...</div>
+        ) : versions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-6 text-center mt-6">
+            <div className="text-3xl mb-3">📜</div>
+            <p className="text-sm text-white/70 mb-1">No version history</p>
+            <p className="text-xs text-white/40">Previous versions will appear here after edits.</p>
+          </div>
+        ) : (
+          versions.map((version, idx) => (
+            <div key={version.id} className="p-3 bg-white/[0.04] border border-white/[0.06] rounded-md">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-white font-medium">{idx === 0 ? 'Latest version' : `Version ${versions.length - idx}`}</div>
+                  <div className="text-[10px] text-white/40">{relativeTime(version.revisionDate)}</div>
+                </div>
+                {idx > 0 && (
+                  <button onClick={() => handleRestore(version.id)} disabled={restoringId === version.id} className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${restoringId === version.id ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-indigo-600/80 text-white hover:bg-indigo-500/90'}`}>
+                    {restoringId === version.id ? '...' : 'Restore'}
+                  </button>
+                )}
+              </div>
+              {version.data && (
+                <div className="mt-2 text-[10px] text-white/30 truncate">
+                  {version.data.name}{version.data.type === 'login' ? ` • ${(version.data as LoginItem).username ?? ''}` : ''}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -2453,6 +3512,7 @@ export default function App() {
           onEdit={() => setViewState({ view: 'edit', item: viewState.item })}
           onDelete={handleSaveOrDelete}
           onBack={() => setViewState({ view: 'tabs' })}
+          onHistory={() => setViewState({ view: 'history', item: viewState.item })}
         />
       </div>
     );
@@ -2570,6 +3630,34 @@ export default function App() {
       </div>
     );
   }
+  if (viewState.view === 'trash') {
+    return (
+      <div className="flex flex-col h-[480px]">
+        <TrashView onBack={() => setViewState({ view: 'tabs' })} />
+      </div>
+    );
+  }
+  if (viewState.view === 'settings') {
+    return (
+      <div className="flex flex-col h-[480px]">
+        <SettingsView onBack={() => setViewState({ view: 'tabs' })} />
+      </div>
+    );
+  }
+  if (viewState.view === 'emergency') {
+    return (
+      <div className="flex flex-col h-[480px]">
+        <EmergencyAccessView onBack={() => setViewState({ view: 'tabs' })} />
+      </div>
+    );
+  }
+  if (viewState.view === 'history') {
+    return (
+      <div className="flex flex-col h-[480px]">
+        <VersionHistoryView item={viewState.item} onBack={() => setViewState({ view: 'detail', item: viewState.item })} />
+      </div>
+    );
+  }
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'site', label: '🌐 Site' },
@@ -2658,6 +3746,27 @@ export default function App() {
                 className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
               >
                 📱
+              </button>
+              <button
+                onClick={() => setViewState({ view: 'trash' })}
+                title="Trash"
+                className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
+              >
+                🗑️
+              </button>
+              <button
+                onClick={() => setViewState({ view: 'settings' })}
+                title="Settings"
+                className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
+              >
+                ⚙️
+              </button>
+              <button
+                onClick={() => setViewState({ view: 'emergency' })}
+                title="Emergency Access"
+                className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
+              >
+                🚨
               </button>
             </>
           )}

@@ -131,7 +131,6 @@ export interface EncryptedVaultItem {
   id: string;
   type: VaultItemType;
   encryptedData: string; // Base64-encoded AES-256-GCM ciphertext
-  iv: string; // Base64-encoded 96-bit IV
   revisionDate: string; // ISO 8601 — used for delta sync and AAD binding
   folderId?: string;
   tags: string[];
