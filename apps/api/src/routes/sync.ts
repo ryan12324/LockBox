@@ -8,6 +8,7 @@ import { eq, and, gt, isNotNull } from 'drizzle-orm';
 import { createDb } from '../db/index.js';
 import { vaultItems, folders, sharedFolders, sharedFolderKeys, teamMembers } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { VALID_TYPES } from './vault.js';
 
 type Bindings = { DB: D1Database };
 type Variables = { userId: string };
@@ -146,11 +147,16 @@ syncRoutes.post('/push', async (c) => {
     const now = new Date().toISOString();
 
     if (change.operation === 'create') {
+      const itemType = change.type ?? 'login';
+      if (!VALID_TYPES.includes(itemType as typeof VALID_TYPES[number])) {
+        results.push({ itemId: change.itemId || '', status: 'conflict', serverRevisionDate: '' });
+        continue;
+      }
       const id = change.itemId || crypto.randomUUID();
       await db.insert(vaultItems).values({
         id,
         userId,
-        type: change.type ?? 'login',
+        type: itemType,
         encryptedData: change.encryptedData ?? '',
         folderId: change.folderId ?? null,
         tags: change.tags ? JSON.stringify(change.tags) : null,
@@ -263,11 +269,16 @@ syncRoutes.post('/push-shared', async (c) => {
     const now = new Date().toISOString();
 
     if (change.operation === 'create') {
+      const itemType = change.type ?? 'login';
+      if (!VALID_TYPES.includes(itemType as typeof VALID_TYPES[number])) {
+        results.push({ itemId: change.itemId || '', status: 'conflict', serverRevisionDate: '' });
+        continue;
+      }
       const id = change.itemId || crypto.randomUUID();
       await db.insert(vaultItems).values({
         id,
         userId: folderOwner,
-        type: change.type ?? 'login',
+        type: itemType,
         encryptedData: change.encryptedData ?? '',
         folderId,
         tags: change.tags ? JSON.stringify(change.tags) : null,

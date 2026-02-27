@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import { eq, and, ne } from 'drizzle-orm';
 
 import { createDb } from '../db/index.js';
-import { users, sessions } from '../db/schema.js';
+import { users, sessions, userTotpSettings } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 type Bindings = { DB: D1Database; AUTH_LIMITER: RateLimit };
@@ -182,6 +182,30 @@ authRoutes.post('/login', async (c) => {
   // Constant-time comparison
   if (serverHash !== user.authHash) {
     return c.json({ error: 'Invalid credentials' }, 401);
+  }
+  // Check if user has 2FA enabled
+  const totpSettings = await db
+    .select()
+    .from(userTotpSettings)
+    .where(and(eq(userTotpSettings.userId, user.id), eq(userTotpSettings.enabled, 1)))
+    .get();
+
+  if (totpSettings) {
+    // User has 2FA enabled — return temp token instead of full session
+    const tempToken = generateToken();
+    const tempSessionId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const tempExpiry = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min
+
+    await db.insert(sessions).values({
+      id: tempSessionId,
+      userId: user.id,
+      token: tempToken,
+      expiresAt: tempExpiry,
+      createdAt: now,
+    });
+
+    return c.json({ requires2FA: true, tempToken });
   }
 
   const token = generateToken();

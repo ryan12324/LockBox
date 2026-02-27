@@ -5,10 +5,12 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull } from 'drizzle-orm';
 import { createDb } from '../db/index.js';
 import { vaultItems, folders } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
+
+export const VALID_TYPES = ['login', 'note', 'card', 'identity'] as const;
 
 type Bindings = { DB: D1Database };
 type Variables = { userId: string };
@@ -53,6 +55,9 @@ vaultRoutes.post('/items', async (c) => {
 
   const { id: clientId, type, encryptedData, folderId, tags, favorite, revisionDate: clientRevisionDate } = body as Record<string, unknown>;
   if (!type || !encryptedData) return c.json({ error: 'Missing required fields' }, 400);
+  if (!VALID_TYPES.includes(type as typeof VALID_TYPES[number])) {
+    return c.json({ error: 'Invalid item type' }, 400);
+  }
 
   const db = createDb(c.env.DB);
   const now = new Date().toISOString();
@@ -178,6 +183,27 @@ vaultRoutes.delete('/items/:id/permanent', async (c) => {
   return c.json({ success: true });
 });
 
+// ─── GET /api/vault/trash ──────────────────────────────────────────────────
+
+vaultRoutes.get('/trash', async (c) => {
+  const userId = c.get('userId');
+  const db = createDb(c.env.DB);
+
+  const deletedItems = await db
+    .select()
+    .from(vaultItems)
+    .where(and(eq(vaultItems.userId, userId), isNotNull(vaultItems.deletedAt)));
+
+  const itemsWithCountdown = deletedItems.map((item) => {
+    const deletedDate = new Date(item.deletedAt!);
+    const now = new Date();
+    const daysSinceDelete = Math.floor((now.getTime() - deletedDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysRemaining = Math.max(0, 30 - daysSinceDelete);
+    return { ...item, daysRemaining };
+  });
+
+  return c.json({ items: itemsWithCountdown });
+});
 // ─── POST /api/vault/folders ──────────────────────────────────────────────────
 
 vaultRoutes.post('/folders', async (c) => {
