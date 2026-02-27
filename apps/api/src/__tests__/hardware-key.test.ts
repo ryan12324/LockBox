@@ -79,7 +79,7 @@ describe('Hardware Key API — challenge endpoint', () => {
       body: JSON.stringify({}),
     });
     expect(res.status).toBe(400);
-    const data = await res.json();
+    const data = (await res.json()) as { error: string };
     expect(data.error).toContain('keyId');
   });
 
@@ -104,7 +104,7 @@ describe('Hardware Key API — verify endpoint', () => {
       body: JSON.stringify({ keyId: 'test' }),
     });
     expect(res.status).toBe(400);
-    const data = await res.json();
+    const data = (await res.json()) as { error: string };
     expect(data.error).toBeDefined();
   });
 
@@ -119,7 +119,7 @@ describe('Hardware Key API — verify endpoint', () => {
       }),
     });
     expect(res.status).toBe(401);
-    const data = await res.json();
+    const data = (await res.json()) as { error: string };
     expect(data.error).toContain('Invalid or expired challenge');
   });
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
-import type { EmergencyAccessGrant } from '@lockbox/types';
+import type { EmergencyAccessGrant, EmergencyAccessRequest } from '@lockbox/types';
 
 type TabId = 'trusted' | 'requests';
 
@@ -35,7 +35,7 @@ export default function EmergencyAccess() {
   const [activeTab, setActiveTab] = useState<TabId>('trusted');
 
   const [grants, setGrants] = useState<EmergencyAccessGrant[]>([]);
-  const [requests, setRequests] = useState<EmergencyAccessGrant[]>([]);
+  const [requests, setRequests] = useState<(EmergencyAccessRequest & { grantorEmail?: string; granteeEmail?: string; status?: string; waitPeriodDays?: number; createdAt?: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -262,11 +262,11 @@ export default function EmergencyAccess() {
                         {statusBadge(grant.status)}
                       </div>
                       <p className="text-xs text-white/40">
-                        Wait period: {grant.waitPeriod} {grant.waitPeriod === 1 ? 'day' : 'days'} ·
+                        Wait period: {grant.waitPeriodDays} {grant.waitPeriodDays === 1 ? 'day' : 'days'} ·
                         Created {new Date(grant.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-                    {grant.status !== 'revoked' && (
+                    {grant.status !== 'expired' && grant.status !== 'rejected' && (
                       <button
                         onClick={() => handleRevoke(grant.id)}
                         className="px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
@@ -305,12 +305,12 @@ export default function EmergencyAccess() {
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-white font-medium text-sm">
-                            {grant.grantorEmail ?? grant.granteeEmail}
+                            {grant.grantorEmail ?? grant.granteeEmail ?? 'Unknown'}
                           </span>
-                          {statusBadge(grant.status)}
+                          {grant.status && statusBadge(grant.status)}
                         </div>
                         <p className="text-xs text-white/40">
-                          Wait period: {grant.waitPeriod} {grant.waitPeriod === 1 ? 'day' : 'days'}
+                          Wait period: {grant.waitPeriodDays ?? '?'} {grant.waitPeriodDays === 1 ? 'day' : 'days'}
                         </p>
                       </div>
                       <div className="flex gap-2">

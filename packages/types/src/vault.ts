@@ -109,7 +109,7 @@ export interface DocumentItem extends VaultItem {
   mimeType: string;
   size: number;
   description?: string;
-  tags?: string[];
+  tags: string[];
 }
 
 /**

@@ -46,7 +46,7 @@ export async function encryptFile(
     {
       name: 'AES-GCM',
       iv,
-      additionalData: aadBytes,
+      additionalData: new Uint8Array(aadBytes),
     },
     cryptoKey,
     data
@@ -89,11 +89,11 @@ export async function decryptFile(
   const plaintextBuffer = await crypto.subtle.decrypt(
     {
       name: 'AES-GCM',
-      iv,
-      additionalData: aadBytes,
+      iv: new Uint8Array(iv),
+      additionalData: new Uint8Array(aadBytes),
     },
     cryptoKey,
-    ciphertext
+    new Uint8Array(ciphertext)
   );
 
   return plaintextBuffer;

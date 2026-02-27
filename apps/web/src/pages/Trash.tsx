@@ -95,7 +95,7 @@ export default function Trash() {
     }
   }
 
-  const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛' })[type as keyof ReturnType<typeof typeIcon>] ?? '📄';
+  const typeIcon = (type: string): string => ({ login: '🔑', note: '📝', card: '💳', identity: '📛' }[type] ?? '📄');
 
   return (
     <>

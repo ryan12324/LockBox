@@ -87,14 +87,12 @@ describe('Travel Mode — schema columns', () => {
     expect(folders.travelSafe).toBeDefined();
   });
 
-  it('travelMode defaults to 0 (off)', () => {
-    const config = users.travelMode.config;
-    expect(config).toBeDefined();
+  it('travelMode column is defined on users', () => {
+    expect(users.travelMode).toBeDefined();
   });
 
-  it('travelSafe defaults to 1 (safe)', () => {
-    const config = folders.travelSafe.config;
-    expect(config).toBeDefined();
+  it('travelSafe column is defined on folders', () => {
+    expect(folders.travelSafe).toBeDefined();
   });
 });
 

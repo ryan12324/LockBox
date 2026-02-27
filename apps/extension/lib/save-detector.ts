@@ -330,10 +330,12 @@ export function initSaveDetector(): void {
   XMLHttpRequest.prototype.open = function patchedOpen(
     method: string,
     url: string | URL,
-    ...rest: [boolean?, string?, string?]
+    async?: boolean,
+    username?: string,
+    password?: string
   ): void {
     xhrMethodMap.set(this, method.toUpperCase());
-    return originalXHROpen.call(this, method, url, ...rest);
+    return originalXHROpen.call(this, method, url, async ?? true, username, password);
   };
 
   XMLHttpRequest.prototype.send = function patchedSend(

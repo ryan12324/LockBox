@@ -78,7 +78,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
   const [rpId, setRpId] = useState(passkeyItem?.rpId || '');
   const [rpName, setRpName] = useState(passkeyItem?.rpName || '');
   const [passkeyUserName, setPasskeyUserName] = useState(passkeyItem?.userName || '');
-  const [userDisplayName, setUserDisplayName] = useState(passkeyItem?.userDisplayName || '');
+  const [passkeyUserId, setPasskeyUserId] = useState(passkeyItem?.userId || '');
   const [credentialId, setCredentialId] = useState(passkeyItem?.credentialId || '');
   const [publicKey, setPublicKey] = useState(passkeyItem?.publicKey || '');
   const [counter, setCounter] = useState(passkeyItem?.counter || 0);
@@ -341,11 +341,12 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           type: 'passkey',
           rpId,
           rpName,
+          userId: passkeyUserId,
           userName: passkeyUserName,
-          userDisplayName: userDisplayName || undefined,
           credentialId,
           publicKey,
           counter,
+          transports: [],
           createdAt: passkeyItem?.createdAt || now,
         } as PasskeyItem;
       } else if (type === 'document') {
@@ -928,8 +929,8 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   <input type="text" value={passkeyUserName} onChange={(e) => setPasskeyUserName(e.target.value)} placeholder="user@example.com" className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Display Name</label>
-                  <input type="text" value={userDisplayName} onChange={(e) => setUserDisplayName(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <label className="block text-sm font-medium text-white/70 mb-1">User ID</label>
+                  <input type="text" value={passkeyUserId} onChange={(e) => setPasskeyUserId(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
                 </div>
               </div>
               <div>
@@ -1450,7 +1451,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <div>
                           <span className="text-sm text-white">{passkeyUserName}</span>
-                          {userDisplayName && <span className="text-xs text-white/40 ml-2">({userDisplayName})</span>}
+                          {passkeyUserId && <span className="text-xs text-white/40 ml-2">({passkeyUserId})</span>}
                         </div>
                         <button onClick={() => copyToClipboard(passkeyUserName, 'userName')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
                           {copiedField === 'userName' ? '✓' : '📋'}

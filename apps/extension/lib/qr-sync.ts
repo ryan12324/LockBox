@@ -158,7 +158,7 @@ export async function scanQRFromImage(imageData: ImageData | Uint8Array): Promis
   // In a real implementation, this would use a QR decoding library (e.g. jsQR).
   // For the extension context, we provide a basic interface that can be
   // backed by different implementations.
-  if (ArrayBuffer.isView(imageData) && !(imageData as Record<string, unknown>).width) {
+  if (ArrayBuffer.isView(imageData) && !('width' in imageData)) {
     // Try to decode as UTF-8 text (for testing/simple payloads)
     try {
       const text = new TextDecoder().decode(imageData);
@@ -208,7 +208,7 @@ export function getRemainingSeconds(payload: QRSyncPayload): number {
 async function deriveKeyFromPublicKey(publicKeyB64: string): Promise<Uint8Array> {
   const publicKeyBytes = base64ToUint8Array(publicKeyB64);
 
-  const ikm = await crypto.subtle.importKey('raw', publicKeyBytes, { name: 'HKDF' }, false, [
+  const ikm = await crypto.subtle.importKey('raw', new Uint8Array(publicKeyBytes), { name: 'HKDF' }, false, [
     'deriveBits',
   ]);
 

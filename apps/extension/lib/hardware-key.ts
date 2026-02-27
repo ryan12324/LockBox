@@ -128,12 +128,12 @@ export async function authenticateWithHardwareKey(options: {
   const challengeBytes = base64urlDecode(options.challenge);
 
   const getOptions: PublicKeyCredentialRequestOptions = {
-    challenge: challengeBytes,
+    challenge: new Uint8Array(challengeBytes),
     rpId: window.location.hostname,
     timeout: 60000,
     allowCredentials: [
       {
-        id: base64urlDecode(options.keyId),
+        id: new Uint8Array(base64urlDecode(options.keyId)),
         type: 'public-key',
         transports: ['usb', 'nfc', 'ble'],
       },
@@ -238,7 +238,7 @@ export async function wrapMasterKey(
   publicKeyBytes: Uint8Array
 ): Promise<string> {
   // Derive a wrapping key from the public key material via HKDF
-  const ikm = await crypto.subtle.importKey('raw', publicKeyBytes, { name: 'HKDF' }, false, [
+  const ikm = await crypto.subtle.importKey('raw', new Uint8Array(publicKeyBytes), { name: 'HKDF' }, false, [
     'deriveBits',
   ]);
 
@@ -291,7 +291,7 @@ export async function unwrapMasterKey(
   const ciphertext = base64urlDecode(wrappedMasterKey.slice(dotIndex + 1));
 
   // Derive the same wrapping key
-  const ikm = await crypto.subtle.importKey('raw', publicKeyBytes, { name: 'HKDF' }, false, [
+  const ikm = await crypto.subtle.importKey('raw', new Uint8Array(publicKeyBytes), { name: 'HKDF' }, false, [
     'deriveBits',
   ]);
 

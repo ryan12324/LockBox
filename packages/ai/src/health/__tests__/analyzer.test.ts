@@ -33,7 +33,7 @@ vi.spyOn(crypto.subtle, 'digest').mockImplementation(
 // Helpers
 // ---------------------------------------------------------------------------
 
-const NOW = '2026-02-26T00:00:00.000Z';
+const NOW = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z').toISOString();
 
 /** Utility to build a LoginItem with sensible defaults. */
 function makeItem(overrides: Partial<LoginItem> & { id: string; password: string }): LoginItem {

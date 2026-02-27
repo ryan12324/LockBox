@@ -48,7 +48,7 @@ export default function AppLayout() {
     navigate('/login');
   }
 
-  const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' })[type as keyof ReturnType<typeof typeIcon>] ?? '📄';
+  const typeIcon = (type: string): string => ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' }[type] ?? '📄');
 
   async function handleCreateFolder() {
     if (!session || !newFolderName.trim()) return;

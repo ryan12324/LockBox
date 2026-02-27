@@ -97,7 +97,7 @@ export default function Vault() {
     }, 30_000);
   }
 
-  const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛' })[type as keyof ReturnType<typeof typeIcon>] ?? '📄';
+  const typeIcon = (type: string): string => ({ login: '🔑', note: '📝', card: '💳', identity: '📛' }[type] ?? '📄');
   return (
     <>
         <div className="p-4 border-b border-white/[0.1] bg-white/[0.05] backdrop-blur-lg flex gap-3">
