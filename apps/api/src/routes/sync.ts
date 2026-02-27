@@ -6,7 +6,7 @@
 import { Hono } from 'hono';
 import { eq, and, gt, isNotNull } from 'drizzle-orm';
 import { createDb } from '../db/index.js';
-import { vaultItems, folders, sharedFolders, sharedFolderKeys, teamMembers } from '../db/schema.js';
+import { vaultItems, folders, users, sharedFolders, sharedFolderKeys, teamMembers } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { VALID_TYPES } from './vault.js';
 
@@ -56,6 +56,34 @@ syncRoutes.get('/', async (c) => {
       sharedItems = sharedItems.concat(folderItems.filter((i) => !i.deletedAt));
     }
 
+    // Travel mode filtering
+    const user = await db.select({ travelMode: users.travelMode })
+      .from(users).where(eq(users.id, userId)).get();
+    const isTravelMode = user?.travelMode === 1;
+
+    if (isTravelMode) {
+      const safeFolderIds = userFolders
+        .filter((f) => f.travelSafe === 1)
+        .map((f) => f.id);
+      const filteredActive = active.filter((i) =>
+        !i.folderId || safeFolderIds.includes(i.folderId)
+      );
+      const filteredDeleted = items
+        .filter((i) => i.deletedAt && (!i.folderId || safeFolderIds.includes(i.folderId)))
+        .map((i) => i.id);
+      const filteredFolders = userFolders.filter((f) => f.travelSafe === 1);
+
+      return c.json({
+        added: filteredActive,
+        modified: [],
+        deleted: filteredDeleted,
+        folders: filteredFolders,
+        sharedItems,
+        sharedFolders: sharedFolderRows,
+        serverTimestamp,
+      });
+    }
+
     return c.json({
       added: active,
       modified: [],
@@ -103,6 +131,37 @@ syncRoutes.get('/', async (c) => {
       .from(vaultItems)
       .where(and(eq(vaultItems.folderId, sfId), gt(vaultItems.revisionDate, since)));
     sharedItems = sharedItems.concat(folderItems);
+  }
+
+  // Travel mode filtering
+  const user = await db.select({ travelMode: users.travelMode })
+    .from(users).where(eq(users.id, userId)).get();
+  const isTravelMode = user?.travelMode === 1;
+
+  if (isTravelMode) {
+    const safeFolderIds = userFolders
+      .filter((f) => f.travelSafe === 1)
+      .map((f) => f.id);
+    const filteredAdded = added.filter((i) =>
+      !i.folderId || safeFolderIds.includes(i.folderId)
+    );
+    const filteredModified = modified.filter((i) =>
+      !i.folderId || safeFolderIds.includes(i.folderId)
+    );
+    const filteredDeleted = changedItems
+      .filter((i) => i.deletedAt && (!i.folderId || safeFolderIds.includes(i.folderId)))
+      .map((i) => i.id);
+    const filteredFolders = userFolders.filter((f) => f.travelSafe === 1);
+
+    return c.json({
+      added: filteredAdded,
+      modified: filteredModified,
+      deleted: filteredDeleted,
+      folders: filteredFolders,
+      sharedItems,
+      sharedFolders: sharedFolderRows,
+      serverTimestamp,
+    });
   }
 
   return c.json({

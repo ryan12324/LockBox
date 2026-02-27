@@ -11,6 +11,7 @@ export const users = sqliteTable('users', {
   recoveryKeyHash: text('recovery_key_hash'), // bcrypt hash of recovery key
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+  travelMode: integer('travel_mode').notNull().default(0), // 0 = off, 1 = on
 });
 
 export const sessions = sqliteTable('sessions', {
@@ -31,6 +32,7 @@ export const folders = sqliteTable('folders', {
   name: text('name').notNull(),
   parentId: text('parent_id'), // self-referential FK
   createdAt: text('created_at').notNull(),
+  travelSafe: integer('travel_safe').notNull().default(1), // 1 = safe for travel, 0 = hide in travel mode
 });
 
 export const vaultItems = sqliteTable('vault_items', {
@@ -173,4 +175,27 @@ export const aliasSettings = sqliteTable('alias_settings', {
   provider: text('provider').notNull(), // 'simplelogin' | 'anonaddy'
   encryptedApiKey: text('encrypted_api_key').notNull(), // encrypted client-side
   baseUrl: text('base_url'), // optional custom instance URL
+});
+
+// ─── Emergency Access ─────────────────────────────────────────────────────────
+
+export const emergencyAccessGrants = sqliteTable('emergency_access_grants', {
+  id: text('id').primaryKey(),
+  grantorUserId: text('grantor_user_id').notNull().references(() => users.id),
+  granteeEmail: text('grantee_email').notNull(),
+  granteeUserId: text('grantee_user_id'),
+  waitPeriodDays: integer('wait_period_days').notNull().default(7),
+  status: text('status').notNull().default('pending'), // pending|confirmed|waiting|approved|rejected|expired
+  encryptedUserKey: text('encrypted_user_key').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+  updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+});
+
+export const emergencyAccessRequests = sqliteTable('emergency_access_requests', {
+  id: text('id').primaryKey(),
+  grantId: text('grant_id').notNull().references(() => emergencyAccessGrants.id),
+  requestedAt: text('requested_at').notNull().default(sql`(datetime('now'))`),
+  approvedAt: text('approved_at'),
+  rejectedAt: text('rejected_at'),
+  expiresAt: text('expires_at').notNull(),
 });

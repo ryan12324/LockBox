@@ -438,3 +438,34 @@ vaultRoutes.post('/items/:id/versions/:versionId/restore', async (c) => {
   const item = await db.select().from(vaultItems).where(eq(vaultItems.id, itemId)).get();
   return c.json({ item });
 });
+
+// ─── PUT /api/vault/folders/:id/travel ────────────────────────────────────────
+
+vaultRoutes.put('/folders/:id/travel', async (c) => {
+  const userId = c.get('userId');
+  const folderId = c.req.param('id');
+  const body = await c.req.json().catch(() => null);
+  if (!body) return c.json({ error: 'Invalid JSON' }, 400);
+
+  const { travelSafe } = body as { travelSafe?: boolean };
+  if (typeof travelSafe !== 'boolean') {
+    return c.json({ error: 'travelSafe must be a boolean' }, 400);
+  }
+
+  const db = createDb(c.env.DB);
+
+  // Only folder owner can update
+  const existing = await db
+    .select()
+    .from(folders)
+    .where(and(eq(folders.id, folderId), eq(folders.userId, userId)))
+    .get();
+  if (!existing) return c.json({ error: 'Not found' }, 404);
+
+  await db
+    .update(folders)
+    .set({ travelSafe: travelSafe ? 1 : 0 })
+    .where(eq(folders.id, folderId));
+
+  return c.json({ success: true });
+});

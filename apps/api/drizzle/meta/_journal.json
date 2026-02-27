@@ -36,6 +36,20 @@
       "when": 1772091552051,
       "tag": "0004_email_alias_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1772091552052,
+      "tag": "0005_emergency_access",
+      "breakpoints": true
     }
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1772091552053,
+      "tag": "0006_travel_mode",
+      "breakpoints": true
   ]
 }

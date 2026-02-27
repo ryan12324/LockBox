@@ -16,11 +16,13 @@ import { shareLinkRoutes } from './routes/share-links.js';
 import { twofaRoutes } from './routes/twofa.js';
 import { attachmentRoutes } from './routes/attachments.js';
 import { aliasRoutes } from './routes/aliases.js';
+import { emergencyRoutes } from './routes/emergency.js';
+import { settingsRoutes } from './routes/settings.js';
 import { corsMiddleware, securityHeaders, requestSizeLimit } from './middleware/security.js';
 import { VaultSyncHub } from './sync-hub.js';
 import { createDb } from './db/index.js';
-import { vaultItems } from './db/schema.js';
-import { and, isNotNull, lte } from 'drizzle-orm';
+import { vaultItems, emergencyAccessGrants, emergencyAccessRequests } from './db/schema.js';
+import { and, eq, isNotNull, lte } from 'drizzle-orm';
 
 export { VaultSyncHub };
 
@@ -52,6 +54,8 @@ app.route('/api/share-links', shareLinkRoutes);
 app.route('/api/auth/2fa', twofaRoutes);
 app.route('/api/vault', attachmentRoutes);
 app.route('/api', aliasRoutes);
+app.route('/api/emergency', emergencyRoutes);
+app.route('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
@@ -67,5 +71,23 @@ export default {
     await db
       .delete(vaultItems)
       .where(and(isNotNull(vaultItems.deletedAt), lte(vaultItems.deletedAt, cutoffDate)));
+
+    // Auto-approve emergency access requests past wait period
+    const waitingGrants = await db.select().from(emergencyAccessGrants)
+      .where(eq(emergencyAccessGrants.status, 'waiting'));
+
+    for (const grant of waitingGrants) {
+      const request = await db.select().from(emergencyAccessRequests)
+        .where(eq(emergencyAccessRequests.grantId, grant.id))
+        .get();
+      if (request && new Date(request.expiresAt) <= new Date()) {
+        await db.update(emergencyAccessGrants)
+          .set({ status: 'approved', updatedAt: new Date().toISOString() })
+          .where(eq(emergencyAccessGrants.id, grant.id));
+        await db.update(emergencyAccessRequests)
+          .set({ approvedAt: new Date().toISOString() })
+          .where(eq(emergencyAccessRequests.id, request.id));
+      }
+    }
   },
 };
