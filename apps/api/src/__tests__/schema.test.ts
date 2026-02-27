@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { users, sessions, vaultItems, folders } from '../db/schema';
+import { users, sessions, vaultItems, folders, aliasSettings } from '../db/schema';
 
 describe('Database Schema', () => {
   describe('users table', () => {
@@ -94,6 +94,7 @@ describe('Database Schema', () => {
       expect(dbModule.sessions).toBeDefined();
       expect(dbModule.folders).toBeDefined();
       expect(dbModule.vaultItems).toBeDefined();
+      expect(dbModule.aliasSettings).toBeDefined();
     });
 
     it('should export createDb function', async () => {

@@ -35,6 +35,12 @@ async function sendMessage<T>(message: object): Promise<T> {
 
 const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳' })[type] ?? '📄';
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 // ─── Setup Screen ──────────────────────────────────────────────────────────
 
 function SetupView({ onComplete }: { onComplete: () => void }) {
@@ -245,6 +251,8 @@ function ItemDetailView({
   const [deleting, setDeleting] = useState(false);
   const [totpCode, setTotpCode] = useState('');
   const [totpRemaining, setTotpRemaining] = useState(0);
+  const [attachments, setAttachments] = useState<Array<{ id: string; fileName: string; fileSize: number; mimeType: string; createdAt: string }>>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const login = item.type === 'login' ? (item as LoginItem) : null;
   const note = item.type === 'note' ? (item as SecureNoteItem) : null;
@@ -275,6 +283,44 @@ function ItemDetailView({
     intervalId = setInterval(refresh, 1000);
     return () => clearInterval(intervalId);
   }, [login?.totp]);
+
+  // Load attachments for this item
+  useEffect(() => {
+    sendMessage<{ success: boolean; attachments?: Array<{ id: string; fileName: string; fileSize: number; mimeType: string; createdAt: string }> }>({
+      type: 'get-attachments',
+      itemId: item.id,
+    })
+      .then(res => {
+        if (res.success && res.attachments) setAttachments(res.attachments);
+      })
+      .catch(() => {});
+  }, [item.id]);
+
+  async function handleDownloadAttachment(attachmentId: string, fileName: string) {
+    setDownloadingId(attachmentId);
+    try {
+      const res = await sendMessage<{ success: boolean; encryptedData?: string }>({
+        type: 'download-attachment',
+        itemId: item.id,
+        attachmentId,
+      });
+      if (res.success && res.encryptedData) {
+        // Trigger browser download
+        const blob = new Blob([Uint8Array.from(atob(res.encryptedData), c => c.charCodeAt(0))]);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setDownloadingId(null);
+    }
+  }
+
 
   async function handleDelete() {
     setDeleting(true);
@@ -470,6 +516,32 @@ function ItemDetailView({
           </>
         )}
 
+        {/* Attachments */}
+        {attachments.length > 0 && (
+          <div className="mt-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-white/30 px-3 mb-1">
+              Attachments ({attachments.length})
+            </div>
+            <div className="flex flex-col gap-1">
+              {attachments.map((att) => (
+                <div key={att.id} className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs text-white truncate">{att.fileName}</div>
+                    <div className="text-[10px] text-white/40">{formatFileSize(att.fileSize)}</div>
+                  </div>
+                  <button
+                    onClick={() => handleDownloadAttachment(att.id, att.fileName)}
+                    disabled={downloadingId === att.id}
+                    className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer shrink-0 ml-2 ${downloadingId === att.id ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
+                  >
+                    {downloadingId === att.id ? '...' : '⬇️'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Delete */}
         <div className="mt-4 pt-3 border-t border-white/[0.1]">
           {confirmDelete ? (
@@ -536,6 +608,7 @@ function AddEditView({
   const [uris, setUris] = useState<string[]>(loginItem?.uris?.length ? loginItem.uris : ['']);
   const [totpSecret, setTotpSecret] = useState(loginItem?.totp || '');
   const [showPassword, setShowPassword] = useState(false);
+  const [generatingAlias, setGeneratingAlias] = useState(false);
 
   // Note fields
   const noteItem = editItem?.type === 'note' ? (editItem as SecureNoteItem) : null;
@@ -780,13 +853,35 @@ function AddEditView({
         {type === 'login' && (
           <>
             <div>
-              <label className={labelClass}>Username</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className={inputClass}
-              />
+              <label className={labelClass}>Username / Email</label>
+              <div className="flex gap-1">
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className={`${inputClass} flex-1`}
+                />
+                <button
+                  onClick={async () => {
+                    setGeneratingAlias(true);
+                    try {
+                      const res = await sendMessage<{ success: boolean; alias?: string; error?: string }>({
+                        type: 'generate-alias',
+                      });
+                      if (res.success && res.alias) setUsername(res.alias);
+                    } catch {
+                      // ignore
+                    } finally {
+                      setGeneratingAlias(false);
+                    }
+                  }}
+                  disabled={generatingAlias}
+                  title="Generate email alias"
+                  className={`px-2 py-1.5 text-xs rounded-md transition-colors whitespace-nowrap cursor-pointer ${generatingAlias ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-white/[0.08] hover:bg-white/[0.14] text-white/70'}`}
+                >
+                  {generatingAlias ? '...' : '✉️ Alias'}
+                </button>
+              </div>
             </div>
             <div>
               <label className={labelClass}>Password</label>
@@ -1234,12 +1329,14 @@ function VaultTab({
   onSelectItem,
   onAddItem,
   rotationMap,
+  attachmentCounts,
 }: {
   items: VaultItem[];
   folders: Folder[];
   onSelectItem: (item: VaultItem) => void;
   onAddItem: () => void;
   rotationMap?: Map<string, 'overdue' | 'due-soon'>;
+  attachmentCounts: Map<string, number>;
 }) {
   const [search, setSearch] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -1341,8 +1438,15 @@ function VaultTab({
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <span className="text-sm shrink-0">{typeIcon(item.type)}</span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-white truncate">
-                      {item.name}
+                    <div className="flex items-center gap-1">
+                      <div className="text-sm font-medium text-white truncate">
+                        {item.name}
+                      </div>
+                      {(attachmentCounts.get(item.id) ?? 0) > 0 && (
+                        <span className="px-1 py-0.5 text-[9px] font-bold rounded bg-indigo-500/20 text-indigo-300 shrink-0" title={`${attachmentCounts.get(item.id)} attachment(s)`}>
+                          📎{attachmentCounts.get(item.id)}
+                        </span>
+                      )}
                     </div>
                     {item.type === 'login' && (
                       <div className="text-xs text-white/50 mt-[1px] truncate">
@@ -1837,6 +1941,7 @@ export default function App() {
   const [healthScore, setHealthScore] = useState<number | null>(null);
   const [breachedCount, setBreachedCount] = useState<number>(0);
   const [phishingWarning, setPhishingWarning] = useState<{ url: string; result: { safe: boolean; score: number; reasons: string[] } } | null>(null);
+  const [attachmentCounts, setAttachmentCounts] = useState<Map<string, number>>(new Map());
 
   const [chatMessages, setChatMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; id: string }>>([]);
   const [chatInput, setChatInput] = useState('');
@@ -1901,6 +2006,23 @@ export default function App() {
         loadSharedItems();
         setAllItems(items);
         setFolders(f ?? []);
+
+        // Fetch attachment counts for all items (non-blocking)
+        Promise.all(
+          items.map(item =>
+            sendMessage<{ success: boolean; attachments?: Array<{ id: string }> }>({
+              type: 'get-attachments',
+              itemId: item.id,
+            }).then(res => [item.id, res.success ? (res.attachments?.length ?? 0) : 0] as [string, number])
+              .catch(() => [item.id, 0] as [string, number])
+          )
+        ).then(counts => {
+          const map = new Map<string, number>();
+          for (const [id, count] of counts) {
+            if (count > 0) map.set(id, count);
+          }
+          setAttachmentCounts(map);
+        });
         
         sendMessage<{ success: boolean; summary?: VaultHealthSummary }>({ type: 'run-health-analysis' })
           .then(res => { if (res.success && res.summary) setHealthScore(res.summary.overallScore); });
@@ -2285,6 +2407,7 @@ export default function App() {
             onSelectItem={(item) => setViewState({ view: 'detail', item })}
             onAddItem={() => setViewState({ view: 'add' })}
             rotationMap={rotationMap}
+            attachmentCounts={attachmentCounts}
           />
         )}
         {activeTab === 'generator' && <GeneratorTab />}

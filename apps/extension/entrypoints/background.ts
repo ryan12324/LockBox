@@ -18,6 +18,7 @@ import { PhishingDetector, SecurityAlertEngine, SemanticSearch, KeywordEmbedding
 import type { SearchResult, SecurityAlert } from '@lockbox/ai';
 import type { VaultItem, LoginItem, KdfConfig, Folder } from '@lockbox/types';
 import { api } from '../lib/api.js';
+import { checkSite as checkTwoFaSite } from '../lib/twofa-directory.js';
 import {
   getSessionToken,
   setSessionToken,
@@ -292,7 +293,11 @@ type Message =
   | { type: 'has-keypair' }
   | { type: 'check-credentials'; url: string; username: string; password: string }
   | { type: 'save-credentials'; url: string; username: string; password: string }
-  | { type: 'update-credentials'; url: string; username: string; password: string; itemId: string };
+  | { type: 'update-credentials'; url: string; username: string; password: string; itemId: string }
+  | { type: 'get-attachments'; itemId: string }
+  | { type: 'download-attachment'; itemId: string; attachmentId: string }
+  | { type: 'check-2fa'; domain: string }
+  | { type: 'generate-alias'; provider?: string; apiKey?: string };
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -732,6 +737,61 @@ async function handleMessage(
         return { success: true, item: updatedItem };
       } catch (err) {
         return { success: false, error: err instanceof Error ? err.message : 'Failed to update credentials' };
+      }
+    }
+
+
+    // ─── Attachments ──────────────────────────────────────────────────
+
+    case 'get-attachments': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.attachments.list(message.itemId, token);
+        return { success: true, attachments: res.attachments };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to get attachments' };
+      }
+    }
+
+    case 'download-attachment': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.attachments.download(message.itemId, message.attachmentId, token);
+        return { success: true, encryptedData: res.encryptedData };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to download attachment' };
+      }
+    }
+
+    // ─── 2FA Check ───────────────────────────────────────────────────
+
+    case 'check-2fa': {
+      try {
+        const result = await checkTwoFaSite(message.domain);
+        return { success: true, ...result };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : '2FA check failed' };
+      }
+    }
+
+    // ─── Email Alias ─────────────────────────────────────────────────
+
+    case 'generate-alias': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.aliases.generate(
+          { provider: message.provider, apiKey: message.apiKey },
+          token,
+        );
+        return { success: true, alias: res.alias };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to generate alias' };
       }
     }
 

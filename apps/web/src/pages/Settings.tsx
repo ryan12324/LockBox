@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.js';
+import { api } from '../lib/api.js';
+import { encryptString, decryptString } from '@lockbox/crypto';
 import { QRCodeSVG } from 'qrcode.react';
 
 type Theme = 'system' | 'light' | 'dark';
@@ -44,6 +46,17 @@ export default function Settings() {
   const [twoFaError, setTwoFaError] = useState('');
   const [twoFaLoading, setTwoFaLoading] = useState(false);
 
+  // Alias state
+  type AliasProvider = 'simplelogin' | 'anonaddy';
+  const { userKey } = useAuthStore();
+  const [aliasProvider, setAliasProvider] = useState<AliasProvider>('simplelogin');
+  const [aliasApiKey, setAliasApiKey] = useState('');
+  const [aliasBaseUrl, setAliasBaseUrl] = useState('');
+  const [aliasConfigured, setAliasConfigured] = useState(false);
+  const [aliasSaving, setAliasSaving] = useState(false);
+  const [aliasTesting, setAliasTesting] = useState(false);
+  const [aliasError, setAliasError] = useState('');
+  const [aliasSuccess, setAliasSuccess] = useState('');
   useEffect(() => {
     async function check2FA() {
       if (!session) return;
@@ -63,6 +76,23 @@ export default function Settings() {
       }
     }
     check2FA();
+  }, [session]);
+
+  // Load alias config
+  useEffect(() => {
+    async function loadAliasConfig() {
+      if (!session) return;
+      try {
+        const config = await api.aliases.getConfig(session.token);
+        setAliasProvider(config.provider as AliasProvider);
+        setAliasConfigured(true);
+        if (config.baseUrl) setAliasBaseUrl(config.baseUrl);
+        setAliasApiKey('');
+      } catch {
+        setAliasConfigured(false);
+      }
+    }
+    loadAliasConfig();
   }, [session]);
 
   useEffect(() => {
@@ -159,6 +189,76 @@ export default function Settings() {
     if (!backupCodes) return;
     await navigator.clipboard.writeText(backupCodes.join('\n'));
     window.alert('Backup codes copied to clipboard');
+  }
+
+  async function handleSaveAlias() {
+    if (!session || !userKey) {
+      setAliasError('Session expired');
+      return;
+    }
+    if (!aliasApiKey.trim()) {
+      setAliasError('API key is required');
+      return;
+    }
+    setAliasSaving(true);
+    setAliasError('');
+    setAliasSuccess('');
+    try {
+      const encryptedApiKey = await encryptString(aliasApiKey, userKey.slice(0, 32));
+      await api.aliases.saveConfig({
+        provider: aliasProvider,
+        encryptedApiKey,
+        baseUrl: aliasBaseUrl || undefined,
+      }, session.token);
+      setAliasConfigured(true);
+      setAliasSuccess('Alias configuration saved');
+      setAliasApiKey('');
+    } catch (err) {
+      setAliasError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setAliasSaving(false);
+    }
+  }
+
+  async function handleTestAlias() {
+    if (!session || !userKey) {
+      setAliasError('Session expired');
+      return;
+    }
+    setAliasTesting(true);
+    setAliasError('');
+    setAliasSuccess('');
+    try {
+      let plainKey = aliasApiKey;
+      if (!plainKey && aliasConfigured) {
+        const config = await api.aliases.getConfig(session.token);
+        plainKey = await decryptString(config.encryptedApiKey, userKey.slice(0, 32));
+      }
+      if (!plainKey) {
+        setAliasError('Enter an API key to test');
+        return;
+      }
+      const result = await api.aliases.list(aliasProvider, plainKey, session.token, aliasBaseUrl || undefined);
+      setAliasSuccess(`Connection successful — ${result.aliases.length} alias(es) found`);
+    } catch (err) {
+      setAliasError(err instanceof Error ? err.message : 'Connection test failed');
+    } finally {
+      setAliasTesting(false);
+    }
+  }
+
+  async function handleDeleteAlias() {
+    if (!session) return;
+    try {
+      await api.aliases.deleteConfig(session.token);
+      setAliasConfigured(false);
+      setAliasProvider('simplelogin');
+      setAliasApiKey('');
+      setAliasBaseUrl('');
+      setAliasSuccess('Alias configuration removed');
+    } catch (err) {
+      setAliasError(err instanceof Error ? err.message : 'Failed to remove');
+    }
   }
 
   return (
@@ -300,6 +400,77 @@ export default function Settings() {
             >
               Configure AI Features →
             </button>
+          </section>
+
+          {/* Email Aliases */}
+          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Email Aliases</h2>
+            <p className="text-sm text-white/50 mb-4">
+              Generate unique email aliases for each login using SimpleLogin or AnonAddy. API keys are encrypted client-side before storage.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">Provider</label>
+                <select
+                  value={aliasProvider}
+                  onChange={(e) => setAliasProvider(e.target.value as AliasProvider)}
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                >
+                  <option value="simplelogin">SimpleLogin</option>
+                  <option value="anonaddy">AnonAddy</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  API Key {aliasConfigured && <span className="text-xs text-green-400 ml-1">(configured)</span>}
+                </label>
+                <input
+                  type="password"
+                  value={aliasApiKey}
+                  onChange={(e) => setAliasApiKey(e.target.value)}
+                  placeholder={aliasConfigured ? 'Enter new key to update' : 'Paste your API key'}
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-2">
+                  Custom Base URL <span className="text-xs text-white/40">(optional, for self-hosted)</span>
+                </label>
+                <input
+                  type="text"
+                  value={aliasBaseUrl}
+                  onChange={(e) => setAliasBaseUrl(e.target.value)}
+                  placeholder={aliasProvider === 'simplelogin' ? 'https://app.simplelogin.io' : 'https://app.anonaddy.com'}
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleSaveAlias}
+                  disabled={aliasSaving}
+                  className="px-4 py-2 text-sm bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded transition-colors disabled:opacity-50"
+                >
+                  {aliasSaving ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={handleTestAlias}
+                  disabled={aliasTesting}
+                  className="px-4 py-2 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded transition-colors disabled:opacity-50"
+                >
+                  {aliasTesting ? 'Testing...' : 'Test Connection'}
+                </button>
+                {aliasConfigured && (
+                  <button
+                    onClick={handleDeleteAlias}
+                    className="px-4 py-2 text-sm bg-red-500/20 hover:bg-red-500/40 text-red-300 rounded transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {aliasError && <p className="text-sm text-red-400">{aliasError}</p>}
+              {aliasSuccess && <p className="text-sm text-green-400">{aliasSuccess}</p>}
+            </div>
           </section>
 
           {/* Security */}

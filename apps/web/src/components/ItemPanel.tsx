@@ -2,11 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
 import { encryptVaultItem } from '../lib/crypto.js';
+import { decryptString } from '@lockbox/crypto';
 import type { VaultItem, LoginItem, SecureNoteItem, CardItem, IdentityItem, CustomField, Folder, VaultItemType } from '@lockbox/types';
 import { totp, getRemainingSeconds, base32Decode, parseOtpAuthUri } from '@lockbox/totp';
 import { generatePassword } from '@lockbox/generator';
 import { SecurityAlertEngine } from '@lockbox/ai';
 import type { SecurityAlert } from '@lockbox/ai';
+import ItemHistoryPanel from './ItemHistoryPanel.js';
+import AttachmentSection from './AttachmentSection.js';
 interface ItemPanelProps {
   mode: 'view' | 'edit' | 'add';
   item: VaultItem | null;
@@ -87,6 +90,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
   const [totpRemaining, setTotpRemaining] = useState(0);
   const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+  const [showHistory, setShowHistory] = useState(false);
   // Sync state if item changes
   useEffect(() => {
     setCurrentMode(mode);
@@ -131,7 +135,6 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
       setLicenseNumber(iden.licenseNumber || '');
     }
     setCustomFields(item?.customFields || []);
-    }
     setShowConfirmDelete(false);
     setShowPassword(false);
     setShowCvv(false);
@@ -398,12 +401,20 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           </div>
           <div className="flex items-center gap-2">
             {currentMode === 'view' ? (
-              <button
-                onClick={() => setCurrentMode('edit')}
-                className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
-              >
-                Edit
-              </button>
+              <>
+                <button
+                  onClick={() => setShowHistory(true)}
+                  className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
+                >
+                  History
+                </button>
+                <button
+                  onClick={() => setCurrentMode('edit')}
+                  className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
+                >
+                  Edit
+                </button>
+              </>
             ) : (
               <>
                 <button
@@ -548,13 +559,37 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           {currentMode !== 'view' && type === 'login' && (
             <div className="space-y-4 pt-4 border-t border-white/[0.1]">
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Username</label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
-                />
+                <label className="block text-sm font-medium text-white/70 mb-1">Username / Email</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!session || !userKey) return;
+                      try {
+                        const config = await api.aliases.getConfig(session.token);
+                        const plainKey = await decryptString(config.encryptedApiKey, userKey.slice(0, 32));
+                        const result = await api.aliases.generate({
+                          provider: config.provider,
+                          apiKey: plainKey,
+                          baseUrl: config.baseUrl || undefined,
+                        }, session.token);
+                        setUsername(result.alias.email);
+                      } catch {
+                        setError('Configure email aliases in Settings first');
+                      }
+                    }}
+                    className="px-3 py-2 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors text-sm whitespace-nowrap"
+                    title="Generate email alias"
+                  >
+                    🎭 Alias
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-white/70 mb-1">Password</label>
@@ -816,6 +851,11 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Attachments - Edit Mode */}
+          {currentMode === 'edit' && item?.id && (
+            <AttachmentSection itemId={item.id} mode="edit" />
           )}
 
           {/* Custom Fields - Edit Mode */}
@@ -1219,6 +1259,11 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 </div>
               )}
 
+              {/* Attachments - View Mode */}
+              {currentMode === 'view' && item?.id && (
+                <AttachmentSection itemId={item.id} mode="view" />
+              )}
+
               {/* Custom Fields - View Mode */}
               {customFields.length > 0 && (
                 <div className="space-y-4 pt-4 border-t border-white/[0.1]">
@@ -1343,6 +1388,16 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           )}
         </div>
       </div>
+      {showHistory && item?.id && (
+        <ItemHistoryPanel
+          itemId={item.id}
+          onClose={() => setShowHistory(false)}
+          onRestore={() => {
+            setShowHistory(false);
+            onSave();
+          }}
+        />
+      )}
     </>
   );
 }

@@ -57,6 +57,7 @@ async function handleAutofill(
   }
 
   const loginItems = items.filter((i): i is LoginItem => i.type === 'login');
+  let filledItem: LoginItem | null = null;
 
   if (loginItems.length === 1) {
     // Single match — fill immediately
@@ -65,6 +66,7 @@ async function handleAutofill(
       loginItems[0].username,
       loginItems[0].password,
     );
+    filledItem = loginItems[0];
   } else {
     // Multiple matches — show dropdown
     createSuggestionDropdown(
@@ -78,9 +80,16 @@ async function handleAutofill(
             item.username,
             item.password,
           );
+          // Check 2FA after dropdown selection
+          checkTwoFaAfterAutofill(item).catch(() => {});
         }
       },
     );
+  }
+
+  // After single-match autofill, check 2FA support
+  if (filledItem) {
+    checkTwoFaAfterAutofill(filledItem).catch(() => {});
   }
 }
 
@@ -115,6 +124,124 @@ async function handleIdentityAutofill(
       },
     );
   }
+}
+
+/** Check if site supports 2FA after autofill and inject badge if needed. */
+async function checkTwoFaAfterAutofill(filledItem: LoginItem): Promise<void> {
+  // If the item already has TOTP configured, no need to nag
+  if (filledItem.totp) return;
+
+  try {
+    const hostname = new URL(window.location.href).hostname.replace(/^www\./, '');
+    const result = await sendMessage<{
+      success: boolean;
+      supports2fa?: boolean;
+      methods?: string[];
+      documentation?: string;
+      siteName?: string;
+    }>({ type: 'check-2fa', domain: hostname });
+
+    if (result.success && result.supports2fa) {
+      inject2faBadge(result.methods ?? [], result.documentation, result.siteName);
+    }
+  } catch {
+    // Silently ignore failures
+  }
+}
+
+/** Inject a 2FA recommendation badge using Shadow DOM. */
+function inject2faBadge(methods: string[], documentation?: string, siteName?: string): void {
+  // Prevent duplicate badges
+  if (document.getElementById('lockbox-2fa-badge')) return;
+
+  const host = document.createElement('div');
+  host.id = 'lockbox-2fa-badge';
+  host.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:2147483647;';
+
+  const shadow = host.attachShadow({ mode: 'closed' });
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .badge {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      max-width: 340px;
+    }
+    .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .text { flex: 1; min-width: 0; }
+    .title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+    .desc { font-size: 12px; opacity: 0.85; }
+    .methods { font-size: 11px; opacity: 0.7; margin-top: 4px; }
+    .link {
+      color: #c7d2fe;
+      text-decoration: underline;
+      font-size: 11px;
+      margin-top: 4px;
+      display: inline-block;
+      cursor: pointer;
+    }
+    .link:hover { color: #fff; }
+    .dismiss {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.5);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .dismiss:hover { color: #fff; }
+  `;
+
+  const badge = document.createElement('div');
+  badge.className = 'badge';
+
+  const siteLabel = siteName ?? 'This site';
+  const methodsText = methods.length > 0 ? methods.join(', ') : '';
+
+  badge.innerHTML = `
+    <span class="icon">⚠️</span>
+    <div class="text">
+      <div class="title">${siteLabel} supports 2FA</div>
+      <div class="desc">Enable it for better security</div>
+      ${methodsText ? `<div class="methods">Methods: ${methodsText}</div>` : ''}
+    </div>
+  `;
+
+  if (documentation) {
+    const link = document.createElement('a');
+    link.className = 'link';
+    link.textContent = '2FA setup guide →';
+    link.href = documentation;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    badge.querySelector('.text')?.appendChild(link);
+  }
+
+  const dismissBtn = document.createElement('button');
+  dismissBtn.className = 'dismiss';
+  dismissBtn.textContent = '✕';
+  dismissBtn.addEventListener('click', () => host.remove());
+  badge.appendChild(dismissBtn);
+
+  shadow.appendChild(style);
+  shadow.appendChild(badge);
+  document.body.appendChild(host);
+
+  // Auto-dismiss after 15 seconds
+  setTimeout(() => {
+    if (host.parentElement) host.remove();
+  }, 15_000);
 }
 
 /** Inject lock icon overlays into detected password fields and identity fields. */

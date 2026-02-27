@@ -143,4 +143,18 @@ export const api = {
     delete: (shareId: string, token: string) =>
       request<{ success: boolean }>(`/api/share-links/${shareId}`, { method: 'DELETE', token }),
   },
+
+  // ─── Attachments ───────────────────────────────────────────
+  attachments: {
+    list: (itemId: string, token: string) =>
+      request<{ attachments: Array<{ id: string; fileName: string; fileSize: number; mimeType: string; createdAt: string }> }>(`/api/vault/items/${itemId}/attachments`, { token }),
+    download: (itemId: string, attachmentId: string, token: string) =>
+      request<{ encryptedData: string }>(`/api/vault/items/${itemId}/attachments/${attachmentId}`, { token }),
+  },
+
+  // ─── Email Aliases ──────────────────────────────────────────
+  aliases: {
+    generate: (body: { provider?: string; apiKey?: string }, token: string) =>
+      request<{ alias: string }>('/api/aliases/generate', { method: 'POST', body: JSON.stringify(body), token }),
+  },
 };

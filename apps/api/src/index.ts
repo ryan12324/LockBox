@@ -15,6 +15,7 @@ import { sharingRoutes } from './routes/sharing.js';
 import { shareLinkRoutes } from './routes/share-links.js';
 import { twofaRoutes } from './routes/twofa.js';
 import { attachmentRoutes } from './routes/attachments.js';
+import { aliasRoutes } from './routes/aliases.js';
 import { corsMiddleware, securityHeaders, requestSizeLimit } from './middleware/security.js';
 import { VaultSyncHub } from './sync-hub.js';
 import { createDb } from './db/index.js';
@@ -50,6 +51,7 @@ app.route('/api/sharing', sharingRoutes);
 app.route('/api/share-links', shareLinkRoutes);
 app.route('/api/auth/2fa', twofaRoutes);
 app.route('/api/vault', attachmentRoutes);
+app.route('/api', aliasRoutes);
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));

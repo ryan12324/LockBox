@@ -165,3 +165,12 @@ export const vaultItemVersions = sqliteTable('vault_item_versions', {
   revisionDate: text('revision_date').notNull(),
   createdAt: text('created_at').notNull(),
 });
+
+// ─── Email Alias Settings ────────────────────────────────────────────────────
+
+export const aliasSettings = sqliteTable('alias_settings', {
+  userId: text('user_id').primaryKey().references(() => users.id),
+  provider: text('provider').notNull(), // 'simplelogin' | 'anonaddy'
+  encryptedApiKey: text('encrypted_api_key').notNull(), // encrypted client-side
+  baseUrl: text('base_url'), // optional custom instance URL
+});

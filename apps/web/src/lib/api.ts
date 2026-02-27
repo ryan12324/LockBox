@@ -145,4 +145,24 @@ export const api = {
     delete: (shareId: string, token: string) =>
       request<{ success: boolean }>(`/api/share-links/${shareId}`, { method: 'DELETE', token }),
   },
+
+  // ─── Email Aliases ───────────────────────────────────────────
+  aliases: {
+    getConfig: (token: string) =>
+      request<{ provider: string; encryptedApiKey: string; baseUrl: string | null }>('/api/settings/alias', { token }),
+    saveConfig: (body: { provider: string; encryptedApiKey: string; baseUrl?: string }, token: string) =>
+      request<{ success: boolean }>('/api/settings/alias', { method: 'PUT', body: JSON.stringify(body), token }),
+    deleteConfig: (token: string) =>
+      request<{ success: boolean }>('/api/settings/alias', { method: 'DELETE', token }),
+    generate: (body: { provider: string; apiKey: string; baseUrl?: string }, token: string) =>
+      request<{ alias: { email: string } }>('/api/aliases/generate', { method: 'POST', body: JSON.stringify(body), token }),
+    list: (provider: string, apiKey: string, token: string, baseUrl?: string) => {
+      const headers: Record<string, string> = {
+        'X-Alias-Provider': provider,
+        'X-Alias-ApiKey': apiKey,
+      };
+      if (baseUrl) headers['X-Alias-BaseUrl'] = baseUrl;
+      return request<{ aliases: Array<{ email: string; enabled: boolean; id: string }> }>('/api/aliases', { token, headers });
+    },
+  },
 };

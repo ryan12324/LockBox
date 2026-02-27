@@ -11,6 +11,12 @@ import { analyzeVaultHealth, analyzeItem, SecurityCopilot, LifecycleTracker } fr
 import type { SecurityPosture, RotationSchedule, LoginItem } from '@lockbox/types';
 import type { ItemCategory } from '@lockbox/ai';
 
+interface TFAData {
+  domain: string;
+  tfa: string[];
+  documentation?: string;
+}
+
 interface EncryptedItem {
   id: string;
   type: string;
@@ -31,6 +37,97 @@ export default function Health() {
   const [analyzing, setAnalyzing] = useState(false);
   const [posture, setPosture] = useState<SecurityPosture | null>(null);
   const [dueItems, setDueItems] = useState<{ schedule: RotationSchedule, item: VaultItem, category: string }[]>([]);
+
+  // 2FA state
+  const [tfaData, setTfaData] = useState<Map<string, TFAData> | null>(null);
+  const [tfaIssues, setTfaIssues] = useState<{ item: LoginItem; info: TFAData }[]>([]);
+  const [tfaScore, setTfaScore] = useState<number>(100);
+  const [tfaCapableCount, setTfaCapableCount] = useState(0);
+
+  // Load 2FA Directory
+  useEffect(() => {
+    async function loadTFA() {
+      try {
+        const cached = localStorage.getItem('lockbox_tfa_cache');
+        const cachedTime = localStorage.getItem('lockbox_tfa_cache_time');
+        const now = Date.now();
+        
+        if (cached && cachedTime && now - Number(cachedTime) < 24 * 60 * 60 * 1000) {
+          const data = JSON.parse(cached);
+          const map = new Map<string, TFAData>();
+          data.forEach((val: [string, TFAData]) => map.set(val[1].domain, val[1]));
+          setTfaData(map);
+          return;
+        }
+        
+        const res = await fetch('https://2fa.directory/api/v3/tfa.json');
+        const data = await res.json();
+        
+        localStorage.setItem('lockbox_tfa_cache', JSON.stringify(data));
+        localStorage.setItem('lockbox_tfa_cache_time', now.toString());
+        
+        const map = new Map<string, TFAData>();
+        data.forEach((val: [string, TFAData]) => map.set(val[1].domain, val[1]));
+        setTfaData(map);
+      } catch (err) {
+        console.error('Failed to load 2FA directory data:', err);
+      }
+    }
+    loadTFA();
+  }, []);
+
+  // Compute 2FA issues
+  useEffect(() => {
+    if (!tfaData || !items.length) return;
+
+    const logins = items.filter((i) => i.type === 'login') as LoginItem[];
+    const issues: { item: LoginItem; info: TFAData }[] = [];
+    let capable = 0;
+    let configured = 0;
+
+    for (const login of logins) {
+      if (!login.uris || login.uris.length === 0) continue;
+
+      let info: TFAData | undefined = undefined;
+      for (const uri of login.uris) {
+        try {
+          const urlStr = uri.startsWith('http') ? uri : `https://${uri}`;
+          let hostname = new URL(urlStr).hostname.replace(/^www\./, '');
+          
+          if (tfaData.has(hostname)) {
+            info = tfaData.get(hostname);
+          } else {
+            const parts = hostname.split('.');
+            if (parts.length > 2) {
+              const rootDomain = parts.slice(-2).join('.');
+              if (tfaData.has(rootDomain)) {
+                info = tfaData.get(rootDomain);
+              }
+            }
+          }
+          if (info) break;
+        } catch (err) {
+          // ignore invalid URLs
+        }
+      }
+
+      if (info) {
+        capable++;
+        if (login.totp) {
+          configured++;
+        } else {
+          issues.push({ item: login, info });
+        }
+      }
+    }
+
+    setTfaCapableCount(capable);
+    setTfaScore(capable > 0 ? Math.round((configured / capable) * 100) : 100);
+    setTfaIssues(issues);
+  }, [tfaData, items]);
+
+  const finalScore = summary ? Math.round(((summary.overallScore || 100) + (tfaCapableCount > 0 ? tfaScore : (summary.overallScore || 100))) / 2) : 100;
+
   const loadAndAnalyzeVault = useCallback(async () => {
     if (!session || !userKey) return;
 
@@ -168,7 +265,7 @@ export default function Health() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Score Card */}
             <div className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-8 flex flex-col items-center justify-center md:col-span-1 min-h-[280px]">
-              <HealthScore score={summary.overallScore} size={posture && posture.actions.length > 0 ? 140 : 180} label="Vault Score" />
+              <HealthScore score={finalScore} size={posture && posture.actions.length > 0 ? 140 : 180} label="Vault Score" />
               {posture && (
                 <div className={`mt-4 px-3 py-1 rounded-full text-sm font-medium ${
                   posture.trend === 'improving' ? 'bg-green-500/20 text-green-400' :
@@ -336,6 +433,56 @@ export default function Health() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* 2FA Section */}
+          {tfaIssues.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-6">
+                <h2 className="text-xl font-medium text-white">Enable 2FA</h2>
+                <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold">
+                  {tfaIssues.length} Sites
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {tfaIssues.map(({ item, info }) => (
+                  <div key={item.id} className="backdrop-blur-xl bg-white/[0.04] border border-white/[0.1] rounded-2xl p-5 hover:bg-white/[0.08] transition-colors flex flex-col justify-between h-full">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold text-white text-lg truncate pr-4">{item.name}</h3>
+                        <div className="flex gap-1">
+                          {info.tfa.map((method) => (
+                            <span key={method} className="px-2 py-1 bg-white/[0.1] rounded text-[10px] font-bold text-white/70 uppercase tracking-wider">
+                              {method}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-sm text-white/50 mb-4">{info.domain}</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-3 mt-auto">
+                      <button
+                        onClick={() => handleItemClick(item.id)}
+                        className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Add TOTP Key
+                      </button>
+                      {info.documentation && (
+                        <a
+                          href={info.documentation}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-4 py-2 bg-white/[0.08] hover:bg-white/[0.12] text-white rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Docs ↗
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
