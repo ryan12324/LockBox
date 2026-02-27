@@ -88,7 +88,7 @@ class QRScannerPlugin : Plugin() {
 
                 val imageAnalysis = ImageAnalysis.Builder()
                     .setTargetResolution(Size(1280, 720))
-                    .setBackpressureStrategy(ImageAnalysis.BACKPRESSURE_STRATEGY_KEEP_ONLY_LATEST)
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
 
                 var scanComplete = false

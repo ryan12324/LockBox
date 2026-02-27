@@ -367,7 +367,7 @@ Default track is `internal` (internal testing). Promote to production when ready
    cd android
    ./gradlew :app:bundleRelease
    ```
-
+cd 
    Upload the AAB from `apps/mobile/android/app/build/outputs/bundle/release/app-release.aab` through the Play Console → Internal testing track.
 
 4. **Create a Google Cloud service account** for automated uploads:

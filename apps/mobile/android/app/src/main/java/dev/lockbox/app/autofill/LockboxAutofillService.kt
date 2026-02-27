@@ -140,7 +140,6 @@ class LockboxAutofillService : AutofillService() {
                     id = java.util.UUID.randomUUID().toString(),
                     encryptedData = "", // Will be encrypted by main app
                     type = "login",
-                    iv = "",
                     revisionDate = java.time.Instant.now().toString(),
                     syncStatus = "pending_create",
                     folderId = null,

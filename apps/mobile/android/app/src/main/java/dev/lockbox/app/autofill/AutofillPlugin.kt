@@ -116,7 +116,6 @@ class AutofillPlugin : Plugin() {
                     id = id,
                     encryptedData = encryptedData,
                     type = "login",
-                    iv = "",
                     revisionDate = java.time.Instant.now().toString(),
                     syncStatus = "synced",
                     folderId = null,
