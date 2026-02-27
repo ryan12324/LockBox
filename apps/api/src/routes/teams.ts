@@ -57,9 +57,9 @@ teamRoutes.get('/', async (c) => {
 
   const memberships = await db
     .select({
-      teamId: teamMembers.teamId,
+      id: teamMembers.teamId,
       role: teamMembers.role,
-      teamName: teams.name,
+      name: teams.name,
       createdBy: teams.createdBy,
       createdAt: teams.createdAt,
     })
@@ -137,7 +137,7 @@ teamRoutes.get('/:id', requireTeamRole('custom'), async (c) => {
     .innerJoin(users, eq(users.id, teamMembers.userId))
     .where(eq(teamMembers.teamId, teamId));
 
-  return c.json({ ...team, members });
+  return c.json({ team, members });
 });
 
 // ─── PUT /:id — Update team name ─────────────────────────────────────────────

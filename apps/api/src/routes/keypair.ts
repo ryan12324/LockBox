@@ -75,9 +75,9 @@ keypairRoutes.get('/', async (c) => {
   });
 });
 
-// ─── GET /api/keypair/:userId ────────────────────────────────────────────────
+// ─── GET /api/auth/keypair/public/:userId ───────────────────────────────────
 
-keypairRoutes.get('/:userId', async (c) => {
+keypairRoutes.get('/public/:userId', async (c) => {
   const targetUserId = c.req.param('userId');
   const db = createDb(c.env.DB);
 

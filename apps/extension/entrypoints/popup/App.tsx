@@ -133,6 +133,13 @@ function LockedView({ onUnlock }: { onUnlock: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Load saved email on mount
+  useEffect(() => {
+    chrome.storage.local.get('email').then((result) => {
+      if (result.email) setEmail(result.email as string);
+    });
+  }, []);
+
   async function handleUnlock(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -1917,7 +1924,7 @@ export default function App() {
           // Evaluate security posture
           const copilot = new SecurityCopilot();
           const posture = await copilot.evaluate(logins, {});
-          setSecurityScore(posture.score);
+          if (posture?.score !== undefined) setSecurityScore(posture.score);
         } catch (err) {
           console.error('Failed to run AI features:', err);
         }
@@ -2231,12 +2238,12 @@ export default function App() {
         </div>
       </div>
       {/* Phishing Warning */}
-      {phishingWarning && (
+      {phishingWarning?.result && (
         <div className="px-3 py-2 bg-red-600/20 border-b border-red-400/30 flex items-center gap-2">
           <span className="text-sm">⚠️</span>
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-red-300">Phishing Risk ({Math.round(phishingWarning.result.score * 100)}%)</div>
-            <div className="text-[10px] text-red-300/70 truncate">{phishingWarning.result.reasons[0] ?? 'Suspicious site'}</div>
+            <div className="text-xs font-semibold text-red-300">Phishing Risk ({Math.round((phishingWarning.result.score ?? 0) * 100)}%)</div>
+            <div className="text-[10px] text-red-300/70 truncate">{phishingWarning.result.reasons?.[0] ?? 'Suspicious site'}</div>
           </div>
           <button
             onClick={() => setPhishingWarning(null)}

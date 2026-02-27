@@ -38,7 +38,7 @@ app.route('/api/vault', vaultRoutes);
 app.route('/api/sync', syncRoutes);
 app.route('/api/sync', wsRoutes);
 app.route('/api/ai', aiRoutes);
-app.route('/api/keypair', keypairRoutes);
+app.route('/api/auth/keypair', keypairRoutes);
 app.route('/api/teams', teamRoutes);
 app.route('/api/sharing', sharingRoutes);
 app.route('/api/share-links', shareLinkRoutes);
