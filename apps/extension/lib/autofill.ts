@@ -47,57 +47,96 @@ export function fillForm(form: DetectedForm, username: string, password: string)
 
 /**
  * Create a lock icon overlay for a password field.
- * Uses Shadow DOM to isolate styles from the page.
+ * Uses position:fixed to avoid stacking-context issues with the input.
+ * Shadow DOM isolates styles from the page.
  */
 export function createLockIconOverlay(
   passwordField: HTMLInputElement,
   onClick: () => void,
 ): HTMLElement {
-  // Create a wrapper using Shadow DOM for style isolation
-  const host = document.createElement('span');
-  host.style.cssText = `
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 2147483647;
-    cursor: pointer;
-    pointer-events: all;
+  const host = document.createElement('div');
+  host.className = 'lockbox-lock-overlay';
+
+  // Position the icon inside the right edge of the input using fixed positioning.
+  // This avoids stacking context / overflow:hidden issues with the parent.
+  const positionIcon = () => {
+    const rect = passwordField.getBoundingClientRect();
+    const size = 24;
+    host.style.cssText = `
+      position: fixed;
+      left: ${rect.right - size - 6}px;
+      top: ${rect.top + (rect.height - size) / 2}px;
+      width: ${size}px;
+      height: ${size}px;
+      z-index: 2147483647;
+      cursor: pointer;
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+  };
+
+  positionIcon();
+
+  const shadow = host.attachShadow({ mode: 'closed' });
+
+  const style = document.createElement('style');
+  style.textContent = `
+    :host { display: flex; align-items: center; justify-content: center; }
+    button {
+      all: unset;
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      opacity: 0.5;
+      transition: opacity 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
+    button:hover { opacity: 1; }
   `;
 
-  const shadow = host.attachShadow({ mode: 'open' });
-  shadow.innerHTML = `
-    <style>
-      button {
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 2px;
-        opacity: 0.6;
-        transition: opacity 0.2s;
-        font-size: 14px;
-        line-height: 1;
-      }
-      button:hover { opacity: 1; }
-    </style>
-    <button title="Autofill with Lockbox">🔐</button>
-  `;
+  const btn = document.createElement('button');
+  btn.title = 'Autofill with Lockbox';
+  btn.textContent = '\uD83D\uDD10';
 
-  shadow.querySelector('button')?.addEventListener('click', (e) => {
+  shadow.appendChild(style);
+  shadow.appendChild(btn);
+
+  // Handle click on the shadow button
+  btn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     onClick();
   });
 
-  // Position relative to the password field
-  const fieldParent = passwordField.parentElement;
-  if (fieldParent) {
-    const parentStyle = window.getComputedStyle(fieldParent);
-    if (parentStyle.position === 'static') {
-      fieldParent.style.position = 'relative';
+  // Fallback: also handle click on the host itself
+  host.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClick();
+  });
+
+  // Reposition on scroll and resize
+  const reposition = () => positionIcon();
+  window.addEventListener('scroll', reposition, { passive: true });
+  window.addEventListener('resize', reposition, { passive: true });
+
+  // Remove listeners when the host is removed from the DOM
+  const observer = new MutationObserver(() => {
+    if (!host.isConnected) {
+      window.removeEventListener('scroll', reposition);
+      window.removeEventListener('resize', reposition);
+      observer.disconnect();
     }
-    fieldParent.appendChild(host);
-  }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  document.body.appendChild(host);
 
   return host;
 }
