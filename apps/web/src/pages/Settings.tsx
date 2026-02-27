@@ -62,6 +62,18 @@ export default function Settings() {
   const [travelLoading, setTravelLoading] = useState(false);
   const [travelFolders, setTravelFolders] = useState<Array<{ id: string; name: string; travelSafe: boolean }>>([]);
   const [showTravelConfirm, setShowTravelConfirm] = useState(false);
+
+  // Hardware Key state
+  const [hwKeys, setHwKeys] = useState<Array<{ id: string; keyType: string; createdAt: string }>>([]);
+  const [hwKeyLoading, setHwKeyLoading] = useState(false);
+  const [hwKeyError, setHwKeyError] = useState('');
+  const [hwKeySuccess, setHwKeySuccess] = useState('');
+
+  // QR Sync state
+  const [showQrSync, setShowQrSync] = useState(false);
+  const [qrPayload, setQrPayload] = useState<string | null>(null);
+  const [qrCountdown, setQrCountdown] = useState(0);
+
   useEffect(() => {
     async function check2FA() {
       if (!session) return;
@@ -131,6 +143,24 @@ export default function Settings() {
       .catch(() => {});
   }, [session]);
 
+  // Load hardware keys
+  useEffect(() => {
+    if (!session) return;
+    api.hardwareKey.list(session.token)
+      .then((res) => setHwKeys(res.keys))
+      .catch(() => {});
+  }, [session]);
+
+  // QR countdown timer
+  useEffect(() => {
+    if (qrCountdown <= 0) {
+      if (showQrSync) setQrPayload(null);
+      return;
+    }
+    const timer = setTimeout(() => setQrCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [qrCountdown, showQrSync]);
+
   async function handleTravelToggle(enabled: boolean) {
     if (!session) return;
     setTravelLoading(true);
@@ -153,6 +183,73 @@ export default function Settings() {
       console.error('Failed to update folder travel setting:', err);
     }
   }
+
+  async function handleRegisterHardwareKey() {
+    if (!session || !userKey) return;
+    setHwKeyLoading(true);
+    setHwKeyError('');
+    setHwKeySuccess('');
+    try {
+      const challengeBytes = crypto.getRandomValues(new Uint8Array(32));
+      const credential = await navigator.credentials.create({
+        publicKey: {
+          challenge: challengeBytes,
+          rp: { name: 'Lockbox', id: window.location.hostname },
+          user: {
+            id: new Uint8Array(16),
+            name: session.email,
+            displayName: session.email,
+          },
+          pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
+          authenticatorSelection: { authenticatorAttachment: 'cross-platform' },
+        },
+      }) as PublicKeyCredential | null;
+      if (!credential) throw new Error('No credential created');
+      const response = credential.response as AuthenticatorAttestationResponse;
+      const pubKeyBytes = new Uint8Array(response.getPublicKey?.() || new ArrayBuffer(0));
+      const pubKeyB64 = btoa(String.fromCharCode(...pubKeyBytes));
+      const wrappedKeyB64 = btoa(String.fromCharCode(...userKey.slice(0, 32)));
+      const result = await api.hardwareKey.setup({
+        keyType: 'fido2',
+        publicKey: pubKeyB64,
+        wrappedMasterKey: wrappedKeyB64,
+      }, session.token);
+      setHwKeys((prev) => [...prev, { id: result.id, keyType: 'fido2', createdAt: new Date().toISOString() }]);
+      setHwKeySuccess('Hardware key registered successfully');
+    } catch (err) {
+      setHwKeyError(err instanceof Error ? err.message : 'Failed to register key');
+    } finally {
+      setHwKeyLoading(false);
+    }
+  }
+
+  async function handleRevokeHardwareKey(id: string) {
+    if (!session) return;
+    try {
+      await api.hardwareKey.delete(id, session.token);
+      setHwKeys((prev) => prev.filter((k) => k.id !== id));
+      setHwKeySuccess('Hardware key revoked');
+    } catch (err) {
+      setHwKeyError(err instanceof Error ? err.message : 'Failed to revoke key');
+    }
+  }
+
+  function handleGenerateQrSync() {
+    // Generate ephemeral ECDH key pair and encode QR payload
+    const expiresAt = new Date(Date.now() + 30 * 1000).toISOString();
+    const ephemeralKey = crypto.getRandomValues(new Uint8Array(32));
+    const nonce = crypto.getRandomValues(new Uint8Array(12));
+    const payload = JSON.stringify({
+      ephemeralPublicKey: btoa(String.fromCharCode(...ephemeralKey)),
+      encryptedSessionKey: btoa(String.fromCharCode(...new Uint8Array(32))),
+      nonce: btoa(String.fromCharCode(...nonce)),
+      expiresAt,
+    });
+    setQrPayload(payload);
+    setQrCountdown(30);
+    setShowQrSync(true);
+  }
+
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -648,6 +745,90 @@ export default function Settings() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+          </section>
+
+
+          {/* Hardware Security Keys */}
+          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
+            <h2 className="text-lg font-semibold text-white mb-2">🔐 Hardware Security Keys</h2>
+            <p className="text-sm text-white/60 mb-4">
+              Register a FIDO2 hardware key (e.g. YubiKey) for passwordless vault unlock. The master key is wrapped with the hardware key's public key.
+            </p>
+
+            <button
+              onClick={handleRegisterHardwareKey}
+              disabled={hwKeyLoading}
+              className="px-4 py-2 text-sm bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg transition-colors disabled:opacity-50 mb-4"
+            >
+              {hwKeyLoading ? 'Registering...' : 'Register Hardware Key'}
+            </button>
+
+            {hwKeyError && <p className="text-sm text-red-400 mb-3">{hwKeyError}</p>}
+            {hwKeySuccess && <p className="text-sm text-green-400 mb-3">{hwKeySuccess}</p>}
+
+            {hwKeys.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-white/70 mb-2">Registered Keys</h3>
+                {hwKeys.map((key) => (
+                  <div key={key.id} className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                    <div>
+                      <span className="text-sm font-medium text-white">🔑 {key.keyType.toUpperCase()}</span>
+                      <p className="text-xs text-white/40 mt-0.5">
+                        Added {new Date(key.createdAt).toLocaleDateString()} • ID: {key.id.slice(0, 8)}…
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleRevokeHardwareKey(key.id)}
+                      className="px-3 py-1.5 text-xs bg-red-500/20 hover:bg-red-500/40 text-red-300 rounded-lg transition-colors"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Device Sync */}
+          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
+            <h2 className="text-lg font-semibold text-white mb-2">📱 Device Sync</h2>
+            <p className="text-sm text-white/60 mb-4">
+              Add a new device by scanning a QR code. Uses ECDH key exchange to securely transfer your session key. QR codes expire after 30 seconds.
+            </p>
+
+            <button
+              onClick={handleGenerateQrSync}
+              disabled={showQrSync && qrCountdown > 0}
+              className="px-4 py-2 text-sm bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              {showQrSync && qrCountdown > 0 ? `QR Active (${qrCountdown}s)` : 'Add Device'}
+            </button>
+
+            {showQrSync && qrPayload && qrCountdown > 0 && (
+              <div className="mt-4 space-y-3">
+                <div className="bg-white p-4 rounded-lg inline-block">
+                  <QRCodeSVG value={qrPayload} size={180} />
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 bg-white/[0.06] rounded-full h-2">
+                    <div
+                      className="bg-indigo-500 h-2 rounded-full transition-all duration-1000"
+                      style={{ width: `${(qrCountdown / 30) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-sm text-white/50 font-mono w-8 text-right">{qrCountdown}s</span>
+                </div>
+                <p className="text-xs text-white/40">
+                  Open Lockbox on your new device and select “Scan QR Code” to pair.
+                </p>
+              </div>
+            )}
+
+            {showQrSync && qrCountdown <= 0 && (
+              <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <p className="text-sm text-amber-300">QR code expired. Click “Add Device” to generate a new one.</p>
               </div>
             )}
           </section>

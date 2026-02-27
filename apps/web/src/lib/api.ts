@@ -193,4 +193,34 @@ export const api = {
     getAccess: (id: string, token: string) =>
       request<{ encryptedVault: string }>(`/api/emergency/grants/${id}/access`, { token }),
   },
+
+  // ─── Documents ────────────────────────────────────────────
+  documents: {
+    upload: (itemId: string, file: ArrayBuffer, contentType: string, token: string) =>
+      request<{ success: boolean; size: number }>(`/api/vault/items/${itemId}/document`, {
+        method: 'POST',
+        body: JSON.stringify({ file: Array.from(new Uint8Array(file)), contentType }),
+        token,
+      }),
+    download: (itemId: string, token: string) =>
+      request<ArrayBuffer>(`/api/vault/items/${itemId}/document`, { token }),
+    delete: (itemId: string, token: string) =>
+      request<{ success: boolean }>(`/api/vault/items/${itemId}/document`, { method: 'DELETE', token }),
+    quota: (token: string) =>
+      request<{ used: number; limit: number }>('/api/vault/documents/quota', { token }),
+  },
+
+  // ─── Hardware Keys ────────────────────────────────────────
+  hardwareKey: {
+    setup: (data: { keyType: string; publicKey: string; wrappedMasterKey: string; attestation?: string }, token: string) =>
+      request<{ id: string }>('/api/auth/hardware-key/setup', { method: 'POST', body: JSON.stringify(data), token }),
+    list: (token: string) =>
+      request<{ keys: Array<{ id: string; keyType: string; createdAt: string }> }>('/api/auth/hardware-key', { token }),
+    challenge: (keyId: string, token: string) =>
+      request<{ challenge: string; keyId: string; expiresAt: string }>(`/api/auth/hardware-key/challenge`, { method: 'POST', body: JSON.stringify({ keyId }), token }),
+    verify: (data: { keyId: string; challenge: string; signature: string }) =>
+      request<{ token: string; wrappedMasterKey: string }>('/api/auth/hardware-key/verify', { method: 'POST', body: JSON.stringify(data) }),
+    delete: (id: string, token: string) =>
+      request<{ success: boolean }>(`/api/auth/hardware-key/${id}`, { method: 'DELETE', token }),
+  },
 };

@@ -105,3 +105,22 @@ export type { SafetyConfig, SafetyCheckResult, ValidationResult, AuditEntry } fr
 export { VaultAgent } from './agent/vault-agent.js';
 export type { VaultAgentOptions } from './agent/vault-agent.js';
 export { SYSTEM_PROMPT } from './prompts/system.js';
+
+// Password Rotation
+export type {
+  RotationStep,
+  RotationPlan,
+  RotationResult,
+  SiteAdapter,
+  RotationRequest,
+  RotationAgent,
+} from './rotation/index.js';
+export {
+  extractDomain,
+  domainMatches,
+  googleAdapter,
+  githubAdapter,
+  amazonAdapter,
+  genericAdapter,
+  createRotationAgent,
+} from './rotation/index.js';

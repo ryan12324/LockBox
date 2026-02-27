@@ -20,6 +20,9 @@ export default function Login() {
   const [twoFaCode, setTwoFaCode] = useState('');
   const [isBackupCode, setIsBackupCode] = useState(false);
 
+  // Hardware Key unlock state
+  const [hwKeyLoading, setHwKeyLoading] = useState(false);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -131,6 +134,68 @@ export default function Login() {
         setError('Verification failed');
       }
       setLoading(false);
+    }
+  }
+
+  async function handleHardwareKeyUnlock() {
+    setError('');
+    setHwKeyLoading(true);
+    try {
+      // Step 1: Get challenge from server
+      const challengeRes = await api.hardwareKey.challenge('', '');
+      const challengeBytes = Uint8Array.from(atob(challengeRes.challenge), (c) => c.charCodeAt(0));
+
+      // Step 2: Authenticate with hardware key
+      const assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge: challengeBytes,
+          rpId: window.location.hostname,
+          userVerification: 'preferred',
+        },
+      }) as PublicKeyCredential | null;
+      if (!assertion) throw new Error('Authentication cancelled');
+
+      const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
+      const signature = btoa(String.fromCharCode(...new Uint8Array(assertionResponse.signature)));
+
+      // Step 3: Verify signature and get session
+      const verifyRes = await api.hardwareKey.verify({
+        keyId: challengeRes.keyId,
+        challenge: challengeRes.challenge,
+        signature,
+      });
+
+      // Step 4: Unwrap master key and set session
+      const wrappedKeyBytes = Uint8Array.from(atob(verifyRes.wrappedMasterKey), (c) => c.charCodeAt(0));
+      const meRes = await api.auth.me(verifyRes.token) as {
+        user: {
+          id: string;
+          email: string;
+          kdfConfig: KdfConfig;
+          salt: string;
+          encryptedUserKey: string;
+        };
+      };
+
+      const userKey = await decryptUserKey(meRes.user.encryptedUserKey, wrappedKeyBytes);
+      setSession({
+        token: verifyRes.token,
+        userId: meRes.user.id,
+        email: meRes.user.email,
+        encryptedUserKey: meRes.user.encryptedUserKey,
+        kdfConfig: meRes.user.kdfConfig,
+        salt: meRes.user.salt,
+      });
+      setKeys(wrappedKeyBytes, userKey);
+      navigate('/vault');
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Hardware key authentication failed');
+      }
+    } finally {
+      setHwKeyLoading(false);
     }
   }
 
@@ -249,6 +314,25 @@ export default function Login() {
                 Create vault
               </Link>
             </p>
+
+            <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                onClick={handleHardwareKeyUnlock}
+                disabled={hwKeyLoading}
+                className="w-full py-2.5 px-4 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 font-medium rounded-lg transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                <span>🔐</span>
+                {hwKeyLoading ? 'Authenticating...' : 'Unlock with Hardware Key'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setError('Scan the QR code shown in Settings \u2192 Device Sync on your existing device')}
+                className="w-full py-2 text-sm text-indigo-300 hover:text-indigo-200 hover:underline text-center"
+              >
+                📱 Scan QR Code
+              </button>
+            </div>
           </form>
         )}
       </div>

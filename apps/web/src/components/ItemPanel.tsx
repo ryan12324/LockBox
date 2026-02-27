@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
 import { encryptVaultItem } from '../lib/crypto.js';
 import { decryptString } from '@lockbox/crypto';
-import type { VaultItem, LoginItem, SecureNoteItem, CardItem, IdentityItem, PasskeyItem, CustomField, Folder, VaultItemType } from '@lockbox/types';
+import type { VaultItem, LoginItem, SecureNoteItem, CardItem, IdentityItem, PasskeyItem, DocumentItem, CustomField, Folder, VaultItemType } from '@lockbox/types';
 import { totp, getRemainingSeconds, base32Decode, parseOtpAuthUri } from '@lockbox/totp';
 import { generatePassword } from '@lockbox/generator';
 import { SecurityAlertEngine } from '@lockbox/ai';
 import type { SecurityAlert } from '@lockbox/ai';
 import ItemHistoryPanel from './ItemHistoryPanel.js';
 import AttachmentSection from './AttachmentSection.js';
+import ShareLinkModal from './ShareLinkModal.js';
 interface ItemPanelProps {
   mode: 'view' | 'edit' | 'add';
   item: VaultItem | null;
@@ -81,9 +82,18 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
   const [credentialId, setCredentialId] = useState(passkeyItem?.credentialId || '');
   const [publicKey, setPublicKey] = useState(passkeyItem?.publicKey || '');
   const [counter, setCounter] = useState(passkeyItem?.counter || 0);
+  // Document State
+  const documentItem = item?.type === 'document' ? (item as DocumentItem) : null;
+  const [description, setDescription] = useState(documentItem?.description || '');
+  const [mimeType, setMimeType] = useState(documentItem?.mimeType || '');
+  const [fileSize, setFileSize] = useState(documentItem?.size || 0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentQuota, setDocumentQuota] = useState<{ used: number; limit: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Custom Fields State
   const [customFields, setCustomFields] = useState<CustomField[]>(item?.customFields || []);
-
 
   // UI State
   const [showPassword, setShowPassword] = useState(false);
@@ -100,6 +110,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
   const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   const [showHistory, setShowHistory] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   // Sync state if item changes
   useEffect(() => {
     setCurrentMode(mode);
@@ -142,6 +153,11 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
       setSsn(iden.ssn || '');
       setPassportNumber(iden.passportNumber || '');
       setLicenseNumber(iden.licenseNumber || '');
+    } else if (item?.type === 'document') {
+      const doc = item as DocumentItem;
+      setDescription(doc.description || '');
+      setMimeType(doc.mimeType || '');
+      setFileSize(doc.size || 0);
     }
     setCustomFields(item?.customFields || []);
     setShowConfirmDelete(false);
@@ -332,6 +348,15 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           counter,
           createdAt: passkeyItem?.createdAt || now,
         } as PasskeyItem;
+      } else if (type === 'document') {
+        vaultItem = {
+          ...baseItem,
+          type: 'document',
+          description: description || undefined,
+          mimeType: mimeType || 'application/octet-stream',
+          size: fileSize,
+          tags: tags,
+        } as VaultItem;
       } else {
         vaultItem = {
           ...baseItem,
@@ -398,7 +423,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
     }
   }
 
-  const typeIcon = (t: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️' }[t] ?? '📄');
+  const typeIcon = (t: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' }[t] ?? '📄');
 
   return (
     <>
@@ -424,6 +449,12 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           <div className="flex items-center gap-2">
             {currentMode === 'view' ? (
               <>
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
+                >
+                  Share
+                </button>
                 <button
                   onClick={() => setShowHistory(true)}
                   className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
@@ -474,7 +505,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
 
           {currentMode === 'add' && (
             <div className="flex bg-white/[0.06] p-1 rounded-lg">
-              {(['login', 'note', 'card', 'identity', 'passkey'] as VaultItemType[]).map((t) => (
+              {(['login', 'note', 'card', 'identity', 'passkey', 'document'] as VaultItemType[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
@@ -913,6 +944,81 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 <label className="block text-sm font-medium text-white/70 mb-1">Counter</label>
                 <input type="number" value={counter} onChange={(e) => setCounter(Number(e.target.value))} min={0} className="w-32 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
               </div>
+            </div>
+          )}
+
+
+          {/* Document Fields - Edit/Add Mode */}
+          {currentMode !== 'view' && type === 'document' && (
+            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Description</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Describe this document..."
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white resize-y"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Upload Document</label>
+                <div
+                  className={`relative w-full p-6 rounded-xl border-2 border-dashed transition-all duration-200 text-center cursor-pointer overflow-hidden ${
+                    isDragging
+                      ? 'border-indigo-400 bg-indigo-500/10'
+                      : 'border-white/[0.12] hover:border-white/[0.2] hover:bg-white/[0.04]'
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    const f = e.dataTransfer.files[0];
+                    if (f) {
+                      setDocumentFile(f);
+                      setMimeType(f.type || 'application/octet-stream');
+                      setFileSize(f.size);
+                    }
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setDocumentFile(f);
+                        setMimeType(f.type || 'application/octet-stream');
+                        setFileSize(f.size);
+                      }
+                    }}
+                  />
+                  <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
+                    <span className="text-2xl text-white/50">📄</span>
+                    <p className="text-sm font-medium text-white/70">
+                      {documentFile ? documentFile.name : 'Drag & drop a file here, or click to browse'}
+                    </p>
+                    <p className="text-xs text-white/40">
+                      {documentFile ? `${(documentFile.size / 1024).toFixed(1)} KB • ${documentFile.type || 'unknown type'}` : 'Max 10MB. Encrypted before upload.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              {mimeType && currentMode === 'edit' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Type</span>
+                    <span className="text-sm text-white">{mimeType}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Size</span>
+                    <span className="text-sm text-white">{fileSize > 0 ? `${(fileSize / 1024).toFixed(1)} KB` : '—'}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1382,6 +1488,69 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 </div>
               )}
 
+
+              {type === 'document' && (
+                <div className="space-y-4">
+                  {description && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Description</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white whitespace-pre-wrap">
+                        {description}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">File Type</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm text-white">{mimeType || 'Unknown'}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">File Size</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm text-white">{fileSize > 0 ? `${(fileSize / 1024).toFixed(1)} KB` : '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* File Preview */}
+                  {mimeType && mimeType.startsWith('image/') && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Preview</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] flex items-center justify-center">
+                        <p className="text-xs text-white/40">Image preview available after download</p>
+                      </div>
+                    </div>
+                  )}
+                  {mimeType === 'application/pdf' && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Preview</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] flex items-center justify-center">
+                        <p className="text-xs text-white/40">PDF preview available after download</p>
+                      </div>
+                    </div>
+                  )}
+                  {/* Quota */}
+                  {documentQuota && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Storage Quota</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <div className="flex justify-between text-sm text-white mb-2">
+                          <span>{(documentQuota.used / 1024 / 1024).toFixed(1)} MB used</span>
+                          <span>{(documentQuota.limit / 1024 / 1024).toFixed(0)} MB limit</span>
+                        </div>
+                        <div className="w-full bg-white/[0.1] rounded-full h-2">
+                          <div
+                            className="bg-indigo-500 h-2 rounded-full transition-all"
+                            style={{ width: `${Math.min(100, (documentQuota.used / documentQuota.limit) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Attachments - View Mode */}
               {currentMode === 'view' && item?.id && (
                 <AttachmentSection itemId={item.id} mode="view" />
@@ -1519,6 +1688,13 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
             setShowHistory(false);
             onSave();
           }}
+        />
+      )}
+      {showShareModal && item && (
+        <ShareLinkModal
+          item={item}
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
         />
       )}
     </>

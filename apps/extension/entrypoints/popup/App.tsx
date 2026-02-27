@@ -28,7 +28,9 @@ type ViewState =
   | { view: 'edit'; item: VaultItem }
   | { view: 'health'; filterBreached?: boolean }
   | { view: 'ai-settings' }
-  | { view: 'chat' };
+  | { view: 'chat' }
+  | { view: 'hw-keys' }
+  | { view: 'qr-sync' };
 async function sendMessage<T>(message: object): Promise<T> {
   return chrome.runtime.sendMessage(message) as Promise<T>;
 }
@@ -224,6 +226,21 @@ function LockedView({ onUnlock }: { onUnlock: () => void }) {
           {loading ? 'Unlocking...' : 'Unlock Vault'}
         </button>
       </form>
+
+      <div className="text-center">
+        <div className="text-xs text-white/30 my-1">or</div>
+        <button
+          type="button"
+          onClick={() => {
+            sendMessage<{ success: boolean }>({ type: 'hw-key-unlock' })
+              .then((res) => { if (res.success) onUnlock(); })
+              .catch(() => {});
+          }}
+          className="px-3 py-2 w-full text-white/70 text-sm font-medium rounded-md border border-white/[0.12] bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer"
+        >
+          🔑 Unlock with Hardware Key
+        </button>
+      </div>
     </div>
   );
 }
@@ -1924,6 +1941,272 @@ function TotpTab({ items }: { items: VaultItem[] }) {
   );
 }
 
+// ─── Hardware Key Settings View ────────────────────────────────────────────
+
+function HardwareKeyView({ onBack }: { onBack: () => void }) {
+  const [keys, setKeys] = useState<Array<{ id: string; keyType: string; createdAt: string }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [registering, setRegistering] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    sendMessage<{ success: boolean; keys?: Array<{ id: string; keyType: string; createdAt: string }> }>({ type: 'list-hardware-keys' })
+      .then((res) => { if (res.success && res.keys) setKeys(res.keys); })
+      .catch(() => setError('Failed to load hardware keys'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleRegister() {
+    setRegistering(true);
+    setError('');
+    setSuccess('');
+    try {
+      const result = await sendMessage<{ success: boolean; keyId?: string; error?: string }>({ type: 'register-hardware-key' });
+      if (result.success && result.keyId) {
+        setKeys((prev) => [...prev, { id: result.keyId!, keyType: 'fido2', createdAt: new Date().toISOString() }]);
+        setSuccess('Hardware key registered successfully');
+      } else {
+        setError(result.error ?? 'Registration failed');
+      }
+    } catch {
+      setError('Registration failed');
+    } finally {
+      setRegistering(false);
+    }
+  }
+
+  async function handleRemove(keyId: string) {
+    setRemovingId(keyId);
+    setError('');
+    try {
+      const result = await sendMessage<{ success: boolean; error?: string }>({ type: 'remove-hardware-key', keyId });
+      if (result.success) {
+        setKeys((prev) => prev.filter((k) => k.id !== keyId));
+        setSuccess('Key removed');
+      } else {
+        setError(result.error ?? 'Failed to remove key');
+      }
+    } catch {
+      setError('Failed to remove key');
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.1]">
+        <button onClick={onBack} className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors">
+          ←
+        </button>
+        <span className="text-sm font-semibold text-white">🔑 Hardware Keys</span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+        {error && (
+          <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs">{error}</div>
+        )}
+        {success && (
+          <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-400/20 rounded-md text-emerald-300 text-xs">{success}</div>
+        )}
+
+        <p className="text-xs text-white/50">
+          Register a hardware security key (YubiKey, etc.) for passwordless unlock.
+        </p>
+
+        <button
+          onClick={handleRegister}
+          disabled={registering}
+          className={`px-3 py-2 text-white text-sm font-medium rounded-md transition-colors ${registering ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90 cursor-pointer'}`}
+        >
+          {registering ? 'Touch your key...' : '+ Register New Key'}
+        </button>
+
+        {loading ? (
+          <div className="text-center text-white/40 text-xs mt-4">Loading keys...</div>
+        ) : keys.length === 0 ? (
+          <div className="text-center text-white/40 text-xs mt-4">No hardware keys registered</div>
+        ) : (
+          <div className="flex flex-col gap-2 mt-2">
+            <div className="text-xs font-semibold uppercase tracking-wide text-white/30">Registered Keys</div>
+            {keys.map((key) => (
+              <div key={key.id} className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs text-white font-medium truncate">{key.keyType === 'yubikey-piv' ? 'YubiKey PIV' : 'FIDO2 Key'}</div>
+                  <div className="text-[10px] text-white/40">Added {new Date(key.createdAt).toLocaleDateString()}</div>
+                  <div className="text-[10px] text-white/30 font-mono truncate">{key.id.slice(0, 16)}...</div>
+                </div>
+                <button
+                  onClick={() => handleRemove(key.id)}
+                  disabled={removingId === key.id}
+                  className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer shrink-0 ml-2 ${removingId === key.id ? 'bg-white/20 text-white/50 cursor-not-allowed' : 'bg-red-500/10 text-red-300 hover:bg-red-500/20'}`}
+                >
+                  {removingId === key.id ? '...' : 'Remove'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── QR Sync View ──────────────────────────────────────────────────────────
+
+function QRSyncView({ onBack }: { onBack: () => void }) {
+  const [mode, setMode] = useState<'idle' | 'sending' | 'receiving'>('idle');
+  const [qrData, setQrData] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState(0);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [scanInput, setScanInput] = useState('');
+
+  async function handleGenerateQR() {
+    setError('');
+    setSuccess('');
+    setMode('sending');
+    try {
+      const result = await sendMessage<{ success: boolean; qrData?: string; expiresAt?: string; error?: string }>({ type: 'generate-sync-qr' });
+      if (result.success && result.qrData) {
+        setQrData(result.qrData);
+        const expiresAt = new Date(result.expiresAt!).getTime();
+        const updateRemaining = () => {
+          const secs = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+          setRemaining(secs);
+          if (secs <= 0) {
+            setMode('idle');
+            setQrData(null);
+          }
+        };
+        updateRemaining();
+        const timer = setInterval(updateRemaining, 1000);
+        setTimeout(() => clearInterval(timer), 31000);
+      } else {
+        setError(result.error ?? 'Failed to generate QR');
+        setMode('idle');
+      }
+    } catch {
+      setError('Failed to generate QR');
+      setMode('idle');
+    }
+  }
+
+  async function handleScanSubmit() {
+    if (!scanInput.trim()) return;
+    setError('');
+    setSuccess('');
+    try {
+      const result = await sendMessage<{ success: boolean; error?: string }>({
+        type: 'process-sync-qr',
+        qrData: scanInput.trim(),
+      });
+      if (result.success) {
+        setSuccess('Device synced successfully!');
+        setScanInput('');
+        setMode('idle');
+      } else {
+        setError(result.error ?? 'Invalid or expired QR data');
+      }
+    } catch {
+      setError('Sync failed');
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.1]">
+        <button onClick={onBack} className="border-0 bg-transparent cursor-pointer text-sm p-1.5 text-white/50 hover:text-white/80 transition-colors">
+          ←
+        </button>
+        <span className="text-sm font-semibold text-white">📱 Device Sync</span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+        {error && (
+          <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs">{error}</div>
+        )}
+        {success && (
+          <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-400/20 rounded-md text-emerald-300 text-xs">{success}</div>
+        )}
+
+        <p className="text-xs text-white/50">
+          Securely transfer your session to another device using an encrypted QR code. The QR expires in 30 seconds.
+        </p>
+
+        {mode === 'idle' && (
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={handleGenerateQR}
+              className="px-3 py-2 text-white text-sm font-medium rounded-md bg-indigo-600/80 hover:bg-indigo-500/90 transition-colors cursor-pointer"
+            >
+              📲 Share via QR (Sender)
+            </button>
+            <button
+              onClick={() => setMode('receiving')}
+              className="px-3 py-2 text-white/70 text-sm font-medium rounded-md border border-white/[0.12] bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer"
+            >
+              📷 Scan QR (Receiver)
+            </button>
+          </div>
+        )}
+
+        {mode === 'sending' && qrData && (
+          <div className="flex flex-col items-center gap-3">
+            <div className="p-4 bg-white rounded-lg">
+              <div className="w-[200px] h-[200px] flex items-center justify-center text-black/60 text-xs text-center font-mono break-all overflow-hidden">
+                {/* In production, render actual QR code via a library */}
+                <div className="p-2 text-[8px] leading-tight">{qrData.slice(0, 120)}...</div>
+              </div>
+            </div>
+            <div className={`text-sm font-bold ${remaining <= 5 ? 'text-red-400' : 'text-white/60'}`}>
+              Expires in {remaining}s
+            </div>
+            <button
+              onClick={() => { setMode('idle'); setQrData(null); }}
+              className="text-xs text-white/50 hover:text-white/80 bg-transparent border-0 cursor-pointer transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {mode === 'receiving' && (
+          <div className="flex flex-col gap-3">
+            <div className="text-xs text-white/60">
+              Paste the QR data from the sender device:
+            </div>
+            <textarea
+              value={scanInput}
+              onChange={(e) => setScanInput(e.target.value)}
+              rows={4}
+              placeholder='Paste QR sync payload...'
+              className="w-full px-3 py-2 border border-white/[0.12] rounded-md bg-white/[0.06] text-white placeholder-white/40 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/60 resize-y"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={handleScanSubmit}
+                disabled={!scanInput.trim()}
+                className={`flex-1 px-3 py-2 text-white text-sm font-medium rounded-md transition-colors ${!scanInput.trim() ? 'bg-white/40 cursor-not-allowed' : 'bg-indigo-600/80 hover:bg-indigo-500/90 cursor-pointer'}`}
+              >
+                Sync
+              </button>
+              <button
+                onClick={() => { setMode('idle'); setScanInput(''); }}
+                className="px-3 py-2 text-white/70 text-sm rounded-md border border-white/[0.12] bg-white/[0.04] hover:bg-white/[0.08] transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -2216,6 +2499,20 @@ export default function App() {
       </div>
     );
   }
+  if (viewState.view === 'hw-keys') {
+    return (
+      <div className="flex flex-col h-[480px]">
+        <HardwareKeyView onBack={() => setViewState({ view: 'tabs' })} />
+      </div>
+    );
+  }
+  if (viewState.view === 'qr-sync') {
+    return (
+      <div className="flex flex-col h-[480px]">
+        <QRSyncView onBack={() => setViewState({ view: 'tabs' })} />
+      </div>
+    );
+  }
   if (viewState.view === 'chat') {
     return (
       <div className="flex flex-col h-[480px]">
@@ -2347,6 +2644,20 @@ export default function App() {
                 className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
               >
                 🤖
+              </button>
+              <button
+                onClick={() => setViewState({ view: 'hw-keys' })}
+                title="Hardware Keys"
+                className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
+              >
+                🔑
+              </button>
+              <button
+                onClick={() => setViewState({ view: 'qr-sync' })}
+                title="Device Sync"
+                className="bg-white/[0.08] hover:bg-white/[0.14] border-0 rounded p-1.5 text-white/70 text-xs cursor-pointer transition-colors"
+              >
+                📱
               </button>
             </>
           )}
