@@ -128,6 +128,28 @@ No subscriptions. No data harvesting. No "we got breached" emails. Just a fast, 
   <sub>Autonomous AI agent that can search, create, edit, and organize your vault via chat.</sub>
 </td>
 </tr>
+<tr>
+<td align="center" width="25%">
+  <h3>👥</h3>
+  <strong>Teams & Sharing</strong><br/>
+  <sub>Share folders with team members via E2EE. Full RBAC with Owner, Admin, Member, and Custom roles.</sub>
+</td>
+<td align="center" width="25%">
+  <h3>🔗</h3>
+  <strong>Share Links</strong><br/>
+  <sub>Send passwords via one-time or multi-use links. No account needed — key stays in the URL fragment.</sub>
+</td>
+<td align="center" width="25%">
+  <h3>📁</h3>
+  <strong>Shared Folders</strong><br/>
+  <sub>Per-folder encryption keys wrapped per-member with RSA-OAEP. 1Password-style vault key model.</sub>
+</td>
+<td align="center" width="25%">
+  <h3>🔑</h3>
+  <strong>Anonymous Access</strong><br/>
+  <sub>Share links use HKDF-derived keys. Server never sees the secret — only a SHA-256 auth token hash.</sub>
+</td>
+</tr>
 </table>
 
 ---
@@ -159,6 +181,42 @@ The chat assistant and advanced LLM features support multiple providers:
 - **Cloudflare Workers AI** — runs on your own Cloudflare account
 
 Configure in **Settings → AI** across web, extension, and mobile.
+
+---
+
+## Teams & Sharing
+
+Lockbox supports secure collaboration without compromising zero-knowledge encryption.
+
+### Shared Folders
+
+Any folder can be shared with team members. Each shared folder gets its own AES-256-GCM key, wrapped per-member using RSA-OAEP (1Password-style vault key model). The server only stores wrapped keys — it never has access to folder keys or plaintext.
+
+### Role-Based Access Control (RBAC)
+
+| Role | Permissions |
+| --- | --- |
+| **Owner** | Full control — delete team, transfer ownership, manage everything |
+| **Admin** | Invite/remove members, manage shared folders, assign roles (except owner) |
+| **Member** | Read/write shared items in folders they have access to |
+| **Custom** | Granular permissions — invite, remove, create folders, edit items, delete items, share |
+
+### Anonymous Share Links
+
+Share individual passwords with anyone — no account required.
+
+- A 32-byte secret is generated client-side and placed in the URL fragment (`#`), which is **never sent to the server**
+- HKDF derives an encryption key, auth token, and share ID from the secret
+- The server stores only a SHA-256 hash of the auth token — it cannot decrypt the shared data
+- Links can be one-time use or multi-use, with optional expiration
+
+```
+https://app.lockbox.dev/share/{shareId}#{base64url(secret)}
+```
+
+### Cross-Platform
+
+Teams, shared folders, and share links work across all surfaces — web vault, browser extension, and mobile app. The extension autofill matches shared items alongside personal vault items.
 
 ---
 
@@ -324,6 +382,8 @@ Lockbox follows a **zero-knowledge architecture**:
 3. **Server Blindness** — The API stores only ciphertext. Even if someone gains full database access, they see nothing useful.
 4. **No Recovery** — There's no "forgot password" flow. Your master password is the only way in. This is a feature, not a bug.
 5. **AI Privacy** — AI features run on-device. The chat assistant uses your own API keys (BYOK) — vault data is never sent to Lockbox servers.
+6. **Team Sharing** — Shared folders use per-folder AES-256-GCM keys, wrapped per-member with RSA-OAEP. The server only stores wrapped keys — it never has access to plaintext or raw folder keys.
+7. **Share Links** — Anonymous share links derive encryption and auth keys from a single secret using HKDF. The secret lives in the URL fragment (never sent to the server). The server stores only a SHA-256 hash of the auth token.
 
 > **Self-hosting amplifies this** — the encrypted data lives on _your_ Cloudflare account, not a shared multi-tenant system.
 
