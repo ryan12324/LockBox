@@ -21,11 +21,6 @@ export default function Login() {
   const [isBackupCode, setIsBackupCode] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -71,19 +66,6 @@ export default function Login() {
       if (!loginRes.token || !loginRes.user) {
         throw new Error('Invalid response');
       }
-
-      // Step 5: Decrypt user key with master key
-      const userKey = await decryptUserKey(loginRes.user.encryptedUserKey, masterKey);
-      const loginRes = await api.auth.login({ email, authHash }) as {
-        token: string;
-        user: {
-          id: string;
-          email: string;
-          kdfConfig: KdfConfig;
-          salt: string;
-          encryptedUserKey: string;
-        };
-      };
 
       // Step 5: Decrypt user key with master key
       const userKey = await decryptUserKey(loginRes.user.encryptedUserKey, masterKey);
