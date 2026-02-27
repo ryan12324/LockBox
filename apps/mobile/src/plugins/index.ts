@@ -59,3 +59,31 @@ export type {
   PasskeyAuthenticationResult,
   StoredPasskeyInfo,
 } from './credential-manager';
+
+export {
+  Fido2,
+  registerFido2Key,
+  authenticateFido2,
+  wrapMasterKey,
+  setupHardwareKey,
+  unlockWithHardwareKey,
+  listHardwareKeys,
+  removeHardwareKey,
+} from './fido2';
+export type {
+  Fido2Plugin,
+  Fido2RegistrationResult,
+  Fido2AuthenticationResult,
+  Fido2RegistrationOptions,
+  Fido2AuthenticationOptions,
+  HardwareKeyInfo,
+} from './fido2';
+
+export {
+  QR_SYNC_EXPIRY_MS,
+  generateSyncQR,
+  processSyncQR,
+  scanSyncQR,
+  isPayloadExpired,
+  getRemainingSeconds,
+} from './qr-sync';

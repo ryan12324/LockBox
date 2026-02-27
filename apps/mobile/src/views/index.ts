@@ -128,3 +128,21 @@ export {
   getHiddenItemCount,
 } from './travel-mode.js';
 export type { TravelModeState, FolderTravelSetting } from './travel-mode.js';
+
+export {
+  formatFileSize as formatDocumentFileSize,
+  getDocumentIcon,
+  getPreviewType,
+  canPreviewDocument,
+  renderDocumentItem,
+  renderDocumentDetail,
+  uploadDocument,
+  downloadDocument,
+  getDocumentQuota,
+} from './document-vault.js';
+export type {
+  DocumentPreviewType,
+  DocumentListItemData,
+  DocumentDetailData,
+  DocumentQuota,
+} from './document-vault.js';
