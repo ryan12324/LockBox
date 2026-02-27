@@ -4,13 +4,12 @@
 #
 # Prerequisites:
 #   - bun installed (https://bun.sh)
-#   - Java 17+ (JAVA_HOME set)
+#   - Java 17-24 (JAVA_HOME set, or auto-detected)
 #   - Android SDK (ANDROID_HOME or ANDROID_SDK_ROOT set)
 #
 # Usage:
 #   ./scripts/build-android.sh              # debug APK
 #   ./scripts/build-android.sh release      # release AAB (unsigned unless env vars set)
-#   ./scripts/build-android.sh release sign # release AAB with keystore from env
 #
 # Signing env vars (for release):
 #   LOCKBOX_KEYSTORE_FILE      — path to .jks keystore
@@ -44,12 +43,91 @@ MODE="${1:-debug}"
 
 # ── Preflight checks ─────────────────────────────────────────────────
 
-command -v bun  >/dev/null 2>&1 || fail "bun not found. Install: https://bun.sh"
-command -v java >/dev/null 2>&1 || fail "java not found. Install JDK 17+."
+command -v bun >/dev/null 2>&1 || fail "bun not found. Install: https://bun.sh"
 
-JAVA_VER=$(java -version 2>&1 | head -1 | grep -oP '\"(\d+)' | tr -d '"')
-if [ "$JAVA_VER" -lt 17 ] 2>/dev/null; then
-  fail "Java 17+ required (found $JAVA_VER)"
+# ── Find a compatible JDK (17-24) ────────────────────────────────────
+# Gradle 8.x does not support Java 25+. If the default java is too new,
+# we try common JDK install locations to find a 17-24 JDK automatically.
+
+get_java_major() {
+  "$1" -version 2>&1 | head -1 | grep -oP '"(\d+)' | tr -d '"'
+}
+
+find_compatible_jdk() {
+  local candidates=()
+
+  # Check JAVA_HOME first
+  if [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+    candidates+=("$JAVA_HOME")
+  fi
+
+  # Common JDK locations (Linux + macOS)
+  for v in 24 23 22 21 17; do
+    # SDKMAN
+    for d in "$HOME/.sdkman/candidates/java/"*"$v"*; do
+      [ -x "$d/bin/java" ] && candidates+=("$d")
+    done
+    # Linux /usr/lib/jvm
+    for d in /usr/lib/jvm/*"$v"*; do
+      [ -x "$d/bin/java" ] && candidates+=("$d")
+    done
+    # Homebrew (macOS)
+    for d in /opt/homebrew/opt/openjdk@"$v" /usr/local/opt/openjdk@"$v"; do
+      [ -x "$d/bin/java" ] && candidates+=("$d")
+    done
+    # macOS /Library/Java
+    for d in /Library/Java/JavaVirtualMachines/*"$v"*/Contents/Home; do
+      [ -x "$d/bin/java" ] && candidates+=("$d")
+    done
+    # Android Studio bundled JDK
+    for d in "$HOME/Android/android-studio/jbr" "$HOME/Library/Application Support/Google/AndroidStudio"*/jbr "/opt/android-studio/jbr"; do
+      [ -x "$d/bin/java" ] && candidates+=("$d")
+    done
+  done
+
+  for jdk in "${candidates[@]}"; do
+    local ver
+    ver=$(get_java_major "$jdk/bin/java" 2>/dev/null) || continue
+    if [ "$ver" -ge 17 ] && [ "$ver" -le 24 ] 2>/dev/null; then
+      echo "$jdk"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Check if current java works
+NEED_JDK_SEARCH=false
+if command -v java >/dev/null 2>&1; then
+  CUR_VER=$(get_java_major java 2>/dev/null) || CUR_VER=0
+  if [ "$CUR_VER" -ge 17 ] && [ "$CUR_VER" -le 24 ] 2>/dev/null; then
+    ok "Using Java $CUR_VER"
+  elif [ "$CUR_VER" -ge 25 ] 2>/dev/null; then
+    warn "Java $CUR_VER detected — Gradle 8.x supports Java 17-24"
+    NEED_JDK_SEARCH=true
+  else
+    warn "Java $CUR_VER detected — need Java 17+"
+    NEED_JDK_SEARCH=true
+  fi
+else
+  warn "java not found on PATH"
+  NEED_JDK_SEARCH=true
+fi
+
+if [ "$NEED_JDK_SEARCH" = true ]; then
+  info "Searching for a compatible JDK (17-24)..."
+  if FOUND_JDK=$(find_compatible_jdk); then
+    FOUND_VER=$(get_java_major "$FOUND_JDK/bin/java")
+    export JAVA_HOME="$FOUND_JDK"
+    export PATH="$JAVA_HOME/bin:$PATH"
+    ok "Found JDK $FOUND_VER at $JAVA_HOME"
+  else
+    echo ""
+    fail "No compatible JDK (17-24) found. Install one and set JAVA_HOME:
+   brew install openjdk@21        # macOS
+   sudo apt install openjdk-21-jdk # Ubuntu/Debian
+   sdk install java 21-tem         # SDKMAN"
+  fi
 fi
 
 if [ -z "${ANDROID_HOME:-}${ANDROID_SDK_ROOT:-}" ]; then
