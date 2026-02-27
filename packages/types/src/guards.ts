@@ -3,7 +3,7 @@
  * Use discriminant checking (type field) to narrow union types.
  */
 
-import type { VaultItem, LoginItem, SecureNoteItem, CardItem, IdentityItem, PasskeyItem } from './vault';
+import type { VaultItem, LoginItem, SecureNoteItem, CardItem, IdentityItem, PasskeyItem, DocumentItem } from './vault';
 
 /**
  * Type guard to check if a vault item is a login item.
@@ -48,4 +48,13 @@ export function isIdentityItem(item: VaultItem): item is IdentityItem {
  */
 export function isPasskeyItem(item: VaultItem): item is PasskeyItem {
   return item.type === 'passkey';
+}
+
+/**
+ * Type guard to check if a vault item is a document item.
+ * @param item - The vault item to check
+ * @returns true if the item is a DocumentItem
+ */
+export function isDocumentItem(item: VaultItem): item is DocumentItem {
+  return item.type === 'document';
 }

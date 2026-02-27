@@ -43,7 +43,6 @@
       "when": 1772091552052,
       "tag": "0005_emergency_access",
       "breakpoints": true
-    }
     },
     {
       "idx": 6,
@@ -51,5 +50,13 @@
       "when": 1772091552053,
       "tag": "0006_travel_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1772091552054,
+      "tag": "0007_hardware_keys",
+      "breakpoints": true
+    }
   ]
 }

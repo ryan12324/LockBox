@@ -18,6 +18,8 @@ import { attachmentRoutes } from './routes/attachments.js';
 import { aliasRoutes } from './routes/aliases.js';
 import { emergencyRoutes } from './routes/emergency.js';
 import { settingsRoutes } from './routes/settings.js';
+import { documentRoutes } from './routes/documents.js';
+import { hardwareKeyRoutes } from './routes/hardware-key.js';
 import { corsMiddleware, securityHeaders, requestSizeLimit } from './middleware/security.js';
 import { VaultSyncHub } from './sync-hub.js';
 import { createDb } from './db/index.js';
@@ -56,6 +58,8 @@ app.route('/api/vault', attachmentRoutes);
 app.route('/api', aliasRoutes);
 app.route('/api/emergency', emergencyRoutes);
 app.route('/api/settings', settingsRoutes);
+app.route('/api/vault', documentRoutes);
+app.route('/api/auth/hardware-key', hardwareKeyRoutes);
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));

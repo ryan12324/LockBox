@@ -6,6 +6,7 @@ export type {
   CardItem,
   IdentityItem,
   PasskeyItem,
+  DocumentItem,
   CustomField,
   EncryptedVaultItem,
   Folder,
@@ -37,7 +38,7 @@ export type {
 } from './crypto.js';
 
 // Type guards
-export { isLoginItem, isSecureNoteItem, isCardItem, isIdentityItem, isPasskeyItem } from './guards.js';
+export { isLoginItem, isSecureNoteItem, isCardItem, isIdentityItem, isPasskeyItem, isDocumentItem } from './guards.js';
 
 // AI types
 export type {
@@ -110,3 +111,25 @@ export type {
   EmergencyAccessGrant,
   EmergencyAccessRequest,
 } from './emergency.js';
+
+// Hardware key types
+export type {
+  HardwareKeyConfig,
+  HardwareKeySetupRequest,
+  HardwareKeyUnlockRequest,
+  HardwareKeyChallengeResponse,
+} from './hardware-key.js';
+
+// Device sync types
+export type {
+  QRSyncPayload,
+  DeviceSyncRequest,
+  DeviceSyncResponse,
+} from './device-sync.js';
+
+// Relay configuration types
+export type {
+  RelayConfig,
+  RelayStatus,
+  ApiEndpoint,
+} from './config.js';

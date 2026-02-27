@@ -17,3 +17,4 @@ export * from './breach.js';
 export * from './rsa.js';
 export * from './sharing.js';
 export * from './emergency.js';
+export * from './ecdh.js';

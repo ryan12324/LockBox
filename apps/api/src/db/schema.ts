@@ -199,3 +199,14 @@ export const emergencyAccessRequests = sqliteTable('emergency_access_requests', 
   rejectedAt: text('rejected_at'),
   expiresAt: text('expires_at').notNull(),
 });
+
+// ─── Hardware Keys ───────────────────────────────────────────────────────────
+
+export const hardwareKeys = sqliteTable('hardware_keys', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  keyType: text('key_type').notNull(), // 'yubikey-piv' | 'fido2'
+  publicKey: text('public_key').notNull(),
+  wrappedMasterKey: text('wrapped_master_key').notNull(),
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+});

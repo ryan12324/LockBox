@@ -4,7 +4,7 @@
  */
 
 /** Vault item type discriminant */
-export type VaultItemType = 'login' | 'note' | 'card' | 'identity' | 'passkey';
+export type VaultItemType = 'login' | 'note' | 'card' | 'identity' | 'passkey' | 'document';
 
 /**
  * Base vault item with common fields.
@@ -96,6 +96,20 @@ export interface PasskeyItem extends VaultItem {
   counter: number;       // Signature counter
   transports: string[];  // e.g. ["internal", "hybrid"]
   createdAt: string;     // ISO 8601
+}
+
+/**
+ * Document item for storing encrypted file metadata.
+ * The actual file content is stored separately; this holds the encrypted file key and metadata.
+ */
+export interface DocumentItem extends VaultItem {
+  type: 'document';
+  name: string;
+  encryptedFileKey?: string;
+  mimeType: string;
+  size: number;
+  description?: string;
+  tags?: string[];
 }
 
 /**
