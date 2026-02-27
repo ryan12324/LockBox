@@ -102,3 +102,29 @@ export {
   validateQuota,
 } from './attachments.js';
 export type { AttachmentListItem, ValidationResult } from './attachments.js';
+
+export {
+  getStatusBadge,
+  getStatusDescription,
+  formatWaitPeriod,
+  calculateTimeRemaining,
+  toGrantListItem,
+  processGrantList,
+  getGrantorActions,
+  getGranteeActions,
+  validateWaitPeriod,
+  getAvailableWaitPeriods,
+} from './emergency-access.js';
+export type { EmergencyGrant, EmergencyAccessAction, GrantListItem } from './emergency-access.js';
+
+export {
+  getTravelModeWarning,
+  getTravelModeDescription,
+  getConfirmEnableMessage,
+  getConfirmDisableMessage,
+  toFolderTravelItem,
+  processFolderList,
+  calculateTravelModeState,
+  getHiddenItemCount,
+} from './travel-mode.js';
+export type { TravelModeState, FolderTravelSetting } from './travel-mode.js';

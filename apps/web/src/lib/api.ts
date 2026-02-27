@@ -70,6 +70,14 @@ export const api = {
       request(`/api/vault/folders/${id}`, { method: 'PUT', body: JSON.stringify(body), token }),
     deleteFolder: (id: string, token: string) =>
       request(`/api/vault/folders/${id}`, { method: 'DELETE', token }),
+    setFolderTravel: (id: string, travelSafe: boolean, token: string) =>
+      request(`/api/vault/folders/${id}/travel`, { method: 'PUT', body: JSON.stringify({ travelSafe }), token }),
+  },
+  settings: {
+    getTravelMode: (token: string) =>
+      request<{ enabled: boolean }>('/api/settings/travel-mode', { token }),
+    setTravelMode: (enabled: boolean, token: string) =>
+      request<{ success: boolean }>('/api/settings/travel-mode', { method: 'PUT', body: JSON.stringify({ enabled }), token }),
   },
   sync: {
     pull: (token: string, since?: string) => {
@@ -164,5 +172,25 @@ export const api = {
       if (baseUrl) headers['X-Alias-BaseUrl'] = baseUrl;
       return request<{ aliases: Array<{ email: string; enabled: boolean; id: string }> }>('/api/aliases', { token, headers });
     },
+  },
+  emergency: {
+    createGrant: (body: { granteeEmail: string; waitPeriodDays: number; waitPeriod?: number; encryptedUserKey: string }, token: string) =>
+      request<{ id: string }>('/api/emergency/grants', { method: 'POST', body: JSON.stringify(body), token }),
+    listGrants: (token: string) =>
+      request<{ grants: import('@lockbox/types').EmergencyAccessGrant[] }>('/api/emergency/grants', { token }),
+    listRequests: (token: string) =>
+      request<{ requests: import('@lockbox/types').EmergencyAccessRequest[] }>('/api/emergency/requests', { token }),
+    confirmGrant: (id: string, token: string) =>
+      request<{ success: boolean }>(`/api/emergency/grants/${id}/confirm`, { method: 'POST', token }),
+    revokeGrant: (id: string, token: string) =>
+      request<{ success: boolean }>(`/api/emergency/grants/${id}`, { method: 'DELETE', token }),
+    requestAccess: (grantId: string, token: string) =>
+      request<{ success: boolean }>('/api/emergency/requests', { method: 'POST', body: JSON.stringify({ grantId }), token }),
+    rejectRequest: (id: string, token: string) =>
+      request<{ success: boolean }>(`/api/emergency/grants/${id}/reject`, { method: 'POST', token }),
+    approveRequest: (id: string, token: string) =>
+      request<{ success: boolean }>(`/api/emergency/grants/${id}/approve`, { method: 'POST', token }),
+    getAccess: (id: string, token: string) =>
+      request<{ encryptedVault: string }>(`/api/emergency/grants/${id}/access`, { token }),
   },
 };

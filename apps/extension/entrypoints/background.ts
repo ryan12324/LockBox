@@ -16,9 +16,23 @@ import { analyzeVaultHealth, analyzeItem } from '@lockbox/ai';
 import { generatePassword, generatePassphrase } from '@lockbox/generator';
 import { PhishingDetector, SecurityAlertEngine, SemanticSearch, KeywordEmbeddingProvider, SecurityCopilot } from '@lockbox/ai';
 import type { SearchResult, SecurityAlert } from '@lockbox/ai';
-import type { VaultItem, LoginItem, KdfConfig, Folder } from '@lockbox/types';
+import type { VaultItem, LoginItem, PasskeyItem, KdfConfig, Folder } from '@lockbox/types';
 import { api } from '../lib/api.js';
 import { checkSite as checkTwoFaSite } from '../lib/twofa-directory.js';
+import {
+  base64urlEncode,
+  base64urlDecode,
+  generateCredentialId,
+  generatePasskeyKeyPair,
+  importPrivateKey,
+  hashRpId,
+  createAuthenticatorData,
+  signChallenge,
+  buildAttestationObject,
+  buildClientDataJSON,
+  findMatchingPasskeys,
+} from '../lib/webauthn.js';
+import type { StoredPasskey, SerializedCreationOptions, SerializedRequestOptions, SerializedCredential } from '../lib/webauthn.js';
 import {
   getSessionToken,
   setSessionToken,
@@ -297,7 +311,9 @@ type Message =
   | { type: 'get-attachments'; itemId: string }
   | { type: 'download-attachment'; itemId: string; attachmentId: string }
   | { type: 'check-2fa'; domain: string }
-  | { type: 'generate-alias'; provider?: string; apiKey?: string };
+  | { type: 'generate-alias'; provider?: string; apiKey?: string }
+  | { type: 'WEBAUTHN_CREATE'; requestId: string; origin: string; options: SerializedCreationOptions }
+  | { type: 'WEBAUTHN_GET'; requestId: string; origin: string; options: SerializedRequestOptions };
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -792,6 +808,222 @@ async function handleMessage(
         return { success: true, alias: res.alias };
       } catch (err) {
         return { success: false, error: err instanceof Error ? err.message : 'Failed to generate alias' };
+      }
+    }
+
+    // ─── WebAuthn passkey operations ───────────────────────────────────────
+
+    case 'WEBAUTHN_CREATE': {
+      if (!userKey) return { fallback: true };
+      const token = await getSessionToken();
+      if (!token) return { fallback: true };
+      try {
+        const { options: createOpts, origin } = message;
+        const rpId = createOpts.rp.id ?? new URL(origin).hostname;
+
+        // Generate ECDSA P-256 key pair
+        const { publicKeySPKI, privateKeyPKCS8, publicKeyCOSE } =
+          await generatePasskeyKeyPair();
+
+        // Generate credential ID
+        const credId = generateCredentialId();
+        const credIdB64 = base64urlEncode(credId);
+
+        // Build authenticator data with attested credential data
+        const rpIdHash = await hashRpId(rpId);
+        const counter = 1;
+        const authData = createAuthenticatorData(rpIdHash, counter, credId, publicKeyCOSE);
+
+        // Build attestation object (fmt="none")
+        const attestationObject = buildAttestationObject(authData);
+
+        // Build clientDataJSON
+        const clientDataJSON = buildClientDataJSON(
+          'webauthn.create',
+          createOpts.challenge,
+          origin,
+        );
+
+        // Store passkey as a vault item
+        const now = new Date().toISOString();
+        const itemId = crypto.randomUUID();
+        const passkeyItem: PasskeyItem = {
+          id: itemId,
+          type: 'passkey',
+          name: `${createOpts.rp.name} (${createOpts.user.name})`,
+          rpId,
+          rpName: createOpts.rp.name,
+          userId: createOpts.user.id,
+          userName: createOpts.user.name,
+          credentialId: credIdB64,
+          publicKey: base64urlEncode(publicKeySPKI),
+          counter,
+          transports: ['internal'],
+          tags: ['passkey'],
+          favorite: false,
+          createdAt: now,
+          updatedAt: now,
+          revisionDate: now,
+        };
+
+        // The encrypted data includes the private key alongside the passkey metadata
+        const itemWithPrivateKey = {
+          ...passkeyItem,
+          privateKey: base64urlEncode(privateKeyPKCS8),
+        };
+
+        const encryptedData = await encryptVaultItem(
+          itemWithPrivateKey as unknown as VaultItem,
+          itemId,
+          now,
+        );
+        if (!encryptedData) return { fallback: true };
+
+        await api.vault.createItem({
+          id: itemId,
+          type: 'passkey' as const,
+          encryptedData,
+          tags: ['passkey'],
+          favorite: false,
+          revisionDate: now,
+        }, token);
+
+        vaultItems.set(itemId, itemWithPrivateKey as unknown as VaultItem);
+
+        // Build the credential response
+        const credential: SerializedCredential = {
+          id: credIdB64,
+          rawId: credIdB64,
+          type: 'public-key',
+          authenticatorAttachment: 'platform',
+          response: {
+            clientDataJSON: base64urlEncode(clientDataJSON),
+            attestationObject: base64urlEncode(attestationObject),
+          },
+        };
+
+        return { credential };
+      } catch (err) {
+        console.error('[Lockbox] WebAuthn create failed:', err);
+        return { fallback: true };
+      }
+    }
+
+    case 'WEBAUTHN_GET': {
+      if (!userKey) return { fallback: true };
+      try {
+        const { options: getOpts, origin } = message;
+        const rpId = getOpts.rpId ?? new URL(origin).hostname;
+
+        // Find matching passkeys in the vault
+        const allPasskeys: StoredPasskey[] = [];
+        for (const item of vaultItems.values()) {
+          if (item.type !== 'passkey') continue;
+          const pk = item as PasskeyItem & { privateKey?: string };
+          allPasskeys.push({
+            credentialId: pk.credentialId,
+            rpId: pk.rpId,
+            rpName: pk.rpName,
+            userName: pk.userName,
+            userDisplayName: pk.userName,
+            userId: pk.userId,
+            publicKeyAlgorithm: -7,
+            publicKeySPKI: pk.publicKey,
+            counter: pk.counter,
+            createdAt: pk.createdAt,
+          });
+        }
+
+        const matches = findMatchingPasskeys(
+          allPasskeys,
+          rpId,
+          getOpts.allowCredentials,
+        );
+
+        if (matches.length === 0) return { fallback: true };
+
+        // Use the first matching passkey
+        const match = matches[0];
+
+        // Find the vault item to get the private key
+        let matchedItem: (PasskeyItem & { privateKey?: string }) | null = null;
+        for (const item of vaultItems.values()) {
+          if (item.type !== 'passkey') continue;
+          const pk = item as PasskeyItem & { privateKey?: string };
+          if (pk.credentialId === match.credentialId) {
+            matchedItem = pk;
+            break;
+          }
+        }
+
+        if (!matchedItem?.privateKey) return { fallback: true };
+
+        // Import the private key
+        const privKeyBytes = base64urlDecode(matchedItem.privateKey);
+        const privKey = await importPrivateKey(privKeyBytes);
+
+        // Increment counter
+        const newCounter = match.counter + 1;
+        matchedItem.counter = newCounter;
+
+        // Build authenticator data (assertion — no attested cred data)
+        const rpIdHash = await hashRpId(rpId);
+        const authData = createAuthenticatorData(rpIdHash, newCounter);
+
+        // Build clientDataJSON
+        const clientDataJSON = buildClientDataJSON(
+          'webauthn.get',
+          getOpts.challenge,
+          origin,
+        );
+
+        // Hash clientDataJSON for signing
+        const clientDataHash = new Uint8Array(
+          await crypto.subtle.digest('SHA-256', clientDataJSON.buffer as ArrayBuffer),
+        );
+
+        // Sign
+        const signature = await signChallenge(privKey, authData, clientDataHash);
+
+        // Update the vault item counter
+        const token = await getSessionToken();
+        if (token) {
+          const now = new Date().toISOString();
+          matchedItem.updatedAt = now;
+          matchedItem.revisionDate = now;
+          const encryptedData = await encryptVaultItem(
+            matchedItem as unknown as VaultItem,
+            matchedItem.id,
+            now,
+          );
+          if (encryptedData) {
+            api.vault.updateItem(matchedItem.id, {
+              encryptedData,
+              tags: matchedItem.tags ?? [],
+              favorite: matchedItem.favorite ?? false,
+              revisionDate: now,
+            }, token).catch(() => {});
+          }
+        }
+
+        // Build the credential response
+        const credential: SerializedCredential = {
+          id: match.credentialId,
+          rawId: match.credentialId,
+          type: 'public-key',
+          authenticatorAttachment: 'platform',
+          response: {
+            clientDataJSON: base64urlEncode(clientDataJSON),
+            authenticatorData: base64urlEncode(authData),
+            signature: base64urlEncode(signature),
+            userHandle: matchedItem.userId,
+          },
+        };
+
+        return { credential };
+      } catch (err) {
+        console.error('[Lockbox] WebAuthn get failed:', err);
+        return { fallback: true };
       }
     }
 

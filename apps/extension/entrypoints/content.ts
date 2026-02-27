@@ -16,6 +16,7 @@ import {
   createIdentitySuggestionDropdown,
 } from '../lib/autofill.js';
 import { initSaveDetector } from '../lib/save-detector.js';
+import { getWebAuthnInterceptorScript } from '../lib/webauthn.js';
 import type { VaultItem, LoginItem, IdentityItem } from '@lockbox/types';
 
 // Track injected overlays to avoid duplicates
@@ -364,6 +365,72 @@ export default defineContentScript({
 
     // Initialize save-on-submit detection
     initSaveDetector();
+
+    // ─── WebAuthn interceptor injection ──────────────────────────────────────
+    // Inject interceptor script into page context so it can override
+    // navigator.credentials.create() and navigator.credentials.get().
+    const interceptorScript = document.createElement('script');
+    interceptorScript.textContent = getWebAuthnInterceptorScript();
+    document.documentElement.appendChild(interceptorScript);
+    interceptorScript.remove();
+
+    // Listen for WebAuthn messages from the injected page script
+    window.addEventListener('message', async (event: MessageEvent) => {
+      if (event.source !== window) return;
+      if (!event.data || typeof event.data.type !== 'string') return;
+
+      if (event.data.type === 'lockbox-webauthn-create') {
+        try {
+          const result = await sendMessage<{
+            credential?: object;
+            error?: string;
+            fallback?: boolean;
+          }>({
+            type: 'WEBAUTHN_CREATE',
+            requestId: event.data.requestId,
+            origin: event.data.origin,
+            options: event.data.options,
+          });
+          window.postMessage({
+            type: 'lockbox-webauthn-response',
+            requestId: event.data.requestId,
+            ...result,
+          }, '*');
+        } catch {
+          window.postMessage({
+            type: 'lockbox-webauthn-response',
+            requestId: event.data.requestId,
+            fallback: true,
+          }, '*');
+        }
+      }
+
+      if (event.data.type === 'lockbox-webauthn-get') {
+        try {
+          const result = await sendMessage<{
+            credential?: object;
+            error?: string;
+            fallback?: boolean;
+          }>({
+            type: 'WEBAUTHN_GET',
+            requestId: event.data.requestId,
+            origin: event.data.origin,
+            options: event.data.options,
+          });
+          window.postMessage({
+            type: 'lockbox-webauthn-response',
+            requestId: event.data.requestId,
+            ...result,
+          }, '*');
+        } catch {
+          window.postMessage({
+            type: 'lockbox-webauthn-response',
+            requestId: event.data.requestId,
+            fallback: true,
+          }, '*');
+        }
+      }
+    });
 
     // Listen for phishing warnings from background
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

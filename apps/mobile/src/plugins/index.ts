@@ -37,3 +37,25 @@ export type {
 } from './qr-scanner';
 
 export { encryptFile, decryptFile } from './file-crypto';
+
+export {
+  CredentialManager,
+  isCredentialManagerAvailable,
+  createPasskey,
+  authenticateWithPasskey,
+  getStoredPasskeys,
+  deletePasskey,
+  base64urlToUint8Array,
+  uint8ArrayToBase64url,
+  isAndroid14OrHigher,
+  formatCredentialId,
+  getPasskeyDisplayName,
+} from './credential-manager';
+export type {
+  CredentialManagerPlugin,
+  PasskeyCreationOptions,
+  PasskeyCreationResult,
+  PasskeyAuthenticationOptions,
+  PasskeyAuthenticationResult,
+  StoredPasskeyInfo,
+} from './credential-manager';

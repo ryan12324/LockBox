@@ -26,12 +26,18 @@ export default function AppLayout() {
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolder, setEditingFolder] = useState<{ id: string; name: string } | null>(null);
   const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
+  const [isTravelMode, setIsTravelMode] = useState(false);
 
   useEffect(() => {
     if (session) {
       api.vault
         .list(session.token)
         .then((res: { folders: Folder[] }) => setFolders(res.folders))
+        .catch(console.error);
+
+      api.settings
+        .getTravelMode(session.token)
+        .then((res) => setIsTravelMode(res.enabled))
         .catch(console.error);
     }
   }, [session, setFolders]);
@@ -42,7 +48,7 @@ export default function AppLayout() {
     navigate('/login');
   }
 
-  const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛' })[type as keyof ReturnType<typeof typeIcon>] ?? '📄';
+  const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️' })[type as keyof ReturnType<typeof typeIcon>] ?? '📄';
 
   async function handleCreateFolder() {
     if (!session || !newFolderName.trim()) return;
@@ -351,8 +357,20 @@ export default function AppLayout() {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col overflow-hidden">
+        {isTravelMode && (
+          <div className="bg-gradient-to-r from-indigo-600 to-amber-600 text-white px-4 py-2 text-sm flex items-center justify-between shadow-md z-50">
+            <span className="flex items-center gap-2 font-medium">
+              <span>⚠️</span>
+              Travel mode active — some items are hidden
+            </span>
+            <button onClick={() => navigate('/settings')} className="hover:text-indigo-200 underline">
+              Settings
+            </button>
+          </div>
+        )}
         <Outlet />
       </main>
+
     </div>
   );
 }
