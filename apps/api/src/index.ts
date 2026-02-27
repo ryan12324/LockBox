@@ -14,6 +14,7 @@ import { teamRoutes } from './routes/teams.js';
 import { sharingRoutes } from './routes/sharing.js';
 import { shareLinkRoutes } from './routes/share-links.js';
 import { twofaRoutes } from './routes/twofa.js';
+import { attachmentRoutes } from './routes/attachments.js';
 import { corsMiddleware, securityHeaders, requestSizeLimit } from './middleware/security.js';
 import { VaultSyncHub } from './sync-hub.js';
 import { createDb } from './db/index.js';
@@ -27,6 +28,7 @@ type Bindings = {
   SYNC_HUB: DurableObjectNamespace;
   AUTH_LIMITER: RateLimit;
   CORS_ORIGINS?: string;
+  ATTACHMENTS: R2Bucket;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -47,6 +49,7 @@ app.route('/api/teams', teamRoutes);
 app.route('/api/sharing', sharingRoutes);
 app.route('/api/share-links', shareLinkRoutes);
 app.route('/api/auth/2fa', twofaRoutes);
+app.route('/api/vault', attachmentRoutes);
 
 // Health check
 app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));

@@ -21,6 +21,9 @@ describe('Vault API — auth enforcement', () => {
     { method: 'POST', path: '/api/vault/folders' },
     { method: 'PUT', path: '/api/vault/folders/test-id' },
     { method: 'DELETE', path: '/api/vault/folders/test-id' },
+    { method: 'GET', path: '/api/vault/items/test-id/versions' },
+    { method: 'GET', path: '/api/vault/items/test-id/versions/v1' },
+    { method: 'POST', path: '/api/vault/items/test-id/versions/v1/restore' },
   ];
 
   for (const { method, path } of protectedRoutes) {
@@ -105,5 +108,38 @@ describe('Vault API — identity item CRUD routes', () => {
   it('DELETE /api/vault/items/:id/permanent — identity permanent delete route exists', async () => {
     const res = await app.request('/api/vault/items/identity-id/permanent', { method: 'DELETE' });
     expect(res.status).toBe(401);
+  });
+});
+
+describe('Vault API — version history routes', () => {
+  const app = new Hono();
+  app.route('/api/vault', vaultRoutes);
+
+  it('GET /api/vault/items/:id/versions — requires auth (401)', async () => {
+    const res = await app.request('/api/vault/items/test-id/versions', { method: 'GET' });
+    expect(res.status).toBe(401);
+  });
+
+  it('GET /api/vault/items/:id/versions/:versionId — requires auth (401)', async () => {
+    const res = await app.request('/api/vault/items/test-id/versions/v1', { method: 'GET' });
+    expect(res.status).toBe(401);
+  });
+
+  it('POST /api/vault/items/:id/versions/:versionId/restore — requires auth (401)', async () => {
+    const res = await app.request('/api/vault/items/test-id/versions/v1/restore', { method: 'POST' });
+    expect(res.status).toBe(401);
+  });
+
+  it('version routes are registered (not 404)', async () => {
+    // All version routes should return 401 (auth required), not 404 (not found)
+    const routes = [
+      { method: 'GET', path: '/api/vault/items/any-id/versions' },
+      { method: 'GET', path: '/api/vault/items/any-id/versions/any-version' },
+      { method: 'POST', path: '/api/vault/items/any-id/versions/any-version/restore' },
+    ];
+    for (const { method, path } of routes) {
+      const res = await app.request(path, { method });
+      expect(res.status).toBe(401);
+    }
   });
 });

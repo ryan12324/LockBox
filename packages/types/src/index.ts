@@ -9,7 +9,9 @@ export type {
   EncryptedVaultItem,
   Folder,
   VaultItemType,
-} from './vault';
+  Attachment,
+  VaultItemVersion,
+} from './vault.js';
 
 // API request/response types
 export type {
@@ -21,7 +23,7 @@ export type {
   VaultItemCreateRequest,
   VaultItemUpdateRequest,
   ChangePasswordRequest,
-} from './api';
+} from './api.js';
 
 // Cryptographic types
 export type {
@@ -31,10 +33,10 @@ export type {
   EncryptedUserKey,
   DerivedKeyMaterial,
   EmergencyKit,
-} from './crypto';
+} from './crypto.js';
 
 // Type guards
-export { isLoginItem, isSecureNoteItem, isCardItem, isIdentityItem } from './guards';
+export { isLoginItem, isSecureNoteItem, isCardItem, isIdentityItem } from './guards.js';
 
 // AI types
 export type {
@@ -60,7 +62,7 @@ export type {
   FormClassification,
   PasswordRules,
   RotationSchedule,
-} from './ai';
+} from './ai.js';
 
 // Team and sharing types
 export type {
@@ -73,7 +75,7 @@ export type {
   SharedFolder,
   SharedFolderKey,
   FolderPermission,
-} from './team';
+} from './team.js';
 
 // Share link types
 export type {
@@ -81,7 +83,7 @@ export type {
   ShareLinkCreateRequest,
   ShareLinkRedeemResponse,
   ShareLinkMeta,
-} from './sharing';
+} from './sharing.js';
 
 // Two-factor authentication types
 export type {
@@ -90,4 +92,12 @@ export type {
   TotpTwoFactorVerifyResponse,
   TotpTwoFactorValidateRequest,
   BackupCode,
-} from './twofa';
+} from './twofa.js';
+
+// Integration types
+export type {
+  TwoFaDirectoryEntry,
+  EmailAliasProvider,
+  EmailAliasConfig,
+  EmailAlias,
+} from './integrations.js';

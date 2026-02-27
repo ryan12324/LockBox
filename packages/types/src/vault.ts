@@ -117,3 +117,22 @@ export interface Folder {
   parentId?: string; // Parent folder ID for nested hierarchies
   createdAt: string; // ISO 8601
 }
+
+/** File attachment metadata (encrypted name/mime client-side). */
+export interface Attachment {
+  id: string;
+  itemId: string;
+  encryptedName: string;
+  encryptedMimeType: string;
+  size: number;
+  createdAt: string;
+}
+
+/** Snapshot of a vault item's encrypted data at a point in time. */
+export interface VaultItemVersion {
+  id: string;
+  itemId: string;
+  encryptedData: string;
+  revisionDate: string;
+  createdAt: string;
+}

@@ -22,6 +22,13 @@
       "when": 1772091552049,
       "tag": "0002_feature_roadmap_wave1",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1772091552050,
+      "tag": "0003_wave2_attachments_versions",
+      "breakpoints": true
     }
   ]
 }

@@ -30,3 +30,7 @@ namespace_id = "1001"
 
 [triggers]
 crons = ["0 2 * * *"]
+
+[[r2_buckets]]
+binding = "ATTACHMENTS"
+bucket_name = "lockbox-attachments"

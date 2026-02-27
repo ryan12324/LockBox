@@ -142,3 +142,26 @@ export const shareLinks = sqliteTable('share_links', {
   expiresAt: text('expires_at').notNull(),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
+
+// ─── File Attachments ─────────────────────────────────────────────────────
+
+export const attachments = sqliteTable('attachments', {
+  id: text('id').primaryKey(),
+  itemId: text('item_id').notNull(),
+  userId: text('user_id').notNull(),
+  encryptedName: text('encrypted_name').notNull(),
+  encryptedMimeType: text('encrypted_mime_type').notNull(),
+  size: integer('size').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+// ─── Version History ──────────────────────────────────────────────────────────
+
+export const vaultItemVersions = sqliteTable('vault_item_versions', {
+  id: text('id').primaryKey(),
+  itemId: text('item_id').notNull(),
+  userId: text('user_id').notNull(),
+  encryptedData: text('encrypted_data').notNull(),
+  revisionDate: text('revision_date').notNull(),
+  createdAt: text('created_at').notNull(),
+});

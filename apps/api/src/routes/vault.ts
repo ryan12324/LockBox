@@ -5,9 +5,9 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and, isNull, isNotNull } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull, desc, asc, sql } from 'drizzle-orm';
 import { createDb } from '../db/index.js';
-import { vaultItems, folders } from '../db/schema.js';
+import { vaultItems, folders, vaultItemVersions } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 export const VALID_TYPES = ['login', 'note', 'card', 'identity'] as const;
@@ -96,6 +96,39 @@ vaultRoutes.put('/items/:id', async (c) => {
     .where(and(eq(vaultItems.id, itemId), eq(vaultItems.userId, userId)))
     .get();
   if (!existing) return c.json({ error: 'Not found' }, 404);
+
+
+  // Capture current version before update
+  const versionId = crypto.randomUUID();
+  const versionNow = new Date().toISOString();
+  await db.insert(vaultItemVersions).values({
+    id: versionId,
+    itemId: itemId,
+    userId: userId,
+    encryptedData: existing.encryptedData,
+    revisionDate: existing.revisionDate,
+    createdAt: versionNow,
+  });
+
+  // Enforce max 10 versions per item
+  const versionCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(vaultItemVersions)
+    .where(eq(vaultItemVersions.itemId, itemId))
+    .get();
+
+  if (versionCount && versionCount.count > 10) {
+    const oldest = await db
+      .select({ id: vaultItemVersions.id })
+      .from(vaultItemVersions)
+      .where(eq(vaultItemVersions.itemId, itemId))
+      .orderBy(asc(vaultItemVersions.createdAt))
+      .limit(1)
+      .get();
+    if (oldest) {
+      await db.delete(vaultItemVersions).where(eq(vaultItemVersions.id, oldest.id));
+    }
+  }
 
   const { encryptedData, folderId, tags, favorite, revisionDate: clientRevisionDate } = body as Record<string, unknown>;
   const now = new Date().toISOString();
@@ -280,4 +313,128 @@ vaultRoutes.delete('/folders/:id', async (c) => {
   await db.delete(folders).where(and(eq(folders.id, folderId), eq(folders.userId, userId)));
 
   return c.json({ success: true });
+});
+
+// ─── GET /api/vault/items/:id/versions ────────────────────────────────────────
+
+vaultRoutes.get('/items/:id/versions', async (c) => {
+  const userId = c.get('userId');
+  const itemId = c.req.param('id');
+  const db = createDb(c.env.DB);
+
+  // Verify item ownership
+  const existing = await db
+    .select()
+    .from(vaultItems)
+    .where(and(eq(vaultItems.id, itemId), eq(vaultItems.userId, userId)))
+    .get();
+  if (!existing) return c.json({ error: 'Not found' }, 404);
+
+  const versions = await db
+    .select({
+      id: vaultItemVersions.id,
+      revisionDate: vaultItemVersions.revisionDate,
+      createdAt: vaultItemVersions.createdAt,
+    })
+    .from(vaultItemVersions)
+    .where(eq(vaultItemVersions.itemId, itemId))
+    .orderBy(desc(vaultItemVersions.createdAt));
+
+  return c.json({ versions });
+});
+
+// ─── GET /api/vault/items/:id/versions/:versionId ────────────────────────────
+
+vaultRoutes.get('/items/:id/versions/:versionId', async (c) => {
+  const userId = c.get('userId');
+  const itemId = c.req.param('id');
+  const versionId = c.req.param('versionId');
+  const db = createDb(c.env.DB);
+
+  // Verify item ownership
+  const existing = await db
+    .select()
+    .from(vaultItems)
+    .where(and(eq(vaultItems.id, itemId), eq(vaultItems.userId, userId)))
+    .get();
+  if (!existing) return c.json({ error: 'Not found' }, 404);
+
+  const version = await db
+    .select()
+    .from(vaultItemVersions)
+    .where(and(eq(vaultItemVersions.id, versionId), eq(vaultItemVersions.itemId, itemId)))
+    .get();
+  if (!version) return c.json({ error: 'Version not found' }, 404);
+
+  return c.json({ version });
+});
+
+// ─── POST /api/vault/items/:id/versions/:versionId/restore ──────────────────
+
+vaultRoutes.post('/items/:id/versions/:versionId/restore', async (c) => {
+  const userId = c.get('userId');
+  const itemId = c.req.param('id');
+  const restoreVersionId = c.req.param('versionId');
+  const db = createDb(c.env.DB);
+
+  // Verify item ownership
+  const existing = await db
+    .select()
+    .from(vaultItems)
+    .where(and(eq(vaultItems.id, itemId), eq(vaultItems.userId, userId)))
+    .get();
+  if (!existing) return c.json({ error: 'Not found' }, 404);
+
+  // Verify version exists and belongs to this item
+  const version = await db
+    .select()
+    .from(vaultItemVersions)
+    .where(and(eq(vaultItemVersions.id, restoreVersionId), eq(vaultItemVersions.itemId, itemId)))
+    .get();
+  if (!version) return c.json({ error: 'Version not found' }, 404);
+
+  // Capture current data as a new version before restoring
+  const newVersionId = crypto.randomUUID();
+  const versionNow = new Date().toISOString();
+  await db.insert(vaultItemVersions).values({
+    id: newVersionId,
+    itemId: itemId,
+    userId: userId,
+    encryptedData: existing.encryptedData,
+    revisionDate: existing.revisionDate,
+    createdAt: versionNow,
+  });
+
+  // Enforce max 10 versions per item
+  const versionCount = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(vaultItemVersions)
+    .where(eq(vaultItemVersions.itemId, itemId))
+    .get();
+
+  if (versionCount && versionCount.count > 10) {
+    const oldest = await db
+      .select({ id: vaultItemVersions.id })
+      .from(vaultItemVersions)
+      .where(eq(vaultItemVersions.itemId, itemId))
+      .orderBy(asc(vaultItemVersions.createdAt))
+      .limit(1)
+      .get();
+    if (oldest) {
+      await db.delete(vaultItemVersions).where(eq(vaultItemVersions.id, oldest.id));
+    }
+  }
+
+  // Restore: copy version data back to item
+  const now = new Date().toISOString();
+  await db
+    .update(vaultItems)
+    .set({
+      encryptedData: version.encryptedData,
+      revisionDate: version.revisionDate,
+    })
+    .where(eq(vaultItems.id, itemId));
+
+  const item = await db.select().from(vaultItems).where(eq(vaultItems.id, itemId)).get();
+  return c.json({ item });
 });
