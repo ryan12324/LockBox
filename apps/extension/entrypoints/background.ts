@@ -32,6 +32,13 @@ let userKey: Uint8Array | null = null;
 let vaultItems: Map<string, VaultItem> = new Map();
 let lastSyncTimestamp: string | null = null;
 let folders: Folder[] = [];
+let userId: string | null = null;
+let privateKey: CryptoKey | null = null;
+let sharedFolderKeys: Map<string, Uint8Array> = new Map();
+let sharedItems: Map<string, VaultItem[]> = new Map();
+let teams: Array<{ id: string; name: string; role: string; createdAt: string }> = [];
+let sharedFoldersList: Array<{ folderId: string; teamId: string; ownerUserId: string; permissionLevel: string; folderName: string }> = [];
+let hasKeyPairFlag = false;
 let cachedBreachStatus: { breachedCount: number; results: Map<string, any> } = { breachedCount: 0, results: new Map() };
 const phishingDetector = new PhishingDetector();
 let searchEngine: SemanticSearch | null = null;
@@ -107,6 +114,7 @@ function getMatchingItems(url: string): VaultItem[] {
     const pageHost = new URL(url).hostname.replace(/^www\./, '');
     const matches: VaultItem[] = [];
 
+    // Search personal vault items
     for (const item of vaultItems.values()) {
       if (item.type !== 'login') continue;
       const login = item as LoginItem;
@@ -122,6 +130,26 @@ function getMatchingItems(url: string): VaultItem[] {
         }
       }
     }
+
+    // Search shared items from team folders
+    for (const folderItems of sharedItems.values()) {
+      for (const item of folderItems) {
+        if (item.type !== 'login') continue;
+        const login = item as LoginItem;
+        for (const uri of login.uris ?? []) {
+          try {
+            const itemHost = new URL(uri).hostname.replace(/^www\./, '');
+            if (pageHost === itemHost || pageHost.endsWith(`.${itemHost}`) || itemHost.endsWith(`.${pageHost}`)) {
+              matches.push(item);
+              break;
+            }
+          } catch {
+            // Not a valid URL, skip
+          }
+        }
+      }
+    }
+
     return matches;
   } catch {
     return [];
@@ -173,8 +201,64 @@ function lock() {
   lastSyncTimestamp = null;
   cachedBreachStatus = { breachedCount: 0, results: new Map() };
   searchEngine = null;
+  userId = null;
+  privateKey = null;
+  sharedFolderKeys.clear();
+  sharedItems.clear();
+  teams = [];
+  sharedFoldersList = [];
+  hasKeyPairFlag = false;
   chrome.alarms.clear(LOCK_ALARM);
   chrome.alarms.clear(BREACH_ALARM);
+}
+
+// ─── Team data loading ─────────────────────────────────────────────────────────
+
+async function loadTeamData(token: string): Promise<void> {
+  if (!userKey) return;
+  try {
+    const keypairRes = await api.keypair.get(token);
+    hasKeyPairFlag = true;
+
+    const { decryptPrivateKey, unwrapFolderKey } = await import('@lockbox/crypto');
+    privateKey = await decryptPrivateKey(keypairRes.encryptedPrivateKey, userKey);
+
+    const teamsRes = await api.teams.list(token);
+    teams = teamsRes.teams;
+
+    const foldersRes = await api.sharing.listSharedFolders(token);
+    sharedFoldersList = foldersRes.sharedFolders;
+
+    for (const sf of sharedFoldersList) {
+      try {
+        const keysRes = await api.sharing.getFolderKeys(sf.folderId, token);
+        const myKey = keysRes.keys.find(k => k.userId === userId);
+        if (!myKey || !privateKey) continue;
+
+        const folderKey = await unwrapFolderKey(myKey.encryptedFolderKey, privateKey);
+        sharedFolderKeys.set(sf.folderId, folderKey);
+
+        const itemsRes = await api.sharing.listSharedFolderItems(sf.folderId, token);
+        const { decryptString, toUtf8 } = await import('@lockbox/crypto');
+        const decryptedItems: VaultItem[] = [];
+        for (const item of itemsRes.items) {
+          if (item.deletedAt) continue;
+          try {
+            const aad = toUtf8(`${item.id}:${item.revisionDate}`);
+            const plaintext = await decryptString(item.encryptedData, folderKey, aad);
+            decryptedItems.push(JSON.parse(plaintext) as VaultItem);
+          } catch {
+            // Skip items that fail to decrypt
+          }
+        }
+        sharedItems.set(sf.folderId, decryptedItems);
+      } catch {
+        // Skip folders that fail to load
+      }
+    }
+  } catch {
+    hasKeyPairFlag = false;
+  }
 }
 
 // ─── Message handlers ─────────────────────────────────────────────────────────
@@ -201,7 +285,11 @@ type Message =
   | { type: 'get-breach-status' }
   | { type: 'search-vault'; query: string }
   | { type: 'get-phishing-status'; tabId: number }
-  | { type: 'check-url-security'; url: string };
+  | { type: 'check-url-security'; url: string }
+  | { type: 'get-teams' }
+  | { type: 'get-shared-items' }
+  | { type: 'get-shared-folders' }
+  | { type: 'has-keypair' };
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -232,12 +320,17 @@ async function handleMessage(
         await setSessionToken(loginRes.token);
         await setStoredEmail(email);
 
+        userId = loginRes.user.id;
         // 7. Load vault
         await loadVault(loginRes.token);
 
         // 8. Schedule auto-lock (15 min default)
         scheduleAutoLock(15);
         schedulePeriodSync();
+
+        // 9. Load team data (non-blocking on unlock)
+        loadTeamData(loginRes.token).catch(err =>
+          console.error('[Lockbox] Failed to load team data:', err));
 
         return { success: true };
       } catch (err) {
@@ -487,6 +580,28 @@ async function handleMessage(
       }
     }
 
+    // ─── Teams & Sharing ──────────────────────────────────────────────────
+
+    case 'get-teams': {
+      return { teams };
+    }
+
+    case 'get-shared-items': {
+      const allItems: VaultItem[] = [];
+      for (const items of sharedItems.values()) {
+        allItems.push(...items);
+      }
+      return { items: allItems };
+    }
+
+    case 'get-shared-folders': {
+      return { sharedFolders: sharedFoldersList };
+    }
+
+    case 'has-keypair': {
+      return { hasKeyPair: hasKeyPairFlag };
+    }
+
     default:
       return { error: 'Unknown message type' };
   }
@@ -540,7 +655,7 @@ export default defineBackground(() => {
           const posture = await copilot.evaluate(logins, {});
           await chrome.storage.local.set({ 'copilot-posture': posture });
           
-          if (posture.score < 50 || posture.criticalActions.length > 0) {
+          if (posture.score < 50 || posture.actions.some(a => a.priority === 'critical')) {
             chrome.action.setBadgeText({ text: '!' });
             chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
           } else {

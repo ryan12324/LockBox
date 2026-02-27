@@ -172,18 +172,9 @@ export default function ImportExport() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
+    <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navigate('/settings')}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            ← Back
-          </button>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Import / Export</h1>
-        </div>
+        <h1 className="text-2xl font-bold text-white mb-6">Import / Export</h1>
 
         <div className="space-y-6">
           {/* Import Section */}

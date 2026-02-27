@@ -121,7 +121,7 @@ export default function Health() {
 
   if (loading || analyzing) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6">
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
         <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
         <h2 className="text-xl font-medium text-white mb-2">Analyzing Vault</h2>
         <p className="text-white/60">Checking passwords for vulnerabilities...</p>
@@ -136,27 +136,20 @@ export default function Health() {
   };
 
   return (
-    <div className="min-h-screen p-6 md:p-8 max-w-5xl mx-auto w-full">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => navigate('/vault')}
-            className="w-10 h-10 flex items-center justify-center rounded-lg bg-white/[0.06] border border-white/[0.12] text-white/70 hover:bg-white/[0.1] hover:text-white transition-colors"
-          >
-            ←
-          </button>
+    <div className="flex-1 overflow-y-auto p-6 md:p-8">
+      <div className="max-w-5xl mx-auto w-full">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-sm">
             Security Health
           </h1>
+          <button
+            onClick={loadAndAnalyzeVault}
+            className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            Re-Analyze
+          </button>
         </div>
-        <button
-          onClick={loadAndAnalyzeVault}
-          className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          Re-Analyze
-        </button>
-      </div>
 
       {!summary || summary.totalItems === 0 ? (
         <div className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-12 text-center">
@@ -354,6 +347,7 @@ export default function Health() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

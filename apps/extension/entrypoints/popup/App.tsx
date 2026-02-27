@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { generatePassword, generatePassphrase, evaluateStrength } from '@lockbox/generator';
+import { generatePassword, generatePassphrase, evaluateStrength, detectPasswordRules, generateCompliant } from '@lockbox/generator';
 import { totp as generateTOTP, getRemainingSeconds } from '@lockbox/totp';
 import type {
   VaultItem,
@@ -16,10 +16,10 @@ import type {
 } from '@lockbox/types';
 import { getApiBaseUrl, setApiBaseUrl } from '../../lib/storage.js';
 import { loadFeatureFlags, saveFeatureFlags, getProviderConfig, setProviderConfig, testProviderConnection, SecurityCopilot, LifecycleTracker } from '@lockbox/ai';
-import type { SearchResult, SecurityAlert, RotationSchedule } from '@lockbox/ai';
+import type { SearchResult, SecurityAlert } from '@lockbox/ai';
 import type { PasswordRules, PasswordFieldMetadata } from '@lockbox/generator';
-import type { VaultHealthSummary, PasswordHealthReport, AIFeatureFlags, AIProviderConfig, AIProvider } from '@lockbox/types';
-type Tab = 'site' | 'vault' | 'generator' | 'totp';
+import type { VaultHealthSummary, PasswordHealthReport, AIFeatureFlags, AIProviderConfig, AIProvider, RotationSchedule } from '@lockbox/types';
+type Tab = 'site' | 'vault' | 'shared' | 'generator' | 'totp';
 
 type ViewState =
   | { view: 'tabs' }
@@ -1226,11 +1226,13 @@ function VaultTab({
   folders,
   onSelectItem,
   onAddItem,
+  rotationMap,
 }: {
   items: VaultItem[];
   folders: Folder[];
   onSelectItem: (item: VaultItem) => void;
   onAddItem: () => void;
+  rotationMap?: Map<string, 'overdue' | 'due-soon'>;
 }) {
   const [search, setSearch] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
@@ -1372,6 +1374,111 @@ function VaultTab({
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Shared Tab ───────────────────────────────────────────────────────────────
+
+function SharedTab({
+  sharedItems,
+  sharedFolders,
+  hasKeyPair,
+  onSelectItem,
+}: {
+  sharedItems: VaultItem[];
+  sharedFolders: Array<{ folderId: string; teamId: string; folderName: string; permissionLevel: string }>;
+  hasKeyPair: boolean;
+  onSelectItem: (item: VaultItem) => void;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+
+  async function copyToClipboard(text: string, id: string) {
+    await navigator.clipboard.writeText(text);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  if (!hasKeyPair) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+        <div className="text-3xl mb-3">🔐</div>
+        <p className="text-sm text-white/70 mb-2">Encryption keys not set up</p>
+        <p className="text-xs text-white/40">Set up your key pair in the web vault to access shared items.</p>
+      </div>
+    );
+  }
+
+  if (sharedItems.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+        <div className="text-3xl mb-3">🤝</div>
+        <p className="text-sm text-white/70 mb-2">No shared items</p>
+        <p className="text-xs text-white/40">Items shared with you through teams will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      {sharedItems.map((item) => {
+        const folderName = sharedFolders.find(f => f.folderId === item.folderId)?.folderName;
+        return (
+          <div
+            key={item.id}
+            onClick={() => onSelectItem(item)}
+            className="p-3 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.04] transition-colors"
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <span className="text-sm shrink-0">{typeIcon(item.type)}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 mb-[1px]">
+                    <div className="text-sm font-medium text-white truncate">
+                      {item.name}
+                    </div>
+                    {folderName && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-white/[0.08] text-white/50 shrink-0">
+                        📁 {folderName}
+                      </span>
+                    )}
+                  </div>
+                  {item.type === 'login' && (
+                    <div className="text-xs text-white/50 truncate">
+                      {(item as LoginItem).username}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {item.type === 'login' && (
+                <div className="flex gap-1 shrink-0 ml-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyToClipboard((item as LoginItem).username, `u-${item.id}`);
+                    }}
+                    title="Copy username"
+                    className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${copied === `u-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
+                  >
+                    {copied === `u-${item.id}` ? '✓' : '👤'}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      copyToClipboard((item as LoginItem).password, `p-${item.id}`);
+                    }}
+                    title="Copy password"
+                    className={`px-2 py-1 text-xs rounded transition-colors cursor-pointer ${copied === `p-${item.id}` ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/[0.08] text-white/70 hover:bg-white/[0.14]'}`}
+                  >
+                    {copied === `p-${item.id}` ? '✓' : '🔑'}
+                  </button>
+                </div>
+              )}
+              {item.favorite && <span className="text-xs ml-0.5">⭐</span>}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1715,6 +1822,9 @@ export default function App() {
   const [allItems, setAllItems] = useState<VaultItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [siteItems, setSiteItems] = useState<VaultItem[]>([]);
+  const [sharedItems, setSharedItems] = useState<VaultItem[]>([]);
+  const [sharedFolders, setSharedFolders] = useState<Array<{ folderId: string; teamId: string; folderName: string; permissionLevel: string }>>([]);
+  const [hasKeyPair, setHasKeyPair] = useState(false);
   const [loading, setLoading] = useState(true);
   const [viewState, setViewState] = useState<ViewState>({ view: 'tabs' });
   const [healthScore, setHealthScore] = useState<number | null>(null);
@@ -1764,8 +1874,24 @@ export default function App() {
 
   const loadVault = useCallback(() => {
     if (!unlocked) return;
+    async function loadSharedItems() {
+      try {
+        const [itemsRes, foldersRes, keypairRes] = await Promise.all([
+          sendMessage<{ items: Record<string, VaultItem> }>({ type: 'get-shared-items' }),
+          sendMessage<{ sharedFolders: Array<{ folderId: string; teamId: string; folderName: string; permissionLevel: string }> }>({ type: 'get-shared-folders' }),
+          sendMessage<{ hasKeyPair: boolean }>({ type: 'has-keypair' }),
+        ]);
+        setSharedItems(Object.values(itemsRes.items || {}));
+        setSharedFolders(foldersRes.sharedFolders || []);
+        setHasKeyPair(keypairRes.hasKeyPair);
+      } catch (err) {
+        console.error('Failed to load shared items:', err);
+      }
+    }
+
     sendMessage<{ items: VaultItem[]; folders: Folder[] }>({ type: 'get-vault' })
       .then(async ({ items, folders: f }) => {
+        loadSharedItems();
         setAllItems(items);
         setFolders(f ?? []);
         
@@ -1782,8 +1908,8 @@ export default function App() {
           const due = tracker.getDueItems(logins);
           const map = new Map<string, 'overdue' | 'due-soon'>();
           for (const schedule of due) {
-            if (schedule.status === 'overdue' || schedule.status === 'due-soon') {
-              map.set(schedule.itemId, schedule.status);
+            if (schedule.urgency === 'overdue' || schedule.urgency === 'due-soon') {
+              map.set(schedule.itemId, schedule.urgency);
             }
           }
           setRotationMap(map);
@@ -1809,7 +1935,25 @@ export default function App() {
       const url = tabs[0]?.url;
       if (url) {
         sendMessage<{ items: VaultItem[] }>({ type: 'get-matches', url })
-          .then(({ items }) => setSiteItems(items))
+          .then(async ({ items }) => {
+            try {
+              const { items: sharedRes } = await sendMessage<{ items: Record<string, VaultItem> }>({ type: 'get-shared-items' });
+              const sharedArr = Object.values(sharedRes || {});
+              let hostname = '';
+              try { hostname = new URL(url).hostname; } catch {}
+              const sharedMatches = sharedArr.filter(item => {
+                if (item.type !== 'login') return false;
+                const uris = (item as LoginItem).uris || [];
+                return uris.some(u => {
+                  try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname === hostname; }
+                  catch { return u.includes(hostname); }
+                });
+              });
+              setSiteItems([...items, ...sharedMatches]);
+            } catch {
+              setSiteItems(items);
+            }
+          })
           .catch(console.error);
       }
     });
@@ -1847,7 +1991,25 @@ export default function App() {
       const url = tabs[0]?.url;
       if (url) {
         sendMessage<{ items: VaultItem[] }>({ type: 'get-matches', url })
-          .then(({ items }) => setSiteItems(items))
+          .then(async ({ items }) => {
+            try {
+              const { items: sharedRes } = await sendMessage<{ items: Record<string, VaultItem> }>({ type: 'get-shared-items' });
+              const sharedArr = Object.values(sharedRes || {});
+              let hostname = '';
+              try { hostname = new URL(url).hostname; } catch {}
+              const sharedMatches = sharedArr.filter(item => {
+                if (item.type !== 'login') return false;
+                const uris = (item as LoginItem).uris || [];
+                return uris.some(u => {
+                  try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname === hostname; }
+                  catch { return u.includes(hostname); }
+                });
+              });
+              setSiteItems([...items, ...sharedMatches]);
+            } catch {
+              setSiteItems(items);
+            }
+          })
           .catch(console.error);
       }
     });
@@ -1986,6 +2148,7 @@ export default function App() {
   const tabs: { id: Tab; label: string }[] = [
     { id: 'site', label: '🌐 Site' },
     { id: 'vault', label: '🔒 Vault' },
+    { id: 'shared', label: '🤝 Shared' },
     { id: 'generator', label: '⚡ Gen' },
     { id: 'totp', label: '🔑 TOTP' },
   ];
@@ -2100,6 +2263,14 @@ export default function App() {
       {/* Tab content */}
       <div className="flex-1 overflow-hidden flex flex-col">
         {activeTab === 'site' && <SiteTab items={siteItems} />}
+        {activeTab === 'shared' && (
+          <SharedTab
+            sharedItems={sharedItems}
+            sharedFolders={sharedFolders}
+            hasKeyPair={hasKeyPair}
+            onSelectItem={(item) => setViewState({ view: 'detail', item })}
+          />
+        )}
         {activeTab === 'vault' && (
           <VaultTab
             items={allItems}

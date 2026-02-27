@@ -1,11 +1,9 @@
 import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { generatePassword, generatePassphrase, evaluateStrength } from '@lockbox/generator';
 
 type Tab = 'password' | 'passphrase';
 
 export default function Generator() {
-  const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('password');
 
   // Password options
@@ -50,15 +48,9 @@ export default function Generator() {
   }
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-lg mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(-1)} className="text-white/40 hover:text-white/70">
-            ← Back
-          </button>
-          <h1 className="text-2xl font-bold text-white">Password Generator</h1>
-        </div>
-
+        <h1 className="text-2xl font-bold text-white mb-6">Password Generator</h1>
         <div className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6 space-y-6">
           {/* Tab toggle */}
           <div className="flex rounded-lg bg-white/[0.06] p-1">

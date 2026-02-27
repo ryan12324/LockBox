@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth.js';
 import Register from './pages/Register.js';
 import Login from './pages/Login.js';
 import Unlock from './pages/Unlock.js';
+import ShareView from './pages/ShareView.js';
 import Vault from './pages/Vault.js';
 import Generator from './pages/Generator.js';
 import Settings from './pages/Settings.js';
@@ -11,7 +12,9 @@ import ImportExport from './pages/ImportExport.js';
 import AISettings from './pages/AISettings.js';
 import Health from './pages/Health.js';
 import Chat from './pages/Chat.js';
-
+import AppLayout from './components/AppLayout.js';
+import Teams from './pages/Teams.js';
+import TeamDetail from './pages/TeamDetail.js';
 const AUTO_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -50,55 +53,20 @@ export default function App() {
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
       <Route path="/unlock" element={<Unlock />} />
-      <Route
-        path="/vault"
-        element={
-          <ProtectedRoute>
-            <Vault />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/generator"
-        element={
-          <ProtectedRoute>
-            <Generator />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <Settings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings/import-export"
-        element={
-          <ProtectedRoute>
-            <ImportExport />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/health"
-        element={
-          <ProtectedRoute>
-            <Health />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings/ai"
-        element={
-          <ProtectedRoute>
-            <AISettings />
-          </ProtectedRoute>
-        }
-      />
-            <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+      <Route path="/share/:shareId" element={<ShareView />} />
+      
+      <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+        <Route path="/vault" element={<Vault />} />
+        <Route path="/generator" element={<Generator />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/import-export" element={<ImportExport />} />
+        <Route path="/settings/ai" element={<AISettings />} />
+        <Route path="/health" element={<Health />} />
+        <Route path="/chat" element={<Chat />} />
+        <Route path="/teams" element={<Teams />} />
+        <Route path="/teams/:teamId" element={<TeamDetail />} />
+      </Route>
+      
       <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />
     </Routes>
   );

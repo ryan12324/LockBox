@@ -8,7 +8,7 @@
  */
 
 export type SyncMessage = {
-  type: 'item-changed' | 'item-deleted' | 'sync-required';
+  type: 'item-changed' | 'item-deleted' | 'sync-required' | 'shared-item-changed' | 'shared-item-deleted' | 'folder-shared' | 'folder-unshared' | 'team-changed';
   itemId?: string;
   revisionDate?: string;
 };

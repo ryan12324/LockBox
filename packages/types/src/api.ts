@@ -41,6 +41,7 @@ export interface LoginResponse {
     salt: string; // Base64-encoded
     encryptedUserKey: string; // Base64-encoded — client decrypts with master key
   };
+    hasKeyPair?: boolean;
 }
 
 /**

@@ -219,14 +219,9 @@ export default function AISettings() {
   }
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate(-1)} className="text-white/40 hover:text-white/70">
-            ← Back
-          </button>
-          <h1 className="text-2xl font-bold text-white">AI & Intelligence</h1>
-        </div>
+        <h1 className="text-2xl font-bold text-white mb-6">AI & Intelligence</h1>
 
         <div className="space-y-6">
           {/* Privacy Notice */}

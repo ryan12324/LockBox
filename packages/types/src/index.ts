@@ -59,3 +59,24 @@ export type {
   PasswordRules,
   RotationSchedule,
 } from './ai';
+
+// Team and sharing types
+export type {
+  TeamRole,
+  CustomPermissions,
+  Team,
+  TeamMember,
+  TeamInvite,
+  UserKeyPair,
+  SharedFolder,
+  SharedFolderKey,
+  FolderPermission,
+} from './team';
+
+// Share link types
+export type {
+  ShareLink,
+  ShareLinkCreateRequest,
+  ShareLinkRedeemResponse,
+  ShareLinkMeta,
+} from './sharing';

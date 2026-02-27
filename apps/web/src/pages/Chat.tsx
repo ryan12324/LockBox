@@ -1,9 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useChatStore } from '../store/chat.js';
 
 export default function Chat() {
-  const navigate = useNavigate();
   const {
     messages,
     loading,
@@ -59,18 +57,10 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-screen max-w-4xl mx-auto">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-white/[0.08]">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/vault')}
-            className="p-2 text-white/60 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
-          >
-            ←
-          </button>
-          <h1 className="text-xl font-medium text-white">Assistant</h1>
-        </div>
+        <h1 className="text-xl font-medium text-white">Assistant</h1>
         <button
           onClick={clearMessages}
           className="px-3 py-1.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
@@ -78,7 +68,6 @@ export default function Chat() {
           Clear Chat
         </button>
       </div>
-
       {/* Message area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.length === 0 && (

@@ -18,6 +18,8 @@ export interface SyncResponse {
   deleted: string[];
   folders: SyncFolder[];
   serverTimestamp: string;
+  sharedItems?: SyncVaultItem[];
+  sharedFolders?: SyncSharedFolder[];
 }
 
 /** Encrypted vault item from server */
@@ -36,6 +38,16 @@ export interface SyncFolder {
   id: string;
   name: string;
   parentId?: string;
+  createdAt: string;
+}
+
+/** Shared folder metadata from server */
+export interface SyncSharedFolder {
+  folderId: string;
+  teamId: string;
+  ownerUserId: string;
+  permissionLevel: string;
+  folderName: string;
   createdAt: string;
 }
 
@@ -67,6 +79,7 @@ export interface SyncResult {
   pulled: number;
   conflicts: number;
   timestamp: string;
+  sharedItemsPulled: number;
 }
 
 /**
@@ -238,6 +251,7 @@ export async function performSync(
     pushed,
     pulled,
     conflicts,
+    sharedItemsPulled: (response.sharedItems ?? []).length,
     timestamp: response.serverTimestamp,
   };
 }

@@ -11,6 +11,8 @@ import {
   performSync,
   type SyncResponse,
   type SyncVaultItem,
+  type SyncSharedFolder,
+  type SyncVaultItem,
 } from '../offline/sync-queue';
 import type { StoragePlugin, StoredVaultItem, SyncStatus } from '../plugins/storage';
 
@@ -394,5 +396,81 @@ describe('performSync', () => {
     expect(result.pushed).toBe(0);
     expect(result.pulled).toBe(4); // 2 added + 1 modified + 1 deleted
     expect(result.conflicts).toBe(0);
+  });
+});
+
+// ─── sharedItems / sharedFolders in sync ─────────────────────────────────────
+
+describe('performSync with shared items', () => {
+  it('returns sharedItemsPulled count when server includes shared items', async () => {
+    const storage = makeStoragePlugin({
+      getPendingItems: vi.fn().mockResolvedValue({ items: [] }),
+      getLastSyncTimestamp: vi.fn().mockResolvedValue({ timestamp: null }),
+    });
+
+    const pushFn = vi.fn().mockResolvedValue(undefined);
+    const pullFn = vi.fn().mockResolvedValue({
+      added: [],
+      modified: [],
+      deleted: [],
+      folders: [],
+      sharedItems: [
+        makeSyncItem({ id: 'shared-1' }),
+        makeSyncItem({ id: 'shared-2' }),
+        makeSyncItem({ id: 'shared-3' }),
+      ],
+      sharedFolders: [
+        { folderId: 'f1', teamId: 't1', ownerUserId: 'u1', permissionLevel: 'read_write', folderName: 'Shared', createdAt: '2024-01-01T00:00:00.000Z' } satisfies SyncSharedFolder,
+      ],
+      serverTimestamp: '2024-06-01T00:00:00.000Z',
+    } as SyncResponse);
+
+    const result = await performSync(storage, pushFn, pullFn);
+
+    expect(result.sharedItemsPulled).toBe(3);
+    expect(result.pushed).toBe(0);
+    expect(result.pulled).toBe(0);
+  });
+
+  it('returns 0 sharedItemsPulled when server omits shared items', async () => {
+    const storage = makeStoragePlugin({
+      getPendingItems: vi.fn().mockResolvedValue({ items: [] }),
+      getLastSyncTimestamp: vi.fn().mockResolvedValue({ timestamp: null }),
+    });
+
+    const pushFn = vi.fn().mockResolvedValue(undefined);
+    const pullFn = vi.fn().mockResolvedValue({
+      added: [],
+      modified: [],
+      deleted: [],
+      folders: [],
+      serverTimestamp: '2024-06-01T00:00:00.000Z',
+    } as SyncResponse);
+
+    const result = await performSync(storage, pushFn, pullFn);
+
+    expect(result.sharedItemsPulled).toBe(0);
+  });
+
+  it('returns 0 sharedItemsPulled when sharedItems is empty array', async () => {
+    const storage = makeStoragePlugin({
+      getPendingItems: vi.fn().mockResolvedValue({ items: [] }),
+      getLastSyncTimestamp: vi.fn().mockResolvedValue({ timestamp: null }),
+    });
+
+    const pushFn = vi.fn().mockResolvedValue(undefined);
+    const pullFn = vi.fn().mockResolvedValue({
+      added: [],
+      modified: [],
+      deleted: [],
+      folders: [],
+      sharedItems: [],
+      sharedFolders: [],
+      serverTimestamp: '2024-06-01T00:00:00.000Z',
+    } as SyncResponse);
+
+    const result = await performSync(storage, pushFn, pullFn);
+
+    expect(result.sharedItemsPulled).toBe(0);
   });
 });
