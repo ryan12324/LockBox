@@ -12,7 +12,6 @@ import {
   type SyncResponse,
   type SyncVaultItem,
   type SyncSharedFolder,
-  type SyncVaultItem,
 } from '../offline/sync-queue';
 import type { StoragePlugin, StoredVaultItem, SyncStatus } from '../plugins/storage';
 
