@@ -2795,7 +2795,30 @@ function SettingsView({ onBack }: { onBack: () => void }) {
   const [aliasApiKey, setAliasApiKey] = useState('');
   const [aliasTesting, setAliasTesting] = useState(false);
   const [aliasResult, setAliasResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [lockTimeout, setLockTimeout] = useState(30);
+  const [lockTimeoutSaving, setLockTimeoutSaving] = useState(false);
 
+  // Load current lock timeout on mount
+  useEffect(() => {
+    sendMessage<{ minutes: number }>({ type: 'get-lock-timeout' })
+      .then(res => setLockTimeout(res.minutes))
+      .catch(() => {});
+  }, []);
+
+  async function handleLockTimeoutChange(minutes: number) {
+    setLockTimeout(minutes);
+    setLockTimeoutSaving(true);
+    try {
+      await sendMessage<{ success: boolean }>({ type: 'set-lock-timeout', minutes });
+    } catch {
+      // revert on failure
+      sendMessage<{ minutes: number }>({ type: 'get-lock-timeout' })
+        .then(res => setLockTimeout(res.minutes))
+        .catch(() => {});
+    } finally {
+      setLockTimeoutSaving(false);
+    }
+  }
   async function handleSetup2FA() {
     setTwoFaLoading(true);
     setTwoFaError('');
@@ -2899,8 +2922,34 @@ function SettingsView({ onBack }: { onBack: () => void }) {
         <span className="text-sm font-semibold text-white">⚙️ Settings</span>
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5">
-        {/* 2FA Section */}
+        {/* Auto-Lock Timeout Section */}
         <div>
+          <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-2">⏰ Auto-Lock Timeout</h3>
+          <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-md border border-white/[0.06]">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-white/80 font-medium">Lock after inactivity</div>
+              <div className="text-[10px] text-white/40 mt-0.5">{lockTimeout === 0 ? 'Never auto-lock' : `Locks after ${lockTimeout} min of idle time`}</div>
+            </div>
+            <select
+              value={lockTimeout}
+              onChange={(e) => handleLockTimeoutChange(Number(e.target.value))}
+              disabled={lockTimeoutSaving}
+              className="px-2 py-1.5 border border-white/[0.12] rounded-md bg-white/[0.06] text-white text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/60 cursor-pointer"
+            >
+              <option value={1} className="bg-slate-900">1 min</option>
+              <option value={5} className="bg-slate-900">5 min</option>
+              <option value={15} className="bg-slate-900">15 min</option>
+              <option value={30} className="bg-slate-900">30 min</option>
+              <option value={60} className="bg-slate-900">1 hour</option>
+              <option value={120} className="bg-slate-900">2 hours</option>
+              <option value={240} className="bg-slate-900">4 hours</option>
+              <option value={0} className="bg-slate-900">Never</option>
+            </select>
+          </div>
+        </div>
+
+        {/* 2FA Section */}
+        <div className="border-t border-white/[0.1] pt-4">
           <h3 className="text-xs font-semibold text-white/80 uppercase tracking-wider mb-2">🔐 Two-Factor Authentication</h3>
           {twoFaError && <div className="px-3 py-2 bg-red-500/10 border border-red-400/20 rounded-md text-red-300 text-xs mb-2">{twoFaError}</div>}
           {twoFaSuccess && <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-400/20 rounded-md text-emerald-300 text-xs mb-2">{twoFaSuccess}</div>}

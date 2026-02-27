@@ -181,10 +181,20 @@ const LOCK_ALARM = 'lockbox-auto-lock';
 const SYNC_ALARM = 'lockbox-sync';
 const BREACH_ALARM = 'lockbox-breach-check';
 const COPILOT_ALARM = 'lockbox-copilot';
+const DEFAULT_LOCK_TIMEOUT = 30; // minutes
+const LOCK_TIMEOUT_KEY = 'lockTimeoutMinutes';
 let lastActivity = Date.now();
+/** Read the user-configured lock timeout (minutes). Falls back to 30. */
+async function getLockTimeout(): Promise<number> {
+  const result = await chrome.storage.local.get(LOCK_TIMEOUT_KEY);
+  const val = result[LOCK_TIMEOUT_KEY];
+  return typeof val === 'number' && val >= 0 ? val : DEFAULT_LOCK_TIMEOUT;
+}
 
-function scheduleAutoLock(timeoutMinutes: number) {
-  chrome.alarms.create(LOCK_ALARM, { delayInMinutes: timeoutMinutes });
+async function scheduleAutoLock(): Promise<void> {
+  const timeout = await getLockTimeout();
+  if (timeout === 0) return; // 0 = never lock
+  chrome.alarms.create(LOCK_ALARM, { delayInMinutes: timeout });
 }
 
 function schedulePeriodSync() {
@@ -338,7 +348,9 @@ type Message =
   | { type: 'remove-hardware-key'; keyId: string }
   | { type: 'generate-sync-qr' }
   | { type: 'process-sync-qr'; qrData: string }
-  | { type: 'open-popup' };
+  | { type: 'open-popup' }
+  | { type: 'get-lock-timeout' }
+  | { type: 'set-lock-timeout'; minutes: number };
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -373,8 +385,8 @@ async function handleMessage(
         // 7. Load vault
         await loadVault(loginRes.token);
 
-        // 8. Schedule auto-lock (15 min default)
-        scheduleAutoLock(15);
+        // 8. Schedule auto-lock (user-configured, default 30 min)
+        await scheduleAutoLock();
         schedulePeriodSync();
 
         // 9. Load team data (non-blocking on unlock)
@@ -430,7 +442,7 @@ async function handleMessage(
       lastActivity = Date.now();
       // Reset auto-lock timer
       chrome.alarms.clear(LOCK_ALARM);
-      scheduleAutoLock(15);
+      await scheduleAutoLock();
       return { success: true };
     }
 
@@ -449,6 +461,20 @@ async function handleMessage(
         // Not supported or user gesture not present — silently ignore
       }
       return { success: true };
+    }
+
+    case 'get-lock-timeout': {
+      const currentTimeout = await getLockTimeout();
+      return { minutes: currentTimeout };
+    }
+
+    case 'set-lock-timeout': {
+      const minutes = Math.max(0, Math.round(message.minutes));
+      await chrome.storage.local.set({ [LOCK_TIMEOUT_KEY]: minutes });
+      // Reschedule with new timeout immediately
+      chrome.alarms.clear(LOCK_ALARM);
+      if (userKey) await scheduleAutoLock();
+      return { success: true, minutes };
     }
 
     // ─── Vault item CRUD ───────────────────────────────────────────────────
