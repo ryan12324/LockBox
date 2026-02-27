@@ -196,30 +196,30 @@ describe('generateSyncQR', () => {
 
 describe('processSyncQR', () => {
   it('returns null for invalid JSON', async () => {
-    const result = await processSyncQR({ qrData: 'not-json' });
+    const result = await processSyncQR({ qrData: 'not-json', senderPrivateKey: '' });
     expect(result).toBeNull();
   });
 
   it('returns null for expired payload', async () => {
     const payload = makePayload({ expiresAt: makePastDate(5000) });
-    const result = await processSyncQR({ qrData: JSON.stringify(payload) });
+    const result = await processSyncQR({ qrData: JSON.stringify(payload), senderPrivateKey: '' });
     expect(result).toBeNull();
   });
 
   it('returns null for empty string', async () => {
-    const result = await processSyncQR({ qrData: '' });
+    const result = await processSyncQR({ qrData: '', senderPrivateKey: '' });
     expect(result).toBeNull();
   });
 
   it('returns null for missing ephemeralPublicKey', async () => {
     const payload = { encryptedSessionKey: 'a', nonce: 'b', expiresAt: makeFutureDate(30000) };
-    const result = await processSyncQR({ qrData: JSON.stringify(payload) });
+    const result = await processSyncQR({ qrData: JSON.stringify(payload), senderPrivateKey: '' });
     expect(result).toBeNull();
   });
 
   it('returns null for missing encryptedSessionKey', async () => {
     const payload = { ephemeralPublicKey: 'a', nonce: 'b', expiresAt: makeFutureDate(30000) };
-    const result = await processSyncQR({ qrData: JSON.stringify(payload) });
+    const result = await processSyncQR({ qrData: JSON.stringify(payload), senderPrivateKey: '' });
     expect(result).toBeNull();
   });
 
@@ -229,19 +229,19 @@ describe('processSyncQR', () => {
       encryptedSessionKey: 'b',
       expiresAt: makeFutureDate(30000),
     };
-    const result = await processSyncQR({ qrData: JSON.stringify(payload) });
+    const result = await processSyncQR({ qrData: JSON.stringify(payload), senderPrivateKey: '' });
     expect(result).toBeNull();
   });
 
   it('returns null for missing expiresAt', async () => {
     const payload = { ephemeralPublicKey: 'a', encryptedSessionKey: 'b', nonce: 'c' };
-    const result = await processSyncQR({ qrData: JSON.stringify(payload) });
+    const result = await processSyncQR({ qrData: JSON.stringify(payload), senderPrivateKey: '' });
     expect(result).toBeNull();
   });
 
   it('returns null when decryption fails (wrong keys)', async () => {
     const payload = makePayload({ expiresAt: makeFutureDate(30000) });
-    const result = await processSyncQR({ qrData: JSON.stringify(payload) });
+    const result = await processSyncQR({ qrData: JSON.stringify(payload), senderPrivateKey: '' });
     expect(result).toBeNull();
   });
 });
