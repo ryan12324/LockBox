@@ -333,3 +333,178 @@ export function createIdentitySuggestionDropdown(
 
   return host;
 }
+
+/** Status type for the lock icon dropdown. */
+export type StatusDropdownType = 'locked' | 'no-matches' | 'error';
+
+/** Action a user can take from the status dropdown. */
+export interface StatusDropdownAction {
+  label: string;
+  onClick: () => void;
+}
+
+/**
+ * Create a status dropdown anchored to a field.
+ * Shows messages like "Vault locked" or "No matching logins" with action buttons.
+ * Uses Shadow DOM for style isolation.
+ */
+export function createStatusDropdown(
+  anchorField: HTMLInputElement,
+  type: StatusDropdownType,
+  actions: StatusDropdownAction[],
+): HTMLElement {
+  // Remove any existing status dropdown
+  document.getElementById('lockbox-status-dropdown')?.remove();
+
+  const host = document.createElement('div');
+  host.id = 'lockbox-status-dropdown';
+
+  const rect = anchorField.getBoundingClientRect();
+  host.style.cssText = `
+    position: fixed;
+    left: ${rect.left}px;
+    top: ${rect.bottom + 2}px;
+    z-index: 2147483647;
+    min-width: ${Math.max(rect.width, 240)}px;
+  `;
+
+  const shadow = host.attachShadow({ mode: 'open' });
+
+  const iconMap: Record<StatusDropdownType, string> = {
+    locked: '🔒',
+    'no-matches': '🔍',
+    error: '⚠️',
+  };
+
+  const titleMap: Record<StatusDropdownType, string> = {
+    locked: 'Vault is locked',
+    'no-matches': 'No matching logins',
+    error: 'Something went wrong',
+  };
+
+  const descMap: Record<StatusDropdownType, string> = {
+    locked: 'Unlock Lockbox to autofill this form.',
+    'no-matches': 'No saved credentials match this site.',
+    error: 'Could not connect to Lockbox.',
+  };
+
+  const icon = iconMap[type];
+  const title = titleMap[type];
+  const desc = descMap[type];
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .dropdown {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+    }
+    .header {
+      padding: 6px 12px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 11px;
+      color: #64748b;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .body {
+      padding: 12px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+    .text { flex: 1; min-width: 0; }
+    .title { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
+    .desc { color: #64748b; font-size: 12px; line-height: 1.4; }
+    .actions {
+      padding: 8px 12px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid #e2e8f0;
+      background: white;
+      color: #374151;
+      transition: background 0.15s;
+    }
+    .btn:hover { background: #f1f5f9; }
+    .btn-primary {
+      background: #4f46e5;
+      color: white;
+      border-color: #4f46e5;
+    }
+    .btn-primary:hover { background: #4338ca; }
+  `;
+
+  const dropdown = document.createElement('div');
+  dropdown.className = 'dropdown';
+
+  const headerEl = document.createElement('div');
+  headerEl.className = 'header';
+  headerEl.textContent = '🔐 Lockbox';
+  dropdown.appendChild(headerEl);
+
+  const bodyEl = document.createElement('div');
+  bodyEl.className = 'body';
+  bodyEl.innerHTML = `
+    <span class="icon">${icon}</span>
+    <div class="text">
+      <div class="title">${title}</div>
+      <div class="desc">${desc}</div>
+    </div>
+  `;
+  dropdown.appendChild(bodyEl);
+
+  if (actions.length > 0) {
+    const actionsEl = document.createElement('div');
+    actionsEl.className = 'actions';
+
+    actions.forEach((action, i) => {
+      const btn = document.createElement('button');
+      btn.className = i === actions.length - 1 ? 'btn btn-primary' : 'btn';
+      btn.textContent = action.label;
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        host.remove();
+        action.onClick();
+      });
+      actionsEl.appendChild(btn);
+    });
+
+    dropdown.appendChild(actionsEl);
+  }
+
+  shadow.appendChild(style);
+  shadow.appendChild(dropdown);
+  document.body.appendChild(host);
+
+  // Close on outside click
+  const closeHandler = (e: MouseEvent) => {
+    if (!host.contains(e.target as Node)) {
+      host.remove();
+      document.removeEventListener('click', closeHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeHandler), 0);
+
+  // Auto-dismiss after 10 seconds
+  setTimeout(() => {
+    if (host.parentElement) host.remove();
+  }, 10_000);
+
+  return host;
+}

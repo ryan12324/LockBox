@@ -14,6 +14,7 @@ import {
   createLockIconOverlay,
   createSuggestionDropdown,
   createIdentitySuggestionDropdown,
+  createStatusDropdown,
 } from '../lib/autofill.js';
 import { initSaveDetector } from '../lib/save-detector.js';
 import { getWebAuthnInterceptorScript } from '../lib/webauthn.js';
@@ -25,6 +26,25 @@ const injectedFields = new WeakSet<HTMLInputElement>();
 /** Send a message to the background service worker. */
 async function sendMessage<T>(message: object): Promise<T> {
   return chrome.runtime.sendMessage(message) as Promise<T>;
+}
+
+/** Check whether the vault is currently unlocked. */
+async function isVaultUnlocked(): Promise<boolean> {
+  try {
+    const result = await sendMessage<{ unlocked: boolean }>({ type: 'is-unlocked' });
+    return result.unlocked;
+  } catch {
+    return false;
+  }
+}
+
+/** Open the extension popup (best-effort — chrome.action.openPopup is not always available). */
+function openExtensionPopup(): void {
+  // Content scripts cannot open the popup directly, but we can send a message
+  // to the background to open the popup via chrome.action.openPopup().
+  // As a fallback on browsers that don't support it, we do nothing — the user
+  // can click the toolbar icon.
+  sendMessage({ type: 'open-popup' }).catch(() => {});
 }
 
 /** Get vault items matching the current page URL. */
@@ -50,14 +70,44 @@ async function handleAutofill(
   passwordField: HTMLInputElement,
   usernameField: HTMLInputElement | null,
 ): Promise<void> {
-  const items = await getMatchingItems();
-
-  if (items.length === 0) {
-    // No matches — show a "no matches" tooltip briefly
+  // 1. Check if vault is unlocked
+  const unlocked = await isVaultUnlocked();
+  if (!unlocked) {
+    createStatusDropdown(passwordField, 'locked', [
+      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+    ]);
     return;
   }
 
+  // 2. Get matching items
+  let items: VaultItem[];
+  try {
+    items = await getMatchingItems();
+  } catch {
+    createStatusDropdown(passwordField, 'error', [
+      { label: 'Retry', onClick: () => { handleAutofill(passwordField, usernameField).catch(() => {}); } },
+    ]);
+    return;
+  }
+
+  // 3. No matches — show status dropdown
+  if (items.length === 0) {
+    createStatusDropdown(passwordField, 'no-matches', [
+      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+    ]);
+    return;
+  }
+
+  // 4. Filter to login items
   const loginItems = items.filter((i): i is LoginItem => i.type === 'login');
+
+  if (loginItems.length === 0) {
+    createStatusDropdown(passwordField, 'no-matches', [
+      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+    ]);
+    return;
+  }
+
   let filledItem: LoginItem | null = null;
 
   if (loginItems.length === 1) {
@@ -98,12 +148,34 @@ async function handleAutofill(
 async function handleIdentityAutofill(
   identityForm: import('../lib/form-detector.js').DetectedIdentityForm,
 ): Promise<void> {
-  const identityItems = await getIdentityItems();
-
-  if (identityItems.length === 0) return;
-
   const firstField = Object.values(identityForm.fields)[0];
   if (!firstField) return;
+
+  // Check if vault is unlocked
+  const unlocked = await isVaultUnlocked();
+  if (!unlocked) {
+    createStatusDropdown(firstField, 'locked', [
+      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+    ]);
+    return;
+  }
+
+  let identityItems: IdentityItem[];
+  try {
+    identityItems = await getIdentityItems();
+  } catch {
+    createStatusDropdown(firstField, 'error', [
+      { label: 'Retry', onClick: () => { handleIdentityAutofill(identityForm).catch(() => {}); } },
+    ]);
+    return;
+  }
+
+  if (identityItems.length === 0) {
+    createStatusDropdown(firstField, 'no-matches', [
+      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+    ]);
+    return;
+  }
 
   if (identityItems.length === 1) {
     // Single identity — fill immediately

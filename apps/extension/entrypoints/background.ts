@@ -337,7 +337,8 @@ type Message =
   | { type: 'register-hardware-key' }
   | { type: 'remove-hardware-key'; keyId: string }
   | { type: 'generate-sync-qr' }
-  | { type: 'process-sync-qr'; qrData: string };
+  | { type: 'process-sync-qr'; qrData: string }
+  | { type: 'open-popup' };
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -435,6 +436,19 @@ async function handleMessage(
 
     case 'is-unlocked': {
       return { unlocked: userKey !== null };
+    }
+
+    case 'open-popup': {
+      // chrome.action.openPopup() is available in Chrome 127+ and Firefox.
+      // In older browsers it may not exist, so we gracefully ignore.
+      try {
+        if (chrome.action?.openPopup) {
+          await chrome.action.openPopup();
+        }
+      } catch {
+        // Not supported or user gesture not present — silently ignore
+      }
+      return { success: true };
     }
 
     // ─── Vault item CRUD ───────────────────────────────────────────────────
