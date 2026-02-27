@@ -34,12 +34,14 @@ export default function ShareLinkModal({ item, isOpen, onClose }: ShareLinkModal
         item.name
       );
 
+      const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+
       await api.shareLinks.create(
         {
           id: shareId,
           encryptedItem,
           tokenHash,
-          expiresInSeconds: expiresIn,
+          expiresAt,
           maxViews,
           itemName: item.name,
         },

@@ -144,7 +144,7 @@ export const api = {
 
   // ─── Share Links ─────────────────────────────────────────
   shareLinks: {
-    create: (body: { id: string; encryptedItem: string; tokenHash: string; expiresInSeconds: number; maxViews: number; itemName: string }, token: string) =>
+    create: (body: { id: string; encryptedItem: string; tokenHash: string; expiresAt: string; maxViews: number; itemName: string }, token: string) =>
       request<{ id: string; expiresAt: string; maxViews: number }>('/api/share-links', { method: 'POST', body: JSON.stringify(body), token }),
     redeem: (shareId: string, bearerToken: string) =>
       request<{ encryptedItem: string; viewCount: number; maxViews: number }>(`/api/share-links/${shareId}/redeem`, { token: bearerToken }),
