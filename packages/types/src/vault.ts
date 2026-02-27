@@ -4,7 +4,7 @@
  */
 
 /** Vault item type discriminant */
-export type VaultItemType = 'login' | 'note' | 'card' | 'identity';
+export type VaultItemType = 'login' | 'note' | 'card' | 'identity' | 'passkey';
 
 /**
  * Base vault item with common fields.
@@ -82,6 +82,23 @@ export interface IdentityItem extends VaultItem {
 }
 
 /**
+ * Passkey (WebAuthn credential) item.
+ * Stores a discoverable credential for passwordless authentication.
+ */
+export interface PasskeyItem extends VaultItem {
+  type: 'passkey';
+  rpId: string;          // Relying Party ID (e.g. "github.com")
+  rpName: string;        // Relying Party display name
+  userId: string;        // RP's user ID (base64url)
+  userName: string;      // RP's username
+  credentialId: string;  // Base64url-encoded credential ID
+  publicKey: string;     // Base64url-encoded COSE public key
+  counter: number;       // Signature counter
+  transports: string[];  // e.g. ["internal", "hybrid"]
+  createdAt: string;     // ISO 8601
+}
+
+/**
  * Custom field attached to any vault item.
  * Stored inside encryptedData — never visible to server.
  */
@@ -115,6 +132,7 @@ export interface Folder {
   id: string;
   name: string;
   parentId?: string; // Parent folder ID for nested hierarchies
+  travelSafe?: boolean;  // If true, included in sync when travel mode is enabled
   createdAt: string; // ISO 8601
 }
 

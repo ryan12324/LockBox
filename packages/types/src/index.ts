@@ -5,6 +5,7 @@ export type {
   SecureNoteItem,
   CardItem,
   IdentityItem,
+  PasskeyItem,
   CustomField,
   EncryptedVaultItem,
   Folder,
@@ -36,7 +37,7 @@ export type {
 } from './crypto.js';
 
 // Type guards
-export { isLoginItem, isSecureNoteItem, isCardItem, isIdentityItem } from './guards.js';
+export { isLoginItem, isSecureNoteItem, isCardItem, isIdentityItem, isPasskeyItem } from './guards.js';
 
 // AI types
 export type {
@@ -101,3 +102,11 @@ export type {
   EmailAliasConfig,
   EmailAlias,
 } from './integrations.js';
+
+// Emergency access types
+export type {
+  EmergencyWaitPeriod,
+  EmergencyAccessStatus,
+  EmergencyAccessGrant,
+  EmergencyAccessRequest,
+} from './emergency.js';

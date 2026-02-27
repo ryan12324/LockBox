@@ -1,0 +1,28 @@
+{
+  "name": "@lockbox/cli",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Lockbox CLI — manage your vault from the terminal",
+  "type": "module",
+  "bin": {
+    "lockbox": "./dist/index.js"
+  },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@lockbox/crypto": "workspace:*",
+    "@lockbox/generator": "workspace:*",
+    "@lockbox/types": "workspace:*",
+    "commander": "^13.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "vitest": "^4.0.18",
+    "tsx": "^4.0.0"
+  }
+}
