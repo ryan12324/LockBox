@@ -4,6 +4,8 @@ export type {
   LoginItem,
   SecureNoteItem,
   CardItem,
+  IdentityItem,
+  CustomField,
   EncryptedVaultItem,
   Folder,
   VaultItemType,
@@ -32,7 +34,7 @@ export type {
 } from './crypto';
 
 // Type guards
-export { isLoginItem, isSecureNoteItem, isCardItem } from './guards';
+export { isLoginItem, isSecureNoteItem, isCardItem, isIdentityItem } from './guards';
 
 // AI types
 export type {
@@ -80,3 +82,12 @@ export type {
   ShareLinkRedeemResponse,
   ShareLinkMeta,
 } from './sharing';
+
+// Two-factor authentication types
+export type {
+  TotpTwoFactorSetupResponse,
+  TotpTwoFactorVerifyRequest,
+  TotpTwoFactorVerifyResponse,
+  TotpTwoFactorValidateRequest,
+  BackupCode,
+} from './twofa';

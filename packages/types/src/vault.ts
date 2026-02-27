@@ -4,7 +4,7 @@
  */
 
 /** Vault item type discriminant */
-export type VaultItemType = 'login' | 'note' | 'card';
+export type VaultItemType = 'login' | 'note' | 'card' | 'identity';
 
 /**
  * Base vault item with common fields.
@@ -20,6 +20,7 @@ export interface VaultItem {
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
   revisionDate: string; // ISO 8601 — used for delta sync and AAD binding
+  customFields?: CustomField[];
 }
 
 /**
@@ -55,6 +56,39 @@ export interface CardItem extends VaultItem {
   expYear: string; // YYYY format
   cvv: string; // Card verification value (encrypted on client)
   brand?: string; // Visa, Mastercard, Amex, etc.
+}
+
+/**
+ * Identity item for storing personal information.
+ * Stores name, address, phone, and identification numbers.
+ */
+export interface IdentityItem extends VaultItem {
+  type: 'identity';
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+  company?: string;
+  ssn?: string;
+  passportNumber?: string;
+  licenseNumber?: string;
+}
+
+/**
+ * Custom field attached to any vault item.
+ * Stored inside encryptedData — never visible to server.
+ */
+export interface CustomField {
+  name: string;
+  value: string;
+  type: 'text' | 'hidden' | 'boolean';
 }
 
 /**

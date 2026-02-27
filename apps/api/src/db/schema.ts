@@ -38,7 +38,7 @@ export const vaultItems = sqliteTable('vault_items', {
   userId: text('user_id')
     .notNull()
     .references(() => users.id),
-  type: text('type').notNull(), // 'login' | 'note' | 'card'
+  type: text('type').notNull(), // 'login' | 'note' | 'card' | 'identity'
   encryptedData: text('encrypted_data').notNull(), // opaque base64 blob — server never decrypts
   folderId: text('folder_id').references(() => folders.id),
   tags: text('tags'), // JSON array of strings
@@ -46,6 +46,25 @@ export const vaultItems = sqliteTable('vault_items', {
   revisionDate: text('revision_date').notNull(),
   createdAt: text('created_at').notNull(),
   deletedAt: text('deleted_at'), // null = active, set = soft-deleted
+});
+
+// ─── Account 2FA ────────────────────────────────────────────────────────────
+
+// TOTP settings for account-level 2FA
+export const userTotpSettings = sqliteTable('user_totp_settings', {
+  userId: text('user_id').primaryKey().references(() => users.id),
+  encryptedTotpSecret: text('encrypted_totp_secret').notNull(), // encrypted with auth hash derivative
+  enabled: integer('enabled').notNull().default(0), // 0 = setup pending, 1 = active
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
+});
+
+// Backup codes for 2FA recovery
+export const backupCodes = sqliteTable('backup_codes', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  codeHash: text('code_hash').notNull(), // bcrypt hash of backup code
+  used: integer('used').notNull().default(0), // 0 = unused, 1 = used
+  createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
 
 // ─── Teams & Sharing ───────────────────────────────────────────────────────
