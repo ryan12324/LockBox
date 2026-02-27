@@ -57,6 +57,11 @@ export default function Settings() {
   const [aliasTesting, setAliasTesting] = useState(false);
   const [aliasError, setAliasError] = useState('');
   const [aliasSuccess, setAliasSuccess] = useState('');
+  // Travel mode state
+  const [travelEnabled, setTravelEnabled] = useState(false);
+  const [travelLoading, setTravelLoading] = useState(false);
+  const [travelFolders, setTravelFolders] = useState<Array<{ id: string; name: string; travelSafe: boolean }>>([]);
+  const [showTravelConfirm, setShowTravelConfirm] = useState(false);
   useEffect(() => {
     async function check2FA() {
       if (!session) return;
@@ -108,6 +113,46 @@ export default function Settings() {
       document.documentElement.classList.toggle('dark', prefersDark);
     }
   }, [settings]);
+
+  // Load travel mode
+  useEffect(() => {
+    if (!session) return;
+    api.settings.getTravelMode(session.token)
+      .then((res) => setTravelEnabled(res.enabled))
+      .catch(() => {});
+    api.vault.list(session.token)
+      .then((res: { folders: Array<{ id: string; name: string; travelSafe?: boolean }> }) => {
+        setTravelFolders(res.folders.map((f) => ({
+          id: f.id,
+          name: f.name,
+          travelSafe: f.travelSafe !== false,
+        })));
+      })
+      .catch(() => {});
+  }, [session]);
+
+  async function handleTravelToggle(enabled: boolean) {
+    if (!session) return;
+    setTravelLoading(true);
+    try {
+      await api.settings.setTravelMode(enabled, session.token);
+      setTravelEnabled(enabled);
+    } catch {
+      // revert
+    } finally {
+      setTravelLoading(false);
+    }
+  }
+
+  async function handleFolderTravel(folderId: string, travelSafe: boolean) {
+    if (!session) return;
+    try {
+      await api.vault.setFolderTravel(folderId, travelSafe, session.token);
+      setTravelFolders((prev) => prev.map((f) => f.id === folderId ? { ...f, travelSafe } : f));
+    } catch (err) {
+      console.error('Failed to update folder travel setting:', err);
+    }
+  }
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -535,6 +580,76 @@ export default function Settings() {
                 ))}
               </div>
             </div>
+          </section>
+
+
+          {/* Travel Mode */}
+          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
+            <h2 className="text-lg font-semibold text-white mb-2">🧳 Travel Mode</h2>
+            <p className="text-sm text-white/60 mb-4">
+              When enabled, only folders marked as travel-safe will sync. Non-safe folders and their items are hidden.
+            </p>
+
+            <div className="flex items-center justify-between mb-4 p-3 bg-white/[0.04] rounded-lg">
+              <div>
+                <span className="text-sm font-medium text-white">Enable Travel Mode</span>
+                <p className="text-xs text-white/40">Hide sensitive folders when traveling</p>
+              </div>
+              <button
+                onClick={() => {
+                  if (!travelEnabled) {
+                    setShowTravelConfirm(true);
+                  } else {
+                    handleTravelToggle(false);
+                  }
+                }}
+                disabled={travelLoading}
+                className={`relative w-12 h-6 rounded-full transition-colors ${travelEnabled ? 'bg-indigo-600' : 'bg-white/[0.15]'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${travelEnabled ? 'translate-x-6' : ''}`} />
+              </button>
+            </div>
+
+            {showTravelConfirm && (
+              <div className="mb-4 p-4 bg-orange-500/10 border border-orange-500/30 rounded-lg">
+                <p className="text-sm text-orange-300 mb-3">
+                  ⚠️ Travel mode will hide all non-travel-safe folders and their items from sync. Only safe folders will be accessible.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setShowTravelConfirm(false); handleTravelToggle(true); }}
+                    className="px-3 py-1.5 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-500"
+                  >
+                    Enable
+                  </button>
+                  <button
+                    onClick={() => setShowTravelConfirm(false)}
+                    className="px-3 py-1.5 text-white/60 text-sm hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {travelFolders.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium text-white/70 mb-2">Folder Settings</h3>
+                <div className="space-y-2">
+                  {travelFolders.map((f) => (
+                    <div key={f.id} className="flex items-center justify-between p-2 bg-white/[0.04] rounded-lg">
+                      <span className="text-sm text-white">📁 {f.name}</span>
+                      <button
+                        onClick={() => handleFolderTravel(f.id, !f.travelSafe)}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${f.travelSafe ? 'bg-green-600' : 'bg-white/[0.15]'}`}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${f.travelSafe ? 'translate-x-5' : ''}`} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           {/* About */}

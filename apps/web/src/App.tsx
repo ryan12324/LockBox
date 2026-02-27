@@ -16,6 +16,7 @@ import Chat from './pages/Chat.js';
 import AppLayout from './components/AppLayout.js';
 import Teams from './pages/Teams.js';
 import TeamDetail from './pages/TeamDetail.js';
+import EmergencyAccess from './pages/EmergencyAccess.js';
 const AUTO_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="/chat" element={<Chat />} />
         <Route path="/teams" element={<Teams />} />
         <Route path="/teams/:teamId" element={<TeamDetail />} />
+        <Route path="/emergency-access" element={<EmergencyAccess />} />
       </Route>
       
       <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />

@@ -171,13 +171,19 @@ export default function AppLayout() {
           >
             👥 Teams
           </button>
+          <button
+            onClick={() => navigate('/emergency-access')}
+            className={getNavItemClass(isNavActive('/emergency-access'))}
+          >
+            🛡️ Emergency
+          </button>
 
           <div className="pt-2 pb-1">
             <p className="px-3 text-xs font-semibold text-white/30 uppercase tracking-wider">
               Types
             </p>
           </div>
-          {['login', 'note', 'card', 'identity'].map((type) => (
+          {['login', 'note', 'card', 'identity', 'passkey'].map((type) => (
             <button
               key={type}
               onClick={() => {
@@ -189,7 +195,7 @@ export default function AppLayout() {
               className={`${getNavItemClass(isVaultActive && selectedType === type)} capitalize`}
             >
               {typeIcon(type)}{' '}
-              {type === 'login' ? 'Logins' : type === 'note' ? 'Secure Notes' : type === 'card' ? 'Cards' : 'Identities'}
+              {type === 'login' ? 'Logins' : type === 'note' ? 'Secure Notes' : type === 'card' ? 'Cards' : type === 'identity' ? 'Identities' : 'Passkeys'}
             </button>
           ))}
 

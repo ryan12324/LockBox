@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
 import { encryptVaultItem } from '../lib/crypto.js';
 import { decryptString } from '@lockbox/crypto';
-import type { VaultItem, LoginItem, SecureNoteItem, CardItem, IdentityItem, CustomField, Folder, VaultItemType } from '@lockbox/types';
+import type { VaultItem, LoginItem, SecureNoteItem, CardItem, IdentityItem, PasskeyItem, CustomField, Folder, VaultItemType } from '@lockbox/types';
 import { totp, getRemainingSeconds, base32Decode, parseOtpAuthUri } from '@lockbox/totp';
 import { generatePassword } from '@lockbox/generator';
 import { SecurityAlertEngine } from '@lockbox/ai';
@@ -72,6 +72,15 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
   const [passportNumber, setPassportNumber] = useState(identityItem?.passportNumber || '');
   const [licenseNumber, setLicenseNumber] = useState(identityItem?.licenseNumber || '');
 
+  // Passkey State
+  const passkeyItem = item?.type === 'passkey' ? (item as PasskeyItem) : null;
+  const [rpId, setRpId] = useState(passkeyItem?.rpId || '');
+  const [rpName, setRpName] = useState(passkeyItem?.rpName || '');
+  const [passkeyUserName, setPasskeyUserName] = useState(passkeyItem?.userName || '');
+  const [userDisplayName, setUserDisplayName] = useState(passkeyItem?.userDisplayName || '');
+  const [credentialId, setCredentialId] = useState(passkeyItem?.credentialId || '');
+  const [publicKey, setPublicKey] = useState(passkeyItem?.publicKey || '');
+  const [counter, setCounter] = useState(passkeyItem?.counter || 0);
   // Custom Fields State
   const [customFields, setCustomFields] = useState<CustomField[]>(item?.customFields || []);
 
@@ -310,6 +319,19 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           passportNumber,
           licenseNumber,
         } as IdentityItem;
+      } else if (type === 'passkey') {
+        vaultItem = {
+          ...baseItem,
+          type: 'passkey',
+          rpId,
+          rpName,
+          userName: passkeyUserName,
+          userDisplayName: userDisplayName || undefined,
+          credentialId,
+          publicKey,
+          counter,
+          createdAt: passkeyItem?.createdAt || now,
+        } as PasskeyItem;
       } else {
         vaultItem = {
           ...baseItem,
@@ -376,7 +398,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
     }
   }
 
-  const typeIcon = (t: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛' }[t] ?? '📄');
+  const typeIcon = (t: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️' }[t] ?? '📄');
 
   return (
     <>
@@ -452,7 +474,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
 
           {currentMode === 'add' && (
             <div className="flex bg-white/[0.06] p-1 rounded-lg">
-              {(['login', 'note', 'card', 'identity'] as VaultItemType[]).map((t) => (
+              {(['login', 'note', 'card', 'identity', 'passkey'] as VaultItemType[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
@@ -849,6 +871,47 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   <label className="block text-sm font-medium text-white/70 mb-1">License Number</label>
                   <input type="text" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
                 </div>
+              </div>
+            </div>
+          )}
+
+
+          {/* Passkey Fields - Edit/Add Mode */}
+          {currentMode !== 'view' && type === 'passkey' && (
+            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+              <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Passkey Details</h3>
+              <p className="text-xs text-white/40">Passkeys are typically created by the browser extension. Use this form to import from other managers.</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Relying Party ID *</label>
+                  <input type="text" value={rpId} onChange={(e) => setRpId(e.target.value)} placeholder="example.com" className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Relying Party Name *</label>
+                  <input type="text" value={rpName} onChange={(e) => setRpName(e.target.value)} placeholder="Example" className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">User Name *</label>
+                  <input type="text" value={passkeyUserName} onChange={(e) => setPasskeyUserName(e.target.value)} placeholder="user@example.com" className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Display Name</label>
+                  <input type="text" value={userDisplayName} onChange={(e) => setUserDisplayName(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Credential ID</label>
+                <input type="text" value={credentialId} onChange={(e) => setCredentialId(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono text-xs" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Public Key</label>
+                <textarea value={publicKey} onChange={(e) => setPublicKey(e.target.value)} rows={3} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono text-xs resize-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-white/70 mb-1">Counter</label>
+                <input type="number" value={counter} onChange={(e) => setCounter(Number(e.target.value))} min={0} className="w-32 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
               </div>
             </div>
           )}
@@ -1256,6 +1319,66 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {type === 'passkey' && (
+                <div className="space-y-4">
+                  {rpName && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Relying Party</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <div>
+                          <span className="text-sm font-medium text-white">{rpName}</span>
+                          <span className="text-xs text-white/40 ml-2">{rpId}</span>
+                        </div>
+                        <button onClick={() => copyToClipboard(rpId, 'rpId')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          {copiedField === 'rpId' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {passkeyUserName && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">User</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <div>
+                          <span className="text-sm text-white">{passkeyUserName}</span>
+                          {userDisplayName && <span className="text-xs text-white/40 ml-2">({userDisplayName})</span>}
+                        </div>
+                        <button onClick={() => copyToClipboard(passkeyUserName, 'userName')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          {copiedField === 'userName' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {credentialId && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Credential ID</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-xs font-mono text-white truncate max-w-[300px]">{credentialId}</span>
+                        <button onClick={() => copyToClipboard(credentialId, 'credId')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          {copiedField === 'credId' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Counter</span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm font-mono text-white">{counter}</span>
+                      </div>
+                    </div>
+                    {passkeyItem?.createdAt && (
+                      <div>
+                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Created</span>
+                        <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                          <span className="text-sm text-white">{new Date(passkeyItem.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
