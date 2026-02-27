@@ -1,5 +1,5 @@
 /**
- * Views module barrel exports — vault list, identity detail, custom fields, and trash.
+ * Views module barrel exports — vault list, identity detail, custom fields, trash,
  */
 
 export {
@@ -53,3 +53,52 @@ export {
   getTrashSummary,
 } from './trash.js';
 export type { TrashItem, TrashListItem, TrashAction } from './trash.js';
+
+ export {
+  MAX_VERSIONS,
+  formatRelativeTime,
+  toVersionListItem,
+  processVersionList,
+  getVersionSummary,
+} from './version-history.js';
+export type { ItemVersion, VersionListItem } from './version-history.js';
+
+export {
+  CACHE_EXPIRY_MS,
+  parseTwoFaDirectory,
+  checkSiteAgainstEntries,
+  fetchTwoFaDirectory,
+  extractDomainFromUri,
+  checkLoginItemsFor2fa,
+} from './twofa-detection.js';
+export type { TwoFaEntry, TwoFaCheckResult } from './twofa-detection.js';
+
+export {
+  SIMPLELOGIN_API_BASE,
+  ANONADDY_API_BASE,
+  ALIAS_PROVIDERS,
+  getProviderName,
+  getProviderDocsUrl,
+  isValidAliasConfig,
+  formatAliasEmail,
+} from './email-aliases.js';
+export type { EmailAliasProvider, AliasConfig, GeneratedAlias } from './email-aliases.js';
+
+export {
+  parseOtpAuthUri,
+} from './qr-totp.js';
+export type { OtpAuthParams } from './qr-totp.js';
+
+export {
+  MAX_FILE_SIZE,
+  MAX_TOTAL_QUOTA,
+  formatFileSize,
+  getAttachmentIcon,
+  isImageAttachment,
+  toAttachmentListItem,
+  processAttachmentList,
+  getAttachmentSummary,
+  validateFileSize,
+  validateQuota,
+} from './attachments.js';
+export type { AttachmentListItem, ValidationResult } from './attachments.js';

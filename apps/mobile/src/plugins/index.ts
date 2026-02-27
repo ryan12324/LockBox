@@ -28,3 +28,12 @@ export type {
   StorageTimestampResult,
   SyncStatus,
 } from './storage';
+
+export { QRScanner } from './qr-scanner';
+export type {
+  QRScannerPlugin,
+  QRScanResult,
+  QRScannerAvailabilityResult,
+} from './qr-scanner';
+
+export { encryptFile, decryptFile } from './file-crypto';
