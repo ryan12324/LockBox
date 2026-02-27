@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import dev.lockbox.app.credentialprovider.PasskeyMetadataDao
+import dev.lockbox.app.credentialprovider.PasskeyMetadataEntity
 
 /**
  * VaultDatabase — Room database for encrypted vault item storage.
@@ -15,13 +17,14 @@ import androidx.room.RoomDatabase
  * The encryption/decryption happens in the TypeScript layer using the user key.
  */
 @Database(
-    entities = [VaultItemEntity::class],
-    version = 2,
+    entities = [VaultItemEntity::class, PasskeyMetadataEntity::class],
+    version = 3,
     exportSchema = true
 )
 abstract class VaultDatabase : RoomDatabase() {
 
     abstract fun vaultItemDao(): VaultItemDao
+    abstract fun passkeyMetadataDao(): PasskeyMetadataDao
 
     companion object {
         private const val DATABASE_NAME = "lockbox_vault.db"

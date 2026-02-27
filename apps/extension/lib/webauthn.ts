@@ -89,9 +89,12 @@ export interface SerializedCredential {
   response: {
     clientDataJSON: string; // base64url
     attestationObject?: string; // base64url (create)
-    authenticatorData?: string; // base64url (get)
+    authenticatorData?: string; // base64url (create + get)
     signature?: string; // base64url (get)
     userHandle?: string; // base64url (get)
+    publicKey?: string; // base64url SPKI (create)
+    publicKeyAlgorithm?: number; // -7 for ES256 (create)
+    transports?: string[]; // e.g. ['internal'] (create)
   };
 }
 
@@ -143,8 +146,8 @@ export function createAuthenticatorData(
   credentialId?: Uint8Array,
   publicKeyCOSE?: Uint8Array
 ): Uint8Array {
-  // flags: UP (0x01) | UV (0x04) | AT if attested (0x40)
-  const flags = credentialId ? 0x45 : 0x05; // UP + UV + AT  or  UP + UV
+  // flags: UP (0x01) | UV (0x04) | BE (0x08) | BS (0x10) | AT if attested (0x40)
+  const flags = credentialId ? 0x5d : 0x1d; // UP + UV + BE + BS + AT  or  UP + UV + BE + BS
 
   const counterBuf = new Uint8Array(4);
   new DataView(counterBuf.buffer).setUint32(0, counter, false);
@@ -323,6 +326,40 @@ export async function signChallenge(
   );
 
   return new Uint8Array(signature);
+}
+
+/**
+ * Convert an ECDSA signature from IEEE P1363 format (r || s) to DER/ASN.1.
+ * WebCrypto returns P1363; WebAuthn RPs expect DER.
+ */
+export function p1363ToDer(signature: Uint8Array): Uint8Array {
+  const r = signature.slice(0, 32);
+  const s = signature.slice(32, 64);
+
+  function encodeInteger(bytes: Uint8Array): Uint8Array {
+    let start = 0;
+    while (start < bytes.length - 1 && bytes[start] === 0) start++;
+    const needsPad = bytes[start] >= 0x80;
+    const len = bytes.length - start + (needsPad ? 1 : 0);
+    const result = new Uint8Array(2 + len);
+    result[0] = 0x02; // INTEGER tag
+    result[1] = len;
+    if (needsPad) result[2] = 0x00;
+    result.set(bytes.slice(start), needsPad ? 3 : 2);
+    return result;
+  }
+
+  const rDer = encodeInteger(r);
+  const sDer = encodeInteger(s);
+
+  // SEQUENCE { INTEGER r, INTEGER s }
+  const seqLen = rDer.length + sDer.length;
+  const result = new Uint8Array(2 + seqLen);
+  result[0] = 0x30; // SEQUENCE tag
+  result[1] = seqLen;
+  result.set(rDer, 2);
+  result.set(sDer, 2 + rDer.length);
+  return result;
 }
 
 /**
@@ -587,18 +624,23 @@ export function getWebAuthnInterceptorScript(): string {
   // Deserialize credential response from the extension
   function deserializeCredential(data) {
     if (!data) return null;
+    var isCreate = !!data.response.attestationObject;
     var response = {};
     if (data.response.clientDataJSON) {
       response.clientDataJSON = b64urlToBuf(data.response.clientDataJSON);
     }
     if (data.response.attestationObject) {
       response.attestationObject = b64urlToBuf(data.response.attestationObject);
-      response.getAuthenticatorData = function() { return new Uint8Array(0); };
-      response.getPublicKey = function() { return null; };
-      response.getPublicKeyAlgorithm = function() { return -7; };
-      response.getTransports = function() { return ['internal']; };
+      var authDataBuf = data.response.authenticatorData ? b64urlToBuf(data.response.authenticatorData) : new ArrayBuffer(0);
+      var pubKeyBuf = data.response.publicKey ? b64urlToBuf(data.response.publicKey) : null;
+      var pubKeyAlg = data.response.publicKeyAlgorithm || -7;
+      var transports = data.response.transports || ['internal'];
+      response.getAuthenticatorData = function() { return authDataBuf; };
+      response.getPublicKey = function() { return pubKeyBuf; };
+      response.getPublicKeyAlgorithm = function() { return pubKeyAlg; };
+      response.getTransports = function() { return transports; };
     }
-    if (data.response.authenticatorData) {
+    if (data.response.authenticatorData && !data.response.attestationObject) {
       response.authenticatorData = b64urlToBuf(data.response.authenticatorData);
     }
     if (data.response.signature) {
@@ -614,10 +656,31 @@ export function getWebAuthnInterceptorScript(): string {
       type: data.type || 'public-key',
       authenticatorAttachment: data.authenticatorAttachment || 'platform',
       response: response,
-      getClientExtensionResults: function() { return {}; }
+      getClientExtensionResults: function() {
+        return isCreate ? { credProps: { rk: true } } : {};
+      },
+      toJSON: function() {
+        var json = { id: data.id, rawId: data.rawId, type: data.type || 'public-key' };
+        json.response = {};
+        if (data.response.clientDataJSON) json.response.clientDataJSON = data.response.clientDataJSON;
+        if (data.response.attestationObject) json.response.attestationObject = data.response.attestationObject;
+        if (data.response.authenticatorData) json.response.authenticatorData = data.response.authenticatorData;
+        if (data.response.signature) json.response.signature = data.response.signature;
+        if (data.response.userHandle) json.response.userHandle = data.response.userHandle;
+        return json;
+      }
     };
-    // Make it look like a PublicKeyCredential to duck-typing checks
-    Object.defineProperty(cred, 'constructor', { value: PublicKeyCredential });
+
+    // CRITICAL: Set prototype chain so instanceof checks pass on RP sites
+    if (typeof PublicKeyCredential !== 'undefined') {
+      Object.setPrototypeOf(cred, PublicKeyCredential.prototype);
+      if (isCreate && typeof AuthenticatorAttestationResponse !== 'undefined') {
+        Object.setPrototypeOf(response, AuthenticatorAttestationResponse.prototype);
+      } else if (!isCreate && typeof AuthenticatorAssertionResponse !== 'undefined') {
+        Object.setPrototypeOf(response, AuthenticatorAssertionResponse.prototype);
+      }
+    }
+
     return cred;
   }
 

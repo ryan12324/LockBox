@@ -28,6 +28,7 @@ import {
   hashRpId,
   createAuthenticatorData,
   signChallenge,
+  p1363ToDer,
   buildAttestationObject,
   buildClientDataJSON,
   findMatchingPasskeys,
@@ -328,6 +329,7 @@ type Message =
   | { type: 'generate-alias'; provider?: string; apiKey?: string }
   | { type: 'WEBAUTHN_CREATE'; requestId: string; origin: string; options: SerializedCreationOptions }
   | { type: 'WEBAUTHN_GET'; requestId: string; origin: string; options: SerializedRequestOptions }
+  | { type: 'WEBAUTHN_GET_SELECTED'; credentialId: string; rpId: string; challenge: string; origin: string }
   | { type: 'get-trash' }
   | { type: 'restore-item'; id: string }
   | { type: 'permanent-delete'; id: string }
@@ -351,6 +353,78 @@ type Message =
   | { type: 'open-popup' }
   | { type: 'get-lock-timeout' }
   | { type: 'set-lock-timeout'; minutes: number };
+
+/** Sign a passkey assertion for a specific credentialId. Shared by WEBAUTHN_GET and WEBAUTHN_GET_SELECTED. */
+async function signPasskeyAssertion(
+  credentialId: string,
+  rpId: string,
+  challenge: string,
+  origin: string,
+): Promise<{ credential: SerializedCredential } | { fallback: true }> {
+  // Find the vault item
+  let matchedItem: (PasskeyItem & { privateKey?: string }) | null = null;
+  for (const item of vaultItems.values()) {
+    if (item.type !== 'passkey') continue;
+    const pk = item as PasskeyItem & { privateKey?: string };
+    if (pk.credentialId === credentialId) {
+      matchedItem = pk;
+      break;
+    }
+  }
+  if (!matchedItem?.privateKey) return { fallback: true };
+
+  // Import private key and sign
+  const privKeyBytes = base64urlDecode(matchedItem.privateKey);
+  const privKey = await importPrivateKey(privKeyBytes);
+  const newCounter = matchedItem.counter + 1;
+  matchedItem.counter = newCounter;
+
+  const rpIdHash = await hashRpId(rpId);
+  const authData = createAuthenticatorData(rpIdHash, newCounter);
+  const clientDataJSON = buildClientDataJSON('webauthn.get', challenge, origin);
+  const clientDataHash = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', clientDataJSON.buffer as ArrayBuffer),
+  );
+  const signatureRaw = await signChallenge(privKey, authData, clientDataHash);
+  const signature = p1363ToDer(signatureRaw);
+
+  // Update vault counter
+  const token = await getSessionToken();
+  if (token) {
+    const now = new Date().toISOString();
+    matchedItem.updatedAt = now;
+    matchedItem.revisionDate = now;
+    const encryptedData = await encryptVaultItem(
+      matchedItem as unknown as VaultItem,
+      matchedItem.id,
+      now,
+    );
+    if (encryptedData) {
+      api.vault.updateItem(matchedItem.id, {
+        encryptedData,
+        tags: matchedItem.tags ?? [],
+        favorite: matchedItem.favorite ?? false,
+        revisionDate: now,
+      }, token).catch(() => {});
+    }
+  }
+
+  return {
+    credential: {
+      id: credentialId,
+      rawId: credentialId,
+      type: 'public-key',
+      authenticatorAttachment: 'platform',
+      response: {
+        clientDataJSON: base64urlEncode(clientDataJSON),
+        authenticatorData: base64urlEncode(authData),
+        signature: base64urlEncode(signature),
+        userHandle: matchedItem.userId,
+      },
+    },
+  };
+}
+
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -963,6 +1037,10 @@ async function handleMessage(
           response: {
             clientDataJSON: base64urlEncode(clientDataJSON),
             attestationObject: base64urlEncode(attestationObject),
+            authenticatorData: base64urlEncode(authData),
+            publicKey: base64urlEncode(publicKeySPKI),
+            publicKeyAlgorithm: -7,
+            transports: ['internal'],
           },
         };
 
@@ -1006,87 +1084,37 @@ async function handleMessage(
 
         if (matches.length === 0) return { fallback: true };
 
-        // Use the first matching passkey
+        // If multiple matches and no specific allowCredentials, ask content script to pick
+        if (matches.length > 1 && (!getOpts.allowCredentials || getOpts.allowCredentials.length === 0)) {
+          return {
+            selectPasskey: true,
+            matches: matches.map((m) => ({
+              credentialId: m.credentialId,
+              userName: m.userName,
+              userDisplayName: m.userDisplayName,
+              rpName: m.rpName,
+            })),
+            // Pass through context needed for signing after selection
+            _context: { rpId, origin, challenge: getOpts.challenge },
+          };
+        }
+
+        // Single match (or allowCredentials specified) — sign directly
         const match = matches[0];
-
-        // Find the vault item to get the private key
-        let matchedItem: (PasskeyItem & { privateKey?: string }) | null = null;
-        for (const item of vaultItems.values()) {
-          if (item.type !== 'passkey') continue;
-          const pk = item as PasskeyItem & { privateKey?: string };
-          if (pk.credentialId === match.credentialId) {
-            matchedItem = pk;
-            break;
-          }
-        }
-
-        if (!matchedItem?.privateKey) return { fallback: true };
-
-        // Import the private key
-        const privKeyBytes = base64urlDecode(matchedItem.privateKey);
-        const privKey = await importPrivateKey(privKeyBytes);
-
-        // Increment counter
-        const newCounter = match.counter + 1;
-        matchedItem.counter = newCounter;
-
-        // Build authenticator data (assertion — no attested cred data)
-        const rpIdHash = await hashRpId(rpId);
-        const authData = createAuthenticatorData(rpIdHash, newCounter);
-
-        // Build clientDataJSON
-        const clientDataJSON = buildClientDataJSON(
-          'webauthn.get',
-          getOpts.challenge,
-          origin,
-        );
-
-        // Hash clientDataJSON for signing
-        const clientDataHash = new Uint8Array(
-          await crypto.subtle.digest('SHA-256', clientDataJSON.buffer as ArrayBuffer),
-        );
-
-        // Sign
-        const signature = await signChallenge(privKey, authData, clientDataHash);
-
-        // Update the vault item counter
-        const token = await getSessionToken();
-        if (token) {
-          const now = new Date().toISOString();
-          matchedItem.updatedAt = now;
-          matchedItem.revisionDate = now;
-          const encryptedData = await encryptVaultItem(
-            matchedItem as unknown as VaultItem,
-            matchedItem.id,
-            now,
-          );
-          if (encryptedData) {
-            api.vault.updateItem(matchedItem.id, {
-              encryptedData,
-              tags: matchedItem.tags ?? [],
-              favorite: matchedItem.favorite ?? false,
-              revisionDate: now,
-            }, token).catch(() => {});
-          }
-        }
-
-        // Build the credential response
-        const credential: SerializedCredential = {
-          id: match.credentialId,
-          rawId: match.credentialId,
-          type: 'public-key',
-          authenticatorAttachment: 'platform',
-          response: {
-            clientDataJSON: base64urlEncode(clientDataJSON),
-            authenticatorData: base64urlEncode(authData),
-            signature: base64urlEncode(signature),
-            userHandle: matchedItem.userId,
-          },
-        };
-
-        return { credential };
+        return signPasskeyAssertion(match.credentialId, rpId, getOpts.challenge, origin);
       } catch (err) {
         console.error('[Lockbox] WebAuthn get failed:', err);
+        return { fallback: true };
+      }
+    }
+
+    case 'WEBAUTHN_GET_SELECTED': {
+      if (!userKey) return { fallback: true };
+      try {
+        const { credentialId, rpId, challenge, origin } = message;
+        return signPasskeyAssertion(credentialId, rpId, challenge, origin);
+      } catch (err) {
+        console.error('[Lockbox] WebAuthn get-selected failed:', err);
         return { fallback: true };
       }
     }

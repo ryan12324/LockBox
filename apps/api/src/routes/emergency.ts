@@ -99,7 +99,16 @@ emergencyRoutes.get('/requests', async (c) => {
   if (!user) return c.json({ error: 'User not found' }, 404);
 
   const grants = await db
-    .select()
+    .select({
+      id: emergencyAccessGrants.id,
+      grantorUserId: emergencyAccessGrants.grantorUserId,
+      granteeEmail: emergencyAccessGrants.granteeEmail,
+      granteeUserId: emergencyAccessGrants.granteeUserId,
+      waitPeriodDays: emergencyAccessGrants.waitPeriodDays,
+      status: emergencyAccessGrants.status,
+      createdAt: emergencyAccessGrants.createdAt,
+      updatedAt: emergencyAccessGrants.updatedAt,
+    })
     .from(emergencyAccessGrants)
     .where(eq(emergencyAccessGrants.granteeEmail, user.email));
 

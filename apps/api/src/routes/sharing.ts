@@ -164,6 +164,28 @@ sharingRoutes.post('/folders/:folderId/keys', async (c) => {
     return c.json({ error: 'No permission to grant keys for this folder' }, 403);
   }
 
+  // Verify target user belongs to a team this folder is shared with (or owns the folder)
+  const targetTeamAccess = await db
+    .select({ teamId: teamMembers.teamId })
+    .from(teamMembers)
+    .innerJoin(sharedFolders, and(
+      eq(sharedFolders.teamId, teamMembers.teamId),
+      eq(sharedFolders.folderId, folderId)
+    ))
+    .where(eq(teamMembers.userId, targetUserId))
+    .get();
+
+  const isTargetFolderOwner = await db
+    .select({ id: folders.id })
+    .from(folders)
+    .where(and(eq(folders.id, folderId), eq(folders.userId, targetUserId)))
+    .get();
+
+  if (!targetTeamAccess && !isTargetFolderOwner) {
+    return c.json({ error: 'Target user is not a member of any team this folder is shared with' }, 403);
+  }
+
+
   // Upsert key for target user
   const existing = await db
     .select()

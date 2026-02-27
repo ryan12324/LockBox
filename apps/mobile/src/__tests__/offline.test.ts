@@ -178,14 +178,13 @@ describe('mergeSyncResponse', () => {
 
     const result = await mergeSyncResponse(storage, response);
 
-    expect(storage.upsertItem).toHaveBeenCalledOnce();
-    const upsertCall = vi.mocked(storage.upsertItem).mock.calls[0][0];
-    expect(upsertCall.id).toBe('item-1');
-    expect(upsertCall.syncStatus).toBe('synced');
+    expect(storage.batchUpsert).toHaveBeenCalledOnce();
+    const batchCall = vi.mocked(storage.batchUpsert).mock.calls[0][0];
+    expect(batchCall.items[0].id).toBe('item-1');
+    expect(batchCall.items[0].syncStatus).toBe('synced');
     expect(result.pulled).toBe(1);
     expect(result.conflicts).toBe(0);
   });
-
   it('detects conflict when local item has pending changes', async () => {
     const storage = makeStoragePlugin({
       getItem: vi.fn().mockResolvedValue({
@@ -204,9 +203,8 @@ describe('mergeSyncResponse', () => {
 
     // Server still wins, but conflict is counted
     expect(result.conflicts).toBe(1);
-    expect(storage.upsertItem).toHaveBeenCalledOnce();
+    expect(storage.batchUpsert).toHaveBeenCalledOnce();
   });
-
   it('deletes items from local storage', async () => {
     const storage = makeStoragePlugin();
     const response: SyncResponse = {

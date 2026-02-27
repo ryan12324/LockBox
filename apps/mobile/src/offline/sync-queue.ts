@@ -100,7 +100,7 @@ export function buildPushPayload(pendingItems: StoredVaultItem[]): PushPayload {
           encryptedData: item.encryptedData,
           folderId: item.folderId,
           tags: item.tags.length > 0 ? item.tags : undefined,
-          favorite: item.favorite || undefined,
+          favorite: item.favorite ? true : undefined,
           revisionDate: item.revisionDate,
         });
         break;
@@ -110,7 +110,7 @@ export function buildPushPayload(pendingItems: StoredVaultItem[]): PushPayload {
           encryptedData: item.encryptedData,
           folderId: item.folderId,
           tags: item.tags.length > 0 ? item.tags : undefined,
-          favorite: item.favorite || undefined,
+          favorite: item.favorite ? true : undefined,
           revisionDate: item.revisionDate,
         });
         break;
@@ -154,28 +154,36 @@ export async function mergeSyncResponse(
     pulled += response.added.length;
   }
 
-  // Process modified items — check for conflicts then overwrite
-  for (const serverItem of response.modified) {
-    const localResult = await storage.getItem({ id: serverItem.id });
-    const localItem = localResult.item;
+  // Process modified items — check for conflicts then batch overwrite
+  if (response.modified.length > 0) {
+    // Parallel conflict detection: fetch all local items at once
+    const localResults = await Promise.all(
+      response.modified.map((item) => storage.getItem({ id: item.id }))
+    );
 
-    if (localItem && localItem.syncStatus !== 'synced') {
-      // Conflict: local has pending changes, server also modified
-      // Resolution: server wins (last-write-wins)
-      conflicts++;
+    for (let i = 0; i < response.modified.length; i++) {
+      const localItem = localResults[i].item;
+      if (localItem && localItem.syncStatus !== 'synced') {
+        // Conflict: local has pending changes, server also modified
+        // Resolution: server wins (last-write-wins)
+        conflicts++;
+      }
     }
 
-    await storage.upsertItem({
-      id: serverItem.id,
-      encryptedData: serverItem.encryptedData,
-      type: serverItem.type,
-      folderId: serverItem.folderId,
-      tags: serverItem.tags,
-      favorite: serverItem.favorite,
-      revisionDate: serverItem.revisionDate,
-      syncStatus: 'synced',
+    // Batch upsert all modified items as synced
+    await storage.batchUpsert({
+      items: response.modified.map((serverItem) => ({
+        id: serverItem.id,
+        encryptedData: serverItem.encryptedData,
+        type: serverItem.type,
+        folderId: serverItem.folderId,
+        tags: serverItem.tags,
+        favorite: serverItem.favorite,
+        revisionDate: serverItem.revisionDate,
+        syncStatus: 'synced' as SyncStatus,
+      })),
     });
-    pulled++;
+    pulled += response.modified.length;
   }
 
   // Process deleted items — remove from local

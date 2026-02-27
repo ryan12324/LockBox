@@ -4,7 +4,7 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and, gt, isNotNull } from 'drizzle-orm';
+import { eq, and, gt, isNotNull, or } from 'drizzle-orm';
 import { createDb } from '../db/index.js';
 import { vaultItems, folders, users, sharedFolders, sharedFolderKeys, teamMembers } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -99,7 +99,7 @@ syncRoutes.get('/', async (c) => {
   const changedItems = await db
     .select()
     .from(vaultItems)
-    .where(and(eq(vaultItems.userId, userId), gt(vaultItems.revisionDate, since)));
+    .where(and(eq(vaultItems.userId, userId), or(gt(vaultItems.revisionDate, since), gt(vaultItems.deletedAt, since))));
 
   const userFolders = await db.select().from(folders).where(eq(folders.userId, userId));
 
@@ -262,10 +262,10 @@ syncRoutes.post('/push', async (c) => {
 
       await db
         .update(vaultItems)
-        .set({ deletedAt: now, revisionDate: now })
+        .set({ deletedAt: now })
         .where(eq(vaultItems.id, change.itemId));
 
-      results.push({ itemId: change.itemId, status: 'ok', serverRevisionDate: now });
+      results.push({ itemId: change.itemId, status: 'ok', serverRevisionDate: existing.revisionDate });
     }
   }
 
@@ -383,10 +383,10 @@ syncRoutes.post('/push-shared', async (c) => {
 
       await db
         .update(vaultItems)
-        .set({ deletedAt: now, revisionDate: now })
+        .set({ deletedAt: now })
         .where(eq(vaultItems.id, change.itemId));
 
-      results.push({ itemId: change.itemId, status: 'ok', serverRevisionDate: now });
+      results.push({ itemId: change.itemId, status: 'ok', serverRevisionDate: existing.revisionDate });
     }
   }
 

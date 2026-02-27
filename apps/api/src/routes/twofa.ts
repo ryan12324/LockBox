@@ -133,7 +133,7 @@ twofaRoutes.post('/verify', authMiddleware, async (c) => {
   // Generate 8 backup codes
   const plainCodes: string[] = [];
   for (let i = 0; i < 8; i++) {
-    const bytes = crypto.getRandomValues(new Uint8Array(4));
+    const bytes = crypto.getRandomValues(new Uint8Array(8));
     const hex = Array.from(bytes)
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('');
@@ -202,6 +202,12 @@ twofaRoutes.post('/disable', authMiddleware, async (c) => {
 // ─── POST /validate ───────────────────────────────────────────────────────────
 
 twofaRoutes.post('/validate', async (c) => {
+  const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
+  if (c.env?.AUTH_LIMITER) {
+    const { success } = await c.env.AUTH_LIMITER.limit({ key: ip });
+    if (!success) return c.json({ error: 'Too many requests' }, 429);
+  }
+
   const body = await c.req.json().catch(() => null);
   if (!body) return c.json({ error: 'Invalid JSON' }, 400);
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { deriveKey, decryptUserKey, makeAuthHash, fromBase64 } from '@lockbox/crypto';
+import { deriveKey, decryptUserKey, makeAuthHash, fromBase64, toBase64 } from '@lockbox/crypto';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../store/auth.js';
 import type { KdfConfig } from '@lockbox/types';
@@ -22,6 +22,7 @@ export default function Login() {
 
   // Hardware Key unlock state
   const [hwKeyLoading, setHwKeyLoading] = useState(false);
+  const [qrScanning, setQrScanning] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,7 +144,7 @@ export default function Login() {
     try {
       // Step 1: Get challenge from server
       const challengeRes = await api.hardwareKey.challenge('', '');
-      const challengeBytes = Uint8Array.from(atob(challengeRes.challenge), (c) => c.charCodeAt(0));
+      const challengeBytes = fromBase64(challengeRes.challenge);
 
       // Step 2: Authenticate with hardware key
       const assertion = await navigator.credentials.get({
@@ -156,7 +157,7 @@ export default function Login() {
       if (!assertion) throw new Error('Authentication cancelled');
 
       const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
-      const signature = btoa(String.fromCharCode(...new Uint8Array(assertionResponse.signature)));
+      const signature = toBase64(new Uint8Array(assertionResponse.signature));
 
       // Step 3: Verify signature and get session
       const verifyRes = await api.hardwareKey.verify({
@@ -166,7 +167,7 @@ export default function Login() {
       });
 
       // Step 4: Unwrap master key and set session
-      const wrappedKeyBytes = Uint8Array.from(atob(verifyRes.wrappedMasterKey), (c) => c.charCodeAt(0));
+      const wrappedKeyBytes = fromBase64(verifyRes.wrappedMasterKey);
       const meRes = await api.auth.me(verifyRes.token) as {
         user: {
           id: string;
@@ -196,6 +197,160 @@ export default function Login() {
       }
     } finally {
       setHwKeyLoading(false);
+    }
+  }
+
+  async function handleQRScan() {
+    setError('');
+    setQrScanning(true);
+
+    // Capacitor injects window.Capacitor in the native WebView at runtime
+    const cap = (window as unknown as Record<string, unknown>).Capacitor as
+      | { isNativePlatform(): boolean; isPluginAvailable(name: string): boolean; nativePromise(plugin: string, method: string, opts: Record<string, unknown>): Promise<Record<string, unknown>> }
+      | undefined;
+
+    if (!cap?.isNativePlatform()) {
+      setError('QR scanning is only available in the mobile app. Open Settings \u2192 Device Sync on your existing device to generate a QR code.');
+      setQrScanning(false);
+      return;
+    }
+
+    if (!cap.isPluginAvailable('QRScanner')) {
+      setError('QR scanner plugin is not available on this device.');
+      setQrScanning(false);
+      return;
+    }
+
+    try {
+      // Check camera availability
+      const availResult = await cap.nativePromise('QRScanner', 'isAvailable', {}) as { available: boolean };
+      if (!availResult.available) {
+        setError('Camera not available. Please grant camera permission in your device settings.');
+        return;
+      }
+
+      // Launch the native QR scanner (CameraX + ML Kit)
+      const scanResult = await cap.nativePromise('QRScanner', 'scanQRCode', {}) as { value: string; format: string };
+
+      // Parse QR sync payload
+      let payload: { ephemeralPublicKey?: string; encryptedSessionKey?: string; nonce?: string; expiresAt?: string };
+      try {
+        payload = JSON.parse(scanResult.value);
+      } catch {
+        setError('Invalid QR code. Please scan a Lockbox device sync QR code.');
+        return;
+      }
+
+      // Validate QR sync payload structure
+      if (!payload.ephemeralPublicKey || !payload.encryptedSessionKey || !payload.nonce || !payload.expiresAt) {
+        setError('Invalid QR code format. Please scan a Lockbox device sync QR code from Settings \u2192 Device Sync.');
+        return;
+      }
+
+      // Check expiry
+      if (new Date(payload.expiresAt).getTime() < Date.now()) {
+        setError('QR code has expired. Please generate a new one from Settings \u2192 Device Sync.');
+        return;
+      }
+
+      // Decode the encrypted session data
+      // The sender encrypted with ECDH self-derived key; the session data contains { sessionToken, userKey }
+      const dotIdx = payload.encryptedSessionKey.indexOf('.');
+      if (dotIdx === -1) {
+        setError('Malformed QR payload. Please generate a new QR code.');
+        return;
+      }
+
+      // Attempt ECDH decryption with the embedded key material
+      // The QR payload uses ECDH P-256; derive shared secret from the ephemeral public key
+      const publicKeyBytes = fromBase64(payload.ephemeralPublicKey);
+      const receiverKeyPair = await crypto.subtle.generateKey(
+        { name: 'ECDH', namedCurve: 'P-256' },
+        true,
+        ['deriveBits']
+      );
+      const receiverPubBuf = await crypto.subtle.exportKey('spki', receiverKeyPair.publicKey);
+
+      // Import sender's public key
+      const senderPubKey = await crypto.subtle.importKey(
+        'spki',
+        publicKeyBytes as Uint8Array<ArrayBuffer>,
+        { name: 'ECDH', namedCurve: 'P-256' },
+        false,
+        []
+      );
+
+      // Derive shared secret via ECDH
+      const rawBits = await crypto.subtle.deriveBits(
+        { name: 'ECDH', public: senderPubKey },
+        receiverKeyPair.privateKey,
+        256
+      );
+      const ikm = await crypto.subtle.importKey('raw', rawBits, { name: 'HKDF' }, false, ['deriveBits']);
+      const info = new TextEncoder().encode('lockbox-device-sync');
+      const derivedBits = await crypto.subtle.deriveBits(
+        { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32) as Uint8Array<ArrayBuffer>, info: info as Uint8Array<ArrayBuffer> },
+        ikm,
+        256
+      );
+      const sharedSecret = new Uint8Array(derivedBits);
+
+      // Decrypt session data: format is base64(iv).base64(ciphertext+tag)
+      const iv = fromBase64(payload.encryptedSessionKey.slice(0, dotIdx));
+      const ciphertext = fromBase64(payload.encryptedSessionKey.slice(dotIdx + 1));
+      const decKey = await crypto.subtle.importKey(
+        'raw',
+        sharedSecret as Uint8Array<ArrayBuffer>,
+        { name: 'AES-GCM' },
+        false,
+        ['decrypt']
+      );
+      const plaintext = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: iv as Uint8Array<ArrayBuffer> },
+        decKey,
+        ciphertext as Uint8Array<ArrayBuffer>
+      );
+      const sessionData = JSON.parse(new TextDecoder().decode(plaintext)) as {
+        sessionToken: string;
+        userKey: string;
+      };
+
+      // Establish session with the decrypted credentials
+      const userKeyBytes = fromBase64(sessionData.userKey);
+      const meRes = await api.auth.me(sessionData.sessionToken) as {
+        user: {
+          id: string;
+          email: string;
+          kdfConfig: KdfConfig;
+          salt: string;
+          encryptedUserKey: string;
+        };
+      };
+
+      setSession({
+        token: sessionData.sessionToken,
+        userId: meRes.user.id,
+        email: meRes.user.email,
+        encryptedUserKey: meRes.user.encryptedUserKey,
+        kdfConfig: meRes.user.kdfConfig,
+        salt: meRes.user.salt,
+      });
+      setKeys(userKeyBytes, userKeyBytes);
+      navigate('/vault');
+    } catch (err) {
+      if (err instanceof Error) {
+        if (err.message.includes('permission') || err.message.includes('Permission')) {
+          setError('Camera permission denied. Please grant camera access in your device settings.');
+        } else if (err.name === 'OperationError') {
+          setError('Could not decrypt QR payload. The QR code may have been generated by a different device or session.');
+        } else {
+          setError(err.message || 'QR scan failed. Please try again.');
+        }
+      } else {
+        setError('QR scan failed. Please try again.');
+      }
+    } finally {
+      setQrScanning(false);
     }
   }
 
@@ -327,10 +482,12 @@ export default function Login() {
               </button>
               <button
                 type="button"
-                onClick={() => setError('Scan the QR code shown in Settings \u2192 Device Sync on your existing device')}
-                className="w-full py-2 text-sm text-indigo-300 hover:text-indigo-200 hover:underline text-center"
+                onClick={handleQRScan}
+                disabled={qrScanning}
+                className="w-full py-2.5 px-4 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 font-medium rounded-lg transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
               >
-                📱 Scan QR Code
+                <span>📱</span>
+                {qrScanning ? 'Scanning...' : 'Scan QR Code'}
               </button>
             </div>
           </form>

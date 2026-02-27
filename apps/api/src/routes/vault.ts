@@ -63,6 +63,16 @@ vaultRoutes.post('/items', async (c) => {
   const now = new Date().toISOString();
   const id = (clientId as string) || crypto.randomUUID();
 
+  // Verify folder ownership if folderId provided (prevent IDOR data injection)
+  if (folderId && typeof folderId === 'string') {
+    const folder = await db
+      .select({ id: folders.id })
+      .from(folders)
+      .where(and(eq(folders.id, folderId), eq(folders.userId, userId)))
+      .get();
+    if (!folder) return c.json({ error: 'Folder not found' }, 404);
+  }
+
   await db.insert(vaultItems).values({
     id,
     userId,
@@ -165,7 +175,7 @@ vaultRoutes.delete('/items/:id', async (c) => {
   const now = new Date().toISOString();
   await db
     .update(vaultItems)
-    .set({ deletedAt: now, revisionDate: now })
+    .set({ deletedAt: now })
     .where(eq(vaultItems.id, itemId));
 
   return c.json({ success: true });
@@ -188,7 +198,7 @@ vaultRoutes.post('/items/:id/restore', async (c) => {
   const now = new Date().toISOString();
   await db
     .update(vaultItems)
-    .set({ deletedAt: null, revisionDate: now })
+    .set({ deletedAt: null })
     .where(eq(vaultItems.id, itemId));
 
   const item = await db.select().from(vaultItems).where(eq(vaultItems.id, itemId)).get();
@@ -250,6 +260,16 @@ vaultRoutes.post('/folders', async (c) => {
   const db = createDb(c.env.DB);
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+
+  // Verify parent folder ownership if parentId provided (prevent IDOR)
+  if (parentId && typeof parentId === 'string') {
+    const parent = await db
+      .select({ id: folders.id })
+      .from(folders)
+      .where(and(eq(folders.id, parentId as string), eq(folders.userId, userId)))
+      .get();
+    if (!parent) return c.json({ error: 'Parent folder not found' }, 404);
+  }
 
   await db.insert(folders).values({
     id,

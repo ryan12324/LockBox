@@ -9,6 +9,7 @@
  */
 
 import { registerPlugin } from '@capacitor/core';
+import { toBase64, fromBase64 } from '@lockbox/crypto';
 
 /** Options for creating a new passkey */
 export interface PasskeyCreationOptions {
@@ -75,7 +76,8 @@ export async function isCredentialManagerAvailable(): Promise<boolean> {
   try {
     const result = await CredentialManager.isAvailable();
     return result.available;
-  } catch {
+  } catch (err) {
+    console.error('Credential Manager: availability check failed', err);
     return false;
   }
 }
@@ -124,7 +126,8 @@ export async function getStoredPasskeys(rpId?: string): Promise<StoredPasskeyInf
   try {
     const result = await CredentialManager.getStoredPasskeys(rpId ? { rpId } : undefined);
     return result.passkeys;
-  } catch {
+  } catch (err) {
+    console.error('Credential Manager: failed to get stored passkeys', err);
     return [];
   }
 }
@@ -149,23 +152,14 @@ export function base64urlToUint8Array(base64url: string): Uint8Array {
   if (pad === 2) base64 += '==';
   else if (pad === 3) base64 += '=';
 
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
+  return fromBase64(base64);
 }
 
 /**
  * Encode a Uint8Array to a base64url string (no padding).
  */
 export function uint8ArrayToBase64url(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return toBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**

@@ -426,25 +426,116 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
 }
 
 
+/**
+ * Show a Shadow DOM passkey picker when multiple passkeys match a WebAuthn request.
+ * Returns the selected passkey or null if the user dismisses.
+ */
+function showPasskeyPicker(
+  passkeys: Array<{ credentialId: string; userName: string; userDisplayName: string; rpName: string }>
+): Promise<{ credentialId: string } | null> {
+  return new Promise((resolve) => {
+    const host = document.createElement('div');
+    host.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;`;
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = `
+      <style>
+        .overlay { position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+        .modal { background:white;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);max-width:380px;width:90%;overflow:hidden; }
+        .modal-header { padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px; }
+        .modal-header svg { width:20px;height:20px;color:#6366f1;flex-shrink:0; }
+        .modal-title { font-size:15px;font-weight:600;color:#1e293b; }
+        .modal-subtitle { font-size:12px;color:#64748b;margin-top:2px; }
+        .passkey-list { max-height:240px;overflow-y:auto; }
+        .passkey-item { padding:12px 20px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:12px;transition:background 0.1s; }
+        .passkey-item:last-child { border-bottom:none; }
+        .passkey-item:hover { background:#f0f9ff; }
+        .passkey-icon { width:32px;height:32px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px; }
+        .passkey-info { min-width:0; }
+        .passkey-name { font-size:14px;font-weight:500;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .passkey-detail { font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .cancel-btn { width:100%;padding:12px;border:none;background:#f8fafc;color:#64748b;font-size:13px;cursor:pointer;border-top:1px solid #e2e8f0; }
+        .cancel-btn:hover { background:#f1f5f9;color:#475569; }
+      </style>
+      <div class="overlay">
+        <div class="modal">
+          <div class="modal-header">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7A5 5 0 0 1 7 7h2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            <div>
+              <div class="modal-title">Choose a passkey</div>
+              <div class="modal-subtitle">Sign in to ${passkeys[0]?.rpName || 'this site'}</div>
+            </div>
+          </div>
+          <div class="passkey-list"></div>
+          <button class="cancel-btn">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    const listEl = shadow.querySelector('.passkey-list')!;
+    for (const pk of passkeys) {
+      const item = document.createElement('div');
+      item.className = 'passkey-item';
+      item.innerHTML = `
+        <div class="passkey-icon">🔑</div>
+        <div class="passkey-info">
+          <div class="passkey-name">${pk.userDisplayName || pk.userName}</div>
+          <div class="passkey-detail">${pk.userName}</div>
+        </div>
+      `;
+      item.addEventListener('click', () => {
+        host.remove();
+        resolve({ credentialId: pk.credentialId });
+      });
+      listEl.appendChild(item);
+    }
+
+    shadow.querySelector('.cancel-btn')!.addEventListener('click', () => {
+      host.remove();
+      resolve(null);
+    });
+
+    shadow.querySelector('.overlay')!.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) {
+        host.remove();
+        resolve(null);
+      }
+    });
+
+    document.documentElement.appendChild(host);
+  });
+}
+
+
 /** WXT content script export. */
 export default defineContentScript({
   matches: ['<all_urls>'],
-  runAt: 'document_idle',
+  runAt: 'document_start',
 
   main() {
-    // Initial scan for login + identity forms
-    injectOverlays();
-
-    // Initialize save-on-submit detection
-    initSaveDetector();
-
-    // ─── WebAuthn interceptor injection ──────────────────────────────────────
+    // ─── WebAuthn interceptor injection (MUST run before page scripts) ────────
     // Inject interceptor script into page context so it can override
     // navigator.credentials.create() and navigator.credentials.get().
+    // This runs at document_start to ensure override is in place before
+    // any page script can save a reference to the original methods.
     const interceptorScript = document.createElement('script');
     interceptorScript.textContent = getWebAuthnInterceptorScript();
-    document.documentElement.appendChild(interceptorScript);
+    (document.head || document.documentElement).appendChild(interceptorScript);
     interceptorScript.remove();
+
+    // ─── DOM-dependent features (deferred until DOM is ready) ─────────────────
+    function initDomFeatures() {
+      // Initial scan for login + identity forms
+      injectOverlays();
+      // Initialize save-on-submit detection
+      initSaveDetector();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initDomFeatures);
+    } else {
+      initDomFeatures();
+    }
+
 
     // Listen for WebAuthn messages from the injected page script
     window.addEventListener('message', async (event: MessageEvent) => {
@@ -483,12 +574,46 @@ export default defineContentScript({
             credential?: object;
             error?: string;
             fallback?: boolean;
+            selectPasskey?: boolean;
+            matches?: Array<{ credentialId: string; userName: string; userDisplayName: string; rpName: string }>;
+            _context?: { rpId: string; origin: string; challenge: string };
           }>({
             type: 'WEBAUTHN_GET',
             requestId: event.data.requestId,
             origin: event.data.origin,
             options: event.data.options,
           });
+
+          // If multiple passkeys match, show a picker for the user to select
+          if (result.selectPasskey && result.matches && result._context) {
+            const selected = await showPasskeyPicker(result.matches);
+            if (!selected) {
+              window.postMessage({
+                type: 'lockbox-webauthn-response',
+                requestId: event.data.requestId,
+                fallback: true,
+              }, '*');
+              return;
+            }
+            // Sign with the selected passkey
+            const signResult = await sendMessage<{
+              credential?: object;
+              fallback?: boolean;
+            }>({
+              type: 'WEBAUTHN_GET_SELECTED',
+              credentialId: selected.credentialId,
+              rpId: result._context.rpId,
+              challenge: result._context.challenge,
+              origin: result._context.origin,
+            });
+            window.postMessage({
+              type: 'lockbox-webauthn-response',
+              requestId: event.data.requestId,
+              ...signResult,
+            }, '*');
+            return;
+          }
+
           window.postMessage({
             type: 'lockbox-webauthn-response',
             requestId: event.data.requestId,

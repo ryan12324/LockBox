@@ -14,6 +14,16 @@ type Variables = { userId: string };
 
 export const shareLinkRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
+/** Constant-time string comparison to prevent timing attacks. */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 // ─── POST / — Create share link (auth required) ─────────────────────────────
 
 shareLinkRoutes.post('/', authMiddleware, async (c) => {
@@ -82,7 +92,7 @@ shareLinkRoutes.get('/:id/redeem', async (c) => {
   const link = await db.select().from(shareLinks).where(eq(shareLinks.id, linkId)).get();
 
   if (!link) return c.json({ error: 'Share link not found' }, 404);
-  if (link.tokenHash !== tokenHash) return c.json({ error: 'Invalid token' }, 401);
+  if (!timingSafeEqual(link.tokenHash, tokenHash)) return c.json({ error: 'Invalid token' }, 401);
 
   const now = new Date().toISOString();
   if (link.expiresAt < now) return c.json({ error: 'Share link expired' }, 410);

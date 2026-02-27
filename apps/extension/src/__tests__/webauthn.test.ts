@@ -13,6 +13,7 @@ import {
   generatePasskeyKeyPair,
   importPrivateKey,
   signChallenge,
+  p1363ToDer,
   spkiToCOSE,
   buildAttestationObject,
   buildClientDataJSON,
@@ -101,20 +102,20 @@ describe('createAuthenticatorData', () => {
     expect(data.slice(0, 32)).toEqual(rpIdHash);
   });
 
-  it('sets UP + UV flags (0x05) for assertion', () => {
+  it('sets UP + UV + BE + BS flags (0x1d) for assertion', () => {
     const rpIdHash = new Uint8Array(32);
     const data = createAuthenticatorData(rpIdHash, 0);
-    // flags at byte 32: UP (0x01) | UV (0x04) = 0x05
-    expect(data[32]).toBe(0x05);
+    // flags at byte 32: UP (0x01) | UV (0x04) | BE (0x08) | BS (0x10) = 0x1d
+    expect(data[32]).toBe(0x1d);
   });
 
-  it('sets UP + UV + AT flags (0x45) for attestation', () => {
+  it('sets UP + UV + BE + BS + AT flags (0x5d) for attestation', () => {
     const rpIdHash = new Uint8Array(32);
     const credId = new Uint8Array(16).fill(0xcc);
     const pubKey = new Uint8Array(10).fill(0xdd);
     const data = createAuthenticatorData(rpIdHash, 0, credId, pubKey);
-    // flags at byte 32: UP (0x01) | UV (0x04) | AT (0x40) = 0x45
-    expect(data[32]).toBe(0x45);
+    // flags at byte 32: UP (0x01) | UV (0x04) | BE (0x08) | BS (0x10) | AT (0x40) = 0x5d
+    expect(data[32]).toBe(0x5d);
   });
 
   it('encodes counter as big-endian uint32', () => {
@@ -420,6 +421,103 @@ describe('getWebAuthnInterceptorScript', () => {
     const script = getWebAuthnInterceptorScript();
     expect(script.trimStart().startsWith('(function()')).toBe(true);
     expect(script.trimEnd().endsWith('})();')).toBe(true);
+  });
+});
+
+// ─── P1363 to DER conversion ─────────────────────────────────────────────────
+
+describe('p1363ToDer', () => {
+  it('converts 64-byte P1363 to DER format', () => {
+    // Construct a known P1363 signature (r || s, each 32 bytes)
+    const r = new Uint8Array(32).fill(0x01);
+    const s = new Uint8Array(32).fill(0x02);
+    const p1363 = new Uint8Array(64);
+    p1363.set(r, 0);
+    p1363.set(s, 32);
+
+    const der = p1363ToDer(p1363);
+
+    // DER: 0x30 <len> 0x02 <rLen> <r> 0x02 <sLen> <s>
+    expect(der[0]).toBe(0x30); // SEQUENCE tag
+    expect(der[2]).toBe(0x02); // INTEGER tag for r
+  });
+
+  it('pads with 0x00 when high bit is set', () => {
+    // r with high bit set (0x80)
+    const r = new Uint8Array(32);
+    r[0] = 0x80;
+    r.fill(0x01, 1);
+    const s = new Uint8Array(32).fill(0x02);
+    const p1363 = new Uint8Array(64);
+    p1363.set(r, 0);
+    p1363.set(s, 32);
+
+    const der = p1363ToDer(p1363);
+
+    // r INTEGER should have leading 0x00 pad
+    const rLen = der[3];
+    expect(rLen).toBe(33); // 32 + 1 padding byte
+    expect(der[4]).toBe(0x00); // padding
+    expect(der[5]).toBe(0x80); // first byte of r
+  });
+
+  it('strips leading zeros from r and s', () => {
+    const r = new Uint8Array(32);
+    r[0] = 0x00;
+    r[1] = 0x00;
+    r[2] = 0x42;
+    r.fill(0x01, 3);
+    const s = new Uint8Array(32).fill(0x03);
+    const p1363 = new Uint8Array(64);
+    p1363.set(r, 0);
+    p1363.set(s, 32);
+
+    const der = p1363ToDer(p1363);
+
+    // r should be stripped to 30 bytes (removed 2 leading zeros)
+    const rLen = der[3];
+    expect(rLen).toBe(30);
+    expect(der[4]).toBe(0x42);
+  });
+
+  it('produces verifiable signatures when used with signChallenge', async () => {
+    const { publicKeySPKI, privateKeyPKCS8 } = await generatePasskeyKeyPair();
+    const privKey = await importPrivateKey(privateKeyPKCS8);
+
+    const authData = new Uint8Array(37).fill(0x01);
+    const clientDataHash = new Uint8Array(32).fill(0x02);
+
+    // signChallenge returns P1363 format
+    const p1363Sig = await signChallenge(privKey, authData, clientDataHash);
+    expect(p1363Sig.length).toBe(64);
+
+    // Convert to DER
+    const derSig = p1363ToDer(p1363Sig);
+    expect(derSig[0]).toBe(0x30); // SEQUENCE
+    expect(derSig.length).toBeGreaterThanOrEqual(68); // minimum DER size for P-256
+    expect(derSig.length).toBeLessThanOrEqual(72); // maximum DER size for P-256
+  });
+});
+
+// ─── Interceptor script prototype chain ──────────────────────────────────────
+
+describe('getWebAuthnInterceptorScript security', () => {
+  it('sets Object.setPrototypeOf for instanceof checks', () => {
+    const script = getWebAuthnInterceptorScript();
+    expect(script).toContain('Object.setPrototypeOf');
+    expect(script).toContain('PublicKeyCredential.prototype');
+    expect(script).toContain('AuthenticatorAttestationResponse.prototype');
+    expect(script).toContain('AuthenticatorAssertionResponse.prototype');
+  });
+
+  it('includes toJSON method on credentials', () => {
+    const script = getWebAuthnInterceptorScript();
+    expect(script).toContain('toJSON');
+  });
+
+  it('includes credProps extension results for create', () => {
+    const script = getWebAuthnInterceptorScript();
+    expect(script).toContain('credProps');
   });
 });
 

@@ -68,6 +68,16 @@ function sessionExpiry(): string {
   return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 }
 
+/** Constant-time string comparison to prevent timing attacks. */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
 // ─── GET /kdf-params ─────────────────────────────────────────────────────────
 
 authRoutes.get('/kdf-params', async (c) => {
@@ -81,10 +91,17 @@ authRoutes.get('/kdf-params', async (c) => {
 
   // Always return 200 — don't reveal whether email exists (timing-safe: same response shape)
   if (!user) {
-    // Return default KDF params for unknown emails (prevents email enumeration)
+    // Derive deterministic fake salt to prevent email enumeration
+    // (same email always returns same fake salt — indistinguishable from real)
+    const fakeBytes = new TextEncoder().encode('lockbox-fake-salt:' + email.toLowerCase());
+    const fakeHash = await crypto.subtle.digest('SHA-256', fakeBytes);
+    const fakeArray = new Uint8Array(fakeHash);
+    let binary = '';
+    for (let i = 0; i < fakeArray.length; i++) binary += String.fromCharCode(fakeArray[i]);
+
     return c.json({
       kdfConfig: { type: 'argon2id', iterations: 3, memory: 65536, parallelism: 4 },
-      salt: btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))),
+      salt: btoa(binary),
     });
   }
 
@@ -180,7 +197,7 @@ authRoutes.post('/login', async (c) => {
   const serverHash = await hashAuthHash(authHash, email);
 
   // Constant-time comparison
-  if (serverHash !== user.authHash) {
+  if (!timingSafeEqual(serverHash, user.authHash)) {
     return c.json({ error: 'Invalid credentials' }, 401);
   }
   // Check if user has 2FA enabled
@@ -293,7 +310,7 @@ authRoutes.post('/change-password', authMiddleware, async (c) => {
 
   // Verify current auth hash
   const currentServerHash = await hashAuthHash(currentAuthHash as string, user.email);
-  if (currentServerHash !== user.authHash) {
+  if (!timingSafeEqual(currentServerHash, user.authHash)) {
     return c.json({ error: 'Invalid current password' }, 401);
   }
 

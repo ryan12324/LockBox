@@ -4,17 +4,25 @@
 
 import { createMiddleware } from 'hono/factory';
 
-type Env = { Bindings: { CORS_ORIGINS?: string } };
+type Env = { Bindings: { CORS_ORIGINS?: string; EXTENSION_IDS?: string } };
 
 function parseAllowedOrigins(envValue?: string): string[] {
   if (!envValue) return [];
   return envValue.split(',').map((o) => o.trim()).filter(Boolean);
 }
 
-function isAllowedOrigin(origin: string, allowedOrigins: string[]): boolean {
+function isAllowedOrigin(origin: string, allowedOrigins: string[], extensionIds: string[]): boolean {
   if (allowedOrigins.includes(origin)) return true;
-  if (origin.startsWith('chrome-extension://')) return true;
-  if (origin.startsWith('moz-extension://')) return true;
+  if (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://')) {
+    // If extension IDs are configured, validate against them
+    if (extensionIds.length > 0) {
+      return extensionIds.some((id) =>
+        origin === `chrome-extension://${id}` || origin === `moz-extension://${id}`
+      );
+    }
+    // No extension IDs configured — accept all extensions (backward-compatible)
+    return true;
+  }
   return false;
 }
 
@@ -22,8 +30,9 @@ function isAllowedOrigin(origin: string, allowedOrigins: string[]): boolean {
 export const corsMiddleware = createMiddleware<Env>(async (c, next) => {
   const origin = c.req.header('Origin') ?? '';
   const allowedOrigins = parseAllowedOrigins(c.env.CORS_ORIGINS);
+  const extensionIds = parseAllowedOrigins(c.env.EXTENSION_IDS);
 
-  if (isAllowedOrigin(origin, allowedOrigins)) {
+  if (isAllowedOrigin(origin, allowedOrigins, extensionIds)) {
     c.header('Access-Control-Allow-Origin', origin);
     c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     c.header('Access-Control-Allow-Headers', 'Authorization, Content-Type');

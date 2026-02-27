@@ -8,6 +8,7 @@ import dev.lockbox.app.biometric.BiometricPlugin;
 import dev.lockbox.app.qrscanner.QRScannerPlugin;
 import dev.lockbox.app.autofill.AutofillPlugin;
 import dev.lockbox.app.storage.StoragePlugin;
+import dev.lockbox.app.credentialprovider.CredentialManagerPlugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -16,6 +17,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(QRScannerPlugin.class);
         registerPlugin(AutofillPlugin.class);
         registerPlugin(StoragePlugin.class);
+        registerPlugin(CredentialManagerPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

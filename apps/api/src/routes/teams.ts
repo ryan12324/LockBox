@@ -6,7 +6,7 @@
 import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
 import { createDb } from '../db/index.js';
-import { teams, teamMembers, teamInvites, users } from '../db/schema.js';
+import { teams, teamMembers, teamInvites, users, sharedFolders, sharedFolderKeys } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requireTeamRole } from '../middleware/team-auth.js';
 
@@ -190,6 +190,12 @@ teamRoutes.post('/:id/invite', requireTeamRole('admin'), async (c) => {
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days
 
+
+  // Prevent inviting with owner role
+  if (typeof role === 'string' && role === 'owner') {
+    return c.json({ error: 'Cannot assign owner role via invite' }, 403);
+  }
+
   await db.insert(teamInvites).values({
     id: inviteId,
     teamId,
@@ -224,6 +230,31 @@ teamRoutes.delete('/:id/members/:userId', requireTeamRole('admin'), async (c) =>
     .delete(teamMembers)
     .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, targetUserId)));
 
+  // Revoke shared folder keys for removed user (only for folders with no remaining team access)
+  const teamSharedFolders = await db
+    .select({ folderId: sharedFolders.folderId })
+    .from(sharedFolders)
+    .where(eq(sharedFolders.teamId, teamId));
+
+  for (const sf of teamSharedFolders) {
+    // Check if user still has access through another team
+    const remainingAccess = await db
+      .select({ folderId: sharedFolders.folderId })
+      .from(sharedFolders)
+      .innerJoin(teamMembers, and(
+        eq(teamMembers.teamId, sharedFolders.teamId),
+        eq(teamMembers.userId, targetUserId)
+      ))
+      .where(eq(sharedFolders.folderId, sf.folderId))
+      .get();
+
+    if (!remainingAccess) {
+      await db.delete(sharedFolderKeys)
+        .where(and(eq(sharedFolderKeys.folderId, sf.folderId), eq(sharedFolderKeys.userId, targetUserId)));
+    }
+  }
+
+
   return c.json({ success: true });
 });
 
@@ -251,6 +282,9 @@ teamRoutes.put('/:id/members/:userId/role', requireTeamRole('admin'), async (c) 
 
   if (!target) return c.json({ error: 'Member not found' }, 404);
   if (target.role === 'owner') return c.json({ error: 'Cannot change the owner role' }, 403);
+  if (role === 'owner') {
+    return c.json({ error: 'Cannot assign owner role. Transfer ownership instead.' }, 403);
+  }
 
   await db
     .update(teamMembers)

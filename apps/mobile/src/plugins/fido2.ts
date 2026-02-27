@@ -13,8 +13,8 @@
  */
 
 import { registerPlugin } from '@capacitor/core';
+import { fromBase64, toBase64 } from '@lockbox/crypto';
 import type {
-  HardwareKeyConfig,
   HardwareKeySetupRequest,
   HardwareKeyChallengeResponse,
 } from '@lockbox/types';
@@ -121,8 +121,11 @@ export async function wrapMasterKey(
   publicKeyBase64: string
 ): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
+  // SECURITY TODO: Deriving wrapping key from public key is insecure — public key is stored server-side.
+  // The server should gate wrappingKey release behind FIDO2 authentication.
+  // Proper fix requires FIDO2 PRF/hmac-secret extension for hardware-bound key derivation.
   // Derive a wrapping key from the FIDO2 public key via HKDF
-  const publicKeyBytes = base64ToUint8Array(publicKeyBase64);
+  const publicKeyBytes = fromBase64(publicKeyBase64);
   const ikm = await crypto.subtle.importKey('raw', publicKeyBytes as Uint8Array<ArrayBuffer>, { name: 'HKDF' }, false, [
     'deriveBits',
   ]);
@@ -131,7 +134,9 @@ export async function wrapMasterKey(
     {
       name: 'HKDF',
       hash: 'SHA-256',
-      salt: new Uint8Array(32) as Uint8Array<ArrayBuffer>,
+      salt: new Uint8Array([
+        0x7d, 0x4e, 0x2f, 0xa1, 0xb8, 0x63, 0xc5, 0x09, 0xd7, 0x3a, 0xf6, 0x81, 0xe4, 0x52, 0x9b, 0x0c, 0x6f, 0xd8, 0x13, 0xa7, 0x45, 0xbe, 0x29, 0xf0, 0x8c, 0x57, 0xe3, 0x1a, 0x94, 0x6b, 0xd2, 0x48,
+      ]) as Uint8Array<ArrayBuffer>,
       info: info as Uint8Array<ArrayBuffer>,
     },
     ikm,
@@ -150,7 +155,7 @@ export async function wrapMasterKey(
     masterKey as Uint8Array<ArrayBuffer>
   );
   // Return as base64(iv).base64(ciphertext+tag)
-  return `${uint8ArrayToBase64(iv)}.${uint8ArrayToBase64(new Uint8Array(ciphertext))}`;
+  return `${toBase64(iv)}.${toBase64(new Uint8Array(ciphertext))}`;
 }
 
 // ─── API Integration ──────────────────────────────────────────────────────────
@@ -189,14 +194,22 @@ export async function setupHardwareKey(options: {
     attestation: registration.attestation,
   };
 
-  const response = await fetch(`${apiUrl}/api/auth/hardware-key/setup`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}/api/auth/hardware-key/setup`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error(`Hardware key setup failed: ${response.status}`);
@@ -220,9 +233,17 @@ export async function unlockWithHardwareKey(options: {
   const { apiUrl, keyId } = options;
 
   // 1. Get challenge from API
-  const challengeResponse = await fetch(
-    `${apiUrl}/api/auth/hardware-key/challenge?keyId=${encodeURIComponent(keyId)}`
-  );
+  const challengeController = new AbortController();
+  const challengeTimeout = setTimeout(() => challengeController.abort(), 30_000);
+  let challengeResponse: Response;
+  try {
+    challengeResponse = await fetch(
+      `${apiUrl}/api/auth/hardware-key/challenge?keyId=${encodeURIComponent(keyId)}`,
+      { signal: challengeController.signal }
+    );
+  } finally {
+    clearTimeout(challengeTimeout);
+  }
   if (!challengeResponse.ok) {
     throw new Error(`Failed to get challenge: ${challengeResponse.status}`);
   }
@@ -236,15 +257,23 @@ export async function unlockWithHardwareKey(options: {
   });
 
   // 3. Verify with API
-  const verifyResponse = await fetch(`${apiUrl}/api/auth/hardware-key/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      keyId,
-      signature: authResult.signature,
-      challenge: challengeData.challenge,
-    }),
-  });
+  const verifyController = new AbortController();
+  const verifyTimeout = setTimeout(() => verifyController.abort(), 30_000);
+  let verifyResponse: Response;
+  try {
+    verifyResponse = await fetch(`${apiUrl}/api/auth/hardware-key/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        keyId,
+        signature: authResult.signature,
+        challenge: challengeData.challenge,
+      }),
+      signal: verifyController.signal,
+    });
+  } finally {
+    clearTimeout(verifyTimeout);
+  }
 
   if (!verifyResponse.ok) {
     throw new Error(`Hardware key verification failed: ${verifyResponse.status}`);
@@ -265,9 +294,17 @@ export async function unlockWithHardwareKey(options: {
  * List all hardware keys registered for the current user.
  */
 export async function listHardwareKeys(apiUrl: string, token: string): Promise<HardwareKeyInfo[]> {
-  const response = await fetch(`${apiUrl}/api/auth/hardware-key/list`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}/api/auth/hardware-key/list`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to list hardware keys: ${response.status}`);
@@ -285,33 +322,21 @@ export async function removeHardwareKey(
   token: string,
   keyId: string
 ): Promise<void> {
-  const response = await fetch(`${apiUrl}/api/auth/hardware-key/${encodeURIComponent(keyId)}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}/api/auth/hardware-key/${encodeURIComponent(keyId)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to remove hardware key: ${response.status}`);
   }
 }
 
-// ─── Utility functions ────────────────────────────────────────────────────────
-
-/** Convert a base64 string to Uint8Array */
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
-/** Convert a Uint8Array to base64 string */
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}

@@ -90,6 +90,9 @@ dependencies {
     implementation 'androidx.room:room-ktx:2.6.1'
     kapt 'androidx.room:room-compiler:2.6.1'
 
+    // Credential Manager (passkey provider — Android 14+)
+    implementation 'androidx.credentials:credentials:1.5.0-alpha05'
+
     // Security — encrypted SharedPreferences for biometric key storage
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
 

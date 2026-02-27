@@ -23,10 +23,10 @@
  * 1. POST /api/auth/2fa/disable → { disabled: true }
  */
 
-/** API base URL — injected from environment */
-const API_BASE =
-  typeof globalThis !== 'undefined' && 'VITE_API_URL' in (globalThis as Record<string, unknown>)
-    ? String((globalThis as Record<string, unknown>).VITE_API_URL)
+/** API base URL — read from Vite env at build time */
+const API_BASE: string =
+  typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL
+    ? String(import.meta.env.VITE_API_URL)
     : '';
 
 /** 2FA challenge returned by login when 2FA is required */
@@ -140,6 +140,9 @@ export function toggleBackupCodeMode(state: TwoFactorLoginState): TwoFactorLogin
 
 // ─── API Functions ────────────────────────────────────────────────────────────
 
+/** Request timeout in milliseconds (30 seconds) */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 /** Internal fetch helper for 2FA endpoints */
 async function twoFactorRequest<T>(
   path: string,
@@ -149,12 +152,31 @@ async function twoFactorRequest<T>(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (options.token) headers['Authorization'] = `Bearer ${options.token}`;
 
-  const res = await fetch(`${base}${path}`, {
-    method: options.method,
-    headers,
-    body: options.body,
-  });
-  const data: unknown = await res.json().catch(() => ({}));
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method: options.method,
+      headers,
+      body: options.body,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  // Parse JSON safely — non-JSON responses (e.g. HTML error pages) fall back to statusText
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    if (!res.ok) {
+      throw new TwoFactorError(res.status, res.statusText);
+    }
+    throw new TwoFactorError(res.status, 'Invalid JSON response from server');
+  }
 
   if (!res.ok) {
     const errorMsg = (data as Record<string, unknown>).error;

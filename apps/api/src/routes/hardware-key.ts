@@ -160,11 +160,64 @@ hardwareKeyRoutes.post('/verify', async (c) => {
   // Clean up used challenge
   challengeStore.delete(challengeId);
 
-  // For now: accept any signature (actual WebAuthn verification is client-side)
-  // Look up hardware key to get wrapped master key
+  // Look up hardware key to verify signature and get wrapped master key
   const db = createDb(c.env.DB);
   const hwKey = await db.select().from(hardwareKeys).where(eq(hardwareKeys.id, keyId)).get();
   if (!hwKey) return c.json({ error: 'Hardware key not found' }, 404);
+
+  // Verify signature against stored public key (ECDSA P-256 or RSA-PKCS1)
+  try {
+    const pubKeyBinary = atob(hwKey.publicKey);
+    const pubKeyBytes = new Uint8Array(pubKeyBinary.length);
+    for (let i = 0; i < pubKeyBinary.length; i++) pubKeyBytes[i] = pubKeyBinary.charCodeAt(i);
+
+    const sigBinary = atob(signature);
+    const sigBytes = new Uint8Array(sigBinary.length);
+    for (let i = 0; i < sigBinary.length; i++) sigBytes[i] = sigBinary.charCodeAt(i);
+
+    const challengeBinary = atob(stored.challenge);
+    const challengeBytes = new Uint8Array(challengeBinary.length);
+    for (let i = 0; i < challengeBinary.length; i++) challengeBytes[i] = challengeBinary.charCodeAt(i);
+
+    let valid = false;
+    try {
+      // Try ECDSA P-256 (FIDO2 / ES256)
+      const ecKey = await crypto.subtle.importKey(
+        'spki',
+        pubKeyBytes,
+        { name: 'ECDSA', namedCurve: 'P-256' },
+        false,
+        ['verify'],
+      );
+      valid = await crypto.subtle.verify(
+        { name: 'ECDSA', hash: 'SHA-256' },
+        ecKey,
+        sigBytes,
+        challengeBytes,
+      );
+    } catch {
+      // Fall back to RSA-PKCS1 (YubiKey PIV)
+      const rsaKey = await crypto.subtle.importKey(
+        'spki',
+        pubKeyBytes,
+        { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+        false,
+        ['verify'],
+      );
+      valid = await crypto.subtle.verify(
+        'RSASSA-PKCS1-v1_5',
+        rsaKey,
+        sigBytes,
+        challengeBytes,
+      );
+    }
+
+    if (!valid) {
+      return c.json({ error: 'Invalid signature' }, 401);
+    }
+  } catch {
+    return c.json({ error: 'Signature verification failed' }, 401);
+  }
 
   // Create session
   const token = generateToken();

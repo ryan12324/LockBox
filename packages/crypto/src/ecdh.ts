@@ -8,6 +8,16 @@ import { toBase64, fromBase64 } from './utils.js';
 const IV_LENGTH = 12; // 96 bits
 
 /**
+ * Application-specific HKDF salt for ECDH key derivation.
+ * A fixed non-zero salt is recommended over zero bytes per RFC 5869 §3.1.
+ * This value is SHA-256('lockbox-ecdh-salt-v1') truncated to 32 bytes.
+ */
+const ECDH_HKDF_SALT = new Uint8Array([
+  0x9a, 0x3b, 0x1c, 0x6f, 0xe2, 0x4d, 0x8a, 0x57, 0xb3, 0x0e, 0xf1, 0x72, 0xc8, 0x5d, 0xa9, 0x34,
+  0x6b, 0xe0, 0x17, 0x83, 0xf4, 0x2c, 0x95, 0xd6, 0xa1, 0x58, 0x0f, 0x7e, 0xb9, 0x43, 0xec, 0x26,
+]);
+
+/**
  * Generate an ECDH P-256 key pair.
  * Returns both keys as base64-encoded SPKI (public) and PKCS8 (private).
  */
@@ -69,7 +79,7 @@ export async function deriveSharedSecret(
     {
       name: 'HKDF',
       hash: 'SHA-256',
-      salt: new Uint8Array(32) as Uint8Array<ArrayBuffer>,
+      salt: ECDH_HKDF_SALT as Uint8Array<ArrayBuffer>,
       info: info as Uint8Array<ArrayBuffer>,
     },
     ikm,

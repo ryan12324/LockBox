@@ -1,13 +1,14 @@
 /**
- * AI & Security Analysis routes — public endpoints for URL reputation checks.
- * No authentication required.
+ * AI & Security Analysis routes — authenticated URL reputation checks.
+ * Requires authentication.
  */
 
 import { Hono } from 'hono';
+import { authMiddleware } from '../middleware/auth.js';
 
 type Bindings = { DB: D1Database };
 
-export const aiRoutes = new Hono<{ Bindings: Bindings }>();
+export const aiRoutes = new Hono<{ Bindings: Bindings; Variables: { userId: string } }>();
 
 /**
  * POST /api/ai/url-check
@@ -20,7 +21,7 @@ export const aiRoutes = new Hono<{ Bindings: Bindings }>();
  * This endpoint exists for future server-side reputation database integration.
  * For now, it returns a basic response based on the PhishingDetector analysis.
  */
-aiRoutes.post('/url-check', async (c) => {
+aiRoutes.post('/url-check', authMiddleware, async (c) => {
   const body = await c.req.json<{ url?: string; urlHash?: string }>();
 
   if (!body.url && !body.urlHash) {
