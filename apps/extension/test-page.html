@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lockbox Extension Test Page</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: #0f1117;
+        color: #e2e8f0;
+        line-height: 1.6;
+        padding: 2rem;
+      }
+
+      h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: #fff;
+      }
+
+      .subtitle {
+        color: #94a3b8;
+        font-size: 0.875rem;
+        margin-bottom: 2rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+        gap: 1.5rem;
+      }
+
+      .card {
+        background: #1a1d2e;
+        border: 1px solid #2d3148;
+        border-radius: 12px;
+        padding: 1.5rem;
+      }
+
+      .card h2 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .card .tag {
+        font-size: 0.625rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: #4f46e5;
+        color: #fff;
+      }
+
+      .card .tag.green {
+        background: #059669;
+      }
+      .card .tag.amber {
+        background: #d97706;
+      }
+      .card .tag.red {
+        background: #dc2626;
+      }
+
+      .card p {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin-bottom: 1rem;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+
+      label {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: #cbd5e1;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: #0f1117;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        color: #e2e8f0;
+        font-size: 0.875rem;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: #6366f1;
+      }
+
+      button[type='submit'],
+      .btn {
+        padding: 0.5rem 1rem;
+        background: #4f46e5;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+
+      button[type='submit']:hover,
+      .btn:hover {
+        background: #4338ca;
+      }
+
+      .result-box {
+        margin-top: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background: #0f1117;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        color: #94a3b8;
+        min-height: 2rem;
+        font-family: monospace;
+      }
+
+      .section-divider {
+        grid-column: 1 / -1;
+        border-top: 1px solid #2d3148;
+        padding-top: 1.5rem;
+        margin-top: 0.5rem;
+      }
+
+      .section-divider h2 {
+        font-size: 1.25rem;
+        color: #fff;
+        margin-bottom: 0.25rem;
+      }
+
+      .section-divider p {
+        font-size: 0.8125rem;
+        color: #64748b;
+      }
+
+      .checklist {
+        list-style: none;
+        font-size: 0.8125rem;
+        color: #94a3b8;
+      }
+
+      .checklist li {
+        padding: 0.25rem 0;
+      }
+
+      .checklist li::before {
+        content: '☐ ';
+      }
+
+      .hidden-section {
+        display: none;
+      }
+
+      #spa-container .card {
+        border-color: #4f46e5;
+      }
+
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔒 Lockbox Extension Test Page</h1>
+    <p class="subtitle">
+      Open with the extension installed. Each card tests a specific content script feature. Check
+      the console for extension messages.
+    </p>
+
+    <div class="grid">
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="section-divider">
+        <h2>🔑 Login Form Detection &amp; Autofill</h2>
+        <p>
+          Extension should detect these forms, inject lock icons on password fields, and offer
+          autofill.
+        </p>
+      </div>
+
+      <!-- Test 1: Standard login -->
+      <div class="card">
+        <h2>Standard Login <span class="tag">autofill</span></h2>
+        <p>
+          Classic email + password form. Expect: lock icon on password field, autofill dropdown on
+          click.
+        </p>
+        <form id="form-standard" action="javascript:void(0)" method="POST">
+          <div>
+            <label for="email-1">Email</label>
+            <input
+              type="email"
+              id="email-1"
+              name="email"
+              autocomplete="email"
+              placeholder="user@example.com"
+            />
+          </div>
+          <div>
+            <label for="pass-1">Password</label>
+            <input
+              type="password"
+              id="pass-1"
+              name="password"
+              autocomplete="current-password"
+              placeholder="••••••••"
+            />
+          </div>
+          <button type="submit">Sign In</button>
+        </form>
+        <div class="result-box" id="result-1">Submit to test save-on-submit banner</div>
+      </div>
+
+      <!-- Test 2: Username login (not email) -->
+      <div class="card">
+        <h2>Username Login <span class="tag">autofill</span></h2>
+        <p>Username (not email) + password. Detector should match on name="username".</p>
+        <form id="form-username" action="javascript:void(0)" method="POST">
+          <div>
+            <label for="user-2">Username</label>
+            <input
+              type="text"
+              id="user-2"
+              name="username"
+              autocomplete="username"
+              placeholder="john_doe"
+            />
+          </div>
+          <div>
+            <label for="pass-2">Password</label>
+            <input type="password" id="pass-2" name="password" autocomplete="current-password" />
+          </div>
+          <button type="submit">Log In</button>
+        </form>
+        <div class="result-box" id="result-2"></div>
+      </div>
+
+      <!-- Test 3: Password-only (e.g. unlock screen) -->
+      <div class="card">
+        <h2>Password Only <span class="tag">autofill</span></h2>
+        <p>No username field — just a password. Lock icon should still appear.</p>
+        <form id="form-passonly" action="javascript:void(0)" method="POST">
+          <div>
+            <label for="pass-3">Master Password</label>
+            <input type="password" id="pass-3" name="password" placeholder="Enter password" />
+          </div>
+          <button type="submit">Unlock</button>
+        </form>
+        <div class="result-box" id="result-3"></div>
+      </div>
+
+      <!-- Test 4: Registration form (new password) -->
+      <div class="card">
+        <h2>Registration Form <span class="tag amber">save-on-submit</span></h2>
+        <p>
+          New account form with password rules. Smart generator should detect min/max length and
+          pattern.
+        </p>
+        <form id="form-register" action="javascript:void(0)" method="POST">
+          <div>
+            <label for="email-4">Email</label>
+            <input type="email" id="email-4" name="email" placeholder="new@example.com" />
+          </div>
+          <div>
+            <label for="pass-4">Password</label>
+            <input
+              type="password"
+              id="pass-4"
+              name="password"
+              autocomplete="new-password"
+              minlength="12"
+              maxlength="64"
+              pattern="^(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%]).{12,}$"
+              title="At least 12 chars, 1 uppercase, 1 number, 1 special character (!@#$%)"
+            />
+          </div>
+          <div>
+            <label for="pass-4-confirm">Confirm Password</label>
+            <input
+              type="password"
+              id="pass-4-confirm"
+              name="password_confirm"
+              autocomplete="new-password"
+            />
+          </div>
+          <button type="submit">Create Account</button>
+        </form>
+        <div class="result-box" id="result-4">
+          Has minlength=12, maxlength=64, pattern, title — smart generator should detect these
+        </div>
+      </div>
+
+      <!-- Test 5: Hidden login (no form tag) -->
+      <div class="card">
+        <h2>No &lt;form&gt; Tag <span class="tag amber">edge case</span></h2>
+        <p>Login fields not wrapped in a form element. Detector should still find them.</p>
+        <div id="no-form-login">
+          <div>
+            <label for="user-5">Email</label>
+            <input type="email" id="user-5" name="email" placeholder="user@site.com" />
+          </div>
+          <div style="margin-top: 0.75rem">
+            <label for="pass-5">Password</label>
+            <input type="password" id="pass-5" name="password" />
+          </div>
+          <button
+            class="btn"
+            style="margin-top: 0.75rem"
+            onclick="document.getElementById('result-5').textContent = 'Submitted (no form tag)'"
+          >
+            Sign In
+          </button>
+        </div>
+        <div class="result-box" id="result-5"></div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="section-divider">
+        <h2>📛 Identity Form Detection</h2>
+        <p>Extension should detect address/name/phone forms and offer identity autofill.</p>
+      </div>
+
+      <!-- Test 6: Full identity / address form -->
+      <div class="card" style="grid-column: span 2">
+        <h2>Checkout / Address Form <span class="tag green">identity</span></h2>
+        <p>
+          Full address form with autocomplete attributes. Extension should detect all fields and
+          offer identity fill.
+        </p>
+        <form id="form-identity" action="javascript:void(0)">
+          <div class="two-col">
+            <div>
+              <label for="fname">First Name</label>
+              <input
+                type="text"
+                id="fname"
+                name="firstName"
+                autocomplete="given-name"
+                placeholder="John"
+              />
+            </div>
+            <div>
+              <label for="lname">Last Name</label>
+              <input
+                type="text"
+                id="lname"
+                name="lastName"
+                autocomplete="family-name"
+                placeholder="Doe"
+              />
+            </div>
+          </div>
+          <div>
+            <label for="id-email">Email</label>
+            <input
+              type="email"
+              id="id-email"
+              name="email"
+              autocomplete="email"
+              placeholder="john@example.com"
+            />
+          </div>
+          <div>
+            <label for="phone">Phone</label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              autocomplete="tel"
+              placeholder="+1 555-123-4567"
+            />
+          </div>
+          <div>
+            <label for="company">Company</label>
+            <input
+              type="text"
+              id="company"
+              name="company"
+              autocomplete="organization"
+              placeholder="Acme Inc."
+            />
+          </div>
+          <div>
+            <label for="addr1">Address Line 1</label>
+            <input
+              type="text"
+              id="addr1"
+              name="address"
+              autocomplete="address-line1"
+              placeholder="123 Main St"
+            />
+          </div>
+          <div>
+            <label for="addr2">Address Line 2</label>
+            <input
+              type="text"
+              id="addr2"
+              name="address2"
+              autocomplete="address-line2"
+              placeholder="Apt 4B"
+            />
+          </div>
+          <div class="two-col">
+            <div>
+              <label for="city">City</label>
+              <input
+                type="text"
+                id="city"
+                name="city"
+                autocomplete="address-level2"
+                placeholder="San Francisco"
+              />
+            </div>
+            <div>
+              <label for="state">State</label>
+              <input
+                type="text"
+                id="state"
+                name="state"
+                autocomplete="address-level1"
+                placeholder="CA"
+              />
+            </div>
+          </div>
+          <div class="two-col">
+            <div>
+              <label for="zip">Zip Code</label>
+              <input
+                type="text"
+                id="zip"
+                name="postalCode"
+                autocomplete="postal-code"
+                placeholder="94102"
+              />
+            </div>
+            <div>
+              <label for="country">Country</label>
+              <input
+                type="text"
+                id="country"
+                name="country"
+                autocomplete="country-name"
+                placeholder="United States"
+              />
+            </div>
+          </div>
+          <button type="submit">Save Address</button>
+        </form>
+      </div>
+
+      <!-- Test 7: Partial identity (name-only heuristic) -->
+      <div class="card">
+        <h2>Name-Only Form <span class="tag green">identity</span></h2>
+        <p>Just first/last name fields. Should still detect as identity form via heuristics.</p>
+        <form id="form-name-only" action="javascript:void(0)">
+          <div>
+            <label for="fn7">First name</label>
+            <input type="text" id="fn7" name="first_name" placeholder="Jane" />
+          </div>
+          <div>
+            <label for="ln7">Last name</label>
+            <input type="text" id="ln7" name="last_name" placeholder="Smith" />
+          </div>
+          <div>
+            <label for="ph7">Phone number</label>
+            <input type="tel" id="ph7" name="phone" placeholder="555-0123" />
+          </div>
+          <button type="submit">Continue</button>
+        </form>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="section-divider">
+        <h2>💾 Save-on-Submit Detection</h2>
+        <p>
+          Submit a login form with credentials — the save banner should appear at the top of the
+          page.
+        </p>
+      </div>
+
+      <!-- Test 8: Save new credentials -->
+      <div class="card">
+        <h2>Save New Credentials <span class="tag amber">save banner</span></h2>
+        <p>
+          Fill in and submit. If these creds aren't in the vault, a "Save to Lockbox?" banner should
+          appear.
+        </p>
+        <form id="form-save-new" action="javascript:void(0)" method="POST">
+          <div>
+            <label for="email-8">Email</label>
+            <input type="email" id="email-8" name="email" value="testuser@lockbox-test.com" />
+          </div>
+          <div>
+            <label for="pass-8">Password</label>
+            <input type="password" id="pass-8" name="password" value="TestPassword123!" />
+          </div>
+          <button type="submit">Sign In</button>
+        </form>
+        <div class="result-box" id="result-8">
+          Pre-filled for quick testing — just click Sign In
+        </div>
+      </div>
+
+      <!-- Test 9: Update existing credentials -->
+      <div class="card">
+        <h2>AJAX Login (XHR intercept) <span class="tag amber">save banner</span></h2>
+        <p>
+          Simulates an AJAX POST. The save detector intercepts fetch/XHR with credential-like
+          payloads.
+        </p>
+        <form id="form-ajax" onsubmit="return false;">
+          <div>
+            <label for="email-9">Email</label>
+            <input type="email" id="email-9" name="email" value="ajax@lockbox-test.com" />
+          </div>
+          <div>
+            <label for="pass-9">Password</label>
+            <input type="password" id="pass-9" name="password" value="AjaxPass456!" />
+          </div>
+          <button type="button" class="btn" onclick="simulateAjaxLogin()">AJAX Login</button>
+        </form>
+        <div class="result-box" id="result-9"></div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="section-divider">
+        <h2>🛡️ Security Features</h2>
+        <p>2FA detection badge, phishing warnings, and WebAuthn interceptor.</p>
+      </div>
+
+      <!-- Test 10: 2FA detection trigger -->
+      <div class="card">
+        <h2>2FA Detection <span class="tag green">badge</span></h2>
+        <p>
+          After autofilling a login for a site that supports 2FA (e.g. github.com), a 2FA
+          recommendation badge should appear in the bottom-right corner.
+        </p>
+        <ul class="checklist">
+          <li>Autofill a login item for a 2FA-supported site</li>
+          <li>Badge appears in bottom-right with indigo gradient</li>
+          <li>Shows site name, "Enable 2FA" message</li>
+          <li>Link to 2FA setup guide (if available)</li>
+          <li>Auto-dismisses after 15 seconds</li>
+          <li>Dismiss button works</li>
+        </ul>
+      </div>
+
+      <!-- Test 11: WebAuthn -->
+      <div class="card">
+        <h2>WebAuthn / Passkey <span class="tag">interceptor</span></h2>
+        <p>
+          The extension intercepts navigator.credentials.create/get. Click to trigger a passkey
+          registration attempt.
+        </p>
+        <button class="btn" onclick="testWebAuthnCreate()">Test Passkey Registration</button>
+        <button
+          class="btn"
+          style="margin-top: 0.5rem; background: #334155"
+          onclick="testWebAuthnGet()"
+        >
+          Test Passkey Login
+        </button>
+        <div class="result-box" id="result-11"></div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="section-divider">
+        <h2>🔄 SPA Navigation (Dynamic Forms)</h2>
+        <p>
+          The content script uses MutationObserver. Dynamically injected forms should be detected.
+        </p>
+      </div>
+
+      <!-- Test 12: Dynamic form injection -->
+      <div class="card" style="grid-column: span 2">
+        <h2>Dynamic Form Injection <span class="tag amber">SPA</span></h2>
+        <p>
+          Click a button to inject a login form into the DOM. The extension's MutationObserver
+          should detect it and add lock icons.
+        </p>
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem">
+          <button class="btn" onclick="injectLoginForm()">Inject Login Form</button>
+          <button class="btn" style="background: #334155" onclick="injectIdentityForm()">
+            Inject Identity Form
+          </button>
+          <button class="btn" style="background: #7c2d12" onclick="clearInjected()">Clear</button>
+        </div>
+        <div
+          id="spa-container"
+          style="min-height: 100px; border: 1px dashed #334155; border-radius: 8px; padding: 1rem"
+        >
+          <p style="color: #475569; font-size: 0.75rem; text-align: center">
+            Dynamically injected forms appear here
+          </p>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════════════════ -->
+      <div class="section-divider">
+        <h2>📋 Manual Test Checklist</h2>
+        <p>Things to verify manually across test scenarios.</p>
+      </div>
+
+      <div class="card">
+        <h2>Lock Icon Overlay</h2>
+        <ul class="checklist">
+          <li>Lock icon visible on all password fields</li>
+          <li>Lock icon positioned correctly (not clipped)</li>
+          <li>Lock icon click opens autofill/suggestion dropdown</li>
+          <li>Icon doesn't break field layout or overlap text</li>
+          <li>Icon appears on dynamically injected forms</li>
+          <li>Identity forms get lock icon on first field</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Autofill Dropdown</h2>
+        <ul class="checklist">
+          <li>Single match → auto-fills immediately</li>
+          <li>Multiple matches → shows dropdown with account list</li>
+          <li>Dropdown shows name + username for each item</li>
+          <li>Clicking item fills both username and password</li>
+          <li>Dropdown dismisses on outside click</li>
+          <li>Identity dropdown shows identity names</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Save-on-Submit Banner</h2>
+        <ul class="checklist">
+          <li>Banner appears at page top after form submit</li>
+          <li>Shows "Save" and "Dismiss" buttons</li>
+          <li>"New credential" vs "Update" distinction</li>
+          <li>Banner uses Shadow DOM (no CSS conflicts)</li>
+          <li>Auto-dismisses after 30 seconds</li>
+          <li>Works with AJAX/fetch submissions</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Popup Features</h2>
+        <ul class="checklist">
+          <li>Current Site tab matches this page</li>
+          <li>Vault tab shows all items</li>
+          <li>Generator tab produces passwords</li>
+          <li>Smart generation detects field rules</li>
+          <li>TOTP codes display and auto-copy</li>
+          <li>Shared tab shows team items</li>
+          <li>Health tab shows vault analysis</li>
+          <li>Trash view lists deleted items</li>
+          <li>Settings view has 2FA / travel mode</li>
+          <li>Emergency access view works</li>
+          <li>Version history shows in item detail</li>
+          <li>HW keys view lists / registers keys</li>
+          <li>QR sync generates / scans codes</li>
+        </ul>
+      </div>
+    </div>
+
+    <script>
+      // ─── Form submission handlers ──────────────────────────────────────
+      document.querySelectorAll('form').forEach((form) => {
+        form.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const data = new FormData(form);
+          const entries = Object.fromEntries(data.entries());
+          const resultEl = form.parentElement.querySelector('.result-box');
+          if (resultEl) {
+            resultEl.textContent = `✓ Submitted: ${JSON.stringify(entries, null, 0)}`;
+            resultEl.style.color = '#22c55e';
+          }
+        });
+      });
+
+      // ─── AJAX login simulation ─────────────────────────────────────────
+      function simulateAjaxLogin() {
+        const email = document.getElementById('email-9').value;
+        const password = document.getElementById('pass-9').value;
+        const resultEl = document.getElementById('result-9');
+
+        fetch('https://httpbin.org/post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+          .then((res) => {
+            resultEl.textContent = `✓ AJAX POST sent (${res.status}). Save banner should appear.`;
+            resultEl.style.color = '#22c55e';
+          })
+          .catch(() => {
+            // Even if fetch fails, the save detector intercepts the request
+            resultEl.textContent =
+              '✓ AJAX POST intercepted (network error is expected). Check for save banner.';
+            resultEl.style.color = '#eab308';
+          });
+      }
+
+      // ─── WebAuthn tests ────────────────────────────────────────────────
+      async function testWebAuthnCreate() {
+        const resultEl = document.getElementById('result-11');
+        resultEl.textContent = 'Attempting navigator.credentials.create()...';
+        resultEl.style.color = '#94a3b8';
+
+        try {
+          const credential = await navigator.credentials.create({
+            publicKey: {
+              rp: { name: 'Lockbox Test', id: window.location.hostname },
+              user: {
+                id: new Uint8Array(16),
+                name: 'test@lockbox.dev',
+                displayName: 'Test User',
+              },
+              challenge: crypto.getRandomValues(new Uint8Array(32)),
+              pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+              timeout: 30000,
+            },
+          });
+          resultEl.textContent = credential
+            ? `✓ Credential created: ${credential.id.substring(0, 20)}...`
+            : '✕ Credential creation returned null';
+          resultEl.style.color = credential ? '#22c55e' : '#ef4444';
+        } catch (err) {
+          resultEl.textContent = `✕ ${err.message}`;
+          resultEl.style.color = '#ef4444';
+        }
+      }
+
+      async function testWebAuthnGet() {
+        const resultEl = document.getElementById('result-11');
+        resultEl.textContent = 'Attempting navigator.credentials.get()...';
+        resultEl.style.color = '#94a3b8';
+
+        try {
+          const credential = await navigator.credentials.get({
+            publicKey: {
+              challenge: crypto.getRandomValues(new Uint8Array(32)),
+              timeout: 30000,
+              rpId: window.location.hostname,
+            },
+          });
+          resultEl.textContent = credential
+            ? `✓ Assertion received: ${credential.id.substring(0, 20)}...`
+            : '✕ No credential returned';
+          resultEl.style.color = credential ? '#22c55e' : '#ef4444';
+        } catch (err) {
+          resultEl.textContent = `✕ ${err.message}`;
+          resultEl.style.color = '#ef4444';
+        }
+      }
+
+      // ─── SPA dynamic injection ─────────────────────────────────────────
+      function injectLoginForm() {
+        const container = document.getElementById('spa-container');
+        container.innerHTML = `
+        <div class="card" style="border-color:#4f46e5">
+          <h2 style="font-size:0.875rem;color:#a5b4fc">Dynamically Injected Login</h2>
+          <form action="javascript:void(0)" method="POST" style="margin-top:0.75rem">
+            <div>
+              <label>Email</label>
+              <input type="email" name="email" autocomplete="email" placeholder="dynamic@test.com">
+            </div>
+            <div>
+              <label>Password</label>
+              <input type="password" name="password" autocomplete="current-password">
+            </div>
+            <button type="submit">Sign In</button>
+          </form>
+        </div>
+      `;
+      }
+
+      function injectIdentityForm() {
+        const container = document.getElementById('spa-container');
+        container.innerHTML = `
+        <div class="card" style="border-color:#059669">
+          <h2 style="font-size:0.875rem;color:#6ee7b7">Dynamically Injected Address Form</h2>
+          <form action="javascript:void(0)" style="margin-top:0.75rem">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+              <div>
+                <label>First Name</label>
+                <input type="text" name="firstName" autocomplete="given-name">
+              </div>
+              <div>
+                <label>Last Name</label>
+                <input type="text" name="lastName" autocomplete="family-name">
+              </div>
+            </div>
+            <div>
+              <label>Street Address</label>
+              <input type="text" name="address" autocomplete="street-address">
+            </div>
+            <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:0.75rem">
+              <div>
+                <label>City</label>
+                <input type="text" name="city" autocomplete="address-level2">
+              </div>
+              <div>
+                <label>State</label>
+                <input type="text" name="state" autocomplete="address-level1">
+              </div>
+              <div>
+                <label>Zip</label>
+                <input type="text" name="zip" autocomplete="postal-code">
+              </div>
+            </div>
+            <button type="submit">Save</button>
+          </form>
+        </div>
+      `;
+      }
+
+      function clearInjected() {
+        document.getElementById('spa-container').innerHTML =
+          '<p style="color:#475569;font-size:0.75rem;text-align:center">Dynamically injected forms appear here</p>';
+      }
+    </script>
+  </body>
+</html>
