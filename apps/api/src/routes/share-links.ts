@@ -71,9 +71,11 @@ shareLinkRoutes.get('/:id/redeem', async (c) => {
   const token = authHeader.slice(7);
   const db = createDb(c.env.DB);
 
-  // Hash the token to compare with stored hash
-  const encoder = new TextEncoder();
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encoder.encode(token));
+  // Decode base64 token back to raw bytes, then SHA-256 to match stored hash
+  const binary = atob(token);
+  const tokenBytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) tokenBytes[i] = binary.charCodeAt(i);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', tokenBytes);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
   const tokenHash = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
 
