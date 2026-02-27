@@ -1,14 +1,22 @@
 /**
  * Content script for Lockbox extension.
- * Detects login forms and provides autofill functionality.
+ * Detects login forms and identity forms, provides autofill functionality,
+ * and monitors form submissions for save/update prompts.
  *
  * Uses Shadow DOM for all injected UI to avoid CSS conflicts.
  * Proxies crypto operations through the background service worker.
  */
 
-import { detectForms, urlMatchesUri } from '../lib/form-detector.js';
-import { fillForm, createLockIconOverlay, createSuggestionDropdown } from '../lib/autofill.js';
-import type { VaultItem, LoginItem } from '@lockbox/types';
+import { detectForms, detectIdentityForms } from '../lib/form-detector.js';
+import {
+  fillForm,
+  fillIdentityForm,
+  createLockIconOverlay,
+  createSuggestionDropdown,
+  createIdentitySuggestionDropdown,
+} from '../lib/autofill.js';
+import { initSaveDetector } from '../lib/save-detector.js';
+import type { VaultItem, LoginItem, IdentityItem } from '@lockbox/types';
 
 // Track injected overlays to avoid duplicates
 const injectedFields = new WeakSet<HTMLInputElement>();
@@ -25,6 +33,15 @@ async function getMatchingItems(): Promise<VaultItem[]> {
     url: window.location.href,
   });
   return result.items ?? [];
+}
+
+/** Get all identity items from the vault. */
+async function getIdentityItems(): Promise<IdentityItem[]> {
+  const result = await sendMessage<{ items: VaultItem[]; locked: boolean }>({
+    type: 'get-vault',
+  });
+  if (result.locked) return [];
+  return (result.items ?? []).filter((i): i is IdentityItem => i.type === 'identity');
 }
 
 /** Handle autofill for a detected form. */
@@ -67,8 +84,42 @@ async function handleAutofill(
   }
 }
 
-/** Inject lock icon overlays into detected password fields. */
+/** Handle autofill for a detected identity form. */
+async function handleIdentityAutofill(
+  identityForm: import('../lib/form-detector.js').DetectedIdentityForm,
+): Promise<void> {
+  const identityItems = await getIdentityItems();
+
+  if (identityItems.length === 0) return;
+
+  const firstField = Object.values(identityForm.fields)[0];
+  if (!firstField) return;
+
+  if (identityItems.length === 1) {
+    // Single identity — fill immediately
+    fillIdentityForm(identityForm, identityItems[0]);
+  } else {
+    // Multiple identities — show dropdown
+    createIdentitySuggestionDropdown(
+      firstField,
+      identityItems.map((i) => ({
+        id: i.id,
+        name: i.name,
+        detail: [i.firstName, i.lastName].filter(Boolean).join(' ') || i.email || '',
+      })),
+      (selected) => {
+        const item = identityItems.find((i) => i.id === selected.id);
+        if (item) {
+          fillIdentityForm(identityForm, item);
+        }
+      },
+    );
+  }
+}
+
+/** Inject lock icon overlays into detected password fields and identity fields. */
 function injectOverlays(): void {
+  // Login forms
   const forms = detectForms(document);
 
   for (const form of forms) {
@@ -79,6 +130,20 @@ function injectOverlays(): void {
 
     createLockIconOverlay(passwordField, () => {
       handleAutofill(passwordField, usernameField).catch(console.error);
+    });
+  }
+
+  // Identity forms
+  const identityForms = detectIdentityForms(document);
+
+  for (const identityForm of identityForms) {
+    // Find the first identity field to anchor the lock icon
+    const firstField = Object.values(identityForm.fields)[0];
+    if (!firstField || injectedFields.has(firstField)) continue;
+    injectedFields.add(firstField);
+
+    createLockIconOverlay(firstField, () => {
+      handleIdentityAutofill(identityForm).catch(console.error);
     });
   }
 }
@@ -167,8 +232,11 @@ export default defineContentScript({
   runAt: 'document_idle',
 
   main() {
-    // Initial scan
+    // Initial scan for login + identity forms
     injectOverlays();
+
+    // Initialize save-on-submit detection
+    initSaveDetector();
 
     // Listen for phishing warnings from background
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

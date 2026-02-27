@@ -81,7 +81,10 @@ type MessageType =
   | 'get-folders'
   | 'create-folder'
   | 'update-folder'
-  | 'delete-folder';
+  | 'delete-folder'
+  | 'check-credentials'
+  | 'save-credentials'
+  | 'update-credentials';
 
 const VALID_MESSAGE_TYPES: MessageType[] = [
   'unlock',
@@ -100,6 +103,9 @@ const VALID_MESSAGE_TYPES: MessageType[] = [
   'create-folder',
   'update-folder',
   'delete-folder',
+  'check-credentials',
+  'save-credentials',
+  'update-credentials',
 ];
 
 describe('background message types', () => {
@@ -120,10 +126,13 @@ describe('background message types', () => {
     expect(VALID_MESSAGE_TYPES).toContain('create-folder');
     expect(VALID_MESSAGE_TYPES).toContain('update-folder');
     expect(VALID_MESSAGE_TYPES).toContain('delete-folder');
+    expect(VALID_MESSAGE_TYPES).toContain('check-credentials');
+    expect(VALID_MESSAGE_TYPES).toContain('save-credentials');
+    expect(VALID_MESSAGE_TYPES).toContain('update-credentials');
   });
 
-  it('has 16 message types total', () => {
-    expect(VALID_MESSAGE_TYPES).toHaveLength(16);
+  it('has 19 message types total', () => {
+    expect(VALID_MESSAGE_TYPES).toHaveLength(19);
   });
 });
 

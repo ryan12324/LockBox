@@ -42,7 +42,7 @@ export default function AppLayout() {
     navigate('/login');
   }
 
-  const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳' })[type] ?? '📄';
+  const typeIcon = (type: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛' })[type as keyof ReturnType<typeof typeIcon>] ?? '📄';
 
   async function handleCreateFolder() {
     if (!session || !newFolderName.trim()) return;
@@ -137,6 +137,12 @@ export default function AppLayout() {
             ⭐ Favorites
           </button>
           <button
+            onClick={() => navigate('/trash')}
+            className={getNavItemClass(isNavActive('/trash'))}
+          >
+            🗑️ Trash
+          </button>
+          <button
             onClick={() => navigate('/chat')}
             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
               isNavActive('/chat')
@@ -165,7 +171,7 @@ export default function AppLayout() {
               Types
             </p>
           </div>
-          {['login', 'note', 'card'].map((type) => (
+          {['login', 'note', 'card', 'identity'].map((type) => (
             <button
               key={type}
               onClick={() => {
@@ -177,7 +183,7 @@ export default function AppLayout() {
               className={`${getNavItemClass(isVaultActive && selectedType === type)} capitalize`}
             >
               {typeIcon(type)}{' '}
-              {type === 'login' ? 'Logins' : type === 'note' ? 'Secure Notes' : 'Cards'}
+              {type === 'login' ? 'Logins' : type === 'note' ? 'Secure Notes' : type === 'card' ? 'Cards' : 'Identities'}
             </button>
           ))}
 

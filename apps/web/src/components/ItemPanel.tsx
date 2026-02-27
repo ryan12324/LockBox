@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
 import { encryptVaultItem } from '../lib/crypto.js';
-import type { VaultItem, LoginItem, SecureNoteItem, CardItem, Folder, VaultItemType } from '@lockbox/types';
+import type { VaultItem, LoginItem, SecureNoteItem, CardItem, IdentityItem, CustomField, Folder, VaultItemType } from '@lockbox/types';
 import { totp, getRemainingSeconds, base32Decode, parseOtpAuthUri } from '@lockbox/totp';
 import { generatePassword } from '@lockbox/generator';
 import { SecurityAlertEngine } from '@lockbox/ai';
@@ -51,11 +51,34 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
   const [expYear, setExpYear] = useState(cardItem?.expYear || new Date().getFullYear().toString());
   const [cvv, setCvv] = useState(cardItem?.cvv || '');
   const [brand, setBrand] = useState(cardItem?.brand || '');
+  // Identity State
+  const identityItem = item?.type === 'identity' ? (item as IdentityItem) : null;
+  const [firstName, setFirstName] = useState(identityItem?.firstName || '');
+  const [middleName, setMiddleName] = useState(identityItem?.middleName || '');
+  const [lastName, setLastName] = useState(identityItem?.lastName || '');
+  const [email, setEmail] = useState(identityItem?.email || '');
+  const [phone, setPhone] = useState(identityItem?.phone || '');
+  const [address1, setAddress1] = useState(identityItem?.address1 || '');
+  const [address2, setAddress2] = useState(identityItem?.address2 || '');
+  const [city, setCity] = useState(identityItem?.city || '');
+  const [stateValue, setStateValue] = useState(identityItem?.state || '');
+  const [postalCode, setPostalCode] = useState(identityItem?.postalCode || '');
+  const [country, setCountry] = useState(identityItem?.country || '');
+  const [company, setCompany] = useState(identityItem?.company || '');
+  const [ssn, setSsn] = useState(identityItem?.ssn || '');
+  const [passportNumber, setPassportNumber] = useState(identityItem?.passportNumber || '');
+  const [licenseNumber, setLicenseNumber] = useState(identityItem?.licenseNumber || '');
+
+  // Custom Fields State
+  const [customFields, setCustomFields] = useState<CustomField[]>(item?.customFields || []);
+
 
   // UI State
   const [showPassword, setShowPassword] = useState(false);
   const [showCvv, setShowCvv] = useState(false);
   const [showCardNumber, setShowCardNumber] = useState(false);
+  const [showSsn, setShowSsn] = useState(false);
+  const [showCustomFields, setShowCustomFields] = useState<Record<number, boolean>>({});
   const [localFolders, setLocalFolders] = useState<Folder[]>(folders);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
@@ -89,11 +112,32 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
       setExpYear(c.expYear || new Date().getFullYear().toString());
       setCvv(c.cvv || '');
       setBrand(c.brand || '');
+    } else if (item?.type === 'identity') {
+      const iden = item as IdentityItem;
+      setFirstName(iden.firstName || '');
+      setMiddleName(iden.middleName || '');
+      setLastName(iden.lastName || '');
+      setEmail(iden.email || '');
+      setPhone(iden.phone || '');
+      setAddress1(iden.address1 || '');
+      setAddress2(iden.address2 || '');
+      setCity(iden.city || '');
+      setStateValue(iden.state || '');
+      setPostalCode(iden.postalCode || '');
+      setCountry(iden.country || '');
+      setCompany(iden.company || '');
+      setSsn(iden.ssn || '');
+      setPassportNumber(iden.passportNumber || '');
+      setLicenseNumber(iden.licenseNumber || '');
+    }
+    setCustomFields(item?.customFields || []);
     }
     setShowConfirmDelete(false);
     setShowPassword(false);
     setShowCvv(false);
     setShowCardNumber(false);
+    setShowSsn(false);
+    setShowCustomFields({});
     setError('');
     setLocalFolders(folders);
     setCreatingFolder(false);
@@ -223,6 +267,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
         createdAt: isAdd ? now : item!.createdAt,
         updatedAt: now,
         revisionDate: now,
+        customFields: customFields.filter(f => f.name.trim() !== ''),
       };
 
       let vaultItem: VaultItem;
@@ -242,6 +287,26 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           type: 'note',
           content,
         } as SecureNoteItem;
+      } else if (type === 'identity') {
+        vaultItem = {
+          ...baseItem,
+          type: 'identity',
+          firstName,
+          middleName,
+          lastName,
+          email,
+          phone,
+          address1,
+          address2,
+          city,
+          state: stateValue,
+          postalCode,
+          country,
+          company,
+          ssn,
+          passportNumber,
+          licenseNumber,
+        } as IdentityItem;
       } else {
         vaultItem = {
           ...baseItem,
@@ -308,7 +373,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
     }
   }
 
-  const typeIcon = (t: string) => ({ login: '🔑', note: '📝', card: '💳' }[t] ?? '📄');
+  const typeIcon = (t: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛' }[t] ?? '📄');
 
   return (
     <>
@@ -376,7 +441,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
 
           {currentMode === 'add' && (
             <div className="flex bg-white/[0.06] p-1 rounded-lg">
-              {(['login', 'note', 'card'] as VaultItemType[]).map((t) => (
+              {(['login', 'note', 'card', 'identity'] as VaultItemType[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
@@ -662,6 +727,203 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
             </div>
           )}
 
+          {currentMode !== 'view' && type === 'identity' && (
+            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Personal</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-white/70 mb-1">First Name</label>
+                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-white/70 mb-1">Middle Name</label>
+                    <input type="text" value={middleName} onChange={(e) => setMiddleName(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Last Name</label>
+                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Email</label>
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Phone</label>
+                  <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Address</h3>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Address 1</label>
+                  <input type="text" value={address1} onChange={(e) => setAddress1(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Address 2</label>
+                  <input type="text" value={address2} onChange={(e) => setAddress2(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-white/70 mb-1">City</label>
+                    <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-white/70 mb-1">State/Province</label>
+                    <input type="text" value={stateValue} onChange={(e) => setStateValue(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-white/70 mb-1">Zip/Postal Code</label>
+                    <input type="text" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-white/70 mb-1">Country</label>
+                    <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Company</h3>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Company Name</label>
+                  <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Identification</h3>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">SSN</label>
+                  <div className="relative">
+                    <input type={showSsn ? 'text' : 'password'} value={ssn} onChange={(e) => setSsn(e.target.value)} className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                    <button type="button" onClick={() => setShowSsn(!showSsn)} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70">
+                      {showSsn ? '👁️‍🗨️' : '👁️'}
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">Passport Number</label>
+                  <input type="text" value={passportNumber} onChange={(e) => setPassportNumber(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/70 mb-1">License Number</label>
+                  <input type="text" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Custom Fields - Edit Mode */}
+          {currentMode !== 'view' && (
+            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Custom Fields</h3>
+                <button
+                  type="button"
+                  onClick={() => setCustomFields([...customFields, { name: '', value: '', type: 'text' }])}
+                  className="px-2 py-1 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors"
+                >
+                  + Add
+                </button>
+              </div>
+              
+              {customFields.map((field, idx) => (
+                <div key={idx} className="flex flex-col gap-2 p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={field.name}
+                      onChange={(e) => {
+                        const newFields = [...customFields];
+                        newFields[idx].name = e.target.value;
+                        setCustomFields(newFields);
+                      }}
+                      placeholder="Field Name"
+                      className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    />
+                    <select
+                      value={field.type}
+                      onChange={(e) => {
+                        const newFields = [...customFields];
+                        newFields[idx].type = e.target.value as 'text' | 'hidden' | 'boolean';
+                        if (newFields[idx].type === 'boolean' && newFields[idx].value !== 'true' && newFields[idx].value !== 'false') {
+                           newFields[idx].value = 'false';
+                        }
+                        setCustomFields(newFields);
+                      }}
+                      className="w-28 px-2 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white text-sm"
+                    >
+                      <option value="text">Text</option>
+                      <option value="hidden">Hidden</option>
+                      <option value="boolean">Boolean</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setCustomFields(customFields.filter((_, i) => i !== idx))}
+                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  
+                  {field.type === 'boolean' ? (
+                    <label className="flex items-center gap-2 cursor-pointer mt-1">
+                      <input
+                        type="checkbox"
+                        checked={field.value === 'true'}
+                        onChange={(e) => {
+                          const newFields = [...customFields];
+                          newFields[idx].value = e.target.checked ? 'true' : 'false';
+                          setCustomFields(newFields);
+                        }}
+                        className="rounded border-white/20 bg-white/10 text-indigo-500 focus:ring-indigo-500/60"
+                      />
+                      <span className="text-sm font-medium text-white/70">Value</span>
+                    </label>
+                  ) : field.type === 'hidden' ? (
+                    <div className="relative">
+                      <input
+                        type={showCustomFields[idx] ? 'text' : 'password'}
+                        value={field.value}
+                        onChange={(e) => {
+                          const newFields = [...customFields];
+                          newFields[idx].value = e.target.value;
+                          setCustomFields(newFields);
+                        }}
+                        placeholder="Hidden Value"
+                        className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomFields(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
+                      >
+                        {showCustomFields[idx] ? '👁️‍🗨️' : '👁️'}
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={field.value}
+                      onChange={(e) => {
+                        const newFields = [...customFields];
+                        newFields[idx].value = e.target.value;
+                        setCustomFields(newFields);
+                      }}
+                      placeholder="Value"
+                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* View Mode Fields */}
           {currentMode === 'view' && (
             <div className="space-y-6">
@@ -854,6 +1116,141 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 </div>
               )}
 
+              {type === 'identity' && (
+                <div className="space-y-4">
+                  {(firstName || middleName || lastName) && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Name</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm font-medium text-white">{[firstName, middleName, lastName].filter(Boolean).join(' ')}</span>
+                        <button onClick={() => copyToClipboard([firstName, middleName, lastName].filter(Boolean).join(' '), 'fullname')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          {copiedField === 'fullname' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {email && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Email</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm text-white">{email}</span>
+                        <button onClick={() => copyToClipboard(email, 'email')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          {copiedField === 'email' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {phone && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Phone</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm text-white">{phone}</span>
+                        <button onClick={() => copyToClipboard(phone, 'phone')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          {copiedField === 'phone' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {(address1 || address2 || city || stateValue || postalCode || country) && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Address</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <div className="text-sm text-white space-y-1">
+                          {address1 && <p>{address1}</p>}
+                          {address2 && <p>{address2}</p>}
+                          {(city || stateValue || postalCode) && <p>{[city, stateValue, postalCode].filter(Boolean).join(', ')}</p>}
+                          {country && <p>{country}</p>}
+                        </div>
+                        <button onClick={() => copyToClipboard([address1, address2, [city, stateValue, postalCode].filter(Boolean).join(', '), country].filter(Boolean).join('\n'), 'address')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors self-start">
+                          {copiedField === 'address' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {company && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Company</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm text-white">{company}</span>
+                        <button onClick={() => copyToClipboard(company, 'company')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          {copiedField === 'company' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {ssn && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">SSN</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm font-mono text-white">{showSsn ? ssn : '•••-••-••••'}</span>
+                        <div className="flex gap-2">
+                          <button onClick={() => setShowSsn(!showSsn)} className="p-1.5 text-white/40 hover:text-white/70 transition-colors">
+                            {showSsn ? '👁️‍🗨️' : '👁️'}
+                          </button>
+                          <button onClick={() => copyToClipboard(ssn, 'ssn')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                            {copiedField === 'ssn' ? '✓' : '📋'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {passportNumber && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Passport Number</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm font-mono text-white">{passportNumber}</span>
+                        <button onClick={() => copyToClipboard(passportNumber, 'passport')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          {copiedField === 'passport' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {licenseNumber && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">License Number</span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm font-mono text-white">{licenseNumber}</span>
+                        <button onClick={() => copyToClipboard(licenseNumber, 'license')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          {copiedField === 'license' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Custom Fields - View Mode */}
+              {customFields.length > 0 && (
+                <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+                  <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Custom Fields</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {customFields.map((field, idx) => (
+                      <div key={idx}>
+                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">{field.name}</span>
+                        <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                          {field.type === 'boolean' ? (
+                            <span className="text-sm text-white">{field.value === 'true' ? 'Yes' : 'No'}</span>
+                          ) : field.type === 'hidden' ? (
+                            <span className="text-sm font-mono text-white">{showCustomFields[idx] ? field.value : '••••••••'}</span>
+                          ) : (
+                            <span className="text-sm text-white whitespace-pre-wrap">{field.value}</span>
+                          )}
+                          <div className="flex gap-2">
+                            {field.type === 'hidden' && (
+                              <button onClick={() => setShowCustomFields(prev => ({ ...prev, [idx]: !prev[idx] }))} className="p-1.5 text-white/40 hover:text-white/70 transition-colors">
+                                {showCustomFields[idx] ? '👁️‍🗨️' : '👁️'}
+                              </button>
+                            )}
+                            <button onClick={() => copyToClipboard(field.value, `cf-${idx}`)} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                              {copiedField === `cf-${idx}` ? '✓' : '📋'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {alerts.length > 0 && (
                 <div className="space-y-3 pt-4 border-t border-white/[0.1]">
                   <span className="block text-xs font-semibold text-white/30 uppercase mb-2">Security Alerts</span>

@@ -17,6 +17,7 @@
     "@lockbox/totp": "*",
     "@lockbox/types": "*",
     "jspdf": "^4.2.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.1",

@@ -289,7 +289,10 @@ type Message =
   | { type: 'get-teams' }
   | { type: 'get-shared-items' }
   | { type: 'get-shared-folders' }
-  | { type: 'has-keypair' };
+  | { type: 'has-keypair' }
+  | { type: 'check-credentials'; url: string; username: string; password: string }
+  | { type: 'save-credentials'; url: string; username: string; password: string }
+  | { type: 'update-credentials'; url: string; username: string; password: string; itemId: string };
 async function handleMessage(
   message: Message,
 ): Promise<unknown> {
@@ -600,6 +603,136 @@ async function handleMessage(
 
     case 'has-keypair': {
       return { hasKeyPair: hasKeyPairFlag };
+    }
+
+    // ─── Credential save/update detection ──────────────────────────────
+
+    case 'check-credentials': {
+      if (!userKey) return { result: 'new' as const };
+      const { url, username, password } = message;
+      try {
+        const pageHost = new URL(url).hostname.replace(/^www\./, '');
+        for (const item of vaultItems.values()) {
+          if (item.type !== 'login') continue;
+          const login = item as LoginItem;
+          for (const uri of login.uris ?? []) {
+            try {
+              const itemHost = new URL(uri).hostname.replace(/^www\./, '');
+              if (pageHost === itemHost || pageHost.endsWith(`.${itemHost}`) || itemHost.endsWith(`.${pageHost}`)) {
+                // Found a matching URI
+                if (login.username === username && login.password === password) {
+                  return { result: 'match' as const };
+                }
+                if (login.username === username && login.password !== password) {
+                  return { result: 'update' as const, itemId: login.id };
+                }
+              }
+            } catch {
+              // Invalid URI, skip
+            }
+          }
+        }
+        // Also check shared items
+        for (const folderItems of sharedItems.values()) {
+          for (const item of folderItems) {
+            if (item.type !== 'login') continue;
+            const login = item as LoginItem;
+            for (const uri of login.uris ?? []) {
+              try {
+                const itemHost = new URL(uri).hostname.replace(/^www\./, '');
+                if (pageHost === itemHost || pageHost.endsWith(`.${itemHost}`) || itemHost.endsWith(`.${pageHost}`)) {
+                  if (login.username === username && login.password === password) {
+                    return { result: 'match' as const };
+                  }
+                  if (login.username === username && login.password !== password) {
+                    return { result: 'update' as const, itemId: login.id };
+                  }
+                }
+              } catch {
+                // Invalid URI, skip
+              }
+            }
+          }
+        }
+        return { result: 'new' as const };
+      } catch {
+        return { result: 'new' as const };
+      }
+    }
+
+    case 'save-credentials': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const now = new Date().toISOString();
+        const itemId = crypto.randomUUID();
+        let hostname = '';
+        try {
+          hostname = new URL(message.url).hostname.replace(/^www\./, '');
+        } catch {
+          hostname = message.url;
+        }
+        const vaultItem: LoginItem = {
+          id: itemId,
+          type: 'login',
+          name: hostname,
+          username: message.username,
+          password: message.password,
+          uris: [message.url],
+          tags: [],
+          favorite: false,
+          createdAt: now,
+          updatedAt: now,
+          revisionDate: now,
+        };
+        const encryptedData = await encryptVaultItem(vaultItem, itemId, now);
+        if (!encryptedData) return { success: false, error: 'Encryption failed' };
+        await api.vault.createItem({
+          id: itemId,
+          type: 'login' as const,
+          encryptedData,
+          tags: [],
+          favorite: false,
+          revisionDate: now,
+        }, token);
+        vaultItems.set(itemId, vaultItem);
+        return { success: true, item: vaultItem };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to save credentials' };
+      }
+    }
+
+    case 'update-credentials': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const existing = vaultItems.get(message.itemId);
+        if (!existing || existing.type !== 'login') {
+          return { success: false, error: 'Item not found' };
+        }
+        const now = new Date().toISOString();
+        const updatedItem: LoginItem = {
+          ...(existing as LoginItem),
+          password: message.password,
+          updatedAt: now,
+          revisionDate: now,
+        };
+        const encryptedData = await encryptVaultItem(updatedItem, message.itemId, now);
+        if (!encryptedData) return { success: false, error: 'Encryption failed' };
+        await api.vault.updateItem(message.itemId, {
+          encryptedData,
+          folderId: updatedItem.folderId,
+          tags: updatedItem.tags ?? [],
+          favorite: updatedItem.favorite ?? false,
+          revisionDate: now,
+        }, token);
+        vaultItems.set(message.itemId, updatedItem);
+        return { success: true, item: updatedItem };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Failed to update credentials' };
+      }
     }
 
     default:

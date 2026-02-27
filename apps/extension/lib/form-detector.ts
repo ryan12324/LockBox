@@ -1,6 +1,6 @@
 /**
  * Form detection for the content script.
- * Scans DOM for login forms and identifies username/password fields.
+ * Scans DOM for login forms, identity forms, and identifies field types.
  */
 
 export interface DetectedForm {
@@ -10,10 +10,38 @@ export interface DetectedForm {
   submitButton: HTMLButtonElement | null;
 }
 
+/** All recognized field types. */
+export type FieldType =
+  | 'username'
+  | 'password'
+  | 'email'
+  | 'first-name'
+  | 'last-name'
+  | 'name'
+  | 'phone'
+  | 'address-line1'
+  | 'address-line2'
+  | 'city'
+  | 'state'
+  | 'postal-code'
+  | 'country'
+  | 'organization'
+  | 'unknown';
+
+/** Identity-specific field types. */
+export type IdentityFieldType = Exclude<FieldType, 'username' | 'password' | 'email' | 'unknown'>;
+
+/** All identity field types for iteration. */
+const IDENTITY_FIELD_TYPES: ReadonlySet<string> = new Set<string>([
+  'first-name', 'last-name', 'name', 'phone',
+  'address-line1', 'address-line2', 'city', 'state',
+  'postal-code', 'country', 'organization',
+]);
+
 /** Detect the semantic type of an input field. */
 export function detectFieldType(
   input: HTMLInputElement,
-): 'username' | 'password' | 'email' | 'unknown' {
+): FieldType {
   const type = input.type?.toLowerCase();
   const name = (input.name ?? '').toLowerCase();
   const id = (input.id ?? '').toLowerCase();
@@ -23,11 +51,56 @@ export function detectFieldType(
 
   if (type === 'password') return 'password';
   if (type === 'email') return 'email';
+  if (type === 'tel') return 'phone';
 
-  const usernamePatterns = ['username', 'user', 'login', 'email', 'account', 'userid', 'user_id'];
+  // Check autocomplete attribute first (most reliable signal)
+  const autocompleteMap: Record<string, FieldType> = {
+    'given-name': 'first-name',
+    'family-name': 'last-name',
+    'name': 'name',
+    'tel': 'phone',
+    'tel-national': 'phone',
+    'street-address': 'address-line1',
+    'address-line1': 'address-line1',
+    'address-line2': 'address-line2',
+    'address-level2': 'city',
+    'address-level1': 'state',
+    'postal-code': 'postal-code',
+    'country-name': 'country',
+    'country': 'country',
+    'organization': 'organization',
+    'username': 'username',
+    'email': 'email',
+  };
+
+  if (autocomplete && autocompleteMap[autocomplete]) {
+    return autocompleteMap[autocomplete];
+  }
+
+  // Heuristic pattern matching on name/id/placeholder/aria-label
+  const allText = `${name} ${id} ${placeholder} ${ariaLabel}`;
+
+  // Identity field patterns (check before username to avoid false positives)
+  const identityPatterns: Array<{ patterns: string[]; fieldType: FieldType }> = [
+    { patterns: ['firstname', 'first-name', 'first_name', 'fname', 'given-name', 'givenname'], fieldType: 'first-name' },
+    { patterns: ['lastname', 'last-name', 'last_name', 'lname', 'family-name', 'familyname', 'surname'], fieldType: 'last-name' },
+    { patterns: ['phone', 'tel', 'mobile', 'cell'], fieldType: 'phone' },
+    { patterns: ['address-line2', 'address2', 'addr2', 'address_2', 'apt', 'suite', 'unit'], fieldType: 'address-line2' },
+    { patterns: ['address', 'street', 'address-line1', 'address1', 'addr1', 'address_1'], fieldType: 'address-line1' },
+    { patterns: ['city', 'locality', 'town'], fieldType: 'city' },
+    { patterns: ['state', 'province', 'region'], fieldType: 'state' },
+    { patterns: ['zip', 'postal', 'postcode', 'postalcode', 'postal-code', 'zipcode'], fieldType: 'postal-code' },
+    { patterns: ['country'], fieldType: 'country' },
+    { patterns: ['company', 'organization', 'org', 'employer'], fieldType: 'organization' },
+  ];
+
+  for (const { patterns, fieldType } of identityPatterns) {
+    if (patterns.some((p) => allText.includes(p))) return fieldType;
+  }
+
+  // Login field patterns
   const emailPatterns = ['email', 'mail'];
-
-  const allText = `${name} ${id} ${autocomplete} ${placeholder} ${ariaLabel}`;
+  const usernamePatterns = ['username', 'user', 'login', 'account', 'userid', 'user_id'];
 
   if (emailPatterns.some((p) => allText.includes(p))) return 'email';
   if (usernamePatterns.some((p) => allText.includes(p))) return 'username';
@@ -137,4 +210,85 @@ export function urlMatchesUri(pageUrl: string, itemUri: string): boolean {
     // If URI is not a valid URL, do a simple string match
     return pageUrl.includes(itemUri) || itemUri.includes(new URL(pageUrl).hostname);
   }
+}
+
+// ─── Identity form detection ──────────────────────────────────────────────────
+
+/** A detected identity form with typed field mappings. */
+export interface DetectedIdentityForm {
+  formElement: HTMLElement | null;
+  fields: Partial<Record<IdentityFieldType | 'email', HTMLInputElement>>;
+}
+
+/** Check if a field type is an identity-related type. */
+export function isIdentityFieldType(fieldType: FieldType): fieldType is IdentityFieldType {
+  return IDENTITY_FIELD_TYPES.has(fieldType);
+}
+
+/**
+ * Check if a form element has 2+ identity-type fields,
+ * qualifying it as an identity form.
+ */
+export function isIdentityForm(container: HTMLElement): boolean {
+  const inputs = Array.from(
+    container.querySelectorAll<HTMLInputElement>('input:not([type="hidden"]):not([type="password"]):not([type="submit"])'),
+  );
+  let identityFieldCount = 0;
+  for (const input of inputs) {
+    const ft = detectFieldType(input);
+    if (isIdentityFieldType(ft)) {
+      identityFieldCount++;
+      if (identityFieldCount >= 2) return true;
+    }
+  }
+  return false;
+}
+
+/** Detect all identity forms on a page or within a container. */
+export function detectIdentityForms(root: Document | Element): DetectedIdentityForm[] {
+  const results: DetectedIdentityForm[] = [];
+
+  // Check explicit <form> elements
+  const formElements = Array.from(root.querySelectorAll<HTMLFormElement>('form'));
+
+  // Also check the root body for form-less inputs
+  const containers: HTMLElement[] = [...formElements];
+  if (root instanceof Document && root.body) {
+    containers.push(root.body);
+  } else if (root instanceof HTMLElement) {
+    containers.push(root);
+  }
+
+  const processedForms = new Set<HTMLElement>();
+
+  for (const container of containers) {
+    if (processedForms.has(container)) continue;
+
+    if (!isIdentityForm(container)) continue;
+
+    processedForms.add(container);
+
+    const inputs = Array.from(
+      container.querySelectorAll<HTMLInputElement>('input:not([type="hidden"]):not([type="password"]):not([type="submit"])'),
+    );
+
+    const fields: DetectedIdentityForm['fields'] = {};
+
+    for (const input of inputs) {
+      const ft = detectFieldType(input);
+      if (isIdentityFieldType(ft) || ft === 'email') {
+        const key = ft as IdentityFieldType | 'email';
+        if (!fields[key]) {
+          fields[key] = input;
+        }
+      }
+    }
+
+    results.push({
+      formElement: container === root ? null : container,
+      fields,
+    });
+  }
+
+  return results;
 }

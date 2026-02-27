@@ -6,6 +6,7 @@ import Login from './pages/Login.js';
 import Unlock from './pages/Unlock.js';
 import ShareView from './pages/ShareView.js';
 import Vault from './pages/Vault.js';
+import Trash from './pages/Trash.js';
 import Generator from './pages/Generator.js';
 import Settings from './pages/Settings.js';
 import ImportExport from './pages/ImportExport.js';
@@ -57,6 +58,7 @@ export default function App() {
       
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route path="/vault" element={<Vault />} />
+        <Route path="/trash" element={<Trash />} />
         <Route path="/generator" element={<Generator />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/import-export" element={<ImportExport />} />

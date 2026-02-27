@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.js';
+import { QRCodeSVG } from 'qrcode.react';
 
 type Theme = 'system' | 'light' | 'dark';
 type AutoLockMinutes = 1 | 5 | 15 | 30 | 60;
@@ -36,6 +37,34 @@ export default function Settings() {
   const { session } = useAuthStore();
   const [settings, setSettings] = useState<Settings>(loadSettings);
 
+  const [is2FAEnabled, setIs2FAEnabled] = useState<boolean | null>(null);
+  const [twoFaSetup, setTwoFaSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
+  const [verifyCode, setVerifyCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
+  const [twoFaError, setTwoFaError] = useState('');
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
+
+  useEffect(() => {
+    async function check2FA() {
+      if (!session) return;
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/auth/2fa/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.token}`,
+          },
+          body: JSON.stringify({ code: '000000' }),
+        });
+        if (res.status === 409) setIs2FAEnabled(true);
+        else setIs2FAEnabled(false);
+      } catch {
+        setIs2FAEnabled(false);
+      }
+    }
+    check2FA();
+  }, [session]);
+
   useEffect(() => {
     saveSettings(settings);
     // Apply theme
@@ -52,6 +81,84 @@ export default function Settings() {
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSettings((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleEnable2FA() {
+    if (!session) return;
+    setTwoFaLoading(true);
+    setTwoFaError('');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/auth/2fa/setup`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to setup 2FA');
+      setTwoFaSetup({ secret: data.secret, otpauthUri: data.otpauthUri });
+    } catch (err) {
+      setTwoFaError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleVerify2FA(e: React.FormEvent) {
+    e.preventDefault();
+    if (!session || !verifyCode) return;
+    setTwoFaLoading(true);
+    setTwoFaError('');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/auth/2fa/verify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({ code: verifyCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to verify 2FA');
+      setBackupCodes(data.backupCodes);
+      setIs2FAEnabled(true);
+      setTwoFaSetup(null);
+      setVerifyCode('');
+    } catch (err) {
+      setTwoFaError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleDisable2FA() {
+    if (!session) return;
+    const code = window.prompt('Enter your current 6-digit TOTP code to disable 2FA:');
+    if (!code) return;
+    setTwoFaLoading(true);
+    setTwoFaError('');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/auth/2fa/disable`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.token}`,
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to disable 2FA');
+      setIs2FAEnabled(false);
+      setBackupCodes(null);
+    } catch (err) {
+      setTwoFaError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function copyBackupCodes() {
+    if (!backupCodes) return;
+    await navigator.clipboard.writeText(backupCodes.join('\n'));
+    window.alert('Backup codes copied to clipboard');
   }
 
   return (
@@ -88,6 +195,97 @@ export default function Settings() {
                 Import / Export →
               </button>
             </div>
+          </section>
+
+          {/* Two-Factor Authentication */}
+          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
+            <h2 className="text-lg font-semibold text-white mb-4">Two-Factor Authentication</h2>
+            
+            {is2FAEnabled === null ? (
+              <p className="text-sm text-white/50">Checking status...</p>
+            ) : is2FAEnabled ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-green-400 bg-green-500/10 px-3 py-2 rounded border border-green-500/20">
+                  <span>✅</span>
+                  <span className="text-sm font-medium">Two-Factor Authentication: Enabled</span>
+                </div>
+                {backupCodes && (
+                  <div className="bg-white/[0.05] p-4 rounded-lg border border-white/[0.1]">
+                    <h3 className="text-sm font-medium text-white mb-2">Your Backup Codes</h3>
+                    <p className="text-xs text-white/50 mb-3">
+                      Save these codes in a safe place. You can use them to sign in if you lose access to your authenticator app.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {backupCodes.map((c) => (
+                        <code key={c} className="text-xs font-mono bg-black/30 px-2 py-1 rounded text-center text-white/80">{c}</code>
+                      ))}
+                    </div>
+                    <button onClick={copyBackupCodes} className="w-full py-1.5 text-xs bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded">
+                      Copy All
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={handleDisable2FA}
+                  disabled={twoFaLoading}
+                  className="px-4 py-2 text-sm bg-red-500/20 hover:bg-red-500/40 text-red-300 rounded transition-colors disabled:opacity-50"
+                >
+                  Disable 2FA
+                </button>
+                {twoFaError && <p className="text-sm text-red-400 mt-2">{twoFaError}</p>}
+              </div>
+            ) : twoFaSetup ? (
+              <div className="space-y-4">
+                <p className="text-sm text-white/70">
+                  Scan this QR code with your authenticator app (e.g. Google Authenticator, Authy, FreeOTP):
+                </p>
+                <div className="bg-white p-4 rounded-lg inline-block">
+                  <QRCodeSVG value={twoFaSetup.otpauthUri} size={150} />
+                </div>
+                <p className="text-xs text-white/50 break-all font-mono">
+                  Manual entry key: {twoFaSetup.secret}
+                </p>
+                
+                <form onSubmit={handleVerify2FA} className="mt-4">
+                  <label className="block text-sm font-medium text-white/70 mb-2">
+                    Enter 6-digit verification code
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      pattern="[0-9]{6}"
+                      value={verifyCode}
+                      onChange={(e) => setVerifyCode(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-white/[0.12] rounded bg-white/[0.06] text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+                      placeholder="000000"
+                    />
+                    <button
+                      type="submit"
+                      disabled={twoFaLoading || verifyCode.length !== 6}
+                      className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 disabled:opacity-40 text-white rounded transition-colors"
+                    >
+                      Verify
+                    </button>
+                  </div>
+                  {twoFaError && <p className="text-sm text-red-400 mt-2">{twoFaError}</p>}
+                </form>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-white/50">
+                  Add an extra layer of security to your account by requiring a code from your authenticator app when you sign in.
+                </p>
+                <button
+                  onClick={handleEnable2FA}
+                  disabled={twoFaLoading}
+                  className="px-4 py-2 text-sm bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded transition-colors disabled:opacity-50"
+                >
+                  Enable 2FA
+                </button>
+                {twoFaError && <p className="text-sm text-red-400 mt-2">{twoFaError}</p>}
+              </div>
+            )}
           </section>
 
           {/* AI & Intelligence */}
