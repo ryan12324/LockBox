@@ -241,6 +241,7 @@ export function injectSaveBanner(
  * Handle detected credentials by checking against vault and showing banner.
  */
 async function handleDetectedCredentials(creds: ExtractedCredentials): Promise<void> {
+  if (!chrome.runtime?.id) return;
   try {
     const response = (await chrome.runtime.sendMessage({
       type: 'check-credentials',
@@ -257,6 +258,7 @@ async function handleDetectedCredentials(creds: ExtractedCredentials): Promise<v
       response.result === 'new' ? 'new' : 'update',
       hostname,
       () => {
+        if (!chrome.runtime?.id) return;
         const msgType = response.result === 'new' ? 'save-credentials' : 'update-credentials';
         chrome.runtime
           .sendMessage({
@@ -281,7 +283,7 @@ async function handleDetectedCredentials(creds: ExtractedCredentials): Promise<v
  * Initialize the save-on-submit detector.
  * Monitors form submissions and intercepts AJAX requests with credentials.
  */
-export function initSaveDetector(): void {
+export function initSaveDetector(signal?: AbortSignal): void {
   // 1. Monitor form submit events
   document.addEventListener(
     'submit',
@@ -294,7 +296,7 @@ export function initSaveDetector(): void {
         handleDetectedCredentials(creds).catch(() => {});
       }
     },
-    { capture: true }
+    { capture: true, signal }
   );
 
   // 2. Intercept fetch for AJAX form submissions

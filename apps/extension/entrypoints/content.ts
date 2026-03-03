@@ -24,6 +24,7 @@ const injectedFields = new WeakSet<HTMLInputElement>();
 
 /** Send a message to the background service worker. */
 async function sendMessage<T>(message: object): Promise<T> {
+  if (!chrome.runtime?.id) throw new Error('Extension context invalidated');
   return chrome.runtime.sendMessage(message) as Promise<T>;
 }
 
@@ -455,6 +456,7 @@ function showPasskeyPicker(
     rpName: string;
   }>
 ): Promise<{ credentialId: string } | null> {
+  if (!chrome.runtime?.id) return Promise.resolve(null);
   return new Promise((resolve) => {
     const host = document.createElement('div');
     host.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;`;
@@ -532,135 +534,139 @@ export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_start',
 
-  main() {
+  main(ctx) {
     // ─── DOM-dependent features (deferred until DOM is ready) ─────────────────
     function initDomFeatures() {
       // Initial scan for login + identity forms
       injectOverlays();
       // Initialize save-on-submit detection
-      initSaveDetector();
+      initSaveDetector(ctx.signal);
     }
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initDomFeatures);
+      document.addEventListener('DOMContentLoaded', initDomFeatures, { signal: ctx.signal });
     } else {
       initDomFeatures();
     }
 
     // Listen for WebAuthn messages from the injected page script
-    window.addEventListener('message', async (event: MessageEvent) => {
-      if (event.source !== window) return;
-      if (!event.data || typeof event.data.type !== 'string') return;
+    window.addEventListener(
+      'message',
+      async (event: MessageEvent) => {
+        if (event.source !== window) return;
+        if (!event.data || typeof event.data.type !== 'string') return;
 
-      if (event.data.type === 'lockbox-webauthn-create') {
-        try {
-          const result = await sendMessage<{
-            credential?: object;
-            error?: string;
-            fallback?: boolean;
-          }>({
-            type: 'WEBAUTHN_CREATE',
-            requestId: event.data.requestId,
-            origin: event.data.origin,
-            options: event.data.options,
-          });
-          window.postMessage(
-            {
-              type: 'lockbox-webauthn-response',
-              requestId: event.data.requestId,
-              ...result,
-            },
-            '*'
-          );
-        } catch {
-          window.postMessage(
-            {
-              type: 'lockbox-webauthn-response',
-              requestId: event.data.requestId,
-              fallback: true,
-            },
-            '*'
-          );
-        }
-      }
-
-      if (event.data.type === 'lockbox-webauthn-get') {
-        try {
-          const result = await sendMessage<{
-            credential?: object;
-            error?: string;
-            fallback?: boolean;
-            selectPasskey?: boolean;
-            matches?: Array<{
-              credentialId: string;
-              userName: string;
-              userDisplayName: string;
-              rpName: string;
-            }>;
-            _context?: { rpId: string; origin: string; challenge: string };
-          }>({
-            type: 'WEBAUTHN_GET',
-            requestId: event.data.requestId,
-            origin: event.data.origin,
-            options: event.data.options,
-          });
-
-          // If multiple passkeys match, show a picker for the user to select
-          if (result.selectPasskey && result.matches && result._context) {
-            const selected = await showPasskeyPicker(result.matches);
-            if (!selected) {
-              window.postMessage(
-                {
-                  type: 'lockbox-webauthn-response',
-                  requestId: event.data.requestId,
-                  fallback: true,
-                },
-                '*'
-              );
-              return;
-            }
-            // Sign with the selected passkey
-            const signResult = await sendMessage<{
+        if (event.data.type === 'lockbox-webauthn-create') {
+          try {
+            const result = await sendMessage<{
               credential?: object;
+              error?: string;
               fallback?: boolean;
             }>({
-              type: 'WEBAUTHN_GET_SELECTED',
-              credentialId: selected.credentialId,
-              rpId: result._context.rpId,
-              challenge: result._context.challenge,
-              origin: result._context.origin,
+              type: 'WEBAUTHN_CREATE',
+              requestId: event.data.requestId,
+              origin: event.data.origin,
+              options: event.data.options,
             });
             window.postMessage(
               {
                 type: 'lockbox-webauthn-response',
                 requestId: event.data.requestId,
-                ...signResult,
+                ...result,
               },
               '*'
             );
-            return;
+          } catch {
+            window.postMessage(
+              {
+                type: 'lockbox-webauthn-response',
+                requestId: event.data.requestId,
+                fallback: true,
+              },
+              '*'
+            );
           }
-
-          window.postMessage(
-            {
-              type: 'lockbox-webauthn-response',
-              requestId: event.data.requestId,
-              ...result,
-            },
-            '*'
-          );
-        } catch {
-          window.postMessage(
-            {
-              type: 'lockbox-webauthn-response',
-              requestId: event.data.requestId,
-              fallback: true,
-            },
-            '*'
-          );
         }
-      }
-    });
+
+        if (event.data.type === 'lockbox-webauthn-get') {
+          try {
+            const result = await sendMessage<{
+              credential?: object;
+              error?: string;
+              fallback?: boolean;
+              selectPasskey?: boolean;
+              matches?: Array<{
+                credentialId: string;
+                userName: string;
+                userDisplayName: string;
+                rpName: string;
+              }>;
+              _context?: { rpId: string; origin: string; challenge: string };
+            }>({
+              type: 'WEBAUTHN_GET',
+              requestId: event.data.requestId,
+              origin: event.data.origin,
+              options: event.data.options,
+            });
+
+            // If multiple passkeys match, show a picker for the user to select
+            if (result.selectPasskey && result.matches && result._context) {
+              const selected = await showPasskeyPicker(result.matches);
+              if (!selected) {
+                window.postMessage(
+                  {
+                    type: 'lockbox-webauthn-response',
+                    requestId: event.data.requestId,
+                    fallback: true,
+                  },
+                  '*'
+                );
+                return;
+              }
+              // Sign with the selected passkey
+              const signResult = await sendMessage<{
+                credential?: object;
+                fallback?: boolean;
+              }>({
+                type: 'WEBAUTHN_GET_SELECTED',
+                credentialId: selected.credentialId,
+                rpId: result._context.rpId,
+                challenge: result._context.challenge,
+                origin: result._context.origin,
+              });
+              window.postMessage(
+                {
+                  type: 'lockbox-webauthn-response',
+                  requestId: event.data.requestId,
+                  ...signResult,
+                },
+                '*'
+              );
+              return;
+            }
+
+            window.postMessage(
+              {
+                type: 'lockbox-webauthn-response',
+                requestId: event.data.requestId,
+                ...result,
+              },
+              '*'
+            );
+          } catch {
+            window.postMessage(
+              {
+                type: 'lockbox-webauthn-response',
+                requestId: event.data.requestId,
+                fallback: true,
+              },
+              '*'
+            );
+          }
+        }
+      },
+      { signal: ctx.signal }
+    );
 
     // Listen for phishing warnings from background
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -701,6 +707,10 @@ export default defineContentScript({
 
     // Watch for dynamically added forms (SPA navigation)
     const observer = new MutationObserver(() => {
+      if (!chrome.runtime?.id) {
+        observer.disconnect();
+        return;
+      }
       injectOverlays();
     });
 
@@ -708,6 +718,7 @@ export default defineContentScript({
       childList: true,
       subtree: true,
     });
+    ctx.onInvalidated(() => observer.disconnect());
 
     // Track user activity for auto-lock
     const activityEvents = ['click', 'keydown', 'mousemove'];
@@ -717,12 +728,16 @@ export default defineContentScript({
       if (activityThrottle) return;
       activityThrottle = setTimeout(() => {
         activityThrottle = null;
+        if (!chrome.runtime?.id) return;
         chrome.runtime.sendMessage({ type: 'activity' }).catch(() => {});
       }, 5000);
     };
 
     activityEvents.forEach((event) => {
-      document.addEventListener(event, reportActivity, { passive: true });
+      document.addEventListener(event, reportActivity, { passive: true, signal: ctx.signal });
+    });
+    ctx.onInvalidated(() => {
+      if (activityThrottle) clearTimeout(activityThrottle);
     });
   },
 });
