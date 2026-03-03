@@ -53,37 +53,37 @@ export default function App() {
   }, [updateActivity]);
 
   return (
-    <Routes>
-      <Route path="/register" element={<Register />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/unlock" element={<Unlock />} />
-      <Route path="/share/:shareId" element={<ShareView />} />
+    <AuraProvider>
+      <ToastProvider>
+        <Routes>
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/unlock" element={<Unlock />} />
+          <Route path="/share/:shareId" element={<ShareView />} />
 
-      <Route
-        element={
-          <ProtectedRoute>
-            <AuraProvider>
-              <ToastProvider>
+          <Route
+            element={
+              <ProtectedRoute>
                 <AppLayout />
-              </ToastProvider>
-            </AuraProvider>
-          </ProtectedRoute>
-        }
-      >
-        <Route path="/vault" element={<Vault />} />
-        <Route path="/trash" element={<Trash />} />
-        <Route path="/generator" element={<Generator />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/settings/import-export" element={<ImportExport />} />
-        <Route path="/settings/ai" element={<AISettings />} />
-        <Route path="/health" element={<Health />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="/teams" element={<Teams />} />
-        <Route path="/teams/:teamId" element={<TeamDetail />} />
-        <Route path="/emergency-access" element={<EmergencyAccess />} />
-      </Route>
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/vault" element={<Vault />} />
+            <Route path="/trash" element={<Trash />} />
+            <Route path="/generator" element={<Generator />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/import-export" element={<ImportExport />} />
+            <Route path="/settings/ai" element={<AISettings />} />
+            <Route path="/health" element={<Health />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/teams" element={<Teams />} />
+            <Route path="/teams/:teamId" element={<TeamDetail />} />
+            <Route path="/emergency-access" element={<EmergencyAccess />} />
+          </Route>
 
-      <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />
-    </Routes>
+          <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />
+        </Routes>
+      </ToastProvider>
+    </AuraProvider>
   );
 }
