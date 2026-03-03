@@ -32,7 +32,7 @@ export default function Login() {
     try {
       // Step 1: Fetch KDF params for this email (no auth required)
       // This lets us derive the master key before sending the auth hash
-      const kdfRes = await api.auth.kdfParams(email) as {
+      const kdfRes = (await api.auth.kdfParams(email)) as {
         kdfConfig: KdfConfig;
         salt: string;
       };
@@ -47,7 +47,7 @@ export default function Login() {
       const authHash = await makeAuthHash(masterKey, password);
 
       // Step 4: Login with derived auth hash
-      const loginRes = await api.auth.login({ email, authHash }) as {
+      const loginRes = (await api.auth.login({ email, authHash })) as {
         token?: string;
         user?: {
           id: string;
@@ -108,7 +108,7 @@ export default function Login() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tempToken, code: twoFaCode }),
       });
-      
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Invalid 2FA code');
 
@@ -147,13 +147,13 @@ export default function Login() {
       const challengeBytes = fromBase64(challengeRes.challenge);
 
       // Step 2: Authenticate with hardware key
-      const assertion = await navigator.credentials.get({
+      const assertion = (await navigator.credentials.get({
         publicKey: {
           challenge: challengeBytes,
           rpId: window.location.hostname,
           userVerification: 'preferred',
         },
-      }) as PublicKeyCredential | null;
+      })) as PublicKeyCredential | null;
       if (!assertion) throw new Error('Authentication cancelled');
 
       const assertionResponse = assertion.response as AuthenticatorAssertionResponse;
@@ -168,7 +168,7 @@ export default function Login() {
 
       // Step 4: Unwrap master key and set session
       const wrappedKeyBytes = fromBase64(verifyRes.wrappedMasterKey);
-      const meRes = await api.auth.me(verifyRes.token) as {
+      const meRes = (await api.auth.me(verifyRes.token)) as {
         user: {
           id: string;
           email: string;
@@ -206,11 +206,21 @@ export default function Login() {
 
     // Capacitor injects window.Capacitor in the native WebView at runtime
     const cap = (window as unknown as Record<string, unknown>).Capacitor as
-      | { isNativePlatform(): boolean; isPluginAvailable(name: string): boolean; nativePromise(plugin: string, method: string, opts: Record<string, unknown>): Promise<Record<string, unknown>> }
+      | {
+          isNativePlatform(): boolean;
+          isPluginAvailable(name: string): boolean;
+          nativePromise(
+            plugin: string,
+            method: string,
+            opts: Record<string, unknown>
+          ): Promise<Record<string, unknown>>;
+        }
       | undefined;
 
     if (!cap?.isNativePlatform()) {
-      setError('QR scanning is only available in the mobile app. Open Settings \u2192 Device Sync on your existing device to generate a QR code.');
+      setError(
+        'QR scanning is only available in the mobile app. Open Settings \u2192 Device Sync on your existing device to generate a QR code.'
+      );
       setQrScanning(false);
       return;
     }
@@ -223,17 +233,27 @@ export default function Login() {
 
     try {
       // Check camera availability
-      const availResult = await cap.nativePromise('QRScanner', 'isAvailable', {}) as { available: boolean };
+      const availResult = (await cap.nativePromise('QRScanner', 'isAvailable', {})) as {
+        available: boolean;
+      };
       if (!availResult.available) {
         setError('Camera not available. Please grant camera permission in your device settings.');
         return;
       }
 
       // Launch the native QR scanner (CameraX + ML Kit)
-      const scanResult = await cap.nativePromise('QRScanner', 'scanQRCode', {}) as { value: string; format: string };
+      const scanResult = (await cap.nativePromise('QRScanner', 'scanQRCode', {})) as {
+        value: string;
+        format: string;
+      };
 
       // Parse QR sync payload
-      let payload: { ephemeralPublicKey?: string; encryptedSessionKey?: string; nonce?: string; expiresAt?: string };
+      let payload: {
+        ephemeralPublicKey?: string;
+        encryptedSessionKey?: string;
+        nonce?: string;
+        expiresAt?: string;
+      };
       try {
         payload = JSON.parse(scanResult.value);
       } catch {
@@ -242,14 +262,23 @@ export default function Login() {
       }
 
       // Validate QR sync payload structure
-      if (!payload.ephemeralPublicKey || !payload.encryptedSessionKey || !payload.nonce || !payload.expiresAt) {
-        setError('Invalid QR code format. Please scan a Lockbox device sync QR code from Settings \u2192 Device Sync.');
+      if (
+        !payload.ephemeralPublicKey ||
+        !payload.encryptedSessionKey ||
+        !payload.nonce ||
+        !payload.expiresAt
+      ) {
+        setError(
+          'Invalid QR code format. Please scan a Lockbox device sync QR code from Settings \u2192 Device Sync.'
+        );
         return;
       }
 
       // Check expiry
       if (new Date(payload.expiresAt).getTime() < Date.now()) {
-        setError('QR code has expired. Please generate a new one from Settings \u2192 Device Sync.');
+        setError(
+          'QR code has expired. Please generate a new one from Settings \u2192 Device Sync.'
+        );
         return;
       }
 
@@ -286,10 +315,17 @@ export default function Login() {
         receiverKeyPair.privateKey,
         256
       );
-      const ikm = await crypto.subtle.importKey('raw', rawBits, { name: 'HKDF' }, false, ['deriveBits']);
+      const ikm = await crypto.subtle.importKey('raw', rawBits, { name: 'HKDF' }, false, [
+        'deriveBits',
+      ]);
       const info = new TextEncoder().encode('lockbox-device-sync');
       const derivedBits = await crypto.subtle.deriveBits(
-        { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32) as Uint8Array<ArrayBuffer>, info: info as Uint8Array<ArrayBuffer> },
+        {
+          name: 'HKDF',
+          hash: 'SHA-256',
+          salt: new Uint8Array(32) as Uint8Array<ArrayBuffer>,
+          info: info as Uint8Array<ArrayBuffer>,
+        },
         ikm,
         256
       );
@@ -317,7 +353,7 @@ export default function Login() {
 
       // Establish session with the decrypted credentials
       const userKeyBytes = fromBase64(sessionData.userKey);
-      const meRes = await api.auth.me(sessionData.sessionToken) as {
+      const meRes = (await api.auth.me(sessionData.sessionToken)) as {
         user: {
           id: string;
           email: string;
@@ -342,7 +378,9 @@ export default function Login() {
         if (err.message.includes('permission') || err.message.includes('Permission')) {
           setError('Camera permission denied. Please grant camera access in your device settings.');
         } else if (err.name === 'OperationError') {
-          setError('Could not decrypt QR payload. The QR code may have been generated by a different device or session.');
+          setError(
+            'Could not decrypt QR payload. The QR code may have been generated by a different device or session.'
+          );
         } else {
           setError(err.message || 'QR scan failed. Please try again.');
         }
@@ -358,20 +396,23 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">🔐 Lockbox</h1>
-          <p className="mt-2 text-white/50">Sign in to your vault</p>
+          <h1 className="text-3xl font-bold text-[var(--color-text)]">🔐 Lockbox</h1>
+          <p className="mt-2 text-[var(--color-text-tertiary)]">Sign in to your vault</p>
         </div>
 
         {tempToken ? (
-          <form onSubmit={handle2FASubmit} className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-8 space-y-5">
+          <form
+            onSubmit={handle2FASubmit}
+            className="bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-8 space-y-5"
+          >
             {error && (
-              <div className="bg-red-500/10 border border-red-400/20 rounded-lg p-3 text-red-300 backdrop-blur-sm text-sm">
+              <div className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)] p-3 text-[var(--color-error)] text-sm">
                 {error}
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-white/70 mb-1">
+              <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                 {isBackupCode ? 'Backup Code' : 'Authenticator Code'}
               </label>
               <input
@@ -380,15 +421,15 @@ export default function Login() {
                 required
                 value={twoFaCode}
                 onChange={(e) => setTwoFaCode(e.target.value)}
-                className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-white/[0.2]"
-                placeholder={isBackupCode ? "8-character code" : "6-digit code"}
+                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
+                placeholder={isBackupCode ? '8-character code' : '6-digit code'}
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-indigo-600/80 hover:bg-indigo-500/90 disabled:opacity-40 text-white backdrop-blur-sm font-medium rounded-lg transition-colors"
+              className="w-full py-2.5 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-40 text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
             >
               {loading ? 'Verifying...' : 'Verify'}
             </button>
@@ -400,7 +441,7 @@ export default function Login() {
                 setTwoFaCode('');
                 setError('');
               }}
-              className="w-full py-2 text-sm text-indigo-300 hover:text-indigo-200 hover:underline text-center"
+              className="w-full py-2 text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline text-center"
             >
               {isBackupCode ? 'Use authenticator app' : 'Use backup code'}
             </button>
@@ -412,21 +453,24 @@ export default function Login() {
                 setTwoFaCode('');
                 setError('');
               }}
-              className="w-full py-2 text-sm text-white/50 hover:text-white/70 hover:underline text-center"
+              className="w-full py-2 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-text)] hover:underline text-center"
             >
               Cancel
             </button>
           </form>
         ) : (
-          <form onSubmit={handleSubmit} className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-8 space-y-5">
+          <form
+            onSubmit={handleSubmit}
+            className="bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-8 space-y-5"
+          >
             {error && (
-              <div className="bg-red-500/10 border border-red-400/20 rounded-lg p-3 text-red-300 backdrop-blur-sm text-sm">
+              <div className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)] p-3 text-[var(--color-error)] text-sm">
                 {error}
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-white/70 mb-1">
+              <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                 Email
               </label>
               <input
@@ -435,13 +479,13 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-white/[0.2]"
+                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
                 placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-white/70 mb-1">
+              <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                 Master Password
               </label>
               <input
@@ -450,7 +494,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-white/[0.2]"
+                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
                 placeholder="Master password"
               />
             </div>
@@ -458,14 +502,17 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-indigo-600/80 hover:bg-indigo-500/90 disabled:opacity-40 text-white backdrop-blur-sm font-medium rounded-lg transition-colors"
+              className="w-full py-2.5 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-40 text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
             >
               {loading ? 'Unlocking vault...' : 'Sign In'}
             </button>
 
-            <p className="text-center text-sm text-white/50">
+            <p className="text-center text-sm text-[var(--color-text-tertiary)]">
               Don't have an account?{' '}
-              <Link to="/register" className="text-indigo-300 hover:text-indigo-200 hover:underline">
+              <Link
+                to="/register"
+                className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
+              >
                 Create vault
               </Link>
             </p>
@@ -475,7 +522,7 @@ export default function Login() {
                 type="button"
                 onClick={handleHardwareKeyUnlock}
                 disabled={hwKeyLoading}
-                className="w-full py-2.5 px-4 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 font-medium rounded-lg transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-4 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] font-medium rounded-[var(--radius-md)] transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 <span>🔐</span>
                 {hwKeyLoading ? 'Authenticating...' : 'Unlock with Hardware Key'}
@@ -484,7 +531,7 @@ export default function Login() {
                 type="button"
                 onClick={handleQRScan}
                 disabled={qrScanning}
-                className="w-full py-2.5 px-4 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 font-medium rounded-lg transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-4 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] font-medium rounded-[var(--radius-md)] transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 <span>📱</span>
                 {qrScanning ? 'Scanning...' : 'Scan QR Code'}

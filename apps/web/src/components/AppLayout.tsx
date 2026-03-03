@@ -105,8 +105,10 @@ export default function AppLayout() {
   const isNavActive = (path: string) => location.pathname === path;
 
   const getNavItemClass = (isActive: boolean) =>
-    `w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-      isActive ? 'bg-white/[0.12] text-white' : 'hover:bg-white/[0.08] text-white/70'
+    `w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-sm transition-colors ${
+      isActive
+        ? 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]'
+        : 'hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)]'
     }`;
 
   const isVaultActive = isNavActive('/vault');
@@ -114,10 +116,12 @@ export default function AppLayout() {
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
-      <aside className="w-64 backdrop-blur-xl bg-white/[0.07] border-r border-white/[0.12] flex flex-col">
-        <div className="p-4 border-b border-white/[0.1]">
-          <h1 className="text-xl font-bold text-white">🔐 Lockbox</h1>
-          <p className="text-xs text-white/40 mt-1 truncate">{session?.email}</p>
+      <aside className="w-64 bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col">
+        <div className="p-4 border-b border-[var(--color-border)]">
+          <h1 className="text-xl font-bold text-[var(--color-text)]">🔐 Lockbox</h1>
+          <p className="text-xs text-[var(--color-text-tertiary)] mt-1 truncate">
+            {session?.email}
+          </p>
         </div>
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
@@ -153,10 +157,10 @@ export default function AppLayout() {
           </button>
           <button
             onClick={() => navigate('/chat')}
-            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-[var(--radius-md)] transition-colors ${
               isNavActive('/chat')
-                ? 'bg-white/[0.12] text-white'
-                : 'text-white/70 hover:bg-white/[0.06] hover:text-white'
+                ? 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]'
+                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-text)]'
             }`}
           >
             <span className="text-lg">✨</span>
@@ -182,7 +186,7 @@ export default function AppLayout() {
           </button>
 
           <div className="pt-2 pb-1">
-            <p className="px-3 text-xs font-semibold text-white/30 uppercase tracking-wider">
+            <p className="px-3 text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
               Types
             </p>
           </div>
@@ -214,12 +218,12 @@ export default function AppLayout() {
 
           {/* Folders */}
           <div className="pt-2 pb-1 flex items-center justify-between">
-            <p className="px-3 text-xs font-semibold text-white/30 uppercase tracking-wider">
+            <p className="px-3 text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
               Folders
             </p>
             <button
               onClick={() => setShowNewFolder(true)}
-              className="px-2 text-white/30 hover:text-indigo-400 transition-colors text-sm"
+              className="px-2 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary-hover)] transition-colors text-sm"
               title="New folder"
             >
               +
@@ -240,12 +244,12 @@ export default function AppLayout() {
                   }
                 }}
                 placeholder="Folder name"
-                className="flex-1 px-2 py-1 text-sm border border-white/[0.12] rounded bg-white/[0.06] text-white placeholder-white/40"
+                className="flex-1 px-2 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
                 autoFocus
               />
               <button
                 onClick={handleCreateFolder}
-                className="px-2 py-1 text-xs bg-indigo-600/80 text-white rounded hover:bg-indigo-500/90"
+                className="px-2 py-1 text-xs bg-[var(--color-primary)] text-[var(--color-primary-fg)] rounded hover:bg-[var(--color-primary-hover)]"
               >
                 ✓
               </button>
@@ -254,7 +258,7 @@ export default function AppLayout() {
                   setShowNewFolder(false);
                   setNewFolderName('');
                 }}
-                className="px-2 py-1 text-xs text-white/30 hover:text-white/60"
+                className="px-2 py-1 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
               >
                 ✕
               </button>
@@ -272,37 +276,37 @@ export default function AppLayout() {
                     if (e.key === 'Enter') handleRenameFolder();
                     if (e.key === 'Escape') setEditingFolder(null);
                   }}
-                  className="flex-1 px-2 py-1 text-sm border border-white/[0.12] rounded bg-white/[0.06] text-white placeholder-white/40"
+                  className="flex-1 px-2 py-1 text-sm border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
                   autoFocus
                 />
                 <button
                   onClick={handleRenameFolder}
-                  className="px-2 py-1 text-xs bg-indigo-600/80 text-white rounded hover:bg-indigo-500/90"
+                  className="px-2 py-1 text-xs bg-[var(--color-primary)] text-[var(--color-primary-fg)] rounded hover:bg-[var(--color-primary-hover)]"
                 >
                   ✓
                 </button>
                 <button
                   onClick={() => setEditingFolder(null)}
-                  className="px-2 py-1 text-xs text-white/30 hover:text-white/60"
+                  className="px-2 py-1 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
                 >
                   ✕
                 </button>
               </div>
             ) : deletingFolderId === folder.id ? (
               <div key={folder.id} className="px-3 py-2">
-                <p className="text-xs text-white/70 mb-2">
+                <p className="text-xs text-[var(--color-text-secondary)] mb-2">
                   Delete "{folder.name}"? Items will be moved to root.
                 </p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleDeleteFolder(folder.id)}
-                    className="px-2 py-1 text-xs bg-red-500/80 hover:bg-red-400/90 text-white rounded"
+                    className="px-2 py-1 text-xs bg-[var(--color-error)] hover:bg-[var(--color-error)] text-[var(--color-primary-fg)] rounded"
                   >
                     Delete
                   </button>
                   <button
                     onClick={() => setDeletingFolderId(null)}
-                    className="px-2 py-1 text-xs text-white/30 hover:text-white/60"
+                    className="px-2 py-1 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
                   >
                     Cancel
                   </button>
@@ -317,10 +321,10 @@ export default function AppLayout() {
                     setShowFavorites(false);
                     navToVault();
                   }}
-                  className={`flex-1 text-left px-3 py-2 rounded-lg text-sm transition-colors truncate ${
+                  className={`flex-1 text-left px-3 py-2 rounded-[var(--radius-md)] text-sm transition-colors truncate ${
                     isVaultActive && selectedFolder === folder.id
-                      ? 'bg-white/[0.12] text-white'
-                      : 'hover:bg-white/[0.08] text-white/70'
+                      ? 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]'
+                      : 'hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)]'
                   }`}
                 >
                   📁 {folder.name}
@@ -328,14 +332,14 @@ export default function AppLayout() {
                 <div className="hidden group-hover:flex gap-0.5 pr-1 shrink-0">
                   <button
                     onClick={() => setEditingFolder({ id: folder.id, name: folder.name })}
-                    className="p-1 text-white/30 hover:text-indigo-400 transition-colors"
+                    className="p-1 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary-hover)] transition-colors"
                     title="Rename"
                   >
                     ✎
                   </button>
                   <button
                     onClick={() => setDeletingFolderId(folder.id)}
-                    className="p-1 text-white/30 hover:text-red-400 transition-colors"
+                    className="p-1 text-[var(--color-text-tertiary)] hover:text-[var(--color-error)] transition-colors"
                     title="Delete"
                   >
                     ✕
@@ -346,7 +350,7 @@ export default function AppLayout() {
           )}
         </nav>
 
-        <div className="p-3 border-t border-white/[0.1] space-y-1">
+        <div className="p-3 border-t border-[var(--color-border)] space-y-1">
           <button
             onClick={() => navigate('/generator')}
             className={getNavItemClass(isNavActive('/generator'))}
@@ -361,13 +365,13 @@ export default function AppLayout() {
           </button>
           <button
             onClick={lock}
-            className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-white/[0.08] text-white/70 transition-colors"
+            className="w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-sm hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] transition-colors"
           >
             🔒 Lock
           </button>
           <button
             onClick={handleLogout}
-            className="w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-white/[0.08] text-red-400 transition-colors"
+            className="w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-sm hover:bg-[var(--color-surface-raised)] text-[var(--color-error)] transition-colors"
           >
             🚪 Sign Out
           </button>
@@ -377,14 +381,14 @@ export default function AppLayout() {
       {/* Main content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {isTravelMode && (
-          <div className="bg-gradient-to-r from-indigo-600 to-amber-600 text-white px-4 py-2 text-sm flex items-center justify-between shadow-md z-50">
+          <div className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-warning)] text-[var(--color-text)] px-4 py-2 text-sm flex items-center justify-between shadow-md z-50">
             <span className="flex items-center gap-2 font-medium">
               <span>⚠️</span>
               Travel mode active — some items are hidden
             </span>
             <button
               onClick={() => navigate('/settings')}
-              className="hover:text-indigo-200 underline"
+              className="hover:text-[var(--color-primary-hover)] underline"
             >
               Settings
             </button>
