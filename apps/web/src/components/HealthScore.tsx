@@ -35,13 +35,13 @@ export default function HealthScore({
 
   const currentOffset = initialRender ? circumference : offset;
 
-  let colorClass = 'text-emerald-500'; // 90-100
+  let colorClass = 'text-[var(--color-success)]'; // 90-100
   if (score < 40) {
-    colorClass = 'text-red-500';
+    colorClass = 'text-[var(--color-error)]';
   } else if (score < 70) {
-    colorClass = 'text-amber-500';
+    colorClass = 'text-[var(--color-warning)]';
   } else if (score < 90) {
-    colorClass = 'text-indigo-500';
+    colorClass = 'text-[var(--color-primary)]';
   }
 
   return (
@@ -57,7 +57,7 @@ export default function HealthScore({
       >
         {/* Background ring */}
         <circle
-          className="text-white/[0.07] stroke-current"
+          className="text-[var(--color-border)] stroke-current"
           strokeWidth={strokeWidth}
           cx={size / 2}
           cy={size / 2}
@@ -77,10 +77,12 @@ export default function HealthScore({
           strokeDashoffset={currentOffset}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--color-text)]">
         <span className="text-4xl font-bold tracking-tight">{score}</span>
         {label && (
-          <span className="text-xs text-white/40 mt-1 uppercase tracking-widest">{label}</span>
+          <span className="text-xs text-[var(--color-text-tertiary)] mt-1 uppercase tracking-widest">
+            {label}
+          </span>
         )}
       </div>
     </div>

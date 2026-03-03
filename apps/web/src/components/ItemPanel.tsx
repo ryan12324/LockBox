@@ -473,18 +473,15 @@ export default function ItemPanel({
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/30 z-40 transition-opacity" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] backdrop-blur-2xl bg-white/[0.08] shadow-[0_16px_48px_rgba(0,0,0,0.35)] border-l border-white/[0.1] z-50 flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0">
+      <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] border-l border-[var(--color-border)] z-50 flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/[0.1]">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
           <div className="flex items-center gap-3">
             <span className="text-2xl">{typeIcon(type)}</span>
-            <h2 className="text-lg font-semibold text-white truncate max-w-[200px]">
+            <h2 className="text-lg font-semibold text-[var(--color-text)] truncate max-w-[200px]">
               {currentMode === 'add'
                 ? `New ${type.charAt(0).toUpperCase() + type.slice(1)}`
                 : name || 'Unnamed Item'}
@@ -495,20 +492,20 @@ export default function ItemPanel({
               <>
                 <button
                   onClick={() => setShowShareModal(true)}
-                  className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-sm bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors"
                 >
                   Share
                 </button>
                 <button
                   onClick={() => setShowHistory(true)}
-                  className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
+                  className="px-3 py-1.5 text-sm bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors"
                 >
                   History
                 </button>
                 {type !== 'passkey' && (
                   <button
                     onClick={() => setCurrentMode('edit')}
-                    className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-sm bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors"
                   >
                     Edit
                   </button>
@@ -518,14 +515,14 @@ export default function ItemPanel({
               <>
                 <button
                   onClick={currentMode === 'add' ? onClose : () => setCurrentMode('view')}
-                  className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 text-sm bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors disabled:opacity-50"
                   disabled={loading}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-3 py-1.5 text-sm bg-indigo-600/80 hover:bg-indigo-500/90 text-white backdrop-blur-sm rounded-lg transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 text-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] transition-colors disabled:opacity-50"
                   disabled={loading}
                 >
                   {loading ? 'Saving...' : 'Save'}
@@ -534,7 +531,7 @@ export default function ItemPanel({
             )}
             <button
               onClick={onClose}
-              className="p-1.5 text-white/30 hover:text-white/60 rounded-lg transition-colors"
+              className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors"
             >
               ✕
             </button>
@@ -544,23 +541,23 @@ export default function ItemPanel({
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {error && (
-            <div className="p-3 bg-red-500/10 text-red-300 border border-red-400/20 text-sm rounded-lg">
+            <div className="p-3 bg-[var(--color-error-subtle)] text-[var(--color-error)] border border-[var(--color-error)] text-sm rounded-[var(--radius-md)]">
               {error}
             </div>
           )}
 
           {currentMode === 'add' && (
-            <div className="flex bg-white/[0.06] p-1 rounded-lg">
+            <div className="flex bg-[var(--color-surface)] p-1 rounded-[var(--radius-md)]">
               {(
                 ['login', 'note', 'card', 'identity', 'passkey', 'document'] as VaultItemType[]
               ).map((t) => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
-                  className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  className={`flex-1 py-1.5 text-sm font-medium rounded-[var(--radius-sm)] transition-colors ${
                     type === t
-                      ? 'bg-white/[0.12] text-white shadow-sm'
-                      : 'text-white/40 hover:text-white/70'
+                      ? 'bg-[var(--color-surface-raised)] text-[var(--color-text)] shadow-sm'
+                      : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
                   }`}
                 >
                   {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -573,18 +570,22 @@ export default function ItemPanel({
           {currentMode !== 'view' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Name</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Name
+                </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   placeholder="e.g. My Bank"
                 />
               </div>
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-white/70 mb-1">Folder</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Folder
+                  </label>
                   <select
                     value={creatingFolder ? '__new__' : folderId}
                     onChange={(e) => {
@@ -595,7 +596,7 @@ export default function ItemPanel({
                         setFolderId(e.target.value);
                       }
                     }}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   >
                     <option value="">No folder</option>
                     {localFolders.map((f) => (
@@ -619,12 +620,12 @@ export default function ItemPanel({
                           }
                         }}
                         placeholder="Folder name"
-                        className="flex-1 px-2 py-1.5 text-sm border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                        className="flex-1 px-2 py-1.5 text-sm border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                         autoFocus
                       />
                       <button
                         onClick={handleCreateFolder}
-                        className="px-2.5 py-1.5 text-xs bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg backdrop-blur-sm"
+                        className="px-2.5 py-1.5 text-xs bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)]"
                       >
                         ✓
                       </button>
@@ -633,7 +634,7 @@ export default function ItemPanel({
                           setCreatingFolder(false);
                           setNewFolderName('');
                         }}
-                        className="px-2 py-1.5 text-xs text-white/30 hover:text-white/60"
+                        className="px-2 py-1.5 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
                       >
                         ✕
                       </button>
@@ -646,26 +647,30 @@ export default function ItemPanel({
                       type="checkbox"
                       checked={favorite}
                       onChange={(e) => setFavorite(e.target.checked)}
-                      className="rounded border-white/20 bg-white/10 text-indigo-500 focus:ring-indigo-500/60"
+                      className="rounded border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-primary)] focus:ring-[var(--color-aura)]"
                     />
-                    <span className="text-sm font-medium text-white/70">Favorite</span>
+                    <span className="text-sm font-medium text-[var(--color-text-secondary)]">
+                      Favorite
+                    </span>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Tags</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Tags
+                </label>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {tags.map((t) => (
                     <span
                       key={t}
-                      className="px-2 py-1 text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full flex items-center gap-1"
+                      className="px-2 py-1 text-xs bg-[var(--color-aura-dim)] text-[var(--color-primary)] border border-[var(--color-primary)] rounded-[var(--radius-full)] flex items-center gap-1"
                     >
                       {t}
                       <button
                         type="button"
                         onClick={() => setTags(tags.filter((x) => x !== t))}
-                        className="hover:text-white"
+                        className="hover:text-[var(--color-text)]"
                       >
                         ✕
                       </button>
@@ -674,7 +679,9 @@ export default function ItemPanel({
                 </div>
                 {suggestedTags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <span className="text-xs text-white/40 self-center">Suggested:</span>
+                    <span className="text-xs text-[var(--color-text-tertiary)] self-center">
+                      Suggested:
+                    </span>
                     {suggestedTags
                       .filter((t) => !tags.includes(t))
                       .map((t) => (
@@ -682,7 +689,7 @@ export default function ItemPanel({
                           type="button"
                           key={t}
                           onClick={() => setTags([...tags, t])}
-                          className="px-2 py-1 text-xs bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 rounded-full text-indigo-300 transition-colors"
+                          className="px-2 py-1 text-xs bg-[var(--color-aura-dim)] hover:bg-[var(--color-aura-dim)] border border-[var(--color-primary)] rounded-[var(--radius-full)] text-[var(--color-primary)] transition-colors"
                         >
                           + {t}
                         </button>
@@ -695,9 +702,9 @@ export default function ItemPanel({
 
           {/* Type Specific Fields - Edit/Add Mode */}
           {currentMode !== 'view' && type === 'login' && (
-            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+            <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                   Username / Email
                 </label>
                 <div className="flex gap-2">
@@ -705,7 +712,7 @@ export default function ItemPanel({
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                   <button
                     type="button"
@@ -730,7 +737,7 @@ export default function ItemPanel({
                         setError('Configure email aliases in Settings first');
                       }
                     }}
-                    className="px-3 py-2 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors text-sm whitespace-nowrap"
+                    className="px-3 py-2 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors text-sm whitespace-nowrap"
                     title="Generate email alias"
                   >
                     🎭 Alias
@@ -738,19 +745,21 @@ export default function ItemPanel({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Password</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Password
+                </label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <input
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 pr-10 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
                     >
                       {showPassword ? '👁️‍🗨️' : '👁️'}
                     </button>
@@ -768,14 +777,14 @@ export default function ItemPanel({
                       setPassword(pw);
                       setShowPassword(true);
                     }}
-                    className="px-3 py-2 bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors text-sm"
+                    className="px-3 py-2 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors text-sm"
                   >
                     Gen
                   </button>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                   Authenticator Key (TOTP)
                 </label>
                 <input
@@ -783,11 +792,13 @@ export default function ItemPanel({
                   value={totpSecret}
                   onChange={(e) => setTotpSecret(e.target.value)}
                   placeholder="Base32 secret or otpauth:// URI"
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">URIs</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  URIs
+                </label>
                 {uris.map((uri, idx) => (
                   <div key={idx} className="flex gap-2 mb-2">
                     <input
@@ -799,12 +810,12 @@ export default function ItemPanel({
                         setUris(newUris);
                       }}
                       placeholder="https://example.com"
-                      className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                     <button
                       type="button"
                       onClick={() => setUris(uris.filter((_, i) => i !== idx))}
-                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
+                      className="p-2 text-[var(--color-error)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-subtle)] rounded-[var(--radius-md)]"
                     >
                       ✕
                     </button>
@@ -813,7 +824,7 @@ export default function ItemPanel({
                 <button
                   type="button"
                   onClick={() => setUris([...uris, ''])}
-                  className="text-sm text-indigo-300 hover:text-indigo-200 hover:underline"
+                  className="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary)] hover:underline"
                 >
                   + Add URI
                 </button>
@@ -822,48 +833,54 @@ export default function ItemPanel({
           )}
 
           {currentMode !== 'view' && type === 'note' && (
-            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+            <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Secure Note</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Secure Note
+                </label>
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   rows={8}
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white resize-y"
+                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] resize-y"
                 />
               </div>
             </div>
           )}
 
           {currentMode !== 'view' && type === 'card' && (
-            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+            <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                   Cardholder Name
                 </label>
                 <input
                   type="text"
                   value={cardholderName}
                   onChange={(e) => setCardholderName(e.target.value)}
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Card Number</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Card Number
+                </label>
                 <input
                   type="text"
                   value={number}
                   onChange={(e) => setNumber(e.target.value)}
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                 />
               </div>
               <div className="flex gap-4">
                 <div className="w-1/3">
-                  <label className="block text-sm font-medium text-white/70 mb-1">Exp Month</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Exp Month
+                  </label>
                   <select
                     value={expMonth}
                     onChange={(e) => setExpMonth(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   >
                     {Array.from({ length: 12 }, (_, i) => {
                       const m = (i + 1).toString().padStart(2, '0');
@@ -876,28 +893,32 @@ export default function ItemPanel({
                   </select>
                 </div>
                 <div className="w-1/3">
-                  <label className="block text-sm font-medium text-white/70 mb-1">Exp Year</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Exp Year
+                  </label>
                   <input
                     type="text"
                     value={expYear}
                     onChange={(e) => setExpYear(e.target.value)}
                     placeholder="YYYY"
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
                 <div className="w-1/3">
-                  <label className="block text-sm font-medium text-white/70 mb-1">CVV</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    CVV
+                  </label>
                   <div className="relative">
                     <input
                       type={showCvv ? 'text' : 'password'}
                       value={cvv}
                       onChange={(e) => setCvv(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 pr-10 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowCvv(!showCvv)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
                     >
                       {showCvv ? '👁️‍🗨️' : '👁️'}
                     </button>
@@ -905,11 +926,13 @@ export default function ItemPanel({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Brand</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Brand
+                </label>
                 <select
                   value={brand}
                   onChange={(e) => setBrand(e.target.value)}
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                 >
                   <option value="">Select Brand...</option>
                   <option value="Visa">Visa</option>
@@ -923,191 +946,207 @@ export default function ItemPanel({
           )}
 
           {currentMode !== 'view' && type === 'identity' && (
-            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+            <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+                <h3 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
                   Personal
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">
+                    <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                       First Name
                     </label>
                     <input
                       type="text"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">
+                    <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                       Middle Name
                     </label>
                     <input
                       type="text"
                       value={middleName}
                       onChange={(e) => setMiddleName(e.target.value)}
-                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Last Name</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Last Name
+                  </label>
                   <input
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Email</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Email
+                  </label>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Phone
+                  </label>
                   <input
                     type="text"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+              <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
+                <h3 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
                   Address
                 </h3>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Address 1</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Address 1
+                  </label>
                   <input
                     type="text"
                     value={address1}
                     onChange={(e) => setAddress1(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Address 2</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Address 2
+                  </label>
                   <input
                     type="text"
                     value={address2}
                     onChange={(e) => setAddress2(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">City</label>
+                    <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                      City
+                    </label>
                     <input
                       type="text"
                       value={city}
                       onChange={(e) => setCity(e.target.value)}
-                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">
+                    <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                       State/Province
                     </label>
                     <input
                       type="text"
                       value={stateValue}
                       onChange={(e) => setStateValue(e.target.value)}
-                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">
+                    <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                       Zip/Postal Code
                     </label>
                     <input
                       type="text"
                       value={postalCode}
                       onChange={(e) => setPostalCode(e.target.value)}
-                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">Country</label>
+                    <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                      Country
+                    </label>
                     <input
                       type="text"
                       value={country}
                       onChange={(e) => setCountry(e.target.value)}
-                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+              <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
+                <h3 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
                   Company
                 </h3>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                     Company Name
                   </label>
                   <input
                     type="text"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+              <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
+                <h3 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
                   Identification
                 </h3>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">SSN</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    SSN
+                  </label>
                   <div className="relative">
                     <input
                       type={showSsn ? 'text' : 'password'}
                       value={ssn}
                       onChange={(e) => setSsn(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 pr-10 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowSsn(!showSsn)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
                     >
                       {showSsn ? '👁️‍🗨️' : '👁️'}
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                     Passport Number
                   </label>
                   <input
                     type="text"
                     value={passportNumber}
                     onChange={(e) => setPassportNumber(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                     License Number
                   </label>
                   <input
                     type="text"
                     value={licenseNumber}
                     onChange={(e) => setLicenseNumber(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
               </div>
@@ -1116,17 +1155,17 @@ export default function ItemPanel({
 
           {/* Passkey Fields - Edit/Add Mode */}
           {currentMode !== 'view' && type === 'passkey' && (
-            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-              <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+            <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
+              <h3 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
                 Passkey Details
               </h3>
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-[var(--color-text-tertiary)]">
                 Passkeys are typically created by the browser extension. Use this form to import
                 from other managers.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                     Relying Party ID *
                   </label>
                   <input
@@ -1134,11 +1173,11 @@ export default function ItemPanel({
                     value={rpId}
                     onChange={(e) => setRpId(e.target.value)}
                     placeholder="example.com"
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                     Relying Party Name *
                   </label>
                   <input
@@ -1146,13 +1185,13 @@ export default function ItemPanel({
                     value={rpName}
                     onChange={(e) => setRpName(e.target.value)}
                     placeholder="Example"
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                     User Name *
                   </label>
                   <input
@@ -1160,47 +1199,53 @@ export default function ItemPanel({
                     value={passkeyUserName}
                     onChange={(e) => setPasskeyUserName(e.target.value)}
                     placeholder="user@example.com"
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">User ID</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    User ID
+                  </label>
                   <input
                     type="text"
                     value={passkeyUserId}
                     onChange={(e) => setPasskeyUserId(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                   Credential ID
                 </label>
                 <input
                   type="text"
                   value={credentialId}
                   onChange={(e) => setCredentialId(e.target.value)}
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono text-xs"
+                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono text-xs"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Public Key</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Public Key
+                </label>
                 <textarea
                   value={publicKey}
                   onChange={(e) => setPublicKey(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono text-xs resize-none"
+                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono text-xs resize-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Counter</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Counter
+                </label>
                 <input
                   type="number"
                   value={counter}
                   onChange={(e) => setCounter(Number(e.target.value))}
                   min={0}
-                  className="w-32 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  className="w-32 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                 />
               </div>
             </div>
@@ -1208,26 +1253,28 @@ export default function ItemPanel({
 
           {/* Document Fields - Edit/Add Mode */}
           {currentMode !== 'view' && type === 'document' && (
-            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+            <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Description</label>
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  Description
+                </label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
                   placeholder="Describe this document..."
-                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white resize-y"
+                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] resize-y"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">
+                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                   Upload Document
                 </label>
                 <div
-                  className={`relative w-full p-6 rounded-xl border-2 border-dashed transition-all duration-200 text-center cursor-pointer overflow-hidden ${
+                  className={`relative w-full p-6 rounded-[var(--radius-lg)] border-2 border-dashed transition-all duration-200 text-center cursor-pointer overflow-hidden ${
                     isDragging
-                      ? 'border-indigo-400 bg-indigo-500/10'
-                      : 'border-white/[0.12] hover:border-white/[0.2] hover:bg-white/[0.04]'
+                      ? 'border-[var(--color-primary)] bg-[var(--color-aura-dim)]'
+                      : 'border-[var(--color-border)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-subtle)]'
                   }`}
                   onDragOver={(e) => {
                     e.preventDefault();
@@ -1260,13 +1307,13 @@ export default function ItemPanel({
                     }}
                   />
                   <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
-                    <span className="text-2xl text-white/50">📄</span>
-                    <p className="text-sm font-medium text-white/70">
+                    <span className="text-2xl text-[var(--color-text-tertiary)]">📄</span>
+                    <p className="text-sm font-medium text-[var(--color-text-secondary)]">
                       {documentFile
                         ? documentFile.name
                         : 'Drag & drop a file here, or click to browse'}
                     </p>
-                    <p className="text-xs text-white/40">
+                    <p className="text-xs text-[var(--color-text-tertiary)]">
                       {documentFile
                         ? `${(documentFile.size / 1024).toFixed(1)} KB • ${documentFile.type || 'unknown type'}`
                         : 'Max 10MB. Encrypted before upload.'}
@@ -1277,16 +1324,16 @@ export default function ItemPanel({
               {mimeType && currentMode === 'edit' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                    <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                       Type
                     </span>
-                    <span className="text-sm text-white">{mimeType}</span>
+                    <span className="text-sm text-[var(--color-text)]">{mimeType}</span>
                   </div>
                   <div>
-                    <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                    <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                       Size
                     </span>
-                    <span className="text-sm text-white">
+                    <span className="text-sm text-[var(--color-text)]">
                       {fileSize > 0 ? `${(fileSize / 1024).toFixed(1)} KB` : '—'}
                     </span>
                   </div>
@@ -1300,9 +1347,9 @@ export default function ItemPanel({
 
           {/* Custom Fields - Edit Mode */}
           {currentMode !== 'view' && (
-            <div className="space-y-4 pt-4 border-t border-white/[0.1]">
+            <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+                <h3 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">
                   Custom Fields
                 </h3>
                 <button
@@ -1310,7 +1357,7 @@ export default function ItemPanel({
                   onClick={() =>
                     setCustomFields([...customFields, { name: '', value: '', type: 'text' }])
                   }
-                  className="px-2 py-1 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors"
+                  className="px-2 py-1 text-xs bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-sm)] transition-colors"
                 >
                   + Add
                 </button>
@@ -1319,7 +1366,7 @@ export default function ItemPanel({
               {customFields.map((field, idx) => (
                 <div
                   key={idx}
-                  className="flex flex-col gap-2 p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]"
+                  className="flex flex-col gap-2 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]"
                 >
                   <div className="flex gap-2">
                     <input
@@ -1331,7 +1378,7 @@ export default function ItemPanel({
                         setCustomFields(newFields);
                       }}
                       placeholder="Field Name"
-                      className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                     <select
                       value={field.type}
@@ -1347,7 +1394,7 @@ export default function ItemPanel({
                         }
                         setCustomFields(newFields);
                       }}
-                      className="w-28 px-2 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white text-sm"
+                      className="w-28 px-2 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] text-sm"
                     >
                       <option value="text">Text</option>
                       <option value="hidden">Hidden</option>
@@ -1356,7 +1403,7 @@ export default function ItemPanel({
                     <button
                       type="button"
                       onClick={() => setCustomFields(customFields.filter((_, i) => i !== idx))}
-                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg"
+                      className="p-2 text-[var(--color-error)] hover:text-[var(--color-error)] hover:bg-[var(--color-error-subtle)] rounded-[var(--radius-md)]"
                     >
                       ✕
                     </button>
@@ -1372,9 +1419,11 @@ export default function ItemPanel({
                           newFields[idx].value = e.target.checked ? 'true' : 'false';
                           setCustomFields(newFields);
                         }}
-                        className="rounded border-white/20 bg-white/10 text-indigo-500 focus:ring-indigo-500/60"
+                        className="rounded border-[var(--color-border-strong)] bg-[var(--color-surface)] text-[var(--color-primary)] focus:ring-[var(--color-aura)]"
                       />
-                      <span className="text-sm font-medium text-white/70">Value</span>
+                      <span className="text-sm font-medium text-[var(--color-text-secondary)]">
+                        Value
+                      </span>
                     </label>
                   ) : field.type === 'hidden' ? (
                     <div className="relative">
@@ -1387,14 +1436,14 @@ export default function ItemPanel({
                           setCustomFields(newFields);
                         }}
                         placeholder="Hidden Value"
-                        className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                        className="w-full px-3 py-2 pr-10 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                       />
                       <button
                         type="button"
                         onClick={() =>
                           setShowCustomFields((prev) => ({ ...prev, [idx]: !prev[idx] }))
                         }
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
                       >
                         {showCustomFields[idx] ? '👁️‍🗨️' : '👁️'}
                       </button>
@@ -1409,7 +1458,7 @@ export default function ItemPanel({
                         setCustomFields(newFields);
                       }}
                       placeholder="Value"
-                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                     />
                   )}
                 </div>
@@ -1423,20 +1472,20 @@ export default function ItemPanel({
               <div className="grid grid-cols-2 gap-4">
                 {folderId && (
                   <div>
-                    <span className="block text-xs font-semibold text-white/30 uppercase">
+                    <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase">
                       Folder
                     </span>
-                    <span className="text-sm text-white">
+                    <span className="text-sm text-[var(--color-text)]">
                       {folders.find((f) => f.id === folderId)?.name || 'Unknown'}
                     </span>
                   </div>
                 )}
                 {favorite && (
                   <div>
-                    <span className="block text-xs font-semibold text-white/30 uppercase">
+                    <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase">
                       Favorite
                     </span>
-                    <span className="text-sm text-amber-400">⭐ Yes</span>
+                    <span className="text-sm text-[var(--color-warning)]">⭐ Yes</span>
                   </div>
                 )}
               </div>
@@ -1445,14 +1494,16 @@ export default function ItemPanel({
                 <div className="space-y-4">
                   {username && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Username
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-mono text-white truncate">{username}</span>
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm font-mono text-[var(--color-text)] truncate">
+                          {username}
+                        </span>
                         <button
                           onClick={() => copyToClipboard(username, 'user')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'user' ? '✓' : '📋'}
                         </button>
@@ -1461,23 +1512,23 @@ export default function ItemPanel({
                   )}
                   {password && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Password
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-mono text-white truncate">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm font-mono text-[var(--color-text)] truncate">
                           {showPassword ? password : '••••••••••••••••'}
                         </span>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setShowPassword(!showPassword)}
-                            className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                            className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
                           >
                             {showPassword ? '👁️‍🗨️' : '👁️'}
                           </button>
                           <button
                             onClick={() => copyToClipboard(password, 'pass')}
-                            className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                            className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                           >
                             {copiedField === 'pass' ? '✓' : '📋'}
                           </button>
@@ -1488,25 +1539,27 @@ export default function ItemPanel({
                   {password && (
                     <button
                       onClick={() => navigate('/health')}
-                      className="w-full px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-white/60 hover:text-white/80 rounded-lg transition-colors text-sm font-medium"
+                      className="w-full px-4 py-2 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] rounded-[var(--radius-md)] transition-colors text-sm font-medium"
                     >
                       🔄 Rotate Password
                     </button>
                   )}
                   {totpSecret && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Authenticator Code
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-2xl font-mono tracking-widest text-indigo-300">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-2xl font-mono tracking-widest text-[var(--color-primary)]">
                           {totpCode || '------'}
                         </span>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-white/30">{totpRemaining}s</span>
+                          <span className="text-xs text-[var(--color-text-tertiary)]">
+                            {totpRemaining}s
+                          </span>
                           <button
                             onClick={() => copyToClipboard(totpCode, 'totp')}
-                            className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                            className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                           >
                             {copiedField === 'totp' ? '✓' : '📋'}
                           </button>
@@ -1516,7 +1569,7 @@ export default function ItemPanel({
                   )}
                   {uris.length > 0 && uris.some((u) => u.trim()) && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         URIs
                       </span>
                       <div className="space-y-2">
@@ -1525,19 +1578,19 @@ export default function ItemPanel({
                           .map((uri, idx) => (
                             <div
                               key={idx}
-                              className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]"
+                              className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]"
                             >
                               <a
                                 href={uri.startsWith('http') ? uri : `https://${uri}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-sm text-indigo-300 hover:text-indigo-200 hover:underline truncate"
+                                className="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary)] hover:underline truncate"
                               >
                                 {uri}
                               </a>
                               <button
                                 onClick={() => copyToClipboard(uri, `uri-${idx}`)}
-                                className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                                className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                               >
                                 {copiedField === `uri-${idx}` ? '✓' : '📋'}
                               </button>
@@ -1551,10 +1604,10 @@ export default function ItemPanel({
 
               {type === 'note' && (
                 <div>
-                  <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                  <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                     Note Content
                   </span>
-                  <div className="p-4 bg-white/[0.04] rounded-lg border border-white/[0.06] whitespace-pre-wrap text-sm text-white">
+                  <div className="p-4 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)] whitespace-pre-wrap text-sm text-[var(--color-text)]">
                     {content}
                   </div>
                 </div>
@@ -1564,33 +1617,33 @@ export default function ItemPanel({
                 <div className="space-y-4">
                   {cardholderName && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Cardholder Name
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white">
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text)]">
                         {cardholderName}
                       </div>
                     </div>
                   )}
                   {number && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Card Number
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-mono text-white">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm font-mono text-[var(--color-text)]">
                           {showCardNumber ? number : '•••• •••• •••• ' + number.slice(-4)}
                         </span>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setShowCardNumber(!showCardNumber)}
-                            className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                            className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
                           >
                             {showCardNumber ? '👁️‍🗨️' : '👁️'}
                           </button>
                           <button
                             onClick={() => copyToClipboard(number, 'cardnum')}
-                            className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                            className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                           >
                             {copiedField === 'cardnum' ? '✓' : '📋'}
                           </button>
@@ -1600,32 +1653,32 @@ export default function ItemPanel({
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Expiration
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white">
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text)]">
                         {expMonth} / {expYear}
                       </div>
                     </div>
                     {cvv && (
                       <div>
-                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                           CVV
                         </span>
-                        <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                          <span className="text-sm font-mono text-white">
+                        <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                          <span className="text-sm font-mono text-[var(--color-text)]">
                             {showCvv ? cvv : '•••'}
                           </span>
                           <div className="flex gap-2">
                             <button
                               onClick={() => setShowCvv(!showCvv)}
-                              className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                              className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
                             >
                               {showCvv ? '👁️‍🗨️' : '👁️'}
                             </button>
                             <button
                               onClick={() => copyToClipboard(cvv, 'cvv')}
-                              className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                              className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                             >
                               {copiedField === 'cvv' ? '✓' : '📋'}
                             </button>
@@ -1636,10 +1689,10 @@ export default function ItemPanel({
                   </div>
                   {brand && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Brand
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white">
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text)]">
                         {brand}
                       </div>
                     </div>
@@ -1651,11 +1704,11 @@ export default function ItemPanel({
                 <div className="space-y-4">
                   {(firstName || middleName || lastName) && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Name
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-medium text-white">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm font-medium text-[var(--color-text)]">
                           {[firstName, middleName, lastName].filter(Boolean).join(' ')}
                         </span>
                         <button
@@ -1665,7 +1718,7 @@ export default function ItemPanel({
                               'fullname'
                             )
                           }
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'fullname' ? '✓' : '📋'}
                         </button>
@@ -1674,14 +1727,14 @@ export default function ItemPanel({
                   )}
                   {email && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Email
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm text-white">{email}</span>
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm text-[var(--color-text)]">{email}</span>
                         <button
                           onClick={() => copyToClipboard(email, 'email')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'email' ? '✓' : '📋'}
                         </button>
@@ -1690,14 +1743,14 @@ export default function ItemPanel({
                   )}
                   {phone && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Phone
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm text-white">{phone}</span>
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm text-[var(--color-text)]">{phone}</span>
                         <button
                           onClick={() => copyToClipboard(phone, 'phone')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'phone' ? '✓' : '📋'}
                         </button>
@@ -1706,11 +1759,11 @@ export default function ItemPanel({
                   )}
                   {(address1 || address2 || city || stateValue || postalCode || country) && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Address
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <div className="text-sm text-white space-y-1">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <div className="text-sm text-[var(--color-text)] space-y-1">
                           {address1 && <p>{address1}</p>}
                           {address2 && <p>{address2}</p>}
                           {(city || stateValue || postalCode) && (
@@ -1732,7 +1785,7 @@ export default function ItemPanel({
                               'address'
                             )
                           }
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors self-start"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors self-start"
                         >
                           {copiedField === 'address' ? '✓' : '📋'}
                         </button>
@@ -1741,14 +1794,14 @@ export default function ItemPanel({
                   )}
                   {company && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Company
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm text-white">{company}</span>
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm text-[var(--color-text)]">{company}</span>
                         <button
                           onClick={() => copyToClipboard(company, 'company')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'company' ? '✓' : '📋'}
                         </button>
@@ -1757,23 +1810,23 @@ export default function ItemPanel({
                   )}
                   {ssn && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         SSN
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-mono text-white">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm font-mono text-[var(--color-text)]">
                           {showSsn ? ssn : '•••-••-••••'}
                         </span>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setShowSsn(!showSsn)}
-                            className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                            className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
                           >
                             {showSsn ? '👁️‍🗨️' : '👁️'}
                           </button>
                           <button
                             onClick={() => copyToClipboard(ssn, 'ssn')}
-                            className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                            className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                           >
                             {copiedField === 'ssn' ? '✓' : '📋'}
                           </button>
@@ -1783,14 +1836,16 @@ export default function ItemPanel({
                   )}
                   {passportNumber && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Passport Number
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-mono text-white">{passportNumber}</span>
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm font-mono text-[var(--color-text)]">
+                          {passportNumber}
+                        </span>
                         <button
                           onClick={() => copyToClipboard(passportNumber, 'passport')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'passport' ? '✓' : '📋'}
                         </button>
@@ -1799,14 +1854,16 @@ export default function ItemPanel({
                   )}
                   {licenseNumber && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         License Number
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-mono text-white">{licenseNumber}</span>
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm font-mono text-[var(--color-text)]">
+                          {licenseNumber}
+                        </span>
                         <button
                           onClick={() => copyToClipboard(licenseNumber, 'license')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'license' ? '✓' : '📋'}
                         </button>
@@ -1820,17 +1877,21 @@ export default function ItemPanel({
                 <div className="space-y-4">
                   {rpName && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Relying Party
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
                         <div>
-                          <span className="text-sm font-medium text-white">{rpName}</span>
-                          <span className="text-xs text-white/40 ml-2">{rpId}</span>
+                          <span className="text-sm font-medium text-[var(--color-text)]">
+                            {rpName}
+                          </span>
+                          <span className="text-xs text-[var(--color-text-tertiary)] ml-2">
+                            {rpId}
+                          </span>
                         </div>
                         <button
                           onClick={() => copyToClipboard(rpId, 'rpId')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'rpId' ? '✓' : '📋'}
                         </button>
@@ -1839,19 +1900,23 @@ export default function ItemPanel({
                   )}
                   {passkeyUserName && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         User
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
                         <div>
-                          <span className="text-sm text-white">{passkeyUserName}</span>
+                          <span className="text-sm text-[var(--color-text)]">
+                            {passkeyUserName}
+                          </span>
                           {passkeyUserId && (
-                            <span className="text-xs text-white/40 ml-2">({passkeyUserId})</span>
+                            <span className="text-xs text-[var(--color-text-tertiary)] ml-2">
+                              ({passkeyUserId})
+                            </span>
                           )}
                         </div>
                         <button
                           onClick={() => copyToClipboard(passkeyUserName, 'userName')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'userName' ? '✓' : '📋'}
                         </button>
@@ -1860,16 +1925,16 @@ export default function ItemPanel({
                   )}
                   {credentialId && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Credential ID
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-xs font-mono text-white truncate max-w-[300px]">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-xs font-mono text-[var(--color-text)] truncate max-w-[300px]">
                           {credentialId}
                         </span>
                         <button
                           onClick={() => copyToClipboard(credentialId, 'credId')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'credId' ? '✓' : '📋'}
                         </button>
@@ -1878,16 +1943,16 @@ export default function ItemPanel({
                   )}
                   {publicKey && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Public Key
                       </span>
-                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-xs font-mono text-white truncate max-w-[300px]">
+                      <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-xs font-mono text-[var(--color-text)] truncate max-w-[300px]">
                           {publicKey.length > 40 ? publicKey.slice(0, 40) + '…' : publicKey}
                         </span>
                         <button
                           onClick={() => copyToClipboard(publicKey, 'pubKey')}
-                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                         >
                           {copiedField === 'pubKey' ? '✓' : '📋'}
                         </button>
@@ -1896,20 +1961,22 @@ export default function ItemPanel({
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Counter
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-mono text-white">{counter}</span>
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm font-mono text-[var(--color-text)]">
+                          {counter}
+                        </span>
                       </div>
                     </div>
                     {passkeyItem?.createdAt && (
                       <div>
-                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                           Created
                         </span>
-                        <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                          <span className="text-sm text-white">
+                        <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                          <span className="text-sm text-[var(--color-text)]">
                             {new Date(passkeyItem.createdAt).toLocaleDateString()}
                           </span>
                         </div>
@@ -1918,11 +1985,11 @@ export default function ItemPanel({
                   </div>
                   {passkeyItem?.transports && passkeyItem.transports.length > 0 && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Transports
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm text-white">
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm text-[var(--color-text)]">
                           {passkeyItem.transports.join(', ')}
                         </span>
                       </div>
@@ -1935,29 +2002,31 @@ export default function ItemPanel({
                 <div className="space-y-4">
                   {description && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Description
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white whitespace-pre-wrap">
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)] text-sm text-[var(--color-text)] whitespace-pre-wrap">
                         {description}
                       </div>
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         File Type
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm text-white">{mimeType || 'Unknown'}</span>
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm text-[var(--color-text)]">
+                          {mimeType || 'Unknown'}
+                        </span>
                       </div>
                     </div>
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         File Size
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm text-white">
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <span className="text-sm text-[var(--color-text)]">
                           {fileSize > 0 ? `${(fileSize / 1024).toFixed(1)} KB` : '—'}
                         </span>
                       </div>
@@ -1966,11 +2035,11 @@ export default function ItemPanel({
                   {/* File Preview */}
                   {mimeType && mimeType.startsWith('image/') && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Preview
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] flex items-center justify-center">
-                        <p className="text-xs text-white/40">
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)] flex items-center justify-center">
+                        <p className="text-xs text-[var(--color-text-tertiary)]">
                           Image preview available after download
                         </p>
                       </div>
@@ -1978,11 +2047,11 @@ export default function ItemPanel({
                   )}
                   {mimeType === 'application/pdf' && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Preview
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] flex items-center justify-center">
-                        <p className="text-xs text-white/40">
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)] flex items-center justify-center">
+                        <p className="text-xs text-[var(--color-text-tertiary)]">
                           PDF preview available after download
                         </p>
                       </div>
@@ -1991,17 +2060,17 @@ export default function ItemPanel({
                   {/* Quota */}
                   {documentQuota && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                         Storage Quota
                       </span>
-                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <div className="flex justify-between text-sm text-white mb-2">
+                      <div className="p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                        <div className="flex justify-between text-sm text-[var(--color-text)] mb-2">
                           <span>{(documentQuota.used / 1024 / 1024).toFixed(1)} MB used</span>
                           <span>{(documentQuota.limit / 1024 / 1024).toFixed(0)} MB limit</span>
                         </div>
-                        <div className="w-full bg-white/[0.1] rounded-full h-2">
+                        <div className="w-full bg-[var(--color-surface-raised)] rounded-[var(--radius-full)] h-2">
                           <div
-                            className="bg-indigo-500 h-2 rounded-full transition-all"
+                            className="bg-[var(--color-primary)] h-2 rounded-[var(--radius-full)] transition-all"
                             style={{
                               width: `${Math.min(100, (documentQuota.used / documentQuota.limit) * 100)}%`,
                             }}
@@ -2020,27 +2089,27 @@ export default function ItemPanel({
 
               {/* Custom Fields - View Mode */}
               {customFields.length > 0 && (
-                <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-                  <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">
+                <div className="space-y-4 pt-4 border-t border-[var(--color-border)]">
+                  <h3 className="text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider mb-2">
                     Custom Fields
                   </h3>
                   <div className="grid grid-cols-1 gap-4">
                     {customFields.map((field, idx) => (
                       <div key={idx}>
-                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
                           {field.name}
                         </span>
-                        <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <div className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
                           {field.type === 'boolean' ? (
-                            <span className="text-sm text-white">
+                            <span className="text-sm text-[var(--color-text)]">
                               {field.value === 'true' ? 'Yes' : 'No'}
                             </span>
                           ) : field.type === 'hidden' ? (
-                            <span className="text-sm font-mono text-white">
+                            <span className="text-sm font-mono text-[var(--color-text)]">
                               {showCustomFields[idx] ? field.value : '••••••••'}
                             </span>
                           ) : (
-                            <span className="text-sm text-white whitespace-pre-wrap">
+                            <span className="text-sm text-[var(--color-text)] whitespace-pre-wrap">
                               {field.value}
                             </span>
                           )}
@@ -2050,14 +2119,14 @@ export default function ItemPanel({
                                 onClick={() =>
                                   setShowCustomFields((prev) => ({ ...prev, [idx]: !prev[idx] }))
                                 }
-                                className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                                className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] transition-colors"
                               >
                                 {showCustomFields[idx] ? '👁️‍🗨️' : '👁️'}
                               </button>
                             )}
                             <button
                               onClick={() => copyToClipboard(field.value, `cf-${idx}`)}
-                              className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                              className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-primary)] transition-colors"
                             >
                               {copiedField === `cf-${idx}` ? '✓' : '📋'}
                             </button>
@@ -2069,8 +2138,8 @@ export default function ItemPanel({
                 </div>
               )}
               {alerts.length > 0 && (
-                <div className="space-y-3 pt-4 border-t border-white/[0.1]">
-                  <span className="block text-xs font-semibold text-white/30 uppercase mb-2">
+                <div className="space-y-3 pt-4 border-t border-[var(--color-border)]">
+                  <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-2">
                     Security Alerts
                   </span>
                   {alerts
@@ -2081,12 +2150,12 @@ export default function ItemPanel({
                       return (
                         <div
                           key={i}
-                          className={`p-4 rounded-xl border flex items-start gap-3 backdrop-blur-md ${
+                          className={`p-4 rounded-[var(--radius-lg)] border flex items-start gap-3 ${
                             isCritical
-                              ? 'bg-red-500/10 border-red-500/30 text-red-100'
+                              ? 'bg-[var(--color-error-subtle)] border-[var(--color-error)] text-[var(--color-error)]'
                               : isWarning
-                                ? 'bg-amber-500/10 border-amber-500/30 text-amber-100'
-                                : 'bg-blue-500/10 border-blue-500/30 text-blue-100'
+                                ? 'bg-[var(--color-warning-subtle)] border-[var(--color-warning)] text-[var(--color-warning)]'
+                                : 'bg-[var(--color-aura-dim)] border-[var(--color-primary)] text-[var(--color-primary)]'
                           }`}
                         >
                           <div className="text-xl">
@@ -2097,10 +2166,10 @@ export default function ItemPanel({
                               <h4
                                 className={`font-medium text-sm ${
                                   isCritical
-                                    ? 'text-red-300'
+                                    ? 'text-[var(--color-error)]'
                                     : isWarning
-                                      ? 'text-amber-300'
-                                      : 'text-blue-300'
+                                      ? 'text-[var(--color-warning)]'
+                                      : 'text-[var(--color-primary)]'
                                 }`}
                               >
                                 {alert.title}
@@ -2110,7 +2179,7 @@ export default function ItemPanel({
                                   onClick={() =>
                                     setDismissedAlerts((prev) => new Set([...prev, alert.title]))
                                   }
-                                  className="text-white/40 hover:text-white/80 p-1 -mr-2 -mt-2"
+                                  className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text)] p-1 -mr-2 -mt-2"
                                 >
                                   ✕
                                 </button>
@@ -2136,12 +2205,12 @@ export default function ItemPanel({
                                     setShowPassword(true);
                                   }
                                 }}
-                                className={`mt-3 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                className={`mt-3 px-3 py-1.5 text-xs font-medium rounded-[var(--radius-md)] transition-colors ${
                                   isCritical
-                                    ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200'
+                                    ? 'bg-[var(--color-error-subtle)] hover:bg-[var(--color-error)] text-[var(--color-error)]'
                                     : isWarning
-                                      ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200'
-                                      : 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-200'
+                                      ? 'bg-[var(--color-warning-subtle)] hover:bg-[var(--color-warning)] text-[var(--color-warning)]'
+                                      : 'bg-[var(--color-aura-dim)] hover:bg-[var(--color-primary)] text-[var(--color-primary)]'
                                 }`}
                               >
                                 {alert.action.label}
@@ -2155,24 +2224,24 @@ export default function ItemPanel({
               )}
 
               {/* Bottom Actions for View Mode */}
-              <div className="pt-6 mt-6 border-t border-white/[0.1]">
+              <div className="pt-6 mt-6 border-t border-[var(--color-border)]">
                 {showConfirmDelete ? (
-                  <div className="p-4 bg-red-500/10 border border-red-400/20 rounded-lg">
-                    <p className="text-sm text-red-300 mb-3 font-medium">
+                  <div className="p-4 bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)]">
+                    <p className="text-sm text-[var(--color-error)] mb-3 font-medium">
                       Are you sure you want to delete this item? This cannot be undone.
                     </p>
                     <div className="flex gap-3">
                       <button
                         onClick={handleDelete}
                         disabled={loading}
-                        className="px-3 py-1.5 text-sm bg-red-500/80 hover:bg-red-400/90 text-white rounded-lg transition-colors disabled:opacity-50"
+                        className="px-3 py-1.5 text-sm bg-[var(--color-error)] hover:bg-[var(--color-error)] text-[var(--color-text)] rounded-[var(--radius-md)] transition-colors disabled:opacity-50"
                       >
                         {loading ? 'Deleting...' : 'Yes, Delete'}
                       </button>
                       <button
                         onClick={() => setShowConfirmDelete(false)}
                         disabled={loading}
-                        className="px-3 py-1.5 text-sm bg-white/[0.06] border border-white/[0.12] text-white/70 rounded-lg transition-colors hover:bg-white/[0.1]"
+                        className="px-3 py-1.5 text-sm bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors hover:bg-[var(--color-surface-raised)]"
                       >
                         Cancel
                       </button>
@@ -2181,7 +2250,7 @@ export default function ItemPanel({
                 ) : (
                   <button
                     onClick={() => setShowConfirmDelete(true)}
-                    className="w-full px-4 py-2 text-sm text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors font-medium"
+                    className="w-full px-4 py-2 text-sm text-[var(--color-error)] bg-[var(--color-error-subtle)] hover:bg-[var(--color-error-subtle)] rounded-[var(--radius-md)] transition-colors font-medium"
                   >
                     Delete Item
                   </button>

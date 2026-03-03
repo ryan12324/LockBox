@@ -27,7 +27,7 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
           return (
             <span
               key={idx}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30"
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-error-subtle)] text-[var(--color-error)] border border-[var(--color-error)]"
             >
               Weak
             </span>
@@ -36,7 +36,7 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
           return (
             <span
               key={idx}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-400 border border-amber-500/30"
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-warning-subtle)] text-[var(--color-warning)] border border-[var(--color-warning)]"
             >
               Reused
             </span>
@@ -45,7 +45,7 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
           return (
             <span
               key={idx}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-warning-subtle)] text-[var(--color-warning)] border border-[var(--color-warning)]"
             >
               Old
             </span>
@@ -54,7 +54,7 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
           return (
             <span
               key={idx}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30"
+              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-error-subtle)] text-[var(--color-error)] border border-[var(--color-error)]"
             >
               💀 Breached
             </span>
@@ -67,10 +67,10 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
 
   const getScoreColor = (score: number) => {
     // Score is 0-4 (zxcvbn scale)
-    if (score < 2) return 'text-red-500';
-    if (score === 2) return 'text-amber-500';
-    if (score === 3) return 'text-indigo-400';
-    return 'text-emerald-500';
+    if (score < 2) return 'text-[var(--color-error)]';
+    if (score === 2) return 'text-[var(--color-warning)]';
+    if (score === 3) return 'text-[var(--color-primary)]';
+    return 'text-[var(--color-success)]';
   };
 
   const getScoreLabel = (score: number) => {
@@ -91,13 +91,13 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
   if (problematicReports.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto mb-4 border border-emerald-500/30">
+        <div className="w-16 h-16 rounded-[var(--radius-full)] bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center mx-auto mb-4 border border-[var(--color-success)]">
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h3 className="text-xl font-medium text-white mb-2">Looking Good</h3>
-        <p className="text-white/60 max-w-sm mx-auto">
+        <h3 className="text-xl font-medium text-[var(--color-text)] mb-2">Looking Good</h3>
+        <p className="text-[var(--color-text-secondary)] max-w-sm mx-auto">
           We didn't find any issues with your passwords. Keep up the good work!
         </p>
       </div>
@@ -112,10 +112,10 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
           <button
             key={tab.id}
             onClick={() => setFilter(tab.id)}
-            className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`whitespace-nowrap px-4 py-2 rounded-[var(--radius-md)] text-sm font-medium transition-colors ${
               filter === tab.id
-                ? 'bg-indigo-600/80 text-white border border-indigo-500/50'
-                : 'bg-white/[0.06] text-white/70 border border-white/[0.12] hover:bg-white/[0.1] hover:text-white'
+                ? 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] border border-[var(--color-primary)]'
+                : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-text)]'
             }`}
           >
             {tab.label}
@@ -124,11 +124,13 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
       </div>
 
       {/* List */}
-      <div className="bg-white/[0.07] backdrop-blur-xl border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] overflow-hidden">
+      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] overflow-hidden">
         {filteredReports.length === 0 ? (
-          <div className="p-8 text-center text-white/50">No items match this filter.</div>
+          <div className="p-8 text-center text-[var(--color-text-tertiary)]">
+            No items match this filter.
+          </div>
         ) : (
-          <ul className="divide-y divide-white/[0.08]">
+          <ul className="divide-y divide-[var(--color-border)]">
             {filteredReports.map((report) => {
               const item = items.find((i) => i.id === report.itemId);
               if (!item) return null;
@@ -137,16 +139,18 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
                 <li key={report.itemId}>
                   <button
                     onClick={() => onItemClick(item.id)}
-                    className="w-full text-left px-6 py-4 hover:bg-white/[0.04] transition-colors flex items-center justify-between group"
+                    className="w-full text-left px-6 py-4 hover:bg-[var(--color-bg-subtle)] transition-colors flex items-center justify-between group"
                   >
                     <div className="flex items-center space-x-4">
                       {/* Item Icon Placeholder */}
-                      <div className="w-10 h-10 rounded-full bg-white/[0.08] flex items-center justify-center border border-white/[0.1] flex-shrink-0 text-white/60">
+                      <div className="w-10 h-10 rounded-[var(--radius-full)] bg-[var(--color-surface)] flex items-center justify-center border border-[var(--color-border)] flex-shrink-0 text-[var(--color-text-secondary)]">
                         {item.type === 'login' ? '🔑' : '📄'}
                       </div>
 
                       <div className="flex flex-col">
-                        <span className="text-white font-medium text-base mb-1">{item.name}</span>
+                        <span className="text-[var(--color-text)] font-medium text-base mb-1">
+                          {item.name}
+                        </span>
                         <div className="flex flex-wrap gap-2">{getBadges(report)}</div>
                       </div>
                     </div>
@@ -155,7 +159,9 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
                       <span className={`text-sm font-bold ${getScoreColor(report.score)}`}>
                         {getScoreLabel(report.score)}
                       </span>
-                      <span className="text-xs text-white/40 mt-1">Score: {report.score}/4</span>
+                      <span className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                        Score: {report.score}/4
+                      </span>
                     </div>
                   </button>
                 </li>

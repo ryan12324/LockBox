@@ -311,11 +311,13 @@ export default function AttachmentSection({ itemId, mode }: Props) {
   const totalUsed = attachments.reduce((sum, a) => sum + a.size, 0);
 
   return (
-    <div className="space-y-4 pt-4 border-t border-white/[0.1] mt-6">
-      <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider mb-2">Attachments</h3>
+    <div className="space-y-4 pt-4 border-t border-[var(--color-border)] mt-6">
+      <h3 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider mb-2">
+        Attachments
+      </h3>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+        <div className="mb-4 p-3 bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-lg)] text-[var(--color-error)] text-sm">
           {error}
         </div>
       )}
@@ -323,10 +325,10 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       {/* Upload Zone */}
       {mode !== 'view' && (
         <div
-          className={`relative w-full p-6 mb-4 rounded-xl border-2 border-dashed transition-all duration-200 text-center cursor-pointer overflow-hidden ${
+          className={`relative w-full p-6 mb-4 rounded-[var(--radius-lg)] border-2 border-dashed transition-all duration-200 text-center cursor-pointer overflow-hidden ${
             isDragging
-              ? 'border-indigo-400 bg-indigo-500/10'
-              : 'border-white/[0.12] hover:border-white/[0.2] hover:bg-white/[0.04]'
+              ? 'border-[var(--color-primary)] bg-[var(--color-aura-dim)]'
+              : 'border-[var(--color-border)] hover:border-[var(--color-border-strong)] hover:bg-[var(--color-bg-subtle)]'
           }`}
           onDragOver={(e) => {
             e.preventDefault();
@@ -348,11 +350,11 @@ export default function AttachmentSection({ itemId, mode }: Props) {
             onChange={(e) => handleUpload(e.target.files)}
           />
           <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
-            <span className="text-2xl text-white/50">📄</span>
-            <p className="text-sm font-medium text-white/70">
+            <span className="text-2xl text-[var(--color-text-tertiary)]">📄</span>
+            <p className="text-sm font-medium text-[var(--color-text-secondary)]">
               Drag & drop files here, or click to browse
             </p>
-            <p className="text-xs text-white/40">
+            <p className="text-xs text-[var(--color-text-tertiary)]">
               Max 10MB per file. Encrypted before upload.
             </p>
           </div>
@@ -360,7 +362,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
           {Object.values(uploadProgress).map((progress, i) => (
             <div
               key={i}
-              className="absolute bottom-0 left-0 h-1 bg-indigo-400 transition-all duration-300"
+              className="absolute bottom-0 left-0 h-1 bg-[var(--color-primary)] transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           ))}
@@ -369,7 +371,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
 
       {/* Quota */}
       {attachments.length > 0 && (
-        <div className="mb-3 text-xs text-right text-white/40 font-mono bg-white/[0.04] px-3 py-1.5 rounded-full inline-block float-right border border-white/[0.06] shadow-inner">
+        <div className="mb-3 text-xs text-right text-[var(--color-text-tertiary)] font-mono bg-[var(--color-bg-subtle)] px-3 py-1.5 rounded-[var(--radius-full)] inline-block float-right border border-[var(--color-border)] shadow-inner">
           Quota: {formatBytes(totalUsed)} / {formatBytes(MAX_USER_QUOTA)} used
         </div>
       )}
@@ -377,12 +379,12 @@ export default function AttachmentSection({ itemId, mode }: Props) {
 
       {/* File List */}
       {loading ? (
-        <div className="text-center py-4 text-sm text-white/50 animate-pulse">
+        <div className="text-center py-4 text-sm text-[var(--color-text-tertiary)] animate-pulse">
           Loading attachments...
         </div>
       ) : attachments.length === 0 ? (
         mode === 'view' ? null : (
-          <div className="text-center py-6 bg-white/[0.02] rounded-xl text-sm text-white/40 border border-white/[0.04]">
+          <div className="text-center py-6 bg-[var(--color-bg-subtle)] rounded-[var(--radius-lg)] text-sm text-[var(--color-text-tertiary)] border border-[var(--color-border)]">
             No attachments yet.
           </div>
         )
@@ -395,25 +397,25 @@ export default function AttachmentSection({ itemId, mode }: Props) {
             return (
               <div
                 key={a.id}
-                className="group flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] hover:border-white/[0.12] transition-colors"
+                className="group flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)] hover:border-[var(--color-border)] transition-colors"
               >
                 <div className="flex items-center space-x-3 overflow-hidden">
                   {isImage && a.previewUrl ? (
                     <img
                       src={a.previewUrl}
                       alt={displayName}
-                      className="w-10 h-10 object-cover rounded-md border border-white/[0.1]"
+                      className="w-10 h-10 object-cover rounded-[var(--radius-sm)] border border-[var(--color-border)]"
                     />
                   ) : (
-                    <div className="w-10 h-10 flex items-center justify-center bg-white/[0.06] text-white/70 rounded-md text-lg">
+                    <div className="w-10 h-10 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-text-secondary)] rounded-[var(--radius-sm)] text-lg">
                       {isImage ? '🖼️' : '📄'}
                     </div>
                   )}
                   <div className="truncate">
-                    <p className="text-sm font-medium text-white truncate">
+                    <p className="text-sm font-medium text-[var(--color-text)] truncate">
                       {displayName}
                     </p>
-                    <p className="text-xs text-white/40 font-mono mt-0.5">
+                    <p className="text-xs text-[var(--color-text-tertiary)] font-mono mt-0.5">
                       {formatBytes(a.size)} • {a.mimeType}
                     </p>
                   </div>
@@ -426,7 +428,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
                         e.stopPropagation();
                         handlePreview(a);
                       }}
-                      className="px-2 py-1 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors"
+                      className="px-2 py-1 text-xs bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-sm)] transition-colors"
                       title="Preview"
                     >
                       Preview
@@ -434,7 +436,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
                   )}
                   <button
                     onClick={() => handleDownload(a)}
-                    className="px-2 py-1 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors"
+                    className="px-2 py-1 text-xs bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-sm)] transition-colors"
                     title="Download"
                   >
                     Download
@@ -442,7 +444,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
                   {mode !== 'view' && (
                     <button
                       onClick={() => handleDelete(a)}
-                      className="px-2 py-1 text-xs bg-red-500/20 hover:bg-red-500/40 text-red-200 rounded-md transition-colors"
+                      className="px-2 py-1 text-xs bg-[var(--color-error-subtle)] hover:bg-[var(--color-error)] text-[var(--color-error)] rounded-[var(--radius-sm)] transition-colors"
                       title="Delete"
                     >
                       Delete

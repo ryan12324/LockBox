@@ -110,7 +110,20 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
     }
   };
 
-  interface DecryptedItem { username?: string; password?: string; totp?: string; uris?: string[]; content?: string; firstName?: string; lastName?: string; email?: string; phone?: string; number?: string; expMonth?: string; expYear?: string; }
+  interface DecryptedItem {
+    username?: string;
+    password?: string;
+    totp?: string;
+    uris?: string[];
+    content?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    number?: string;
+    expMonth?: string;
+    expYear?: string;
+  }
   const renderDecryptedFields = (item: DecryptedItem) => {
     const fields = [];
     if (item.username) fields.push(['Username', item.username]);
@@ -130,16 +143,21 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
     if (item.expMonth && item.expYear) fields.push(['Expires', `${item.expMonth}/${item.expYear}`]);
 
     if (fields.length === 0)
-      return <div className="text-white/40 text-sm italic">No details to show</div>;
+      return (
+        <div className="text-[var(--color-text-tertiary)] text-sm italic">No details to show</div>
+      );
 
     return (
       <div className="space-y-3">
         {fields.map(([label, val], i) => (
-          <div key={i} className="bg-white/[0.04] p-3 rounded-lg border border-white/[0.06]">
-            <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+          <div
+            key={i}
+            className="bg-[var(--color-bg-subtle)] p-3 rounded-[var(--radius-md)] border border-[var(--color-border)]"
+          >
+            <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
               {label}
             </span>
-            <span className="text-sm text-white font-mono">{val}</span>
+            <span className="text-sm text-[var(--color-text)] font-mono">{val}</span>
           </div>
         ))}
       </div>
@@ -149,12 +167,12 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
   return (
     <>
       <div className="fixed inset-0 z-[60]" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] backdrop-blur-2xl bg-slate-900/90 shadow-[0_16px_48px_rgba(0,0,0,0.5)] border-l border-white/[0.1] z-[70] flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0">
-        <div className="flex items-center justify-between p-4 border-b border-white/[0.1]">
-          <h2 className="text-lg font-semibold text-white">Version History</h2>
+      <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] border-l border-[var(--color-border)] z-[70] flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
+          <h2 className="text-lg font-semibold text-[var(--color-text)]">Version History</h2>
           <button
             onClick={onClose}
-            className="p-1.5 text-white/30 hover:text-white/60 rounded-lg transition-colors"
+            className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors"
           >
             ✕
           </button>
@@ -162,15 +180,17 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 text-red-300 border border-red-400/20 text-sm rounded-lg mb-4">
+            <div className="p-3 bg-[var(--color-error-subtle)] text-[var(--color-error)] border border-[var(--color-error)] text-sm rounded-[var(--radius-md)] mb-4">
               {error}
             </div>
           )}
 
           {loading ? (
-            <div className="text-white/50 text-sm text-center py-8">Loading history...</div>
+            <div className="text-[var(--color-text-tertiary)] text-sm text-center py-8">
+              Loading history...
+            </div>
           ) : versions.length === 0 ? (
-            <div className="text-white/50 text-sm text-center py-8">
+            <div className="text-[var(--color-text-tertiary)] text-sm text-center py-8">
               No previous versions found.
             </div>
           ) : (
@@ -182,28 +202,30 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
                 return (
                   <div
                     key={v.id}
-                    className={`p-4 rounded-xl border transition-colors ${isSelected ? 'bg-indigo-500/10 border-indigo-500/30' : 'bg-white/[0.02] border-white/[0.06]'}`}
+                    className={`p-4 rounded-[var(--radius-lg)] border transition-colors ${isSelected ? 'bg-[var(--color-aura-dim)] border-[var(--color-primary)]' : 'bg-[var(--color-bg-subtle)] border-[var(--color-border)]'}`}
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <div className="text-sm text-white font-medium">
+                        <div className="text-sm text-[var(--color-text)] font-medium">
                           {formatRelativeTime(v.revisionDate)}
                         </div>
-                        <div className="text-xs text-white/40 mt-1">{d.toLocaleString()}</div>
+                        <div className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                          {d.toLocaleString()}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         {isSelected ? (
                           <button
                             disabled={restoring}
                             onClick={() => handleRestore(v.id)}
-                            className="px-3 py-1.5 text-xs bg-indigo-600/80 hover:bg-indigo-500/90 text-white backdrop-blur-sm rounded-lg transition-colors disabled:opacity-50"
+                            className="px-3 py-1.5 text-xs bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] transition-colors disabled:opacity-50"
                           >
                             {restoring ? 'Restoring...' : 'Restore'}
                           </button>
                         ) : (
                           <button
                             onClick={() => handleView(v.id)}
-                            className="px-3 py-1.5 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
+                            className="px-3 py-1.5 text-xs bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors"
                           >
                             View
                           </button>
@@ -212,9 +234,11 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
                     </div>
 
                     {isSelected && (
-                      <div className="mt-4 pt-4 border-t border-white/[0.06]">
+                      <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
                         {loadingVersion ? (
-                          <div className="text-white/40 text-xs">Decrypting...</div>
+                          <div className="text-[var(--color-text-tertiary)] text-xs">
+                            Decrypting...
+                          </div>
                         ) : decryptedData ? (
                           renderDecryptedFields(decryptedData as unknown as DecryptedItem)
                         ) : null}
