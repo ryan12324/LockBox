@@ -14,24 +14,26 @@ jobs:
   ci:
     name: Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.10'
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Turbo cache
+      - name: Cache Turbo
         uses: actions/cache@v4
         with:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
           restore-keys: turbo-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
       - name: Lint
         run: bun run lint
@@ -44,3 +46,28 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      # Upload build artifacts so they can be inspected on PRs
+      - name: Upload Chrome extension
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chrome-mv3-${{ github.sha }}
+          path: apps/extension/.output/chrome-mv3/
+          retention-days: 7
+
+      - name: Upload Firefox extension
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: firefox-mv2-${{ github.sha }}
+          path: apps/extension/.output/firefox-mv2/
+          retention-days: 7
+
+      - name: Upload web vault
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-dist-${{ github.sha }}
+          path: apps/web/dist/
+          retention-days: 7
