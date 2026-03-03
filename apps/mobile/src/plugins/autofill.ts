@@ -24,6 +24,20 @@ export interface AutofillCredentialsResult {
   credentials: AutofillCredential[];
 }
 
+/** Passkey metadata returned by autofill passkey lookup */
+export interface AutofillPasskeyEntry {
+  credentialId: string;
+  rpId: string;
+  rpName: string;
+  userName: string;
+  userDisplayName: string;
+}
+
+/** Result from listing passkeys for a URI */
+export interface AutofillPasskeysResult {
+  passkeys: AutofillPasskeyEntry[];
+}
+
 /**
  * AutofillPlugin interface — defines the contract between TypeScript and native Kotlin.
  *
@@ -45,16 +59,25 @@ export interface AutofillPlugin {
   getCredentialsForUri(options: { uri: string }): Promise<AutofillCredentialsResult>;
 
   /** Store a credential for autofill use (encrypted blob only) */
-  saveCredential(options: {
-    id: string;
-    encryptedData: string;
-    uri: string;
-  }): Promise<void>;
+  saveCredential(options: { id: string; encryptedData: string; uri: string }): Promise<void>;
 
   /** Remove a credential from the autofill-accessible store */
   removeCredential(options: { id: string }): Promise<void>;
+
+  /** Find matching passkeys for a website URI (queries Room DB by rpId) */
+  getPasskeysForUri(options: { uri: string }): Promise<AutofillPasskeysResult>;
 }
 
 const Autofill = registerPlugin<AutofillPlugin>('Autofill');
+
+export async function getPasskeysForUri(uri: string): Promise<AutofillPasskeyEntry[]> {
+  try {
+    const result = await Autofill.getPasskeysForUri({ uri });
+    return result.passkeys;
+  } catch (err) {
+    console.error('Autofill: failed to get passkeys for URI', err);
+    return [];
+  }
+}
 
 export { Autofill };

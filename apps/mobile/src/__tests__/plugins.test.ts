@@ -18,7 +18,10 @@ vi.mock('@capacitor/core', () => ({
       getCredentialsForUri: vi.fn().mockResolvedValue({ credentials: [] }),
       saveCredential: vi.fn().mockResolvedValue(undefined),
       removeCredential: vi.fn().mockResolvedValue(undefined),
-      checkAvailability: vi.fn().mockResolvedValue({ available: true, biometryType: 'fingerprint' }),
+      getPasskeysForUri: vi.fn().mockResolvedValue({ passkeys: [] }),
+      checkAvailability: vi
+        .fn()
+        .mockResolvedValue({ available: true, biometryType: 'fingerprint' }),
       isEnrolled: vi.fn().mockResolvedValue({ enrolled: false }),
       enrollBiometric: vi.fn().mockResolvedValue(undefined),
       authenticate: vi.fn().mockResolvedValue({ success: true, userKey: 'base64-user-key' }),
@@ -73,9 +76,7 @@ describe('AutofillPlugin interface', () => {
   });
 
   it('removeCredential accepts item id', async () => {
-    await expect(
-      Autofill.removeCredential({ id: 'item-123' })
-    ).resolves.toBeUndefined();
+    await expect(Autofill.removeCredential({ id: 'item-123' })).resolves.toBeUndefined();
   });
 });
 
@@ -207,7 +208,7 @@ describe('StoragePlugin interface', () => {
 
 describe('SyncStatus type', () => {
   it('defines all valid sync statuses', async () => {
-    const { } = await import('../plugins/storage');
+    const {} = await import('../plugins/storage');
     const validStatuses = ['synced', 'pending_create', 'pending_update', 'pending_delete'];
     expect(validStatuses).toHaveLength(4);
     expect(validStatuses).toContain('synced');

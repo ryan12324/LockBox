@@ -1,6 +1,8 @@
 package dev.lockbox.app.autofill
 
+import android.app.PendingIntent
 import android.app.assist.AssistStructure
+import android.content.Intent
 import android.os.CancellationSignal
 import android.service.autofill.AutofillService
 import android.service.autofill.Dataset
@@ -14,6 +16,8 @@ import android.view.autofill.AutofillId
 import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
 import dev.lockbox.app.R
+import dev.lockbox.app.credentialprovider.GetPasskeyActivity
+import dev.lockbox.app.credentialprovider.PasskeyMetadataEntity
 import dev.lockbox.app.storage.VaultDatabase
 import dev.lockbox.app.storage.VaultItemEntity
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +39,10 @@ import kotlinx.coroutines.launch
  * 5. User picks a credential → Android fills the fields
  */
 class LockboxAutofillService : AutofillService() {
+
+    companion object {
+        private const val PASSKEY_REQUEST_CODE_BASE = 2000
+    }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -67,11 +75,6 @@ class LockboxAutofillService : AutofillService() {
                 val db = VaultDatabase.getInstance(applicationContext)
                 val items = db.vaultItemDao().getByTypeAndStatus("login", "synced")
 
-                if (items.isEmpty()) {
-                    callback.onSuccess(null)
-                    return@launch
-                }
-
                 val responseBuilder = FillResponse.Builder()
                 var hasDatasets = false
 
@@ -80,6 +83,19 @@ class LockboxAutofillService : AutofillService() {
                     if (dataset != null) {
                         responseBuilder.addDataset(dataset)
                         hasDatasets = true
+                    }
+                }
+
+                // Query passkey metadata for matching rpId (web domain)
+                val webDomain = parsedFields.webDomain
+                if (webDomain != null) {
+                    val passkeys = db.passkeyMetadataDao().getByRpId(webDomain)
+                    for ((index, passkey) in passkeys.withIndex()) {
+                        val dataset = buildPasskeyDataset(passkey, parsedFields, index)
+                        if (dataset != null) {
+                            responseBuilder.addDataset(dataset)
+                            hasDatasets = true
+                        }
                     }
                 }
 
@@ -154,15 +170,10 @@ class LockboxAutofillService : AutofillService() {
         }
     }
 
-    /**
-     * Build a Dataset for a vault item to present in the autofill popup.
-     */
     private fun buildDataset(
         item: VaultItemEntity,
         fields: ParsedAutofillFields
     ): Dataset? {
-        // Note: In production, we'd decrypt the item to get username for display.
-        // For the autofill popup, we show a generic "Lockbox" label.
         val presentation = RemoteViews(packageName, R.layout.autofill_item).apply {
             setTextViewText(R.id.autofill_item_label, "Lockbox credential")
             setTextViewText(R.id.autofill_item_sublabel, item.id.take(8))
@@ -172,7 +183,6 @@ class LockboxAutofillService : AutofillService() {
         var hasValues = false
 
         fields.usernameId?.let { id ->
-            // The actual credential data would be decrypted on-demand
             datasetBuilder.setValue(id, AutofillValue.forText(""))
             hasValues = true
         }
@@ -183,6 +193,43 @@ class LockboxAutofillService : AutofillService() {
         }
 
         return if (hasValues) datasetBuilder.build() else null
+    }
+
+    /**
+     * Build a Dataset for a passkey entry. Uses a PendingIntent to
+     * GetPasskeyActivity so that passkey assertion happens on selection.
+     */
+    private fun buildPasskeyDataset(
+        passkey: PasskeyMetadataEntity,
+        fields: ParsedAutofillFields,
+        index: Int
+    ): Dataset? {
+        val presentation = RemoteViews(packageName, R.layout.autofill_item).apply {
+            setTextViewText(R.id.autofill_item_label, "Passkey: ${passkey.userName}")
+            setTextViewText(R.id.autofill_item_sublabel, passkey.rpName)
+        }
+
+        val intent = Intent(applicationContext, GetPasskeyActivity::class.java).apply {
+            putExtra(GetPasskeyActivity.EXTRA_CREDENTIAL_ID, passkey.credentialId)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            applicationContext,
+            PASSKEY_REQUEST_CODE_BASE + index,
+            intent,
+            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val datasetBuilder = Dataset.Builder(presentation)
+        datasetBuilder.setAuthentication(pendingIntent.intentSender)
+
+        fields.usernameId?.let { id ->
+            datasetBuilder.setValue(id, AutofillValue.forText(passkey.userName))
+        }
+        fields.passwordId?.let { id ->
+            datasetBuilder.setValue(id, AutofillValue.forText(""))
+        }
+
+        return datasetBuilder.build()
     }
 
     /**

@@ -130,9 +130,6 @@ class AutofillPlugin : Plugin() {
         }
     }
 
-    /**
-     * Remove a credential from the autofill-accessible store.
-     */
     @PluginMethod
     fun removeCredential(call: PluginCall) {
         val id = call.getString("id") ?: run {
@@ -148,6 +145,49 @@ class AutofillPlugin : Plugin() {
             } catch (e: Exception) {
                 call.reject("Failed to remove credential: ${e.message}")
             }
+        }
+    }
+
+    @PluginMethod
+    fun getPasskeysForUri(call: PluginCall) {
+        val uri = call.getString("uri") ?: run {
+            call.reject("URI is required")
+            return
+        }
+
+        val domain = extractDomain(uri)
+
+        pluginScope.launch {
+            try {
+                val db = VaultDatabase.getInstance(context)
+                val passkeys = db.passkeyMetadataDao().getByRpId(domain)
+
+                val passkeyArray = com.getcapacitor.JSArray()
+                for (passkey in passkeys) {
+                    val entry = JSObject()
+                    entry.put("credentialId", passkey.credentialId)
+                    entry.put("rpId", passkey.rpId)
+                    entry.put("rpName", passkey.rpName)
+                    entry.put("userName", passkey.userName)
+                    entry.put("userDisplayName", passkey.userDisplayName)
+                    passkeyArray.put(entry)
+                }
+
+                val result = JSObject()
+                result.put("passkeys", passkeyArray)
+                call.resolve(result)
+            } catch (e: Exception) {
+                call.reject("Failed to get passkeys: ${e.message}")
+            }
+        }
+    }
+
+    private fun extractDomain(uri: String): String {
+        return try {
+            val parsed = android.net.Uri.parse(uri)
+            parsed.host ?: uri
+        } catch (e: Exception) {
+            uri
         }
     }
 }
