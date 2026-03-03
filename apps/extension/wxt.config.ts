@@ -8,6 +8,8 @@ export default defineConfig({
     description: 'Zero-knowledge self-hosted password manager',
     version: '0.0.1',
     permissions: ['storage', 'activeTab', 'alarms', 'scripting', 'webNavigation'],
+    // @ts-expect-error — webAuthenticationProxy is Chrome 115+ and not in WXT's type defs yet
+    optional_permissions: ['webAuthenticationProxy'],
     host_permissions: ['<all_urls>'],
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",

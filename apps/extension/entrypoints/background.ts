@@ -14,7 +14,13 @@ import { totp as generateTOTP, parseOtpAuthUri } from '@lockbox/totp';
 import { checkBatch } from '@lockbox/crypto';
 import { analyzeVaultHealth, analyzeItem } from '@lockbox/ai';
 import { generatePassword, generatePassphrase } from '@lockbox/generator';
-import { PhishingDetector, SecurityAlertEngine, SemanticSearch, KeywordEmbeddingProvider, SecurityCopilot } from '@lockbox/ai';
+import {
+  PhishingDetector,
+  SecurityAlertEngine,
+  SemanticSearch,
+  KeywordEmbeddingProvider,
+  SecurityCopilot,
+} from '@lockbox/ai';
 import type { SearchResult, SecurityAlert } from '@lockbox/ai';
 import type { VaultItem, LoginItem, PasskeyItem, KdfConfig, Folder } from '@lockbox/types';
 import { api } from '../lib/api.js';
@@ -33,7 +39,12 @@ import {
   buildClientDataJSON,
   findMatchingPasskeys,
 } from '../lib/webauthn.js';
-import type { StoredPasskey, SerializedCreationOptions, SerializedRequestOptions, SerializedCredential } from '../lib/webauthn.js';
+import type {
+  StoredPasskey,
+  SerializedCreationOptions,
+  SerializedRequestOptions,
+  SerializedCredential,
+} from '../lib/webauthn.js';
 import {
   getSessionToken,
   setSessionToken,
@@ -42,8 +53,16 @@ import {
   getApiBaseUrl,
   getStoredEmail,
 } from '../lib/storage.js';
-import { listHardwareKeys, removeHardwareKey, registerHardwareKey, authenticateWithHardwareKey, requestHardwareKeyChallenge, unwrapMasterKey } from '../lib/hardware-key.js';
+import {
+  listHardwareKeys,
+  removeHardwareKey,
+  registerHardwareKey,
+  authenticateWithHardwareKey,
+  requestHardwareKeyChallenge,
+  unwrapMasterKey,
+} from '../lib/hardware-key.js';
 import { generateSyncQR, processSyncQR } from '../lib/qr-sync.js';
+import { initWebAuthnProxy } from '../lib/webauthn-proxy.js';
 
 // ─── In-memory state (cleared on lock) ────────────────────────────────────────
 
@@ -57,9 +76,18 @@ let privateKey: CryptoKey | null = null;
 let sharedFolderKeys: Map<string, Uint8Array> = new Map();
 let sharedItems: Map<string, VaultItem[]> = new Map();
 let teams: Array<{ id: string; name: string; role: string; createdAt: string }> = [];
-let sharedFoldersList: Array<{ folderId: string; teamId: string; ownerUserId: string; permissionLevel: string; folderName: string }> = [];
+let sharedFoldersList: Array<{
+  folderId: string;
+  teamId: string;
+  ownerUserId: string;
+  permissionLevel: string;
+  folderName: string;
+}> = [];
 let hasKeyPairFlag = false;
-let cachedBreachStatus: { breachedCount: number; results: Map<string, any> } = { breachedCount: 0, results: new Map() };
+let cachedBreachStatus: { breachedCount: number; results: Map<string, any> } = {
+  breachedCount: 0,
+  results: new Map(),
+};
 const phishingDetector = new PhishingDetector();
 let searchEngine: SemanticSearch | null = null;
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
@@ -67,7 +95,7 @@ let searchEngine: SemanticSearch | null = null;
 async function decryptVaultItem(
   encryptedData: string,
   itemId: string,
-  revisionDate: string,
+  revisionDate: string
 ): Promise<VaultItem | null> {
   if (!userKey) return null;
   try {
@@ -83,7 +111,7 @@ async function decryptVaultItem(
 async function encryptVaultItem(
   item: VaultItem,
   itemId: string,
-  revisionDate: string,
+  revisionDate: string
 ): Promise<string | null> {
   if (!userKey) return null;
   try {
@@ -100,7 +128,7 @@ async function encryptVaultItem(
 
 async function loadVault(token: string): Promise<void> {
   try {
-    const res = await api.vault.list(token) as {
+    const res = (await api.vault.list(token)) as {
       items: Array<{
         id: string;
         type: string;
@@ -141,7 +169,11 @@ function getMatchingItems(url: string): VaultItem[] {
       for (const uri of login.uris ?? []) {
         try {
           const itemHost = new URL(uri).hostname.replace(/^www\./, '');
-          if (pageHost === itemHost || pageHost.endsWith(`.${itemHost}`) || itemHost.endsWith(`.${pageHost}`)) {
+          if (
+            pageHost === itemHost ||
+            pageHost.endsWith(`.${itemHost}`) ||
+            itemHost.endsWith(`.${pageHost}`)
+          ) {
             matches.push(item);
             break;
           }
@@ -159,7 +191,11 @@ function getMatchingItems(url: string): VaultItem[] {
         for (const uri of login.uris ?? []) {
           try {
             const itemHost = new URL(uri).hostname.replace(/^www\./, '');
-            if (pageHost === itemHost || pageHost.endsWith(`.${itemHost}`) || itemHost.endsWith(`.${pageHost}`)) {
+            if (
+              pageHost === itemHost ||
+              pageHost.endsWith(`.${itemHost}`) ||
+              itemHost.endsWith(`.${pageHost}`)
+            ) {
               matches.push(item);
               break;
             }
@@ -205,7 +241,7 @@ function schedulePeriodSync() {
 }
 async function runBreachCheck(): Promise<{ breachedCount: number; results: Map<string, any> }> {
   if (!userKey) return { breachedCount: 0, results: new Map() };
-  const loginItems: Array<{id: string, password: string}> = [];
+  const loginItems: Array<{ id: string; password: string }> = [];
   for (const item of vaultItems.values()) {
     if (item.type === 'login') {
       const login = item as LoginItem;
@@ -262,7 +298,7 @@ async function loadTeamData(token: string): Promise<void> {
     for (const sf of sharedFoldersList) {
       try {
         const keysRes = await api.sharing.getFolderKeys(sf.folderId, token);
-        const myKey = keysRes.keys.find(k => k.userId === userId);
+        const myKey = keysRes.keys.find((k) => k.userId === userId);
         if (!myKey || !privateKey) continue;
 
         const folderKey = await unwrapFolderKey(myKey.encryptedFolderKey, privateKey);
@@ -327,9 +363,20 @@ type Message =
   | { type: 'download-attachment'; itemId: string; attachmentId: string }
   | { type: 'check-2fa'; domain: string }
   | { type: 'generate-alias'; provider?: string; apiKey?: string }
-  | { type: 'WEBAUTHN_CREATE'; requestId: string; origin: string; options: SerializedCreationOptions }
+  | {
+      type: 'WEBAUTHN_CREATE';
+      requestId: string;
+      origin: string;
+      options: SerializedCreationOptions;
+    }
   | { type: 'WEBAUTHN_GET'; requestId: string; origin: string; options: SerializedRequestOptions }
-  | { type: 'WEBAUTHN_GET_SELECTED'; credentialId: string; rpId: string; challenge: string; origin: string }
+  | {
+      type: 'WEBAUTHN_GET_SELECTED';
+      credentialId: string;
+      rpId: string;
+      challenge: string;
+      origin: string;
+    }
   | { type: 'get-trash' }
   | { type: 'restore-item'; id: string }
   | { type: 'permanent-delete'; id: string }
@@ -359,7 +406,7 @@ async function signPasskeyAssertion(
   credentialId: string,
   rpId: string,
   challenge: string,
-  origin: string,
+  origin: string
 ): Promise<{ credential: SerializedCredential } | { fallback: true }> {
   // Find the vault item
   let matchedItem: (PasskeyItem & { privateKey?: string }) | null = null;
@@ -383,7 +430,7 @@ async function signPasskeyAssertion(
   const authData = createAuthenticatorData(rpIdHash, newCounter);
   const clientDataJSON = buildClientDataJSON('webauthn.get', challenge, origin);
   const clientDataHash = new Uint8Array(
-    await crypto.subtle.digest('SHA-256', clientDataJSON.buffer as ArrayBuffer),
+    await crypto.subtle.digest('SHA-256', clientDataJSON.buffer as ArrayBuffer)
   );
   const signatureRaw = await signChallenge(privKey, authData, clientDataHash);
   const signature = p1363ToDer(signatureRaw);
@@ -397,15 +444,21 @@ async function signPasskeyAssertion(
     const encryptedData = await encryptVaultItem(
       matchedItem as unknown as VaultItem,
       matchedItem.id,
-      now,
+      now
     );
     if (encryptedData) {
-      api.vault.updateItem(matchedItem.id, {
-        encryptedData,
-        tags: matchedItem.tags ?? [],
-        favorite: matchedItem.favorite ?? false,
-        revisionDate: now,
-      }, token).catch(() => {});
+      api.vault
+        .updateItem(
+          matchedItem.id,
+          {
+            encryptedData,
+            tags: matchedItem.tags ?? [],
+            favorite: matchedItem.favorite ?? false,
+            revisionDate: now,
+          },
+          token
+        )
+        .catch(() => {});
     }
   }
 
@@ -425,15 +478,13 @@ async function signPasskeyAssertion(
   };
 }
 
-async function handleMessage(
-  message: Message,
-): Promise<unknown> {
+async function handleMessage(message: Message): Promise<unknown> {
   switch (message.type) {
     case 'unlock': {
       const { email, password } = message;
       try {
         // 1. Get KDF params
-        const kdfRes = await api.auth.kdfParams(email) as { kdfConfig: KdfConfig; salt: string };
+        const kdfRes = (await api.auth.kdfParams(email)) as { kdfConfig: KdfConfig; salt: string };
         const salt = fromBase64(kdfRes.salt);
 
         // 2. Derive master key
@@ -443,9 +494,15 @@ async function handleMessage(
         const authHash = await makeAuthHash(masterKey, password);
 
         // 4. Login
-        const loginRes = await api.auth.login({ email, authHash }) as {
+        const loginRes = (await api.auth.login({ email, authHash })) as {
           token: string;
-          user: { id: string; email: string; kdfConfig: KdfConfig; salt: string; encryptedUserKey: string };
+          user: {
+            id: string;
+            email: string;
+            kdfConfig: KdfConfig;
+            salt: string;
+            encryptedUserKey: string;
+          };
         };
 
         // 5. Decrypt user key
@@ -464,8 +521,9 @@ async function handleMessage(
         schedulePeriodSync();
 
         // 9. Load team data (non-blocking on unlock)
-        loadTeamData(loginRes.token).catch(err =>
-          console.error('[Lockbox] Failed to load team data:', err));
+        loadTeamData(loginRes.token).catch((err) =>
+          console.error('[Lockbox] Failed to load team data:', err)
+        );
 
         return { success: true };
       } catch (err) {
@@ -571,19 +629,25 @@ async function handleMessage(
         };
         const encryptedData = await encryptVaultItem(vaultItem, itemId, now);
         if (!encryptedData) return { success: false, error: 'Encryption failed' };
-        await api.vault.createItem({
-          id: itemId,
-          type: itemType,
-          encryptedData,
-          folderId: vaultItem.folderId,
-          tags: vaultItem.tags ?? [],
-          favorite: vaultItem.favorite ?? false,
-          revisionDate: now,
-        }, token);
+        await api.vault.createItem(
+          {
+            id: itemId,
+            type: itemType,
+            encryptedData,
+            folderId: vaultItem.folderId,
+            tags: vaultItem.tags ?? [],
+            favorite: vaultItem.favorite ?? false,
+            revisionDate: now,
+          },
+          token
+        );
         vaultItems.set(itemId, vaultItem);
         return { success: true, item: vaultItem };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to create item' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to create item',
+        };
       }
     }
 
@@ -605,17 +669,24 @@ async function handleMessage(
         };
         const encryptedData = await encryptVaultItem(vaultItem, message.id, now);
         if (!encryptedData) return { success: false, error: 'Encryption failed' };
-        await api.vault.updateItem(message.id, {
-          encryptedData,
-          folderId: vaultItem.folderId,
-          tags: vaultItem.tags ?? [],
-          favorite: vaultItem.favorite ?? false,
-          revisionDate: now,
-        }, token);
+        await api.vault.updateItem(
+          message.id,
+          {
+            encryptedData,
+            folderId: vaultItem.folderId,
+            tags: vaultItem.tags ?? [],
+            favorite: vaultItem.favorite ?? false,
+            revisionDate: now,
+          },
+          token
+        );
         vaultItems.set(message.id, vaultItem);
         return { success: true, item: vaultItem };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to update item' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to update item',
+        };
       }
     }
 
@@ -628,7 +699,10 @@ async function handleMessage(
         vaultItems.delete(message.id);
         return { success: true };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to delete item' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to delete item',
+        };
       }
     }
 
@@ -643,11 +717,16 @@ async function handleMessage(
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
-        const res = await api.vault.createFolder({ name: message.name }, token) as { folder: Folder };
+        const res = (await api.vault.createFolder({ name: message.name }, token)) as {
+          folder: Folder;
+        };
         folders.push(res.folder);
         return { success: true, folder: res.folder };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to create folder' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to create folder',
+        };
       }
     }
 
@@ -657,11 +736,14 @@ async function handleMessage(
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
         await api.vault.updateFolder(message.id, { name: message.name }, token);
-        const idx = folders.findIndex(f => f.id === message.id);
+        const idx = folders.findIndex((f) => f.id === message.id);
         if (idx >= 0) folders[idx] = { ...folders[idx], name: message.name };
         return { success: true };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to update folder' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to update folder',
+        };
       }
     }
 
@@ -671,10 +753,13 @@ async function handleMessage(
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
         await api.vault.deleteFolder(message.id, token);
-        folders = folders.filter(f => f.id !== message.id);
+        folders = folders.filter((f) => f.id !== message.id);
         return { success: true };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to delete folder' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to delete folder',
+        };
       }
     }
 
@@ -682,12 +767,17 @@ async function handleMessage(
       if (!userKey) return { success: false, error: 'Vault is locked' };
       try {
         const items = Array.from(vaultItems.values());
-        const logins = items.filter(i => i.type === 'login') as import('@lockbox/types').LoginItem[];
+        const logins = items.filter(
+          (i) => i.type === 'login'
+        ) as import('@lockbox/types').LoginItem[];
         const summary = await analyzeVaultHealth(logins);
-        const reports = await Promise.all(logins.map(login => analyzeItem(login, logins)));
+        const reports = await Promise.all(logins.map((login) => analyzeItem(login, logins)));
         return { success: true, summary, reports };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Health analysis failed' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Health analysis failed',
+        };
       }
     }
 
@@ -696,7 +786,10 @@ async function handleMessage(
         const result = await runBreachCheck();
         return { success: true, ...result };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Breach check failed' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Breach check failed',
+        };
       }
     }
 
@@ -714,7 +807,9 @@ async function handleMessage(
           await searchEngine.index(Array.from(vaultItems.values()));
         }
         const results = await searchEngine.search(message.query, { limit: 10 });
-        return { results: results.map(r => ({ item: r.item, score: r.score, matchType: r.matchType })) };
+        return {
+          results: results.map((r) => ({ item: r.item, score: r.score, matchType: r.matchType })),
+        };
       } catch {
         return { results: [] };
       }
@@ -734,7 +829,9 @@ async function handleMessage(
       if (!userKey) return { alerts: [] };
       try {
         const engine = new SecurityAlertEngine();
-        const logins = Array.from(vaultItems.values()).filter((i): i is LoginItem => i.type === 'login');
+        const logins = Array.from(vaultItems.values()).filter(
+          (i): i is LoginItem => i.type === 'login'
+        );
         const alerts = engine.checkUrl(message.url, logins);
         return { alerts };
       } catch {
@@ -777,7 +874,11 @@ async function handleMessage(
           for (const uri of login.uris ?? []) {
             try {
               const itemHost = new URL(uri).hostname.replace(/^www\./, '');
-              if (pageHost === itemHost || pageHost.endsWith(`.${itemHost}`) || itemHost.endsWith(`.${pageHost}`)) {
+              if (
+                pageHost === itemHost ||
+                pageHost.endsWith(`.${itemHost}`) ||
+                itemHost.endsWith(`.${pageHost}`)
+              ) {
                 // Found a matching URI
                 if (login.username === username && login.password === password) {
                   return { result: 'match' as const };
@@ -799,7 +900,11 @@ async function handleMessage(
             for (const uri of login.uris ?? []) {
               try {
                 const itemHost = new URL(uri).hostname.replace(/^www\./, '');
-                if (pageHost === itemHost || pageHost.endsWith(`.${itemHost}`) || itemHost.endsWith(`.${pageHost}`)) {
+                if (
+                  pageHost === itemHost ||
+                  pageHost.endsWith(`.${itemHost}`) ||
+                  itemHost.endsWith(`.${pageHost}`)
+                ) {
                   if (login.username === username && login.password === password) {
                     return { result: 'match' as const };
                   }
@@ -847,18 +952,24 @@ async function handleMessage(
         };
         const encryptedData = await encryptVaultItem(vaultItem, itemId, now);
         if (!encryptedData) return { success: false, error: 'Encryption failed' };
-        await api.vault.createItem({
-          id: itemId,
-          type: 'login' as const,
-          encryptedData,
-          tags: [],
-          favorite: false,
-          revisionDate: now,
-        }, token);
+        await api.vault.createItem(
+          {
+            id: itemId,
+            type: 'login' as const,
+            encryptedData,
+            tags: [],
+            favorite: false,
+            revisionDate: now,
+          },
+          token
+        );
         vaultItems.set(itemId, vaultItem);
         return { success: true, item: vaultItem };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to save credentials' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to save credentials',
+        };
       }
     }
 
@@ -880,20 +991,26 @@ async function handleMessage(
         };
         const encryptedData = await encryptVaultItem(updatedItem, message.itemId, now);
         if (!encryptedData) return { success: false, error: 'Encryption failed' };
-        await api.vault.updateItem(message.itemId, {
-          encryptedData,
-          folderId: updatedItem.folderId,
-          tags: updatedItem.tags ?? [],
-          favorite: updatedItem.favorite ?? false,
-          revisionDate: now,
-        }, token);
+        await api.vault.updateItem(
+          message.itemId,
+          {
+            encryptedData,
+            folderId: updatedItem.folderId,
+            tags: updatedItem.tags ?? [],
+            favorite: updatedItem.favorite ?? false,
+            revisionDate: now,
+          },
+          token
+        );
         vaultItems.set(message.itemId, updatedItem);
         return { success: true, item: updatedItem };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to update credentials' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to update credentials',
+        };
       }
     }
-
 
     // ─── Attachments ──────────────────────────────────────────────────
 
@@ -905,7 +1022,10 @@ async function handleMessage(
         const res = await api.attachments.list(message.itemId, token);
         return { success: true, attachments: res.attachments };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to get attachments' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to get attachments',
+        };
       }
     }
 
@@ -917,7 +1037,10 @@ async function handleMessage(
         const res = await api.attachments.download(message.itemId, message.attachmentId, token);
         return { success: true, encryptedData: res.encryptedData };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to download attachment' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to download attachment',
+        };
       }
     }
 
@@ -941,11 +1064,14 @@ async function handleMessage(
       try {
         const res = await api.aliases.generate(
           { provider: message.provider, apiKey: message.apiKey },
-          token,
+          token
         );
         return { success: true, alias: res.alias };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to generate alias' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to generate alias',
+        };
       }
     }
 
@@ -960,8 +1086,7 @@ async function handleMessage(
         const rpId = createOpts.rp.id ?? new URL(origin).hostname;
 
         // Generate ECDSA P-256 key pair
-        const { publicKeySPKI, privateKeyPKCS8, publicKeyCOSE } =
-          await generatePasskeyKeyPair();
+        const { publicKeySPKI, privateKeyPKCS8, publicKeyCOSE } = await generatePasskeyKeyPair();
 
         // Generate credential ID
         const credId = generateCredentialId();
@@ -976,11 +1101,7 @@ async function handleMessage(
         const attestationObject = buildAttestationObject(authData);
 
         // Build clientDataJSON
-        const clientDataJSON = buildClientDataJSON(
-          'webauthn.create',
-          createOpts.challenge,
-          origin,
-        );
+        const clientDataJSON = buildClientDataJSON('webauthn.create', createOpts.challenge, origin);
 
         // Store passkey as a vault item
         const now = new Date().toISOString();
@@ -1013,18 +1134,21 @@ async function handleMessage(
         const encryptedData = await encryptVaultItem(
           itemWithPrivateKey as unknown as VaultItem,
           itemId,
-          now,
+          now
         );
         if (!encryptedData) return { fallback: true };
 
-        await api.vault.createItem({
-          id: itemId,
-          type: 'passkey' as const,
-          encryptedData,
-          tags: ['passkey'],
-          favorite: false,
-          revisionDate: now,
-        }, token);
+        await api.vault.createItem(
+          {
+            id: itemId,
+            type: 'passkey' as const,
+            encryptedData,
+            tags: ['passkey'],
+            favorite: false,
+            revisionDate: now,
+          },
+          token
+        );
 
         vaultItems.set(itemId, itemWithPrivateKey as unknown as VaultItem);
 
@@ -1076,16 +1200,15 @@ async function handleMessage(
           });
         }
 
-        const matches = findMatchingPasskeys(
-          allPasskeys,
-          rpId,
-          getOpts.allowCredentials,
-        );
+        const matches = findMatchingPasskeys(allPasskeys, rpId, getOpts.allowCredentials);
 
         if (matches.length === 0) return { fallback: true };
 
         // If multiple matches and no specific allowCredentials, ask content script to pick
-        if (matches.length > 1 && (!getOpts.allowCredentials || getOpts.allowCredentials.length === 0)) {
+        if (
+          matches.length > 1 &&
+          (!getOpts.allowCredentials || getOpts.allowCredentials.length === 0)
+        ) {
           return {
             selectPasskey: true,
             matches: matches.map((m) => ({
@@ -1119,7 +1242,6 @@ async function handleMessage(
       }
     }
 
-
     // ─── Trash ──────────────────────────────────────────────────────────
 
     case 'get-trash': {
@@ -1137,7 +1259,10 @@ async function handleMessage(
         }
         return { success: true, items: decryptedItems };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to get trash' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to get trash',
+        };
       }
     }
 
@@ -1149,7 +1274,10 @@ async function handleMessage(
         await api.trash.restore(message.id, token);
         return { success: true };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to restore item' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to restore item',
+        };
       }
     }
 
@@ -1161,7 +1289,10 @@ async function handleMessage(
         await api.trash.permanentDelete(message.id, token);
         return { success: true };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to permanently delete item' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to permanently delete item',
+        };
       }
     }
 
@@ -1175,7 +1306,10 @@ async function handleMessage(
         const res = await api.emergency.list(token);
         return { success: true, ...res };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to get emergency access' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to get emergency access',
+        };
       }
     }
 
@@ -1184,7 +1318,10 @@ async function handleMessage(
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
-        const res = await api.emergency.invite({ email: message.email, waitDays: message.waitDays }, token);
+        const res = await api.emergency.invite(
+          { email: message.email, waitDays: message.waitDays },
+          token
+        );
         return { success: true, grant: res.grant };
       } catch (err) {
         return { success: false, error: err instanceof Error ? err.message : 'Failed to invite' };
@@ -1237,7 +1374,10 @@ async function handleMessage(
         const res = await api.travelMode.set({ enabled: message.enabled }, token);
         return { success: true, enabled: res.enabled };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to set travel mode' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to set travel mode',
+        };
       }
     }
 
@@ -1249,14 +1389,27 @@ async function handleMessage(
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
         const res = await api.versions.list(message.itemId, token);
-        const decryptedVersions: Array<{ id: string; revisionDate: string; createdAt: string; data: VaultItem | null }> = [];
+        const decryptedVersions: Array<{
+          id: string;
+          revisionDate: string;
+          createdAt: string;
+          data: VaultItem | null;
+        }> = [];
         for (const v of res.versions) {
           const decrypted = await decryptVaultItem(v.encryptedData, message.itemId, v.revisionDate);
-          decryptedVersions.push({ id: v.id, revisionDate: v.revisionDate, createdAt: v.createdAt, data: decrypted });
+          decryptedVersions.push({
+            id: v.id,
+            revisionDate: v.revisionDate,
+            createdAt: v.createdAt,
+            data: decrypted,
+          });
         }
         return { success: true, versions: decryptedVersions };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to get versions' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to get versions',
+        };
       }
     }
 
@@ -1268,7 +1421,10 @@ async function handleMessage(
         await api.versions.restore(message.itemId, message.versionId, token);
         return { success: true };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to restore version' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to restore version',
+        };
       }
     }
 
@@ -1280,9 +1436,17 @@ async function handleMessage(
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
         const res = await api.twoFactor.setup(token);
-        return { success: true, secret: res.secret, otpauthUri: res.otpauthUri, backupCodes: res.backupCodes };
+        return {
+          success: true,
+          secret: res.secret,
+          otpauthUri: res.otpauthUri,
+          backupCodes: res.backupCodes,
+        };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to setup 2FA' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to setup 2FA',
+        };
       }
     }
 
@@ -1294,7 +1458,10 @@ async function handleMessage(
         await api.twoFactor.verify({ code: message.code }, token);
         return { success: true };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to verify 2FA' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to verify 2FA',
+        };
       }
     }
 
@@ -1306,7 +1473,10 @@ async function handleMessage(
         await api.twoFactor.disable({ code: message.code }, token);
         return { success: true };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to disable 2FA' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to disable 2FA',
+        };
       }
     }
 
@@ -1321,7 +1491,10 @@ async function handleMessage(
         const keys = await listHardwareKeys(apiUrl, token);
         return { success: true, keys };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to list hardware keys' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to list hardware keys',
+        };
       }
     }
 
@@ -1334,7 +1507,10 @@ async function handleMessage(
         await removeHardwareKey(apiUrl, token, message.keyId);
         return { success: true };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to remove hardware key' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to remove hardware key',
+        };
       }
     }
 
@@ -1354,7 +1530,11 @@ async function handleMessage(
         const msg = err instanceof Error ? err.message : 'Registration failed';
         // WebAuthn may not be available in service worker context
         if (msg.includes('WebAuthn') || msg.includes('credentials')) {
-          return { success: false, error: 'Hardware key registration requires browser interaction. Please use the web vault.' };
+          return {
+            success: false,
+            error:
+              'Hardware key registration requires browser interaction. Please use the web vault.',
+          };
         }
         return { success: false, error: msg };
       }
@@ -1363,10 +1543,11 @@ async function handleMessage(
     case 'hw-key-unlock': {
       try {
         const email = await getStoredEmail();
-        if (!email) return { success: false, error: 'No stored email — log in with password first' };
+        if (!email)
+          return { success: false, error: 'No stored email — log in with password first' };
         const apiUrl = await getApiBaseUrl();
         // Get KDF params and derive keys to find stored key IDs
-        const kdfRes = await api.auth.kdfParams(email) as { kdfConfig: KdfConfig; salt: string };
+        const kdfRes = (await api.auth.kdfParams(email)) as { kdfConfig: KdfConfig; salt: string };
         // List keys requires auth — attempt to use stored credentials
         // For HW key unlock, we need the key ID from local storage
         const stored = await chrome.storage.local.get('hwKeyId');
@@ -1402,7 +1583,10 @@ async function handleMessage(
         const result = await generateSyncQR({ sessionToken: token, userKey });
         return { success: true, qrData: result.qrData, expiresAt: result.expiresAt };
       } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to generate sync QR' };
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to generate sync QR',
+        };
       }
     }
 
@@ -1427,7 +1611,94 @@ async function handleMessage(
 // ─── WXT background export ────────────────────────────────────────────────────
 
 export default defineBackground(() => {
-  // Message listener
+  initWebAuthnProxy({
+    isUnlocked: () => userKey !== null,
+    getPasskeys: () => {
+      const passkeys: Array<{
+        id: string;
+        credentialId: string;
+        rpId: string;
+        rpName: string;
+        userId: string;
+        userName: string;
+        publicKey: string;
+        counter: number;
+        privateKey?: string;
+        createdAt: string;
+        updatedAt: string;
+        revisionDate: string;
+      }> = [];
+      for (const item of vaultItems.values()) {
+        if (item.type !== 'passkey') continue;
+        const pk = item as PasskeyItem & { privateKey?: string };
+        passkeys.push({
+          id: pk.id,
+          credentialId: pk.credentialId,
+          rpId: pk.rpId,
+          rpName: pk.rpName,
+          userId: pk.userId,
+          userName: pk.userName,
+          publicKey: pk.publicKey,
+          counter: pk.counter,
+          privateKey: pk.privateKey,
+          createdAt: pk.createdAt,
+          updatedAt: pk.updatedAt ?? pk.createdAt,
+          revisionDate: pk.revisionDate ?? pk.createdAt,
+        });
+      }
+      return passkeys;
+    },
+    persistCounter: (credentialId: string, newCounter: number, updatedAt: string) => {
+      for (const item of vaultItems.values()) {
+        if (item.type !== 'passkey') continue;
+        const pk = item as PasskeyItem & { privateKey?: string };
+        if (pk.credentialId === credentialId) {
+          pk.counter = newCounter;
+          (pk as PasskeyItem & { updatedAt: string }).updatedAt = updatedAt;
+          (pk as PasskeyItem & { revisionDate: string }).revisionDate = updatedAt;
+          getSessionToken().then((token) => {
+            if (!token) return;
+            encryptVaultItem(pk as unknown as VaultItem, pk.id, updatedAt).then((encrypted) => {
+              if (!encrypted) return;
+              api.vault
+                .updateItem(
+                  pk.id,
+                  {
+                    encryptedData: encrypted,
+                    tags: pk.tags ?? [],
+                    favorite: pk.favorite ?? false,
+                    revisionDate: updatedAt,
+                  },
+                  token
+                )
+                .catch(() => {});
+            });
+          });
+          break;
+        }
+      }
+    },
+    savePasskeyItem: async (passkeyData) => {
+      const token = await getSessionToken();
+      if (!token || !userKey) return;
+      const vaultItem = passkeyData as unknown as VaultItem;
+      const encrypted = await encryptVaultItem(vaultItem, passkeyData.id, passkeyData.revisionDate);
+      if (!encrypted) return;
+      await api.vault.createItem(
+        {
+          id: passkeyData.id,
+          type: 'passkey' as const,
+          encryptedData: encrypted,
+          tags: ['passkey'],
+          favorite: false,
+          revisionDate: passkeyData.revisionDate,
+        },
+        token
+      );
+      vaultItems.set(passkeyData.id, vaultItem);
+    },
+  });
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     handleMessage(message as Message)
       .then(sendResponse)
@@ -1443,12 +1714,14 @@ export default defineBackground(() => {
       await chrome.storage.session.set({
         [`phishing_${details.tabId}`]: { url: details.url, result },
       });
-      chrome.tabs.sendMessage(details.tabId, {
-        type: 'phishing-warning',
-        url: details.url,
-        score: result.score,
-        reasons: result.reasons,
-      }).catch(() => {});
+      chrome.tabs
+        .sendMessage(details.tabId, {
+          type: 'phishing-warning',
+          url: details.url,
+          score: result.score,
+          reasons: result.reasons,
+        })
+        .catch(() => {});
     }
   });
 
@@ -1467,12 +1740,14 @@ export default defineBackground(() => {
     } else if (alarm.name === COPILOT_ALARM) {
       if (userKey) {
         try {
-          const logins = Array.from(vaultItems.values()).filter((i): i is LoginItem => i.type === 'login');
+          const logins = Array.from(vaultItems.values()).filter(
+            (i): i is LoginItem => i.type === 'login'
+          );
           const copilot = new SecurityCopilot();
           const posture = await copilot.evaluate(logins, {});
           await chrome.storage.local.set({ 'copilot-posture': posture });
-          
-          if (posture.score < 50 || posture.actions.some(a => a.priority === 'critical')) {
+
+          if (posture.score < 50 || posture.actions.some((a) => a.priority === 'critical')) {
             chrome.action.setBadgeText({ text: '!' });
             chrome.action.setBadgeBackgroundColor({ color: '#ef4444' });
           } else {

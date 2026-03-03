@@ -18,7 +18,6 @@ import {
   buildAttestationObject,
   buildClientDataJSON,
   findMatchingPasskeys,
-  getWebAuthnInterceptorScript,
 } from '../../lib/webauthn.js';
 import type { StoredPasskey } from '../../lib/webauthn.js';
 
@@ -382,48 +381,6 @@ describe('findMatchingPasskeys', () => {
   });
 });
 
-// ─── Interceptor script ─────────────────────────────────────────────────────────
-
-describe('getWebAuthnInterceptorScript', () => {
-  it('returns a non-empty string', () => {
-    const script = getWebAuthnInterceptorScript();
-    expect(typeof script).toBe('string');
-    expect(script.length).toBeGreaterThan(100);
-  });
-
-  it('contains navigator.credentials override code', () => {
-    const script = getWebAuthnInterceptorScript();
-    expect(script).toContain('navigator.credentials.create');
-    expect(script).toContain('navigator.credentials.get');
-  });
-
-  it('contains lockbox message types', () => {
-    const script = getWebAuthnInterceptorScript();
-    expect(script).toContain('lockbox-webauthn-create');
-    expect(script).toContain('lockbox-webauthn-get');
-    expect(script).toContain('lockbox-webauthn-response');
-  });
-
-  it('saves original methods before overriding', () => {
-    const script = getWebAuthnInterceptorScript();
-    expect(script).toContain('origCreate');
-    expect(script).toContain('origGet');
-  });
-
-  it('implements fallback to original methods', () => {
-    const script = getWebAuthnInterceptorScript();
-    // Should call origCreate / origGet when extension declines
-    expect(script).toContain('origCreate(options)');
-    expect(script).toContain('origGet(options)');
-  });
-
-  it('is wrapped in an IIFE for isolation', () => {
-    const script = getWebAuthnInterceptorScript();
-    expect(script.trimStart().startsWith('(function()')).toBe(true);
-    expect(script.trimEnd().endsWith('})();')).toBe(true);
-  });
-});
-
 // ─── P1363 to DER conversion ─────────────────────────────────────────────────
 
 describe('p1363ToDer', () => {
@@ -499,28 +456,6 @@ describe('p1363ToDer', () => {
   });
 });
 
-// ─── Interceptor script prototype chain ──────────────────────────────────────
-
-describe('getWebAuthnInterceptorScript security', () => {
-  it('sets Object.setPrototypeOf for instanceof checks', () => {
-    const script = getWebAuthnInterceptorScript();
-    expect(script).toContain('Object.setPrototypeOf');
-    expect(script).toContain('PublicKeyCredential.prototype');
-    expect(script).toContain('AuthenticatorAttestationResponse.prototype');
-    expect(script).toContain('AuthenticatorAssertionResponse.prototype');
-  });
-
-  it('includes toJSON method on credentials', () => {
-    const script = getWebAuthnInterceptorScript();
-    expect(script).toContain('toJSON');
-  });
-
-  it('includes credProps extension results for create', () => {
-    const script = getWebAuthnInterceptorScript();
-    expect(script).toContain('credProps');
-  });
-});
-
 // ─── End-to-end key generation + signing flow ───────────────────────────────────
 
 describe('end-to-end passkey flow', () => {
@@ -554,7 +489,9 @@ describe('end-to-end passkey flow', () => {
       base64urlEncode(crypto.getRandomValues(new Uint8Array(32))),
       'https://example.com'
     );
-    const clientDataHash = new Uint8Array(await crypto.subtle.digest('SHA-256', clientDataJSON.buffer as ArrayBuffer));
+    const clientDataHash = new Uint8Array(
+      await crypto.subtle.digest('SHA-256', clientDataJSON.buffer as ArrayBuffer)
+    );
 
     // 8. Sign
     const signature = await signChallenge(privKey, authDataGet, clientDataHash);

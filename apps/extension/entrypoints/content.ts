@@ -17,7 +17,6 @@ import {
   createStatusDropdown,
 } from '../lib/autofill.js';
 import { initSaveDetector } from '../lib/save-detector.js';
-import { getWebAuthnInterceptorScript } from '../lib/webauthn.js';
 import type { VaultItem, LoginItem, IdentityItem } from '@lockbox/types';
 
 // Track injected overlays to avoid duplicates
@@ -68,7 +67,7 @@ async function getIdentityItems(): Promise<IdentityItem[]> {
 /** Handle autofill for a detected form. */
 async function handleAutofill(
   passwordField: HTMLInputElement,
-  usernameField: HTMLInputElement | null,
+  usernameField: HTMLInputElement | null
 ): Promise<void> {
   // 1. Check if vault is unlocked
   const unlocked = await isVaultUnlocked();
@@ -85,7 +84,12 @@ async function handleAutofill(
     items = await getMatchingItems();
   } catch {
     createStatusDropdown(passwordField, 'error', [
-      { label: 'Retry', onClick: () => { handleAutofill(passwordField, usernameField).catch(() => {}); } },
+      {
+        label: 'Retry',
+        onClick: () => {
+          handleAutofill(passwordField, usernameField).catch(() => {});
+        },
+      },
     ]);
     return;
   }
@@ -115,7 +119,7 @@ async function handleAutofill(
     fillForm(
       { formElement: null, usernameField, passwordField, submitButton: null },
       loginItems[0].username,
-      loginItems[0].password,
+      loginItems[0].password
     );
     filledItem = loginItems[0];
   } else {
@@ -129,12 +133,12 @@ async function handleAutofill(
           fillForm(
             { formElement: null, usernameField, passwordField, submitButton: null },
             item.username,
-            item.password,
+            item.password
           );
           // Check 2FA after dropdown selection
           checkTwoFaAfterAutofill(item).catch(() => {});
         }
-      },
+      }
     );
   }
 
@@ -146,7 +150,7 @@ async function handleAutofill(
 
 /** Handle autofill for a detected identity form. */
 async function handleIdentityAutofill(
-  identityForm: import('../lib/form-detector.js').DetectedIdentityForm,
+  identityForm: import('../lib/form-detector.js').DetectedIdentityForm
 ): Promise<void> {
   const firstField = Object.values(identityForm.fields)[0];
   if (!firstField) return;
@@ -165,7 +169,12 @@ async function handleIdentityAutofill(
     identityItems = await getIdentityItems();
   } catch {
     createStatusDropdown(firstField, 'error', [
-      { label: 'Retry', onClick: () => { handleIdentityAutofill(identityForm).catch(() => {}); } },
+      {
+        label: 'Retry',
+        onClick: () => {
+          handleIdentityAutofill(identityForm).catch(() => {});
+        },
+      },
     ]);
     return;
   }
@@ -194,7 +203,7 @@ async function handleIdentityAutofill(
         if (item) {
           fillIdentityForm(identityForm, item);
         }
-      },
+      }
     );
   }
 }
@@ -434,13 +443,17 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
   document.body.prepend(host);
 }
 
-
 /**
  * Show a Shadow DOM passkey picker when multiple passkeys match a WebAuthn request.
  * Returns the selected passkey or null if the user dismisses.
  */
 function showPasskeyPicker(
-  passkeys: Array<{ credentialId: string; userName: string; userDisplayName: string; rpName: string }>
+  passkeys: Array<{
+    credentialId: string;
+    userName: string;
+    userDisplayName: string;
+    rpName: string;
+  }>
 ): Promise<{ credentialId: string } | null> {
   return new Promise((resolve) => {
     const host = document.createElement('div');
@@ -514,23 +527,12 @@ function showPasskeyPicker(
   });
 }
 
-
 /** WXT content script export. */
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_start',
 
   main() {
-    // ─── WebAuthn interceptor injection (MUST run before page scripts) ────────
-    // Inject interceptor script into page context so it can override
-    // navigator.credentials.create() and navigator.credentials.get().
-    // This runs at document_start to ensure override is in place before
-    // any page script can save a reference to the original methods.
-    const interceptorScript = document.createElement('script');
-    interceptorScript.textContent = getWebAuthnInterceptorScript();
-    (document.head || document.documentElement).appendChild(interceptorScript);
-    interceptorScript.remove();
-
     // ─── DOM-dependent features (deferred until DOM is ready) ─────────────────
     function initDomFeatures() {
       // Initial scan for login + identity forms
@@ -544,7 +546,6 @@ export default defineContentScript({
     } else {
       initDomFeatures();
     }
-
 
     // Listen for WebAuthn messages from the injected page script
     window.addEventListener('message', async (event: MessageEvent) => {
@@ -563,17 +564,23 @@ export default defineContentScript({
             origin: event.data.origin,
             options: event.data.options,
           });
-          window.postMessage({
-            type: 'lockbox-webauthn-response',
-            requestId: event.data.requestId,
-            ...result,
-          }, '*');
+          window.postMessage(
+            {
+              type: 'lockbox-webauthn-response',
+              requestId: event.data.requestId,
+              ...result,
+            },
+            '*'
+          );
         } catch {
-          window.postMessage({
-            type: 'lockbox-webauthn-response',
-            requestId: event.data.requestId,
-            fallback: true,
-          }, '*');
+          window.postMessage(
+            {
+              type: 'lockbox-webauthn-response',
+              requestId: event.data.requestId,
+              fallback: true,
+            },
+            '*'
+          );
         }
       }
 
@@ -584,7 +591,12 @@ export default defineContentScript({
             error?: string;
             fallback?: boolean;
             selectPasskey?: boolean;
-            matches?: Array<{ credentialId: string; userName: string; userDisplayName: string; rpName: string }>;
+            matches?: Array<{
+              credentialId: string;
+              userName: string;
+              userDisplayName: string;
+              rpName: string;
+            }>;
             _context?: { rpId: string; origin: string; challenge: string };
           }>({
             type: 'WEBAUTHN_GET',
@@ -597,11 +609,14 @@ export default defineContentScript({
           if (result.selectPasskey && result.matches && result._context) {
             const selected = await showPasskeyPicker(result.matches);
             if (!selected) {
-              window.postMessage({
-                type: 'lockbox-webauthn-response',
-                requestId: event.data.requestId,
-                fallback: true,
-              }, '*');
+              window.postMessage(
+                {
+                  type: 'lockbox-webauthn-response',
+                  requestId: event.data.requestId,
+                  fallback: true,
+                },
+                '*'
+              );
               return;
             }
             // Sign with the selected passkey
@@ -615,25 +630,34 @@ export default defineContentScript({
               challenge: result._context.challenge,
               origin: result._context.origin,
             });
-            window.postMessage({
-              type: 'lockbox-webauthn-response',
-              requestId: event.data.requestId,
-              ...signResult,
-            }, '*');
+            window.postMessage(
+              {
+                type: 'lockbox-webauthn-response',
+                requestId: event.data.requestId,
+                ...signResult,
+              },
+              '*'
+            );
             return;
           }
 
-          window.postMessage({
-            type: 'lockbox-webauthn-response',
-            requestId: event.data.requestId,
-            ...result,
-          }, '*');
+          window.postMessage(
+            {
+              type: 'lockbox-webauthn-response',
+              requestId: event.data.requestId,
+              ...result,
+            },
+            '*'
+          );
         } catch {
-          window.postMessage({
-            type: 'lockbox-webauthn-response',
-            requestId: event.data.requestId,
-            fallback: true,
-          }, '*');
+          window.postMessage(
+            {
+              type: 'lockbox-webauthn-response',
+              requestId: event.data.requestId,
+              fallback: true,
+            },
+            '*'
+          );
         }
       }
     });
@@ -647,9 +671,10 @@ export default defineContentScript({
         const pwField = document.querySelector('input[type="password"]') as HTMLInputElement | null;
         if (pwField) {
           // Gather nearby text (labels, descriptions) for rule detection
-          const label = pwField.closest('label')?.textContent?.trim()
-            ?? document.querySelector(`label[for="${pwField.id}"]`)?.textContent?.trim()
-            ?? '';
+          const label =
+            pwField.closest('label')?.textContent?.trim() ??
+            document.querySelector(`label[for="${pwField.id}"]`)?.textContent?.trim() ??
+            '';
           const describedBy = pwField.getAttribute('aria-describedby');
           let ariaDesc = '';
           if (describedBy) {
