@@ -476,3 +476,132 @@ export function showVaultLockedToast(onOpenLockbox?: () => void): void {
     if (host.parentElement) host.remove();
   }, 8000);
 }
+
+// ─── Unlock Prompt (blocking modal with polling) ────────────────────────────
+
+const UNLOCK_PROMPT_STYLES = `
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #818cf8;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; margin-top: 8px;
+    background: rgba(99,102,241,0.08); border-radius: 8px;
+    font-size: 13px; color: #94a3b8;
+  }
+  .status-row.unlocked { color: #4ade80; }
+`;
+
+export interface UnlockPromptParams {
+  onOpenLockbox: () => void;
+  checkUnlocked: () => Promise<boolean>;
+  timeoutMs?: number;
+}
+
+/**
+ * Show a full-screen blocking modal when the vault is locked during a WebAuthn request.
+ * Polls `checkUnlocked()` every second. Auto-dismisses and resolves `true` when
+ * the vault unlocks. Resolves `false` on cancel, Escape, backdrop click, or timeout.
+ */
+export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
+  if (!chrome.runtime?.id) return Promise.resolve(false);
+
+  const timeoutMs = params.timeoutMs ?? 120_000;
+
+  return new Promise((resolve) => {
+    const { host, shadow } = createHost('lockbox-webauthn-unlock-prompt');
+
+    const style = document.createElement('style');
+    style.textContent = BASE_STYLES + UNLOCK_PROMPT_STYLES;
+    shadow.appendChild(style);
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          ${LOCK_ICON_SVG}
+          <div>
+            <div class="modal-title">Lockbox is locked</div>
+            <div class="modal-subtitle">Unlock to use passkeys on this site</div>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="info-row">
+            <div class="info-icon">🔑</div>
+            <div>
+              <div class="info-label">Action required</div>
+              <div class="info-value">Enter your master password to continue</div>
+            </div>
+          </div>
+          <div class="status-row" data-status>
+            <div class="spinner"></div>
+            <span>Waiting for unlock…</span>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" data-action="cancel">Cancel</button>
+          <button class="btn btn-primary" data-action="open">Open Lockbox</button>
+        </div>
+      </div>
+    `;
+
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+    let resolved = false;
+
+    function cleanup(result: boolean): void {
+      if (resolved) return;
+      resolved = true;
+      if (pollTimer) clearInterval(pollTimer);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      host.remove();
+      resolve(result);
+    }
+
+    overlay
+      .querySelector('[data-action="open"]')!
+      .addEventListener('click', () => params.onOpenLockbox());
+    overlay
+      .querySelector('[data-action="cancel"]')!
+      .addEventListener('click', () => cleanup(false));
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) cleanup(false);
+    });
+
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        document.removeEventListener('keydown', keyHandler);
+        cleanup(false);
+      }
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    shadow.appendChild(overlay);
+    (shadow.querySelector('[data-action="open"]') as HTMLButtonElement)?.focus();
+
+    pollTimer = setInterval(async () => {
+      if (resolved) return;
+      try {
+        const unlocked = await params.checkUnlocked();
+        if (unlocked) {
+          const statusRow = shadow.querySelector('[data-status]');
+          if (statusRow) {
+            statusRow.classList.add('unlocked');
+            statusRow.innerHTML = `<span>✓</span><span>Unlocked!</span>`;
+          }
+          setTimeout(() => cleanup(true), 300);
+        }
+      } catch {
+        /* poll error — keep trying */
+      }
+    }, 1000);
+
+    timeoutTimer = setTimeout(() => cleanup(false), timeoutMs);
+  });
+}

@@ -145,12 +145,16 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
     if (cancelledRequests.delete(details.requestId)) return;
 
     if (!handlers.isUnlocked()) {
-      await sendToActiveTab({ type: 'webauthn-vault-locked' });
-      proxy.completeCreateRequest({
-        requestId: details.requestId,
-        error: { name: 'NotAllowedError', message: 'Vault is locked' },
+      const result = await sendToActiveTab<{ unlocked: boolean }>({
+        type: 'webauthn-unlock-prompt',
       });
-      return;
+      if (!result?.unlocked || !handlers.isUnlocked()) {
+        proxy.completeCreateRequest({
+          requestId: details.requestId,
+          error: { name: 'NotAllowedError', message: 'Vault is locked' },
+        });
+        return;
+      }
     }
 
     try {
@@ -249,12 +253,16 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
     if (cancelledRequests.delete(details.requestId)) return;
 
     if (!handlers.isUnlocked()) {
-      await sendToActiveTab({ type: 'webauthn-vault-locked' });
-      proxy.completeGetRequest({
-        requestId: details.requestId,
-        error: { name: 'NotAllowedError', message: 'Vault is locked' },
+      const result = await sendToActiveTab<{ unlocked: boolean }>({
+        type: 'webauthn-unlock-prompt',
       });
-      return;
+      if (!result?.unlocked || !handlers.isUnlocked()) {
+        proxy.completeGetRequest({
+          requestId: details.requestId,
+          error: { name: 'NotAllowedError', message: 'Vault is locked' },
+        });
+        return;
+      }
     }
 
     try {

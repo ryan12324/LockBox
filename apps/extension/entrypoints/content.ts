@@ -22,6 +22,7 @@ import {
   showGetConsent,
   showPasskeyPicker,
   showVaultLockedToast,
+  showUnlockPrompt,
 } from '../lib/webauthn-ui.js';
 import type { VaultItem, LoginItem, IdentityItem } from '@lockbox/types';
 
@@ -480,18 +481,23 @@ export default defineContentScript({
         if (event.data.type === 'lockbox-webauthn-create') {
           try {
             const opts = event.data.options;
-            const unlocked = await isVaultUnlocked();
+            let unlocked = await isVaultUnlocked();
             if (!unlocked) {
-              showVaultLockedToast(() => openExtensionPopup());
-              window.postMessage(
-                {
-                  type: 'lockbox-webauthn-response',
-                  requestId: event.data.requestId,
-                  fallback: true,
-                },
-                '*'
-              );
-              return;
+              unlocked = await showUnlockPrompt({
+                onOpenLockbox: () => openExtensionPopup(),
+                checkUnlocked: () => isVaultUnlocked(),
+              });
+              if (!unlocked) {
+                window.postMessage(
+                  {
+                    type: 'lockbox-webauthn-response',
+                    requestId: event.data.requestId,
+                    fallback: true,
+                  },
+                  '*'
+                );
+                return;
+              }
             }
 
             const confirmed = await showCreateConsent({
@@ -540,18 +546,23 @@ export default defineContentScript({
 
         if (event.data.type === 'lockbox-webauthn-get') {
           try {
-            const unlocked = await isVaultUnlocked();
+            let unlocked = await isVaultUnlocked();
             if (!unlocked) {
-              showVaultLockedToast(() => openExtensionPopup());
-              window.postMessage(
-                {
-                  type: 'lockbox-webauthn-response',
-                  requestId: event.data.requestId,
-                  fallback: true,
-                },
-                '*'
-              );
-              return;
+              unlocked = await showUnlockPrompt({
+                onOpenLockbox: () => openExtensionPopup(),
+                checkUnlocked: () => isVaultUnlocked(),
+              });
+              if (!unlocked) {
+                window.postMessage(
+                  {
+                    type: 'lockbox-webauthn-response',
+                    requestId: event.data.requestId,
+                    fallback: true,
+                  },
+                  '*'
+                );
+                return;
+              }
             }
 
             const result = await sendMessage<{
@@ -699,6 +710,14 @@ export default defineContentScript({
       } else if (message.type === 'webauthn-vault-locked') {
         showVaultLockedToast(() => openExtensionPopup());
         sendResponse({ shown: true });
+      } else if (message.type === 'webauthn-unlock-prompt') {
+        showUnlockPrompt({
+          onOpenLockbox: () => openExtensionPopup(),
+          checkUnlocked: () => isVaultUnlocked(),
+        })
+          .then((unlocked) => sendResponse({ unlocked }))
+          .catch(() => sendResponse({ unlocked: false }));
+        return true;
       } else if (message.type === 'phishing-warning') {
         injectPhishingWarning(message);
       } else if (message.type === 'get-password-field-metadata') {

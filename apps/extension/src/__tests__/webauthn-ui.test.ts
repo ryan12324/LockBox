@@ -4,6 +4,7 @@ import {
   showGetConsent,
   showPasskeyPicker,
   showVaultLockedToast,
+  showUnlockPrompt,
 } from '../../lib/webauthn-ui.js';
 
 beforeEach(() => {
@@ -281,5 +282,145 @@ describe('showVaultLockedToast', () => {
     expect(document.getElementById('lockbox-webauthn-locked-toast')).toBeNull();
 
     vi.useRealTimers();
+  });
+});
+
+// ─── showUnlockPrompt ───────────────────────────────────────────────────────
+
+describe('showUnlockPrompt', () => {
+  it('renders modal with lock messaging', async () => {
+    const promise = showUnlockPrompt({
+      onOpenLockbox: vi.fn(),
+      checkUnlocked: () => Promise.resolve(false),
+    });
+
+    const host = document.getElementById('lockbox-webauthn-unlock-prompt');
+    expect(host).not.toBeNull();
+
+    const shadow = host!.shadowRoot!;
+    expect(shadow.querySelector('.modal-title')!.textContent).toBe('Lockbox is locked');
+    expect(shadow.innerHTML).toContain('Waiting for unlock');
+
+    (shadow.querySelector('[data-action="cancel"]') as HTMLButtonElement).click();
+    expect(await promise).toBe(false);
+  });
+
+  it('calls onOpenLockbox when open button is clicked', async () => {
+    const onOpen = vi.fn();
+    const promise = showUnlockPrompt({
+      onOpenLockbox: onOpen,
+      checkUnlocked: () => Promise.resolve(false),
+    });
+
+    const shadow = document.getElementById('lockbox-webauthn-unlock-prompt')!.shadowRoot!;
+    (shadow.querySelector('[data-action="open"]') as HTMLButtonElement).click();
+    expect(onOpen).toHaveBeenCalledOnce();
+
+    (shadow.querySelector('[data-action="cancel"]') as HTMLButtonElement).click();
+    await promise;
+  });
+
+  it('returns false on cancel', async () => {
+    const promise = showUnlockPrompt({
+      onOpenLockbox: vi.fn(),
+      checkUnlocked: () => Promise.resolve(false),
+    });
+
+    const shadow = document.getElementById('lockbox-webauthn-unlock-prompt')!.shadowRoot!;
+    (shadow.querySelector('[data-action="cancel"]') as HTMLButtonElement).click();
+    expect(await promise).toBe(false);
+    expect(document.getElementById('lockbox-webauthn-unlock-prompt')).toBeNull();
+  });
+
+  it('returns false on backdrop click', async () => {
+    const promise = showUnlockPrompt({
+      onOpenLockbox: vi.fn(),
+      checkUnlocked: () => Promise.resolve(false),
+    });
+
+    const shadow = document.getElementById('lockbox-webauthn-unlock-prompt')!.shadowRoot!;
+    (shadow.querySelector('.overlay') as HTMLElement).click();
+    expect(await promise).toBe(false);
+  });
+
+  it('returns false on Escape key', async () => {
+    const promise = showUnlockPrompt({
+      onOpenLockbox: vi.fn(),
+      checkUnlocked: () => Promise.resolve(false),
+    });
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(await promise).toBe(false);
+  });
+
+  it('returns false when chrome.runtime is unavailable', async () => {
+    (globalThis as Record<string, unknown>).chrome = { runtime: {} };
+    const result = await showUnlockPrompt({
+      onOpenLockbox: vi.fn(),
+      checkUnlocked: () => Promise.resolve(false),
+    });
+    expect(result).toBe(false);
+  });
+
+  it('resolves true when checkUnlocked returns true during polling', async () => {
+    vi.useFakeTimers();
+    let pollCount = 0;
+
+    const promise = showUnlockPrompt({
+      onOpenLockbox: vi.fn(),
+      checkUnlocked: () => Promise.resolve(++pollCount >= 3),
+    });
+
+    vi.advanceTimersByTime(1000);
+    await vi.advanceTimersByTimeAsync(0);
+    vi.advanceTimersByTime(1000);
+    await vi.advanceTimersByTimeAsync(0);
+    vi.advanceTimersByTime(1000);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // 300ms delay for success state display
+    vi.advanceTimersByTime(300);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(await promise).toBe(true);
+    expect(document.getElementById('lockbox-webauthn-unlock-prompt')).toBeNull();
+
+    vi.useRealTimers();
+  });
+
+  it('returns false on timeout', async () => {
+    vi.useFakeTimers();
+
+    const promise = showUnlockPrompt({
+      onOpenLockbox: vi.fn(),
+      checkUnlocked: () => Promise.resolve(false),
+      timeoutMs: 5000,
+    });
+
+    vi.advanceTimersByTime(5000);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(await promise).toBe(false);
+
+    vi.useRealTimers();
+  });
+
+  it('replaces existing prompt if one is already open', async () => {
+    const first = showUnlockPrompt({
+      onOpenLockbox: vi.fn(),
+      checkUnlocked: () => Promise.resolve(false),
+    });
+
+    const second = showUnlockPrompt({
+      onOpenLockbox: vi.fn(),
+      checkUnlocked: () => Promise.resolve(false),
+    });
+
+    const hosts = document.querySelectorAll('#lockbox-webauthn-unlock-prompt');
+    expect(hosts.length).toBe(1);
+
+    const shadow = hosts[0].shadowRoot!;
+    (shadow.querySelector('[data-action="cancel"]') as HTMLButtonElement).click();
+    expect(await second).toBe(false);
   });
 });
