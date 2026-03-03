@@ -16,6 +16,7 @@ export interface HardwareKeySetupRequest {
   publicKey: string;
   wrappedMasterKey: string;
   attestation?: string;
+  prfSalt?: string;
 }
 
 export interface HardwareKeyUnlockRequest {

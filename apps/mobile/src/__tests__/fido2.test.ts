@@ -14,11 +14,13 @@ const mockFido2Plugin = vi.hoisted(() => ({
     keyId: 'test-key-id-base64url',
     publicKey: 'dGVzdC1wdWJsaWMta2V5LWRhdGEtMzItYnl0ZXM=',
     attestation: 'test-attestation-base64url',
+    prfEnabled: true,
   }),
   authenticate: vi.fn().mockResolvedValue({
     signature: 'test-signature-base64url',
     authenticatorData: 'test-auth-data-base64url',
     clientDataJSON: 'test-client-data-base64url',
+    prfOutput: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
   }),
 }));
 
@@ -40,7 +42,8 @@ import {
   Fido2,
   registerFido2Key,
   authenticateFido2,
-  wrapMasterKey,
+  wrapMasterKeyWithPrf,
+  unwrapMasterKeyWithPrf,
   setupHardwareKey,
   unlockWithHardwareKey,
   listHardwareKeys,
@@ -73,11 +76,13 @@ function resetMocks(): void {
     keyId: 'test-key-id-base64url',
     publicKey: 'dGVzdC1wdWJsaWMta2V5LWRhdGEtMzItYnl0ZXM=',
     attestation: 'test-attestation-base64url',
+    prfEnabled: true,
   });
   mockFido2Plugin.authenticate.mockResolvedValue({
     signature: 'test-signature-base64url',
     authenticatorData: 'test-auth-data-base64url',
     clientDataJSON: 'test-client-data-base64url',
+    prfOutput: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
   });
 }
 
@@ -274,36 +279,56 @@ describe('authenticateFido2', () => {
   });
 });
 
-// ─── wrapMasterKey ────────────────────────────────────────────────────────────
+// ─── wrapMasterKeyWithPrf ─────────────────────────────────────────────────────
 
-describe('wrapMasterKey', () => {
-  it('wraps a master key and returns encrypted format', async () => {
+describe('wrapMasterKeyWithPrf', () => {
+  beforeEach(resetMocks);
+
+  it('wraps a master key and returns encrypted format + prfSalt', async () => {
     const masterKey = crypto.getRandomValues(new Uint8Array(32));
-    const publicKeyBase64 = btoa(
-      String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))
-    );
-    const result = await wrapMasterKey(masterKey, publicKeyBase64);
-    expect(typeof result).toBe('string');
-    expect(result).toContain('.');
+    const result = await wrapMasterKeyWithPrf({
+      masterKey,
+      credentialId: 'test-key-id',
+      rpId: 'lockbox.dev',
+    });
+    expect(typeof result.wrappedMasterKey).toBe('string');
+    expect(result.wrappedMasterKey).toContain('.');
+    expect(typeof result.prfSalt).toBe('string');
+    expect(result.prfSalt.length).toBeGreaterThan(0);
   });
 
-  it('produces different outputs for same input (random IV)', async () => {
+  it('calls authenticate with prfSalt', async () => {
     const masterKey = crypto.getRandomValues(new Uint8Array(32));
-    const publicKeyBase64 = btoa(
-      String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))
+    await wrapMasterKeyWithPrf({
+      masterKey,
+      credentialId: 'test-key-id',
+      rpId: 'lockbox.dev',
+    });
+    expect(mockFido2Plugin.authenticate).toHaveBeenCalledWith(
+      expect.objectContaining({ prfSalt: expect.any(String) })
     );
-    const result1 = await wrapMasterKey(masterKey, publicKeyBase64);
-    const result2 = await wrapMasterKey(masterKey, publicKeyBase64);
-    expect(result1).not.toBe(result2);
+  });
+
+  it('throws when PRF is not supported', async () => {
+    mockFido2Plugin.authenticate.mockResolvedValue({
+      signature: 'sig',
+      authenticatorData: 'auth',
+      clientDataJSON: 'client',
+    });
+    const masterKey = crypto.getRandomValues(new Uint8Array(32));
+    await expect(
+      wrapMasterKeyWithPrf({ masterKey, credentialId: 'key-1', rpId: 'lockbox.dev' })
+    ).rejects.toThrow('FIDO2 PRF extension is not supported');
   });
 
   it('output contains two base64 segments separated by dot', async () => {
     const masterKey = crypto.getRandomValues(new Uint8Array(32));
-    const publicKeyBase64 = btoa(
-      String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32)))
-    );
-    const result = await wrapMasterKey(masterKey, publicKeyBase64);
-    const parts = result.split('.');
+    const result = await wrapMasterKeyWithPrf({
+      masterKey,
+      credentialId: 'test-key-id',
+      rpId: 'lockbox.dev',
+    });
+    const parts = result.wrappedMasterKey.split('.');
     expect(parts).toHaveLength(2);
     expect(parts[0].length).toBeGreaterThan(0);
     expect(parts[1].length).toBeGreaterThan(0);
@@ -354,7 +379,7 @@ describe('setupHardwareKey', () => {
     );
   });
 
-  it('sends correct body with keyType fido2', async () => {
+  it('sends correct body with keyType fido2 and prfSalt', async () => {
     mockFetch.mockResolvedValue(makeJsonResponse({ keyId: 'key-1' }));
 
     await setupHardwareKey({
@@ -371,6 +396,7 @@ describe('setupHardwareKey', () => {
     expect(body.publicKey).toBeDefined();
     expect(body.wrappedMasterKey).toBeDefined();
     expect(body.attestation).toBeDefined();
+    expect(body.prfSalt).toBeDefined();
   });
 
   it('throws on API error', async () => {
@@ -400,14 +426,44 @@ describe('setupHardwareKey', () => {
       })
     ).rejects.toThrow('FIDO2 hardware key support is not available');
   });
+
+  it('throws when PRF is not supported by authenticator', async () => {
+    mockFido2Plugin.register.mockResolvedValue({
+      keyId: 'test-key-id',
+      publicKey: 'dGVzdA',
+      attestation: 'test-attestation',
+      prfEnabled: false,
+    });
+
+    await expect(
+      setupHardwareKey({
+        apiUrl: 'https://api.lockbox.dev',
+        token: 'token',
+        userId: 'user-1',
+        email: 'test@test.com',
+        masterKey: crypto.getRandomValues(new Uint8Array(32)),
+      })
+    ).rejects.toThrow('FIDO2 PRF extension is not supported');
+  });
 });
 
 // ─── unlockWithHardwareKey ────────────────────────────────────────────────────
 
 describe('unlockWithHardwareKey', () => {
-  beforeEach(resetMocks);
+  let testWrapped: { wrappedMasterKey: string; prfSalt: string };
+  const testMasterKey = new Uint8Array(32).fill(42);
 
-  it('calls challenge + auth + verify', async () => {
+  beforeEach(async () => {
+    resetMocks();
+    testWrapped = await wrapMasterKeyWithPrf({
+      masterKey: testMasterKey,
+      credentialId: 'key-1',
+      rpId: 'api.lockbox.dev',
+    });
+    resetMocks();
+  });
+
+  it('calls challenge + auth + verify + unwrap', async () => {
     mockFetch
       .mockResolvedValueOnce(
         makeJsonResponse({
@@ -419,7 +475,8 @@ describe('unlockWithHardwareKey', () => {
       .mockResolvedValueOnce(
         makeJsonResponse({
           token: 'session-token',
-          wrappedMasterKey: 'wrapped-key-data',
+          wrappedMasterKey: testWrapped.wrappedMasterKey,
+          prfSalt: testWrapped.prfSalt,
         })
       );
 
@@ -431,7 +488,7 @@ describe('unlockWithHardwareKey', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(mockFido2Plugin.authenticate).toHaveBeenCalled();
     expect(result.token).toBe('session-token');
-    expect(result.wrappedMasterKey).toBe('wrapped-key-data');
+    expect(result.masterKey).toEqual(testMasterKey);
   });
 
   it('fetches challenge from correct endpoint', async () => {
@@ -439,7 +496,13 @@ describe('unlockWithHardwareKey', () => {
       .mockResolvedValueOnce(
         makeJsonResponse({ challenge: 'c', keyId: 'k', expiresAt: new Date().toISOString() })
       )
-      .mockResolvedValueOnce(makeJsonResponse({ token: 't', wrappedMasterKey: 'w' }));
+      .mockResolvedValueOnce(
+        makeJsonResponse({
+          token: 't',
+          wrappedMasterKey: testWrapped.wrappedMasterKey,
+          prfSalt: testWrapped.prfSalt,
+        })
+      );
 
     await unlockWithHardwareKey({ apiUrl: 'https://api.lockbox.dev', keyId: 'my-key' });
 
@@ -452,7 +515,13 @@ describe('unlockWithHardwareKey', () => {
       .mockResolvedValueOnce(
         makeJsonResponse({ challenge: 'c', keyId: 'k', expiresAt: new Date().toISOString() })
       )
-      .mockResolvedValueOnce(makeJsonResponse({ token: 't', wrappedMasterKey: 'w' }));
+      .mockResolvedValueOnce(
+        makeJsonResponse({
+          token: 't',
+          wrappedMasterKey: testWrapped.wrappedMasterKey,
+          prfSalt: testWrapped.prfSalt,
+        })
+      );
 
     await unlockWithHardwareKey({ apiUrl: 'https://api.lockbox.dev', keyId: 'key-1' });
 

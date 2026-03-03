@@ -7,17 +7,16 @@
  * Flow:
  * 1. registerFido2Key() → register a hardware key, get credential
  * 2. authenticateFido2() → sign a challenge with the hardware key
- * 3. setupHardwareKey() → full setup: register + wrap master key + POST to API
- * 4. unlockWithHardwareKey() → challenge → sign → verify → get session
+ * 3. wrapMasterKeyWithPrf() → PRF-based hardware-bound master key wrapping
+ * 4. unwrapMasterKeyWithPrf() → PRF-based master key unwrapping
+ * 5. setupHardwareKey() → full setup: register + PRF wrap + POST to API
+ * 6. unlockWithHardwareKey() → challenge → sign → verify → PRF unwrap
  * 5. listHardwareKeys() / removeHardwareKey() → key management
  */
 
 import { registerPlugin } from '@capacitor/core';
 import { fromBase64, toBase64 } from '@lockbox/crypto';
-import type {
-  HardwareKeySetupRequest,
-  HardwareKeyChallengeResponse,
-} from '@lockbox/types';
+import type { HardwareKeySetupRequest, HardwareKeyChallengeResponse } from '@lockbox/types';
 
 // ─── Native Plugin Interface ──────────────────────────────────────────────────
 
@@ -29,6 +28,8 @@ export interface Fido2RegistrationResult {
   publicKey: string;
   /** Base64url-encoded attestation object */
   attestation: string;
+  /** Whether the authenticator supports the PRF extension */
+  prfEnabled?: boolean;
 }
 
 /** Result from FIDO2 authentication */
@@ -39,6 +40,8 @@ export interface Fido2AuthenticationResult {
   authenticatorData: string;
   /** Base64url-encoded client data JSON */
   clientDataJSON: string;
+  /** Base64url-encoded PRF output (32 bytes) when prfSalt was provided */
+  prfOutput?: string;
 }
 
 /** Options for FIDO2 key registration */
@@ -54,6 +57,8 @@ export interface Fido2AuthenticationOptions {
   challenge: string;
   rpId: string;
   allowCredentials: Array<{ id: string; type: string }>;
+  /** Base64url-encoded PRF salt for hardware-bound key derivation */
+  prfSalt?: string;
 }
 
 /** Hardware key info returned from the API */
@@ -110,60 +115,150 @@ export async function authenticateFido2(
   return Fido2.authenticate(options);
 }
 
-// ─── Master Key Wrapping ──────────────────────────────────────────────────────
+// ─── PRF Constants ────────────────────────────────────────────────────────────
 
-/**
- * Wrap (encrypt) a master key with a FIDO2-derived public key using AES-256-GCM.
- * The wrapped key is stored server-side and can only be unwrapped by the hardware key.
- */
-export async function wrapMasterKey(
-  masterKey: Uint8Array,
-  publicKeyBase64: string
-): Promise<string> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  // SECURITY TODO: Deriving wrapping key from public key is insecure — public key is stored server-side.
-  // The server should gate wrappingKey release behind FIDO2 authentication.
-  // Proper fix requires FIDO2 PRF/hmac-secret extension for hardware-bound key derivation.
-  // Derive a wrapping key from the FIDO2 public key via HKDF
-  const publicKeyBytes = fromBase64(publicKeyBase64);
-  const ikm = await crypto.subtle.importKey('raw', publicKeyBytes as Uint8Array<ArrayBuffer>, { name: 'HKDF' }, false, [
-    'deriveBits',
-  ]);
-  const info = new TextEncoder().encode('lockbox-fido2-wrap');
+const PRF_CONTEXT = 'lockbox-master-key-wrap-v1';
+
+// ─── PRF Helpers ──────────────────────────────────────────────────────────────
+
+function base64urlEncode(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64urlDecode(str: string): Uint8Array {
+  const padded = str.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function derivePrfSalt(): Promise<Uint8Array> {
+  const encoded = new TextEncoder().encode(PRF_CONTEXT);
+  const hash = await crypto.subtle.digest('SHA-256', encoded as Uint8Array<ArrayBuffer>);
+  return new Uint8Array(hash);
+}
+
+async function deriveWrappingKeyFromPrf(
+  prfOutput: Uint8Array,
+  usage: KeyUsage[]
+): Promise<CryptoKey> {
+  const ikm = await crypto.subtle.importKey(
+    'raw',
+    prfOutput as Uint8Array<ArrayBuffer>,
+    { name: 'HKDF' },
+    false,
+    ['deriveBits']
+  );
+  const info = new TextEncoder().encode(PRF_CONTEXT);
   const derivedBits = await crypto.subtle.deriveBits(
     {
       name: 'HKDF',
       hash: 'SHA-256',
-      salt: new Uint8Array([
-        0x7d, 0x4e, 0x2f, 0xa1, 0xb8, 0x63, 0xc5, 0x09, 0xd7, 0x3a, 0xf6, 0x81, 0xe4, 0x52, 0x9b, 0x0c, 0x6f, 0xd8, 0x13, 0xa7, 0x45, 0xbe, 0x29, 0xf0, 0x8c, 0x57, 0xe3, 0x1a, 0x94, 0x6b, 0xd2, 0x48,
-      ]) as Uint8Array<ArrayBuffer>,
+      salt: new Uint8Array(32) as Uint8Array<ArrayBuffer>,
       info: info as Uint8Array<ArrayBuffer>,
     },
     ikm,
     256
   );
-  const wrappingKey = await crypto.subtle.importKey(
-    'raw',
-    derivedBits,
-    { name: 'AES-GCM' },
-    false,
-    ['encrypt']
-  );
+  return crypto.subtle.importKey('raw', derivedBits, { name: 'AES-GCM' }, false, usage);
+}
+
+// ─── Master Key Wrapping (PRF-based) ─────────────────────────────────────────
+
+export async function wrapMasterKeyWithPrf(options: {
+  masterKey: Uint8Array;
+  credentialId: string;
+  rpId: string;
+}): Promise<{ wrappedMasterKey: string; prfSalt: string }> {
+  const { masterKey, credentialId, rpId } = options;
+
+  const salt = await derivePrfSalt();
+  const saltBase64url = base64urlEncode(salt);
+
+  const challengeBytes = crypto.getRandomValues(new Uint8Array(32));
+  const authResult = await Fido2.authenticate({
+    challenge: base64urlEncode(challengeBytes),
+    rpId,
+    allowCredentials: [{ id: credentialId, type: 'public-key' }],
+    prfSalt: saltBase64url,
+  });
+
+  if (!authResult.prfOutput) {
+    throw new Error(
+      'FIDO2 PRF extension is not supported by this authenticator. ' +
+        'Hardware key wrapping requires PRF support (Android 14+ with compatible security key).'
+    );
+  }
+
+  const prfBytes = base64urlDecode(authResult.prfOutput);
+  const wrappingKey = await deriveWrappingKeyFromPrf(prfBytes, ['encrypt']);
+
+  const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv: iv as Uint8Array<ArrayBuffer> },
     wrappingKey,
     masterKey as Uint8Array<ArrayBuffer>
   );
-  // Return as base64(iv).base64(ciphertext+tag)
-  return `${toBase64(iv)}.${toBase64(new Uint8Array(ciphertext))}`;
+
+  const wrappedMasterKey = `${toBase64(iv)}.${toBase64(new Uint8Array(ciphertext))}`;
+  return { wrappedMasterKey, prfSalt: saltBase64url };
+}
+
+export async function unwrapMasterKeyWithPrf(options: {
+  wrappedMasterKey: string;
+  prfSalt: string;
+  credentialId: string;
+  rpId: string;
+}): Promise<Uint8Array> {
+  const { wrappedMasterKey, prfSalt, credentialId, rpId } = options;
+
+  const challengeBytes = crypto.getRandomValues(new Uint8Array(32));
+  const authResult = await Fido2.authenticate({
+    challenge: base64urlEncode(challengeBytes),
+    rpId,
+    allowCredentials: [{ id: credentialId, type: 'public-key' }],
+    prfSalt,
+  });
+
+  if (!authResult.prfOutput) {
+    throw new Error(
+      'FIDO2 PRF extension is not supported by this authenticator. ' +
+        'Hardware key unwrapping requires PRF support (Android 14+ with compatible security key).'
+    );
+  }
+
+  const prfBytes = base64urlDecode(authResult.prfOutput);
+  const wrappingKey = await deriveWrappingKeyFromPrf(prfBytes, ['decrypt']);
+
+  const parts = wrappedMasterKey.split('.');
+  if (parts.length !== 2) {
+    throw new Error('Invalid wrapped master key format');
+  }
+  const iv = fromBase64(parts[0]);
+  const ciphertext = fromBase64(parts[1]);
+
+  const plaintext = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: iv as Uint8Array<ArrayBuffer> },
+    wrappingKey,
+    ciphertext as Uint8Array<ArrayBuffer>
+  );
+
+  return new Uint8Array(plaintext);
 }
 
 // ─── API Integration ──────────────────────────────────────────────────────────
 
 /**
  * Full hardware key setup flow:
- * 1. Register FIDO2 key on device
- * 2. Wrap master key with the registered key's public key
+ * 1. Register FIDO2 key on device — reject if PRF not supported
+ * 2. Wrap master key via PRF-derived hardware-bound secret
  * 3. POST setup to /api/auth/hardware-key/setup
  */
 export async function setupHardwareKey(options: {
@@ -174,24 +269,34 @@ export async function setupHardwareKey(options: {
   masterKey: Uint8Array;
 }): Promise<{ keyId: string }> {
   const { apiUrl, token, userId, email, masterKey } = options;
+  const rpId = new URL(apiUrl).hostname;
 
-  // 1. Register FIDO2 key
   const registration = await registerFido2Key({
     userId,
     email,
-    rpId: new URL(apiUrl).hostname,
+    rpId,
     rpName: 'Lockbox',
   });
 
-  // 2. Wrap master key
-  const wrappedMasterKey = await wrapMasterKey(masterKey, registration.publicKey);
+  if (!registration.prfEnabled) {
+    throw new Error(
+      'FIDO2 PRF extension is not supported by this authenticator. ' +
+        'Hardware key setup requires a security key with PRF support (Android 14+ with compatible key).'
+    );
+  }
 
-  // 3. POST to API
+  const { wrappedMasterKey, prfSalt } = await wrapMasterKeyWithPrf({
+    masterKey,
+    credentialId: registration.keyId,
+    rpId,
+  });
+
   const body: HardwareKeySetupRequest = {
     keyType: 'fido2',
     publicKey: registration.publicKey,
     wrappedMasterKey,
     attestation: registration.attestation,
+    prfSalt,
   };
 
   const controller = new AbortController();
@@ -221,18 +326,19 @@ export async function setupHardwareKey(options: {
 
 /**
  * Unlock with hardware key flow:
- * 1. GET challenge from /api/auth/hardware-key/challenge
+ * 1. GET challenge + prfSalt from /api/auth/hardware-key/challenge
  * 2. Sign challenge with FIDO2 hardware key
  * 3. POST verification to /api/auth/hardware-key/verify
- * 4. Return session token + wrapped master key
+ * 4. Unwrap master key using PRF-derived secret
+ * 5. Return session token + decrypted master key
  */
 export async function unlockWithHardwareKey(options: {
   apiUrl: string;
   keyId: string;
-}): Promise<{ token: string; wrappedMasterKey: string }> {
+}): Promise<{ token: string; masterKey: Uint8Array }> {
   const { apiUrl, keyId } = options;
+  const rpId = new URL(apiUrl).hostname;
 
-  // 1. Get challenge from API
   const challengeController = new AbortController();
   const challengeTimeout = setTimeout(() => challengeController.abort(), 30_000);
   let challengeResponse: Response;
@@ -247,16 +353,17 @@ export async function unlockWithHardwareKey(options: {
   if (!challengeResponse.ok) {
     throw new Error(`Failed to get challenge: ${challengeResponse.status}`);
   }
-  const challengeData = (await challengeResponse.json()) as HardwareKeyChallengeResponse;
+  const challengeData = (await challengeResponse.json()) as HardwareKeyChallengeResponse & {
+    prfSalt?: string;
+    wrappedMasterKey?: string;
+  };
 
-  // 2. Sign with FIDO2
   const authResult = await authenticateFido2({
     challenge: challengeData.challenge,
-    rpId: new URL(apiUrl).hostname,
+    rpId,
     allowCredentials: [{ id: keyId, type: 'public-key' }],
   });
 
-  // 3. Verify with API
   const verifyController = new AbortController();
   const verifyTimeout = setTimeout(() => verifyController.abort(), 30_000);
   let verifyResponse: Response;
@@ -282,12 +389,17 @@ export async function unlockWithHardwareKey(options: {
   const verifyData = (await verifyResponse.json()) as {
     token: string;
     wrappedMasterKey: string;
+    prfSalt: string;
   };
 
-  return {
-    token: verifyData.token,
+  const masterKey = await unwrapMasterKeyWithPrf({
     wrappedMasterKey: verifyData.wrappedMasterKey,
-  };
+    prfSalt: verifyData.prfSalt,
+    credentialId: keyId,
+    rpId,
+  });
+
+  return { token: verifyData.token, masterKey };
 }
 
 /**
@@ -339,4 +451,3 @@ export async function removeHardwareKey(
     throw new Error(`Failed to remove hardware key: ${response.status}`);
   }
 }
-

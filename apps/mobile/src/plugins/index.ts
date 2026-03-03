@@ -30,11 +30,7 @@ export type {
 } from './storage';
 
 export { QRScanner } from './qr-scanner';
-export type {
-  QRScannerPlugin,
-  QRScanResult,
-  QRScannerAvailabilityResult,
-} from './qr-scanner';
+export type { QRScannerPlugin, QRScanResult, QRScannerAvailabilityResult } from './qr-scanner';
 
 export { encryptFile, decryptFile } from './file-crypto';
 
@@ -64,7 +60,8 @@ export {
   Fido2,
   registerFido2Key,
   authenticateFido2,
-  wrapMasterKey,
+  wrapMasterKeyWithPrf,
+  unwrapMasterKeyWithPrf,
   setupHardwareKey,
   unlockWithHardwareKey,
   listHardwareKeys,
