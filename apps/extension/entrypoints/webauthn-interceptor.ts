@@ -179,6 +179,8 @@ export default defineContentScript({
             id: data.id,
             rawId: data.rawId,
             type: data.type || 'public-key',
+            authenticatorAttachment: data.authenticatorAttachment || 'platform',
+            clientExtensionResults: isCreate ? { credProps: { rk: true } } : {},
           };
           const resp: Record<string, string> = {};
           if (data.response.clientDataJSON) resp.clientDataJSON = data.response.clientDataJSON;

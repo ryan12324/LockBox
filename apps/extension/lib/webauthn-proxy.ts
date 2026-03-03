@@ -121,6 +121,16 @@ async function sendToActiveTab<T>(message: object): Promise<T | null> {
   }
 }
 
+async function getActiveTabOrigin(): Promise<string> {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.url) return new URL(tab.url).origin;
+  } catch {
+    /* */
+  }
+  return '';
+}
+
 export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
   const proxy = (chrome as unknown as { webAuthenticationProxy?: WebAuthenticationProxy })
     .webAuthenticationProxy;
@@ -159,8 +169,8 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
 
     try {
       const options = JSON.parse(details.requestDetailsJson);
-      const rpId = options.rp?.id ?? new URL(options.origin ?? '').hostname;
-      const origin = options.origin ?? '';
+      const origin = options.origin ?? (await getActiveTabOrigin());
+      const rpId = options.rp?.id ?? (origin ? new URL(origin).hostname : '');
 
       const consent = await sendToActiveTab<{ confirmed: boolean }>({
         type: 'webauthn-create-consent',
@@ -267,8 +277,8 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
 
     try {
       const options = JSON.parse(details.requestDetailsJson);
-      const rpId = options.rpId ?? new URL(options.origin ?? '').hostname;
-      const origin = options.origin ?? '';
+      const origin = options.origin ?? (await getActiveTabOrigin());
+      const rpId = options.rpId ?? (origin ? new URL(origin).hostname : '');
       const challenge =
         typeof options.challenge === 'string'
           ? options.challenge
