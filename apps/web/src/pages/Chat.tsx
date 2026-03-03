@@ -59,11 +59,11 @@ export default function Chat() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/[0.08]">
-        <h1 className="text-xl font-medium text-white">Assistant</h1>
+      <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
+        <h1 className="text-xl font-medium text-[var(--color-text)]">Assistant</h1>
         <button
           onClick={clearMessages}
-          className="px-3 py-1.5 text-sm text-white/60 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors"
+          className="px-3 py-1.5 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)] rounded-[var(--radius-md)] transition-colors"
         >
           Clear Chat
         </button>
@@ -71,23 +71,23 @@ export default function Chat() {
       {/* Message area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-4">
         {messages.length === 0 && (
-          <div className="h-full flex items-center justify-center text-white/40">
+          <div className="h-full flex items-center justify-center text-[var(--color-text-tertiary)]">
             Start a conversation...
           </div>
         )}
         {messages.map((msg) => (
           <div key={msg.id} className="flex flex-col w-full">
             {msg.role === 'user' ? (
-              <div className="ml-auto max-w-[80%] px-4 py-3 bg-indigo-600/80 text-white rounded-2xl rounded-br-md">
+              <div className="ml-auto max-w-[80%] px-4 py-3 bg-[var(--color-primary)] text-[var(--color-text)] rounded-[var(--radius-xl)] rounded-br-[var(--radius-sm)]">
                 {msg.content}
               </div>
             ) : (
-              <div className="mr-auto max-w-[80%] px-4 py-3 backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] text-white rounded-2xl rounded-bl-md">
+              <div className="mr-auto max-w-[80%] px-4 py-3 bg-[var(--color-aura-dim)] border border-[var(--color-border)] text-[var(--color-text)] rounded-[var(--radius-xl)] rounded-bl-[var(--radius-sm)]">
                 {msg.content}
                 {msg.toolCalls?.map((tool, idx) => (
                   <div
                     key={idx}
-                    className="mt-2 px-3 py-1.5 bg-white/[0.04] border border-white/[0.08] rounded-lg text-xs text-white/60 flex items-center gap-2"
+                    className="mt-2 px-3 py-1.5 bg-[var(--color-bg-subtle)] border border-[var(--color-border)] rounded-[var(--radius-md)] text-xs text-[var(--color-text-secondary)] flex items-center gap-2"
                   >
                     🔧 {tool.name} {tool.status === 'pending' ? '...' : `(${tool.status})`}
                   </div>
@@ -97,7 +97,7 @@ export default function Chat() {
           </div>
         ))}
         {loading && (
-          <div className="mr-auto max-w-[80%] px-4 py-3 backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] text-white rounded-2xl rounded-bl-md">
+          <div className="mr-auto max-w-[80%] px-4 py-3 bg-[var(--color-aura-dim)] border border-[var(--color-border)] text-[var(--color-text)] rounded-[var(--radius-xl)] rounded-bl-[var(--radius-sm)]">
             <div className="flex gap-1">
               <span className="animate-bounce">.</span>
               <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>
@@ -113,7 +113,7 @@ export default function Chat() {
       </div>
 
       {/* Input bar container */}
-      <div className="p-4 border-t border-white/[0.08]">
+      <div className="p-4 border-t border-[var(--color-border)]">
         <form onSubmit={handleSend} className="flex gap-2">
           {/* Text input */}
           <input
@@ -121,13 +121,13 @@ export default function Chat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Message the assistant..."
-            className="flex-1 px-4 py-3 bg-white/[0.06] border border-white/[0.12] rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+            className="flex-1 px-4 py-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)]"
           />
           {/* Send button */}
           <button
             type="submit"
             disabled={!input.trim() || loading}
-            className="ml-3 px-5 py-3 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-xl font-medium transition-colors disabled:opacity-40"
+            className="ml-3 px-5 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-lg)] font-medium transition-colors disabled:opacity-40"
           >
             Send
           </button>
@@ -138,22 +138,25 @@ export default function Chat() {
       {confirmationRequest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           {/* Confirmation card */}
-          <div className="backdrop-blur-xl bg-white/[0.12] border border-white/[0.15] rounded-2xl p-6 max-w-md w-full mx-4 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-            <h3 className="text-lg font-medium text-white mb-2">Permission Required</h3>
-            <p className="text-white/70 mb-6">
+          <div className="bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] rounded-[var(--radius-xl)] p-6 max-w-md w-full mx-4 shadow-[var(--shadow-lg)]">
+            <h3 className="text-lg font-medium text-[var(--color-text)] mb-2">
+              Permission Required
+            </h3>
+            <p className="text-[var(--color-text-secondary)] mb-6">
               The assistant wants to{' '}
-              <strong className="text-white">{confirmationRequest.callName}</strong>. Allow?
+              <strong className="text-[var(--color-text)]">{confirmationRequest.callName}</strong>.
+              Allow?
             </p>
             <div className="flex gap-3 justify-end">
               <button
                 onClick={handleDeny}
-                className="px-4 py-2 bg-white/[0.06] hover:bg-white/[0.1] text-white rounded-xl transition-colors"
+                className="px-4 py-2 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text)] rounded-[var(--radius-lg)] transition-colors"
               >
                 Deny
               </button>
               <button
                 onClick={handleApprove}
-                className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-xl transition-colors"
+                className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-lg)] transition-colors"
               >
                 Approve
               </button>

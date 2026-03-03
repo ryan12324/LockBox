@@ -221,28 +221,31 @@ export default function AISettings() {
   return (
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-white mb-6">AI & Intelligence</h1>
+        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">AI & Intelligence</h1>
 
         <div className="space-y-6">
           {/* Privacy Notice */}
-          <section className="backdrop-blur-xl bg-indigo-500/[0.08] border border-indigo-400/[0.15] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
+          <section className="bg-[var(--color-aura-dim)] border border-[var(--color-primary)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
             <div className="flex items-start gap-3">
               <span className="text-xl shrink-0">🛡️</span>
               <div>
-                <h2 className="text-sm font-semibold text-indigo-300 mb-1">Privacy-First AI</h2>
-                <p className="text-xs text-white/50 leading-relaxed">
+                <h2 className="text-sm font-semibold text-[var(--color-primary)] mb-1">
+                  Privacy-First AI
+                </h2>
+                <p className="text-xs text-[var(--color-text-tertiary)] leading-relaxed">
                   Passwords, card numbers, and TOTP secrets{' '}
-                  <strong className="text-white/70">never</strong> leave your device. Health
-                  analysis and breach checking run entirely client-side. Chat features use your own
-                  API keys (BYOK) — Lockbox servers never see your data or your keys.
+                  <strong className="text-[var(--color-text-secondary)]">never</strong> leave your
+                  device. Health analysis and breach checking run entirely client-side. Chat
+                  features use your own API keys (BYOK) — Lockbox servers never see your data or
+                  your keys.
                 </p>
               </div>
             </div>
           </section>
 
           {/* Feature Toggles */}
-          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Features</h2>
+          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Features</h2>
             <div className="space-y-3">
               {FEATURE_LABELS.map(({ key, label, description, phase }) => (
                 <label key={key} className="flex items-start gap-3 cursor-pointer group">
@@ -250,18 +253,20 @@ export default function AISettings() {
                     type="checkbox"
                     checked={flags[key]}
                     onChange={() => toggleFlag(key)}
-                    className="mt-0.5 rounded border-white/20 bg-white/10 text-indigo-500 focus:ring-indigo-500/60"
+                    className="mt-0.5 rounded border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] text-[var(--color-primary)] focus:ring-[var(--color-aura)]"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-white group-hover:text-indigo-300 transition-colors">
+                      <span className="text-sm font-medium text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors">
                         {label}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/[0.08] text-white/40 font-mono">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-[var(--radius-full)] bg-[var(--color-surface)] text-[var(--color-text-tertiary)] font-mono">
                         P{phase}
                       </span>
                     </div>
-                    <p className="text-xs text-white/40 mt-0.5">{description}</p>
+                    <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">
+                      {description}
+                    </p>
                   </div>
                 </label>
               ))}
@@ -269,9 +274,11 @@ export default function AISettings() {
           </section>
 
           {/* Provider Configuration */}
-          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">LLM Provider (BYOK)</h2>
-            <p className="text-xs text-white/40 mb-4">
+          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+              LLM Provider (BYOK)
+            </h2>
+            <p className="text-xs text-[var(--color-text-tertiary)] mb-4">
               Configure your own API key for chat and copilot features. Keys are encrypted with your
               master key.
             </p>
@@ -284,22 +291,24 @@ export default function AISettings() {
                   return (
                     <div
                       key={config.provider}
-                      className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]"
+                      className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]"
                     >
                       <div>
-                        <span className="text-sm font-medium text-white">
+                        <span className="text-sm font-medium text-[var(--color-text)]">
                           {meta?.name ?? config.provider}
                         </span>
                         {config.model && (
-                          <span className="text-xs text-white/40 ml-2">({config.model})</span>
+                          <span className="text-xs text-[var(--color-text-tertiary)] ml-2">
+                            ({config.model})
+                          </span>
                         )}
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-[var(--radius-full)] bg-[var(--color-success-subtle)] text-[var(--color-success)]">
                           Active
                         </span>
                       </div>
                       <button
                         onClick={() => handleRemoveProvider(config.provider)}
-                        className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                        className="text-xs text-[var(--color-error)] hover:text-[var(--color-error)] transition-colors"
                       >
                         Remove
                       </button>
@@ -318,14 +327,16 @@ export default function AISettings() {
                     <button
                       key={p.id}
                       onClick={() => handleSelectProvider(p.id)}
-                      className={`text-left p-3 rounded-lg border transition-colors ${
+                      className={`text-left p-3 rounded-[var(--radius-md)] border transition-colors ${
                         isConfigured
-                          ? 'border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/15'
-                          : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.15]'
+                          ? 'border-[var(--color-primary)] bg-[var(--color-aura-dim)] hover:bg-[var(--color-surface)]'
+                          : 'border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:bg-[var(--color-surface)] hover:border-[var(--color-border-strong)]'
                       }`}
                     >
-                      <span className="text-sm font-medium text-white block">{p.name}</span>
-                      <span className="text-[10px] text-white/40 block mt-0.5">
+                      <span className="text-sm font-medium text-[var(--color-text)] block">
+                        {p.name}
+                      </span>
+                      <span className="text-[10px] text-[var(--color-text-tertiary)] block mt-0.5">
                         {p.description}
                       </span>
                     </button>
@@ -333,9 +344,9 @@ export default function AISettings() {
                 })}
               </div>
             ) : (
-              <div className="space-y-3 p-4 bg-white/[0.03] rounded-lg border border-white/[0.08]">
+              <div className="space-y-3 p-4 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-white">
+                  <h3 className="text-sm font-semibold text-[var(--color-text)]">
                     {PROVIDERS.find((p) => p.id === selectedProvider)?.name}
                   </h3>
                   <button
@@ -343,7 +354,7 @@ export default function AISettings() {
                       setSelectedProvider(null);
                       setTestResult(null);
                     }}
-                    className="text-xs text-white/40 hover:text-white/60"
+                    className="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
                   >
                     Cancel
                   </button>
@@ -351,20 +362,22 @@ export default function AISettings() {
 
                 {PROVIDERS.find((p) => p.id === selectedProvider)?.requiresKey && (
                   <div>
-                    <label className="block text-xs font-medium text-white/70 mb-1">API Key</label>
+                    <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+                      API Key
+                    </label>
                     <input
                       type="password"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
                       placeholder="sk-..."
-                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30 text-sm"
+                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] text-sm"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-medium text-white/70 mb-1">
-                    Base URL <span className="text-white/30">(optional)</span>
+                  <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+                    Base URL <span className="text-[var(--color-text-tertiary)]">(optional)</span>
                   </label>
                   <input
                     type="url"
@@ -375,30 +388,30 @@ export default function AISettings() {
                         ? 'http://localhost:11434'
                         : 'Leave empty for default'
                     }
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30 text-sm"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] text-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-white/70 mb-1">
-                    Model <span className="text-white/30">(optional)</span>
+                  <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
+                    Model <span className="text-[var(--color-text-tertiary)]">(optional)</span>
                   </label>
                   <input
                     type="text"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                     placeholder="Leave empty for default"
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30 text-sm"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] text-sm"
                   />
                 </div>
 
                 {/* Test result */}
                 {testResult && (
                   <div
-                    className={`p-3 rounded-lg border text-xs ${
+                    className={`p-3 rounded-[var(--radius-md)] border text-xs ${
                       testResult.success
-                        ? 'bg-emerald-500/10 border-emerald-400/20 text-emerald-300'
-                        : 'bg-red-500/10 border-red-400/20 text-red-300'
+                        ? 'bg-[var(--color-success-subtle)] border-[var(--color-success)] text-[var(--color-success)]'
+                        : 'bg-[var(--color-error-subtle)] border-[var(--color-error)] text-[var(--color-error)]'
                     }`}
                   >
                     {testResult.success
@@ -411,13 +424,13 @@ export default function AISettings() {
                   <button
                     onClick={handleTestConnection}
                     disabled={testing}
-                    className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors disabled:opacity-50"
                   >
                     {testing ? 'Testing...' : 'Test Connection'}
                   </button>
                   <button
                     onClick={handleSaveProvider}
-                    className="px-3 py-1.5 text-sm bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg backdrop-blur-sm transition-colors"
+                    className="px-3 py-1.5 text-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] transition-colors"
                   >
                     Save Provider
                   </button>
@@ -427,36 +440,39 @@ export default function AISettings() {
           </section>
 
           {/* Data Management */}
-          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Data Management</h2>
-            <p className="text-xs text-white/40 mb-4">
+          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Data Management</h2>
+            <p className="text-xs text-[var(--color-text-tertiary)] mb-4">
               Clear cached AI data including embeddings, breach check results, and provider
               configurations.
             </p>
             <button
               onClick={handleClearAIData}
-              className="px-4 py-2 text-sm text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors font-medium"
+              className="px-4 py-2 text-sm text-[var(--color-error)] bg-[var(--color-error-subtle)] hover:bg-[var(--color-error-subtle)] rounded-[var(--radius-md)] transition-colors font-medium"
             >
               Clear All AI Data
             </button>
           </section>
 
           {/* About */}
-          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">About AI Features</h2>
-            <div className="space-y-2 text-xs text-white/40">
+          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+              About AI Features
+            </h2>
+            <div className="space-y-2 text-xs text-[var(--color-text-tertiary)]">
               <p>
-                <strong className="text-white/60">Phase 1:</strong> Password health, breach
-                monitoring, smart autofill
+                <strong className="text-[var(--color-text-secondary)]">Phase 1:</strong> Password
+                health, breach monitoring, smart autofill
               </p>
               <p>
-                <strong className="text-white/60">Phase 2:</strong> Semantic search, phishing
-                detection, auto-categorization
+                <strong className="text-[var(--color-text-secondary)]">Phase 2:</strong> Semantic
+                search, phishing detection, auto-categorization
               </p>
               <p>
-                <strong className="text-white/60">Phase 3:</strong> Chat assistant, security copilot
+                <strong className="text-[var(--color-text-secondary)]">Phase 3:</strong> Chat
+                assistant, security copilot
               </p>
-              <p className="pt-2 border-t border-white/[0.06]">
+              <p className="pt-2 border-t border-[var(--color-border)]">
                 All AI features are privacy-first. Sensitive data never leaves your device. Chat and
                 copilot features require your own API key (BYOK).
               </p>
