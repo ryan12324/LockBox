@@ -4,7 +4,18 @@ import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
 import { encryptVaultItem } from '../lib/crypto.js';
 import { decryptString } from '@lockbox/crypto';
-import type { VaultItem, LoginItem, SecureNoteItem, CardItem, IdentityItem, PasskeyItem, DocumentItem, CustomField, Folder, VaultItemType } from '@lockbox/types';
+import type {
+  VaultItem,
+  LoginItem,
+  SecureNoteItem,
+  CardItem,
+  IdentityItem,
+  PasskeyItem,
+  DocumentItem,
+  CustomField,
+  Folder,
+  VaultItemType,
+} from '@lockbox/types';
 import { totp, getRemainingSeconds, base32Decode, parseOtpAuthUri } from '@lockbox/totp';
 import { generatePassword } from '@lockbox/generator';
 import { SecurityAlertEngine } from '@lockbox/ai';
@@ -22,16 +33,24 @@ interface ItemPanelProps {
   onClose: () => void;
 }
 
-export default function ItemPanel({ mode, item, folders, items, onSave, onDelete, onClose }: ItemPanelProps) {
+export default function ItemPanel({
+  mode,
+  item,
+  folders,
+  items,
+  onSave,
+  onDelete,
+  onClose,
+}: ItemPanelProps) {
   const { session, userKey } = useAuthStore();
   const navigate = useNavigate();
-  
+
   const [currentMode, setCurrentMode] = useState(mode);
   const [type, setType] = useState<VaultItemType>(item?.type || 'login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
-  
+
   // Form State
   const [name, setName] = useState(item?.name || '');
   const [folderId, setFolderId] = useState(item?.folderId || '');
@@ -44,11 +63,11 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
   const [password, setPassword] = useState(loginItem?.password || '');
   const [uris, setUris] = useState<string[]>(loginItem?.uris || ['']);
   const [totpSecret, setTotpSecret] = useState(loginItem?.totp || '');
-  
+
   // Note State
   const noteItem = item?.type === 'note' ? (item as SecureNoteItem) : null;
   const [content, setContent] = useState(noteItem?.content || '');
-  
+
   // Card State
   const cardItem = item?.type === 'card' ? (item as CardItem) : null;
   const [cardholderName, setCardholderName] = useState(cardItem?.cardholderName || '');
@@ -155,6 +174,15 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
       setSsn(iden.ssn || '');
       setPassportNumber(iden.passportNumber || '');
       setLicenseNumber(iden.licenseNumber || '');
+    } else if (item?.type === 'passkey') {
+      const pk = item as PasskeyItem;
+      setRpId(pk.rpId || '');
+      setRpName(pk.rpName || '');
+      setPasskeyUserName(pk.userName || '');
+      setPasskeyUserId(pk.userId || '');
+      setCredentialId(pk.credentialId || '');
+      setPublicKey(pk.publicKey || '');
+      setCounter(pk.counter || 0);
     } else if (item?.type === 'document') {
       const doc = item as DocumentItem;
       setDescription(doc.description || '');
@@ -179,12 +207,12 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
     if (currentMode !== 'view' || type !== 'login' || !totpSecret) return;
 
     let intervalId: ReturnType<typeof setInterval>;
-    
+
     const updateTotp = async () => {
       try {
         let secretBytes: Uint8Array;
         let period = 30;
-        
+
         if (totpSecret.startsWith('otpauth://')) {
           const parsed = parseOtpAuthUri(totpSecret);
           secretBytes = parsed.secret;
@@ -192,7 +220,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
         } else {
           secretBytes = base32Decode(totpSecret);
         }
-        
+
         const code = await totp(secretBytes, Date.now(), { period });
         setTotpCode(code);
         setTotpRemaining(getRemainingSeconds(period));
@@ -211,17 +239,19 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
   // Tags generation
   useEffect(() => {
     if (currentMode !== 'view') {
-      import('@lockbox/ai').then((ai: any) => {
-        if (typeof ai.suggestTags === 'function') {
-           // Provide all necessary data for suggestion
-           const data = { name, uris, type };
-           Promise.resolve(ai.suggestTags(data)).then(res => setSuggestedTags(res || []));
-        } else {
-           setSuggestedTags(['personal', 'work', 'finance', 'shopping']);
-        }
-      }).catch(() => {
-        setSuggestedTags(['personal', 'work', 'finance', 'shopping']);
-      });
+      import('@lockbox/ai')
+        .then((ai: any) => {
+          if (typeof ai.suggestTags === 'function') {
+            // Provide all necessary data for suggestion
+            const data = { name, uris, type };
+            Promise.resolve(ai.suggestTags(data)).then((res) => setSuggestedTags(res || []));
+          } else {
+            setSuggestedTags(['personal', 'work', 'finance', 'shopping']);
+          }
+        })
+        .catch(() => {
+          setSuggestedTags(['personal', 'work', 'finance', 'shopping']);
+        });
     }
   }, [currentMode, name, uris, type]);
 
@@ -230,12 +260,12 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
     if (currentMode === 'view' && type === 'login' && uris.length > 0 && uris[0]) {
       try {
         const engine = new SecurityAlertEngine();
-        const loginItems = items.filter(i => i.type === 'login') as LoginItem[];
+        const loginItems = items.filter((i) => i.type === 'login') as LoginItem[];
         const newAlerts = engine.checkUrl(uris[0], loginItems);
         // Only keep alerts for this item specifically or global ones for the url
         // Wait, checkUrl returns alerts for matching items. We want only alerts for THIS item
         // or general URL alerts like phishing/http.
-        const relevantAlerts = newAlerts.filter(a => !a.itemId || a.itemId === item?.id);
+        const relevantAlerts = newAlerts.filter((a) => !a.itemId || a.itemId === item?.id);
         setAlerts(relevantAlerts);
       } catch (err) {
         console.warn('Failed to run security alerts:', err);
@@ -297,7 +327,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
         createdAt: isAdd ? now : item!.createdAt,
         updatedAt: now,
         revisionDate: now,
-        customFields: customFields.filter(f => f.name.trim() !== ''),
+        customFields: customFields.filter((f) => f.name.trim() !== ''),
       };
 
       let vaultItem: VaultItem;
@@ -308,7 +338,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           type: 'login',
           username,
           password,
-          uris: uris.filter(u => u.trim()),
+          uris: uris.filter((u) => u.trim()),
           totp: totpSecret || undefined,
         } as LoginItem;
       } else if (type === 'note') {
@@ -379,7 +409,15 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
       if (isAdd) {
         // Send client-generated id + revisionDate so AAD matches on decrypt
         await api.vault.createItem(
-          { id: itemId, type, encryptedData, folderId: folderId || undefined, tags: [], favorite, revisionDate: now },
+          {
+            id: itemId,
+            type,
+            encryptedData,
+            folderId: folderId || undefined,
+            tags: [],
+            favorite,
+            revisionDate: now,
+          },
           session.token
         );
       } else {
@@ -416,7 +454,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
   async function handleCreateFolder() {
     if (!session || !newFolderName.trim()) return;
     try {
-      const res = await api.vault.createFolder({ name: newFolderName.trim() }, session.token) as { folder: Folder };
+      const res = (await api.vault.createFolder({ name: newFolderName.trim() }, session.token)) as {
+        folder: Folder;
+      };
       setLocalFolders((prev) => [...prev, res.folder]);
       setFolderId(res.folder.id);
       setCreatingFolder(false);
@@ -426,27 +466,28 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
     }
   }
 
-  const typeIcon = (t: string) => ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' }[t] ?? '📄');
+  const typeIcon = (t: string) =>
+    ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' })[t] ??
+    '📄';
 
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40 transition-opacity"
         onClick={onClose}
       />
-      
+
       {/* Panel */}
       <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] backdrop-blur-2xl bg-white/[0.08] shadow-[0_16px_48px_rgba(0,0,0,0.35)] border-l border-white/[0.1] z-50 flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0">
-        
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-white/[0.1]">
           <div className="flex items-center gap-3">
             <span className="text-2xl">{typeIcon(type)}</span>
             <h2 className="text-lg font-semibold text-white truncate max-w-[200px]">
-              {currentMode === 'add' 
-                ? `New ${type.charAt(0).toUpperCase() + type.slice(1)}` 
-                : (name || 'Unnamed Item')}
+              {currentMode === 'add'
+                ? `New ${type.charAt(0).toUpperCase() + type.slice(1)}`
+                : name || 'Unnamed Item'}
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -464,12 +505,14 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 >
                   History
                 </button>
-                <button
-                  onClick={() => setCurrentMode('edit')}
-                  className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
-                >
-                  Edit
-                </button>
+                {type !== 'passkey' && (
+                  <button
+                    onClick={() => setCurrentMode('edit')}
+                    className="px-3 py-1.5 text-sm bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-lg transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -508,7 +551,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
 
           {currentMode === 'add' && (
             <div className="flex bg-white/[0.06] p-1 rounded-lg">
-              {(['login', 'note', 'card', 'identity', 'passkey', 'document'] as VaultItemType[]).map((t) => (
+              {(
+                ['login', 'note', 'card', 'identity', 'passkey', 'document'] as VaultItemType[]
+              ).map((t) => (
                 <button
                   key={t}
                   onClick={() => setType(t)}
@@ -553,8 +598,10 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                     className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                   >
                     <option value="">No folder</option>
-                    {localFolders.map(f => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
+                    {localFolders.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
                     ))}
                     <option value="__new__">+ New folder...</option>
                   </select>
@@ -564,13 +611,32 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                         type="text"
                         value={newFolderName}
                         onChange={(e) => setNewFolderName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName(''); } }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleCreateFolder();
+                          if (e.key === 'Escape') {
+                            setCreatingFolder(false);
+                            setNewFolderName('');
+                          }
+                        }}
                         placeholder="Folder name"
                         className="flex-1 px-2 py-1.5 text-sm border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                         autoFocus
                       />
-                      <button onClick={handleCreateFolder} className="px-2.5 py-1.5 text-xs bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg backdrop-blur-sm">✓</button>
-                      <button onClick={() => { setCreatingFolder(false); setNewFolderName(''); }} className="px-2 py-1.5 text-xs text-white/30 hover:text-white/60">✕</button>
+                      <button
+                        onClick={handleCreateFolder}
+                        className="px-2.5 py-1.5 text-xs bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg backdrop-blur-sm"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => {
+                          setCreatingFolder(false);
+                          setNewFolderName('');
+                        }}
+                        className="px-2 py-1.5 text-xs text-white/30 hover:text-white/60"
+                      >
+                        ✕
+                      </button>
                     </div>
                   )}
                 </div>
@@ -586,25 +652,41 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   </label>
                 </div>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-white/70 mb-1">Tags</label>
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {tags.map(t => (
-                    <span key={t} className="px-2 py-1 text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full flex items-center gap-1">
+                  {tags.map((t) => (
+                    <span
+                      key={t}
+                      className="px-2 py-1 text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full flex items-center gap-1"
+                    >
                       {t}
-                      <button type="button" onClick={() => setTags(tags.filter(x => x !== t))} className="hover:text-white">✕</button>
+                      <button
+                        type="button"
+                        onClick={() => setTags(tags.filter((x) => x !== t))}
+                        className="hover:text-white"
+                      >
+                        ✕
+                      </button>
                     </span>
                   ))}
                 </div>
                 {suggestedTags.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     <span className="text-xs text-white/40 self-center">Suggested:</span>
-                    {suggestedTags.filter(t => !tags.includes(t)).map(t => (
-                      <button type="button" key={t} onClick={() => setTags([...tags, t])} className="px-2 py-1 text-xs bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 rounded-full text-indigo-300 transition-colors">
-                        + {t}
-                      </button>
-                    ))}
+                    {suggestedTags
+                      .filter((t) => !tags.includes(t))
+                      .map((t) => (
+                        <button
+                          type="button"
+                          key={t}
+                          onClick={() => setTags([...tags, t])}
+                          className="px-2 py-1 text-xs bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 rounded-full text-indigo-300 transition-colors"
+                        >
+                          + {t}
+                        </button>
+                      ))}
                   </div>
                 )}
               </div>
@@ -615,7 +697,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           {currentMode !== 'view' && type === 'login' && (
             <div className="space-y-4 pt-4 border-t border-white/[0.1]">
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Username / Email</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">
+                  Username / Email
+                </label>
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -629,12 +713,18 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                       if (!session || !userKey) return;
                       try {
                         const config = await api.aliases.getConfig(session.token);
-                        const plainKey = await decryptString(config.encryptedApiKey, userKey.slice(0, 32));
-                        const result = await api.aliases.generate({
-                          provider: config.provider,
-                          apiKey: plainKey,
-                          baseUrl: config.baseUrl || undefined,
-                        }, session.token);
+                        const plainKey = await decryptString(
+                          config.encryptedApiKey,
+                          userKey.slice(0, 32)
+                        );
+                        const result = await api.aliases.generate(
+                          {
+                            provider: config.provider,
+                            apiKey: plainKey,
+                            baseUrl: config.baseUrl || undefined,
+                          },
+                          session.token
+                        );
                         setUsername(result.alias.email);
                       } catch {
                         setError('Configure email aliases in Settings first');
@@ -668,7 +758,13 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   <button
                     type="button"
                     onClick={() => {
-                      const pw = generatePassword({ length: 20, uppercase: true, lowercase: true, digits: true, symbols: true });
+                      const pw = generatePassword({
+                        length: 20,
+                        uppercase: true,
+                        lowercase: true,
+                        digits: true,
+                        symbols: true,
+                      });
                       setPassword(pw);
                       setShowPassword(true);
                     }}
@@ -679,7 +775,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Authenticator Key (TOTP)</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">
+                  Authenticator Key (TOTP)
+                </label>
                 <input
                   type="text"
                   value={totpSecret}
@@ -740,7 +838,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           {currentMode !== 'view' && type === 'card' && (
             <div className="space-y-4 pt-4 border-t border-white/[0.1]">
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Cardholder Name</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">
+                  Cardholder Name
+                </label>
                 <input
                   type="text"
                   value={cardholderName}
@@ -765,9 +865,13 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                     onChange={(e) => setExpMonth(e.target.value)}
                     className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
                   >
-                    {Array.from({length: 12}, (_, i) => {
+                    {Array.from({ length: 12 }, (_, i) => {
                       const m = (i + 1).toString().padStart(2, '0');
-                      return <option key={m} value={m}>{m}</option>;
+                      return (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      );
                     })}
                   </select>
                 </div>
@@ -821,135 +925,286 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           {currentMode !== 'view' && type === 'identity' && (
             <div className="space-y-4 pt-4 border-t border-white/[0.1]">
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Personal</h3>
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+                  Personal
+                </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">First Name</label>
-                    <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                    <label className="block text-sm font-medium text-white/70 mb-1">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">Middle Name</label>
-                    <input type="text" value={middleName} onChange={(e) => setMiddleName(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                    <label className="block text-sm font-medium text-white/70 mb-1">
+                      Middle Name
+                    </label>
+                    <input
+                      type="text"
+                      value={middleName}
+                      onChange={(e) => setMiddleName(e.target.value)}
+                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    />
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white/70 mb-1">Last Name</label>
-                  <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white/70 mb-1">Email</label>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white/70 mb-1">Phone</label>
-                  <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
                 </div>
               </div>
 
               <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Address</h3>
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+                  Address
+                </h3>
                 <div>
                   <label className="block text-sm font-medium text-white/70 mb-1">Address 1</label>
-                  <input type="text" value={address1} onChange={(e) => setAddress1(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <input
+                    type="text"
+                    value={address1}
+                    onChange={(e) => setAddress1(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white/70 mb-1">Address 2</label>
-                  <input type="text" value={address2} onChange={(e) => setAddress2(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <input
+                    type="text"
+                    value={address2}
+                    onChange={(e) => setAddress2(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-white/70 mb-1">City</label>
-                    <input type="text" value={city} onChange={(e) => setCity(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">State/Province</label>
-                    <input type="text" value={stateValue} onChange={(e) => setStateValue(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                    <label className="block text-sm font-medium text-white/70 mb-1">
+                      State/Province
+                    </label>
+                    <input
+                      type="text"
+                      value={stateValue}
+                      onChange={(e) => setStateValue(e.target.value)}
+                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-white/70 mb-1">Zip/Postal Code</label>
-                    <input type="text" value={postalCode} onChange={(e) => setPostalCode(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                    <label className="block text-sm font-medium text-white/70 mb-1">
+                      Zip/Postal Code
+                    </label>
+                    <input
+                      type="text"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
+                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-white/70 mb-1">Country</label>
-                    <input type="text" value={country} onChange={(e) => setCountry(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                    <input
+                      type="text"
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value)}
+                      className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Company</h3>
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+                  Company
+                </h3>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Company Name</label>
-                  <input type="text" value={company} onChange={(e) => setCompany(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <label className="block text-sm font-medium text-white/70 mb-1">
+                    Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
                 </div>
               </div>
 
               <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Identification</h3>
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+                  Identification
+                </h3>
                 <div>
                   <label className="block text-sm font-medium text-white/70 mb-1">SSN</label>
                   <div className="relative">
-                    <input type={showSsn ? 'text' : 'password'} value={ssn} onChange={(e) => setSsn(e.target.value)} className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
-                    <button type="button" onClick={() => setShowSsn(!showSsn)} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70">
+                    <input
+                      type={showSsn ? 'text' : 'password'}
+                      value={ssn}
+                      onChange={(e) => setSsn(e.target.value)}
+                      className="w-full px-3 py-2 pr-10 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSsn(!showSsn)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
+                    >
                       {showSsn ? '👁️‍🗨️' : '👁️'}
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Passport Number</label>
-                  <input type="text" value={passportNumber} onChange={(e) => setPassportNumber(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <label className="block text-sm font-medium text-white/70 mb-1">
+                    Passport Number
+                  </label>
+                  <input
+                    type="text"
+                    value={passportNumber}
+                    onChange={(e) => setPassportNumber(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">License Number</label>
-                  <input type="text" value={licenseNumber} onChange={(e) => setLicenseNumber(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <label className="block text-sm font-medium text-white/70 mb-1">
+                    License Number
+                  </label>
+                  <input
+                    type="text"
+                    value={licenseNumber}
+                    onChange={(e) => setLicenseNumber(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
                 </div>
               </div>
             </div>
           )}
-
 
           {/* Passkey Fields - Edit/Add Mode */}
           {currentMode !== 'view' && type === 'passkey' && (
             <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-              <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Passkey Details</h3>
-              <p className="text-xs text-white/40">Passkeys are typically created by the browser extension. Use this form to import from other managers.</p>
+              <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+                Passkey Details
+              </h3>
+              <p className="text-xs text-white/40">
+                Passkeys are typically created by the browser extension. Use this form to import
+                from other managers.
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Relying Party ID *</label>
-                  <input type="text" value={rpId} onChange={(e) => setRpId(e.target.value)} placeholder="example.com" className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30" />
+                  <label className="block text-sm font-medium text-white/70 mb-1">
+                    Relying Party ID *
+                  </label>
+                  <input
+                    type="text"
+                    value={rpId}
+                    onChange={(e) => setRpId(e.target.value)}
+                    placeholder="example.com"
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30"
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Relying Party Name *</label>
-                  <input type="text" value={rpName} onChange={(e) => setRpName(e.target.value)} placeholder="Example" className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30" />
+                  <label className="block text-sm font-medium text-white/70 mb-1">
+                    Relying Party Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={rpName}
+                    onChange={(e) => setRpName(e.target.value)}
+                    placeholder="Example"
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">User Name *</label>
-                  <input type="text" value={passkeyUserName} onChange={(e) => setPasskeyUserName(e.target.value)} placeholder="user@example.com" className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30" />
+                  <label className="block text-sm font-medium text-white/70 mb-1">
+                    User Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={passkeyUserName}
+                    onChange={(e) => setPasskeyUserName(e.target.value)}
+                    placeholder="user@example.com"
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white/70 mb-1">User ID</label>
-                  <input type="text" value={passkeyUserId} onChange={(e) => setPasskeyUserId(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                  <input
+                    type="text"
+                    value={passkeyUserId}
+                    onChange={(e) => setPasskeyUserId(e.target.value)}
+                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Credential ID</label>
-                <input type="text" value={credentialId} onChange={(e) => setCredentialId(e.target.value)} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono text-xs" />
+                <label className="block text-sm font-medium text-white/70 mb-1">
+                  Credential ID
+                </label>
+                <input
+                  type="text"
+                  value={credentialId}
+                  onChange={(e) => setCredentialId(e.target.value)}
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono text-xs"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-white/70 mb-1">Public Key</label>
-                <textarea value={publicKey} onChange={(e) => setPublicKey(e.target.value)} rows={3} className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono text-xs resize-none" />
+                <textarea
+                  value={publicKey}
+                  onChange={(e) => setPublicKey(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono text-xs resize-none"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-white/70 mb-1">Counter</label>
-                <input type="number" value={counter} onChange={(e) => setCounter(Number(e.target.value))} min={0} className="w-32 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white" />
+                <input
+                  type="number"
+                  value={counter}
+                  onChange={(e) => setCounter(Number(e.target.value))}
+                  min={0}
+                  className="w-32 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                />
               </div>
             </div>
           )}
-
 
           {/* Document Fields - Edit/Add Mode */}
           {currentMode !== 'view' && type === 'document' && (
@@ -965,14 +1220,19 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-1">Upload Document</label>
+                <label className="block text-sm font-medium text-white/70 mb-1">
+                  Upload Document
+                </label>
                 <div
                   className={`relative w-full p-6 rounded-xl border-2 border-dashed transition-all duration-200 text-center cursor-pointer overflow-hidden ${
                     isDragging
                       ? 'border-indigo-400 bg-indigo-500/10'
                       : 'border-white/[0.12] hover:border-white/[0.2] hover:bg-white/[0.04]'
                   }`}
-                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
                   onDragLeave={() => setIsDragging(false)}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -1002,10 +1262,14 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
                     <span className="text-2xl text-white/50">📄</span>
                     <p className="text-sm font-medium text-white/70">
-                      {documentFile ? documentFile.name : 'Drag & drop a file here, or click to browse'}
+                      {documentFile
+                        ? documentFile.name
+                        : 'Drag & drop a file here, or click to browse'}
                     </p>
                     <p className="text-xs text-white/40">
-                      {documentFile ? `${(documentFile.size / 1024).toFixed(1)} KB • ${documentFile.type || 'unknown type'}` : 'Max 10MB. Encrypted before upload.'}
+                      {documentFile
+                        ? `${(documentFile.size / 1024).toFixed(1)} KB • ${documentFile.type || 'unknown type'}`
+                        : 'Max 10MB. Encrypted before upload.'}
                     </p>
                   </div>
                 </div>
@@ -1013,12 +1277,18 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
               {mimeType && currentMode === 'edit' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Type</span>
+                    <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      Type
+                    </span>
                     <span className="text-sm text-white">{mimeType}</span>
                   </div>
                   <div>
-                    <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Size</span>
-                    <span className="text-sm text-white">{fileSize > 0 ? `${(fileSize / 1024).toFixed(1)} KB` : '—'}</span>
+                    <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                      Size
+                    </span>
+                    <span className="text-sm text-white">
+                      {fileSize > 0 ? `${(fileSize / 1024).toFixed(1)} KB` : '—'}
+                    </span>
                   </div>
                 </div>
               )}
@@ -1026,26 +1296,31 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           )}
 
           {/* Attachments - Edit Mode */}
-          {currentMode === 'edit' && item?.id && (
-            <AttachmentSection itemId={item.id} mode="edit" />
-          )}
+          {currentMode === 'edit' && item?.id && <AttachmentSection itemId={item.id} mode="edit" />}
 
           {/* Custom Fields - Edit Mode */}
           {currentMode !== 'view' && (
             <div className="space-y-4 pt-4 border-t border-white/[0.1]">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">Custom Fields</h3>
+                <h3 className="text-sm font-semibold text-white/50 uppercase tracking-wider">
+                  Custom Fields
+                </h3>
                 <button
                   type="button"
-                  onClick={() => setCustomFields([...customFields, { name: '', value: '', type: 'text' }])}
+                  onClick={() =>
+                    setCustomFields([...customFields, { name: '', value: '', type: 'text' }])
+                  }
                   className="px-2 py-1 text-xs bg-white/[0.08] hover:bg-white/[0.14] text-white/70 rounded-md transition-colors"
                 >
                   + Add
                 </button>
               </div>
-              
+
               {customFields.map((field, idx) => (
-                <div key={idx} className="flex flex-col gap-2 p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                <div
+                  key={idx}
+                  className="flex flex-col gap-2 p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]"
+                >
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -1063,8 +1338,12 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                       onChange={(e) => {
                         const newFields = [...customFields];
                         newFields[idx].type = e.target.value as 'text' | 'hidden' | 'boolean';
-                        if (newFields[idx].type === 'boolean' && newFields[idx].value !== 'true' && newFields[idx].value !== 'false') {
-                           newFields[idx].value = 'false';
+                        if (
+                          newFields[idx].type === 'boolean' &&
+                          newFields[idx].value !== 'true' &&
+                          newFields[idx].value !== 'false'
+                        ) {
+                          newFields[idx].value = 'false';
                         }
                         setCustomFields(newFields);
                       }}
@@ -1082,7 +1361,7 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                       ✕
                     </button>
                   </div>
-                  
+
                   {field.type === 'boolean' ? (
                     <label className="flex items-center gap-2 cursor-pointer mt-1">
                       <input
@@ -1112,7 +1391,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                       />
                       <button
                         type="button"
-                        onClick={() => setShowCustomFields(prev => ({ ...prev, [idx]: !prev[idx] }))}
+                        onClick={() =>
+                          setShowCustomFields((prev) => ({ ...prev, [idx]: !prev[idx] }))
+                        }
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70"
                       >
                         {showCustomFields[idx] ? '👁️‍🗨️' : '👁️'}
@@ -1139,19 +1420,22 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
           {/* View Mode Fields */}
           {currentMode === 'view' && (
             <div className="space-y-6">
-              
               <div className="grid grid-cols-2 gap-4">
                 {folderId && (
                   <div>
-                    <span className="block text-xs font-semibold text-white/30 uppercase">Folder</span>
+                    <span className="block text-xs font-semibold text-white/30 uppercase">
+                      Folder
+                    </span>
                     <span className="text-sm text-white">
-                      {folders.find(f => f.id === folderId)?.name || 'Unknown'}
+                      {folders.find((f) => f.id === folderId)?.name || 'Unknown'}
                     </span>
                   </div>
                 )}
                 {favorite && (
                   <div>
-                    <span className="block text-xs font-semibold text-white/30 uppercase">Favorite</span>
+                    <span className="block text-xs font-semibold text-white/30 uppercase">
+                      Favorite
+                    </span>
                     <span className="text-sm text-amber-400">⭐ Yes</span>
                   </div>
                 )}
@@ -1161,7 +1445,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 <div className="space-y-4">
                   {username && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Username</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Username
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-sm font-mono text-white truncate">{username}</span>
                         <button
@@ -1175,7 +1461,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {password && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Password</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Password
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-sm font-mono text-white truncate">
                           {showPassword ? password : '••••••••••••••••'}
@@ -1207,7 +1495,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {totpSecret && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Authenticator Code</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Authenticator Code
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-2xl font-mono tracking-widest text-indigo-300">
                           {totpCode || '------'}
@@ -1224,28 +1514,35 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                       </div>
                     </div>
                   )}
-                  {uris.length > 0 && uris.some(u => u.trim()) && (
+                  {uris.length > 0 && uris.some((u) => u.trim()) && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">URIs</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        URIs
+                      </span>
                       <div className="space-y-2">
-                        {uris.filter(u => u.trim()).map((uri, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                            <a 
-                              href={uri.startsWith('http') ? uri : `https://${uri}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-sm text-indigo-300 hover:text-indigo-200 hover:underline truncate"
+                        {uris
+                          .filter((u) => u.trim())
+                          .map((uri, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]"
                             >
-                              {uri}
-                            </a>
-                            <button
-                              onClick={() => copyToClipboard(uri, `uri-${idx}`)}
-                              className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
-                            >
-                              {copiedField === `uri-${idx}` ? '✓' : '📋'}
-                            </button>
-                          </div>
-                        ))}
+                              <a
+                                href={uri.startsWith('http') ? uri : `https://${uri}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-sm text-indigo-300 hover:text-indigo-200 hover:underline truncate"
+                              >
+                                {uri}
+                              </a>
+                              <button
+                                onClick={() => copyToClipboard(uri, `uri-${idx}`)}
+                                className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                              >
+                                {copiedField === `uri-${idx}` ? '✓' : '📋'}
+                              </button>
+                            </div>
+                          ))}
                       </div>
                     </div>
                   )}
@@ -1254,7 +1551,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
 
               {type === 'note' && (
                 <div>
-                  <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Note Content</span>
+                  <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                    Note Content
+                  </span>
                   <div className="p-4 bg-white/[0.04] rounded-lg border border-white/[0.06] whitespace-pre-wrap text-sm text-white">
                     {content}
                   </div>
@@ -1265,7 +1564,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 <div className="space-y-4">
                   {cardholderName && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Cardholder Name</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Cardholder Name
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white">
                         {cardholderName}
                       </div>
@@ -1273,9 +1574,13 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {number && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Card Number</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Card Number
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-mono text-white">{showCardNumber ? number : '•••• •••• •••• ' + number.slice(-4)}</span>
+                        <span className="text-sm font-mono text-white">
+                          {showCardNumber ? number : '•••• •••• •••• ' + number.slice(-4)}
+                        </span>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setShowCardNumber(!showCardNumber)}
@@ -1295,14 +1600,18 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Expiration</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Expiration
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white">
                         {expMonth} / {expYear}
                       </div>
                     </div>
                     {cvv && (
                       <div>
-                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">CVV</span>
+                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                          CVV
+                        </span>
                         <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                           <span className="text-sm font-mono text-white">
                             {showCvv ? cvv : '•••'}
@@ -1327,7 +1636,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   </div>
                   {brand && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Brand</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Brand
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white">
                         {brand}
                       </div>
@@ -1340,10 +1651,22 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 <div className="space-y-4">
                   {(firstName || middleName || lastName) && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Name</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Name
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-medium text-white">{[firstName, middleName, lastName].filter(Boolean).join(' ')}</span>
-                        <button onClick={() => copyToClipboard([firstName, middleName, lastName].filter(Boolean).join(' '), 'fullname')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                        <span className="text-sm font-medium text-white">
+                          {[firstName, middleName, lastName].filter(Boolean).join(' ')}
+                        </span>
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              [firstName, middleName, lastName].filter(Boolean).join(' '),
+                              'fullname'
+                            )
+                          }
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
                           {copiedField === 'fullname' ? '✓' : '📋'}
                         </button>
                       </div>
@@ -1351,10 +1674,15 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {email && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Email</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Email
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-sm text-white">{email}</span>
-                        <button onClick={() => copyToClipboard(email, 'email')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                        <button
+                          onClick={() => copyToClipboard(email, 'email')}
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
                           {copiedField === 'email' ? '✓' : '📋'}
                         </button>
                       </div>
@@ -1362,10 +1690,15 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {phone && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Phone</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Phone
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-sm text-white">{phone}</span>
-                        <button onClick={() => copyToClipboard(phone, 'phone')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                        <button
+                          onClick={() => copyToClipboard(phone, 'phone')}
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
                           {copiedField === 'phone' ? '✓' : '📋'}
                         </button>
                       </div>
@@ -1373,15 +1706,34 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {(address1 || address2 || city || stateValue || postalCode || country) && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Address</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Address
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <div className="text-sm text-white space-y-1">
                           {address1 && <p>{address1}</p>}
                           {address2 && <p>{address2}</p>}
-                          {(city || stateValue || postalCode) && <p>{[city, stateValue, postalCode].filter(Boolean).join(', ')}</p>}
+                          {(city || stateValue || postalCode) && (
+                            <p>{[city, stateValue, postalCode].filter(Boolean).join(', ')}</p>
+                          )}
                           {country && <p>{country}</p>}
                         </div>
-                        <button onClick={() => copyToClipboard([address1, address2, [city, stateValue, postalCode].filter(Boolean).join(', '), country].filter(Boolean).join('\n'), 'address')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors self-start">
+                        <button
+                          onClick={() =>
+                            copyToClipboard(
+                              [
+                                address1,
+                                address2,
+                                [city, stateValue, postalCode].filter(Boolean).join(', '),
+                                country,
+                              ]
+                                .filter(Boolean)
+                                .join('\n'),
+                              'address'
+                            )
+                          }
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors self-start"
+                        >
                           {copiedField === 'address' ? '✓' : '📋'}
                         </button>
                       </div>
@@ -1389,10 +1741,15 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {company && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Company</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Company
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-sm text-white">{company}</span>
-                        <button onClick={() => copyToClipboard(company, 'company')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                        <button
+                          onClick={() => copyToClipboard(company, 'company')}
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
                           {copiedField === 'company' ? '✓' : '📋'}
                         </button>
                       </div>
@@ -1400,14 +1757,24 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {ssn && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">SSN</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        SSN
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm font-mono text-white">{showSsn ? ssn : '•••-••-••••'}</span>
+                        <span className="text-sm font-mono text-white">
+                          {showSsn ? ssn : '•••-••-••••'}
+                        </span>
                         <div className="flex gap-2">
-                          <button onClick={() => setShowSsn(!showSsn)} className="p-1.5 text-white/40 hover:text-white/70 transition-colors">
+                          <button
+                            onClick={() => setShowSsn(!showSsn)}
+                            className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                          >
                             {showSsn ? '👁️‍🗨️' : '👁️'}
                           </button>
-                          <button onClick={() => copyToClipboard(ssn, 'ssn')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                          <button
+                            onClick={() => copyToClipboard(ssn, 'ssn')}
+                            className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                          >
                             {copiedField === 'ssn' ? '✓' : '📋'}
                           </button>
                         </div>
@@ -1416,10 +1783,15 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {passportNumber && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Passport Number</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Passport Number
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-sm font-mono text-white">{passportNumber}</span>
-                        <button onClick={() => copyToClipboard(passportNumber, 'passport')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                        <button
+                          onClick={() => copyToClipboard(passportNumber, 'passport')}
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
                           {copiedField === 'passport' ? '✓' : '📋'}
                         </button>
                       </div>
@@ -1427,10 +1799,15 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {licenseNumber && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">License Number</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        License Number
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-sm font-mono text-white">{licenseNumber}</span>
-                        <button onClick={() => copyToClipboard(licenseNumber, 'license')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                        <button
+                          onClick={() => copyToClipboard(licenseNumber, 'license')}
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
                           {copiedField === 'license' ? '✓' : '📋'}
                         </button>
                       </div>
@@ -1443,13 +1820,18 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                 <div className="space-y-4">
                   {rpName && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Relying Party</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Relying Party
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <div>
                           <span className="text-sm font-medium text-white">{rpName}</span>
                           <span className="text-xs text-white/40 ml-2">{rpId}</span>
                         </div>
-                        <button onClick={() => copyToClipboard(rpId, 'rpId')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                        <button
+                          onClick={() => copyToClipboard(rpId, 'rpId')}
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
                           {copiedField === 'rpId' ? '✓' : '📋'}
                         </button>
                       </div>
@@ -1457,13 +1839,20 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {passkeyUserName && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">User</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        User
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <div>
                           <span className="text-sm text-white">{passkeyUserName}</span>
-                          {passkeyUserId && <span className="text-xs text-white/40 ml-2">({passkeyUserId})</span>}
+                          {passkeyUserId && (
+                            <span className="text-xs text-white/40 ml-2">({passkeyUserId})</span>
+                          )}
                         </div>
-                        <button onClick={() => copyToClipboard(passkeyUserName, 'userName')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                        <button
+                          onClick={() => copyToClipboard(passkeyUserName, 'userName')}
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
                           {copiedField === 'userName' ? '✓' : '📋'}
                         </button>
                       </div>
@@ -1471,40 +1860,84 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   {credentialId && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Credential ID</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Credential ID
+                      </span>
                       <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-xs font-mono text-white truncate max-w-[300px]">{credentialId}</span>
-                        <button onClick={() => copyToClipboard(credentialId, 'credId')} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                        <span className="text-xs font-mono text-white truncate max-w-[300px]">
+                          {credentialId}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(credentialId, 'credId')}
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
                           {copiedField === 'credId' ? '✓' : '📋'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {publicKey && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Public Key
+                      </span>
+                      <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-xs font-mono text-white truncate max-w-[300px]">
+                          {publicKey.length > 40 ? publicKey.slice(0, 40) + '…' : publicKey}
+                        </span>
+                        <button
+                          onClick={() => copyToClipboard(publicKey, 'pubKey')}
+                          className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                        >
+                          {copiedField === 'pubKey' ? '✓' : '📋'}
                         </button>
                       </div>
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Counter</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Counter
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-sm font-mono text-white">{counter}</span>
                       </div>
                     </div>
                     {passkeyItem?.createdAt && (
                       <div>
-                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Created</span>
+                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                          Created
+                        </span>
                         <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                          <span className="text-sm text-white">{new Date(passkeyItem.createdAt).toLocaleDateString()}</span>
+                          <span className="text-sm text-white">
+                            {new Date(passkeyItem.createdAt).toLocaleDateString()}
+                          </span>
                         </div>
                       </div>
                     )}
                   </div>
+                  {passkeyItem?.transports && passkeyItem.transports.length > 0 && (
+                    <div>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Transports
+                      </span>
+                      <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
+                        <span className="text-sm text-white">
+                          {passkeyItem.transports.join(', ')}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-
 
               {type === 'document' && (
                 <div className="space-y-4">
                   {description && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Description</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Description
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] text-sm text-white whitespace-pre-wrap">
                         {description}
                       </div>
@@ -1512,39 +1945,55 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">File Type</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        File Type
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <span className="text-sm text-white">{mimeType || 'Unknown'}</span>
                       </div>
                     </div>
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">File Size</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        File Size
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
-                        <span className="text-sm text-white">{fileSize > 0 ? `${(fileSize / 1024).toFixed(1)} KB` : '—'}</span>
+                        <span className="text-sm text-white">
+                          {fileSize > 0 ? `${(fileSize / 1024).toFixed(1)} KB` : '—'}
+                        </span>
                       </div>
                     </div>
                   </div>
                   {/* File Preview */}
                   {mimeType && mimeType.startsWith('image/') && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Preview</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Preview
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] flex items-center justify-center">
-                        <p className="text-xs text-white/40">Image preview available after download</p>
+                        <p className="text-xs text-white/40">
+                          Image preview available after download
+                        </p>
                       </div>
                     </div>
                   )}
                   {mimeType === 'application/pdf' && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Preview</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Preview
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06] flex items-center justify-center">
-                        <p className="text-xs text-white/40">PDF preview available after download</p>
+                        <p className="text-xs text-white/40">
+                          PDF preview available after download
+                        </p>
                       </div>
                     </div>
                   )}
                   {/* Quota */}
                   {documentQuota && (
                     <div>
-                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">Storage Quota</span>
+                      <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                        Storage Quota
+                      </span>
                       <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                         <div className="flex justify-between text-sm text-white mb-2">
                           <span>{(documentQuota.used / 1024 / 1024).toFixed(1)} MB used</span>
@@ -1553,7 +2002,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
                         <div className="w-full bg-white/[0.1] rounded-full h-2">
                           <div
                             className="bg-indigo-500 h-2 rounded-full transition-all"
-                            style={{ width: `${Math.min(100, (documentQuota.used / documentQuota.limit) * 100)}%` }}
+                            style={{
+                              width: `${Math.min(100, (documentQuota.used / documentQuota.limit) * 100)}%`,
+                            }}
                           />
                         </div>
                       </div>
@@ -1570,26 +2021,44 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
               {/* Custom Fields - View Mode */}
               {customFields.length > 0 && (
                 <div className="space-y-4 pt-4 border-t border-white/[0.1]">
-                  <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Custom Fields</h3>
+                  <h3 className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">
+                    Custom Fields
+                  </h3>
                   <div className="grid grid-cols-1 gap-4">
                     {customFields.map((field, idx) => (
                       <div key={idx}>
-                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">{field.name}</span>
+                        <span className="block text-xs font-semibold text-white/30 uppercase mb-1">
+                          {field.name}
+                        </span>
                         <div className="flex items-center justify-between p-3 bg-white/[0.04] rounded-lg border border-white/[0.06]">
                           {field.type === 'boolean' ? (
-                            <span className="text-sm text-white">{field.value === 'true' ? 'Yes' : 'No'}</span>
+                            <span className="text-sm text-white">
+                              {field.value === 'true' ? 'Yes' : 'No'}
+                            </span>
                           ) : field.type === 'hidden' ? (
-                            <span className="text-sm font-mono text-white">{showCustomFields[idx] ? field.value : '••••••••'}</span>
+                            <span className="text-sm font-mono text-white">
+                              {showCustomFields[idx] ? field.value : '••••••••'}
+                            </span>
                           ) : (
-                            <span className="text-sm text-white whitespace-pre-wrap">{field.value}</span>
+                            <span className="text-sm text-white whitespace-pre-wrap">
+                              {field.value}
+                            </span>
                           )}
                           <div className="flex gap-2">
                             {field.type === 'hidden' && (
-                              <button onClick={() => setShowCustomFields(prev => ({ ...prev, [idx]: !prev[idx] }))} className="p-1.5 text-white/40 hover:text-white/70 transition-colors">
+                              <button
+                                onClick={() =>
+                                  setShowCustomFields((prev) => ({ ...prev, [idx]: !prev[idx] }))
+                                }
+                                className="p-1.5 text-white/40 hover:text-white/70 transition-colors"
+                              >
                                 {showCustomFields[idx] ? '👁️‍🗨️' : '👁️'}
                               </button>
                             )}
-                            <button onClick={() => copyToClipboard(field.value, `cf-${idx}`)} className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors">
+                            <button
+                              onClick={() => copyToClipboard(field.value, `cf-${idx}`)}
+                              className="p-1.5 text-white/30 hover:text-indigo-300 transition-colors"
+                            >
                               {copiedField === `cf-${idx}` ? '✓' : '📋'}
                             </button>
                           </div>
@@ -1601,58 +2070,87 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
               )}
               {alerts.length > 0 && (
                 <div className="space-y-3 pt-4 border-t border-white/[0.1]">
-                  <span className="block text-xs font-semibold text-white/30 uppercase mb-2">Security Alerts</span>
-                  {alerts.filter(a => !dismissedAlerts.has(a.title)).map((alert, i) => {
-                    const isCritical = alert.severity === 'critical';
-                    const isWarning = alert.severity === 'warning';
-                    return (
-                      <div key={i} className={`p-4 rounded-xl border flex items-start gap-3 backdrop-blur-md ${
-                        isCritical ? 'bg-red-500/10 border-red-500/30 text-red-100' :
-                        isWarning ? 'bg-amber-500/10 border-amber-500/30 text-amber-100' :
-                        'bg-blue-500/10 border-blue-500/30 text-blue-100'
-                      }`}>
-                        <div className="text-xl">
-                          {isCritical ? '🛡️' : isWarning ? '⚠️' : 'ℹ️'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-start gap-2">
-                            <h4 className={`font-medium text-sm ${
-                              isCritical ? 'text-red-300' : isWarning ? 'text-amber-300' : 'text-blue-300'
-                            }`}>{alert.title}</h4>
-                            {alert.dismissible && (
-                              <button 
-                                onClick={() => setDismissedAlerts(prev => new Set([...prev, alert.title]))}
-                                className="text-white/40 hover:text-white/80 p-1 -mr-2 -mt-2"
+                  <span className="block text-xs font-semibold text-white/30 uppercase mb-2">
+                    Security Alerts
+                  </span>
+                  {alerts
+                    .filter((a) => !dismissedAlerts.has(a.title))
+                    .map((alert, i) => {
+                      const isCritical = alert.severity === 'critical';
+                      const isWarning = alert.severity === 'warning';
+                      return (
+                        <div
+                          key={i}
+                          className={`p-4 rounded-xl border flex items-start gap-3 backdrop-blur-md ${
+                            isCritical
+                              ? 'bg-red-500/10 border-red-500/30 text-red-100'
+                              : isWarning
+                                ? 'bg-amber-500/10 border-amber-500/30 text-amber-100'
+                                : 'bg-blue-500/10 border-blue-500/30 text-blue-100'
+                          }`}
+                        >
+                          <div className="text-xl">
+                            {isCritical ? '🛡️' : isWarning ? '⚠️' : 'ℹ️'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between items-start gap-2">
+                              <h4
+                                className={`font-medium text-sm ${
+                                  isCritical
+                                    ? 'text-red-300'
+                                    : isWarning
+                                      ? 'text-amber-300'
+                                      : 'text-blue-300'
+                                }`}
                               >
-                                ✕
+                                {alert.title}
+                              </h4>
+                              {alert.dismissible && (
+                                <button
+                                  onClick={() =>
+                                    setDismissedAlerts((prev) => new Set([...prev, alert.title]))
+                                  }
+                                  className="text-white/40 hover:text-white/80 p-1 -mr-2 -mt-2"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-sm mt-1 opacity-80 leading-relaxed">
+                              {alert.message}
+                            </p>
+                            {alert.action && (
+                              <button
+                                onClick={() => {
+                                  if (alert.action?.type === 'generate-password') {
+                                    setCurrentMode('edit');
+                                    setType('login');
+                                    const pw = generatePassword({
+                                      length: 20,
+                                      uppercase: true,
+                                      lowercase: true,
+                                      digits: true,
+                                      symbols: true,
+                                    });
+                                    setPassword(pw);
+                                    setShowPassword(true);
+                                  }
+                                }}
+                                className={`mt-3 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                                  isCritical
+                                    ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200'
+                                    : isWarning
+                                      ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200'
+                                      : 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-200'
+                                }`}
+                              >
+                                {alert.action.label}
                               </button>
                             )}
                           </div>
-                          <p className="text-sm mt-1 opacity-80 leading-relaxed">{alert.message}</p>
-                          {alert.action && (
-                            <button
-                              onClick={() => {
-                                if (alert.action?.type === 'generate-password') {
-                                  setCurrentMode('edit');
-                                  setType('login');
-                                  const pw = generatePassword({ length: 20, uppercase: true, lowercase: true, digits: true, symbols: true });
-                                  setPassword(pw);
-                                  setShowPassword(true);
-                                }
-                              }}
-                              className={`mt-3 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                                isCritical ? 'bg-red-500/20 hover:bg-red-500/30 text-red-200' :
-                                isWarning ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-200' :
-                                'bg-blue-500/20 hover:bg-blue-500/30 text-blue-200'
-                              }`}
-                            >
-                              {alert.action.label}
-                            </button>
-                          )}
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               )}
 
@@ -1660,7 +2158,9 @@ export default function ItemPanel({ mode, item, folders, items, onSave, onDelete
               <div className="pt-6 mt-6 border-t border-white/[0.1]">
                 {showConfirmDelete ? (
                   <div className="p-4 bg-red-500/10 border border-red-400/20 rounded-lg">
-                    <p className="text-sm text-red-300 mb-3 font-medium">Are you sure you want to delete this item? This cannot be undone.</p>
+                    <p className="text-sm text-red-300 mb-3 font-medium">
+                      Are you sure you want to delete this item? This cannot be undone.
+                    </p>
                     <div className="flex gap-3">
                       <button
                         onClick={handleDelete}

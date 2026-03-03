@@ -6,10 +6,10 @@
  */
 
 /** Vault item type discriminant (matches @lockbox/types VaultItemType) */
-export type VaultItemType = 'login' | 'note' | 'card' | 'identity';
+export type VaultItemType = 'login' | 'note' | 'card' | 'identity' | 'passkey';
 
 /** Icon identifiers for each vault item type */
-export type VaultItemIcon = 'globe' | 'sticky-note' | 'credit-card' | 'id-card';
+export type VaultItemIcon = 'globe' | 'sticky-note' | 'credit-card' | 'id-card' | 'key';
 
 /** Processed vault list item ready for display */
 export interface VaultListItem {
@@ -47,6 +47,11 @@ export interface DecryptedItemData {
   email?: string;
   phone?: string;
   company?: string;
+  // Passkey fields
+  rpId?: string;
+  rpName?: string;
+  userName?: string;
+  credentialId?: string;
 }
 
 /**
@@ -63,6 +68,8 @@ export function getItemIcon(type: VaultItemType): VaultItemIcon {
       return 'credit-card';
     case 'identity':
       return 'id-card';
+    case 'passkey':
+      return 'key';
   }
 }
 
@@ -88,6 +95,8 @@ export function getItemSubtitle(item: DecryptedItemData): string {
       const fullName = buildIdentityName(item.firstName, item.middleName, item.lastName);
       return fullName || item.email || item.company || '';
     }
+    case 'passkey':
+      return item.rpName ? `${item.rpName}${item.userName ? ` (${item.userName})` : ''}` : '';
   }
 }
 

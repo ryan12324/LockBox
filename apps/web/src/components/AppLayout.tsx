@@ -48,7 +48,10 @@ export default function AppLayout() {
     navigate('/login');
   }
 
-  const typeIcon = (type: string): string => ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' }[type] ?? '📄');
+  const typeIcon = (type: string): string =>
+    ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' })[
+      type
+    ] ?? '📄';
 
   async function handleCreateFolder() {
     if (!session || !newFolderName.trim()) return;
@@ -195,7 +198,17 @@ export default function AppLayout() {
               className={`${getNavItemClass(isVaultActive && selectedType === type)} capitalize`}
             >
               {typeIcon(type)}{' '}
-              {type === 'login' ? 'Logins' : type === 'note' ? 'Secure Notes' : type === 'card' ? 'Cards' : type === 'identity' ? 'Identities' : 'Passkeys'}
+              {type === 'login'
+                ? 'Logins'
+                : type === 'note'
+                  ? 'Secure Notes'
+                  : type === 'card'
+                    ? 'Cards'
+                    : type === 'identity'
+                      ? 'Identities'
+                      : type === 'passkey'
+                        ? 'Passkeys'
+                        : 'Documents'}
             </button>
           ))}
 
@@ -369,14 +382,16 @@ export default function AppLayout() {
               <span>⚠️</span>
               Travel mode active — some items are hidden
             </span>
-            <button onClick={() => navigate('/settings')} className="hover:text-indigo-200 underline">
+            <button
+              onClick={() => navigate('/settings')}
+              className="hover:text-indigo-200 underline"
+            >
               Settings
             </button>
           </div>
         )}
         <Outlet />
       </main>
-
     </div>
   );
 }
