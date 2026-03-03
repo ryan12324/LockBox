@@ -1,0 +1,20 @@
+/* ──────────────────────────────────────────────
+   Aura & Architecture — Border Radius Tokens
+   "Tumbled sea glass" — no sharp 90° corners.
+   Organic variants use slightly asymmetric radii
+   for a hand-shaped feel.
+   ────────────────────────────────────────────── */
+
+:root {
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-full: 9999px;
+
+  /* Organic (asymmetric) — like tumbled glass edges */
+  --radius-organic-sm: 8px 12px 10px 14px;
+  --radius-organic-md: 14px 20px 16px 22px;
+  --radius-organic-lg: 20px 28px 24px 30px;
+  --radius-organic-xl: 28px 36px 32px 38px;
+}

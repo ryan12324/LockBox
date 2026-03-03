@@ -1,10 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalDependencies": [
-    "tsconfig.base.json",
-    ".prettierrc",
-    "eslint.config.js"
-  ],
+  "globalDependencies": ["tsconfig.base.json", ".prettierrc", "eslint.config.js"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
@@ -16,6 +12,14 @@
     "test": {
       "outputs": ["coverage/**"]
     },
-    "lint": {}
+    "lint": {},
+    "storybook": {
+      "cache": false,
+      "persistent": true
+    },
+    "build-storybook": {
+      "dependsOn": ["^build"],
+      "outputs": ["storybook-static/**"]
+    }
   }
 }

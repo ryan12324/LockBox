@@ -1,0 +1,109 @@
+/* ──────────────────────────────────────────────
+   Aura & Architecture — Color Tokens
+   Base: Pantone 11-4201 Cloud Dancer (#F2EFEA)
+   Aesthetic: paper, clay, frosted glass, sea glass
+   ────────────────────────────────────────────── */
+
+:root {
+  /* Backgrounds */
+  --color-bg: #f2efea;
+  --color-bg-subtle: #eae6df;
+  --color-surface: #fdfcfa;
+  --color-surface-raised: #ffffff;
+
+  /* Borders */
+  --color-border: #ddd6cc;
+  --color-border-strong: #c4baac;
+
+  /* Text */
+  --color-text: #2c2825;
+  --color-text-secondary: #7a7168;
+  --color-text-tertiary: #a69e93;
+
+  /* Primary — warm umber clay */
+  --color-primary: #8b7355;
+  --color-primary-hover: #7a6348;
+  --color-primary-active: #6b5640;
+  --color-primary-fg: #ffffff;
+
+  /* Aura — the AI ghost's glow */
+  --color-aura: #c4a882;
+  --color-aura-dim: rgba(196, 168, 130, 0.15);
+  --color-aura-glow: rgba(196, 168, 130, 0.35);
+
+  /* Semantic */
+  --color-error: #b5553a;
+  --color-error-subtle: rgba(181, 85, 58, 0.08);
+  --color-success: #5e8a5e;
+  --color-success-subtle: rgba(94, 138, 94, 0.08);
+  --color-warning: #b58e3a;
+  --color-warning-subtle: rgba(181, 142, 58, 0.08);
+
+  /* Frost (warm frosted glass) */
+  --color-frost: rgba(242, 239, 234, 0.75);
+  --color-frost-border: rgba(196, 186, 172, 0.4);
+
+  /* Shadows (warm-tinted) */
+  --shadow-sm: 0 1px 3px rgba(44, 40, 37, 0.06);
+  --shadow-md: 0 4px 12px rgba(44, 40, 37, 0.08);
+  --shadow-lg: 0 12px 32px rgba(44, 40, 37, 0.12);
+  --shadow-aura: 0 0 40px rgba(196, 168, 130, 0.3);
+
+  /* Contextual — Banking mode (solid charcoal) */
+  --color-ctx-banking-bg: #2c2825;
+  --color-ctx-banking-surface: #3a3634;
+  --color-ctx-banking-text: #ede8e1;
+  --color-ctx-banking-border: #4e4945;
+}
+
+.dark {
+  /* Backgrounds */
+  --color-bg: #1a1816;
+  --color-bg-subtle: #222020;
+  --color-surface: #2a2725;
+  --color-surface-raised: #332f2d;
+
+  /* Borders */
+  --color-border: #3a3634;
+  --color-border-strong: #4e4945;
+
+  /* Text */
+  --color-text: #ede8e1;
+  --color-text-secondary: #a69e93;
+  --color-text-tertiary: #7a7168;
+
+  /* Primary — golden clay on dark */
+  --color-primary: #c4a882;
+  --color-primary-hover: #d4b892;
+  --color-primary-active: #b49872;
+  --color-primary-fg: #1a1816;
+
+  /* Aura */
+  --color-aura: #c4a882;
+  --color-aura-dim: rgba(196, 168, 130, 0.1);
+  --color-aura-glow: rgba(196, 168, 130, 0.25);
+
+  /* Semantic */
+  --color-error: #d47a6a;
+  --color-error-subtle: rgba(212, 122, 106, 0.1);
+  --color-success: #8bab8b;
+  --color-success-subtle: rgba(139, 171, 139, 0.1);
+  --color-warning: #d4ab5b;
+  --color-warning-subtle: rgba(212, 171, 91, 0.1);
+
+  /* Frost */
+  --color-frost: rgba(26, 24, 22, 0.8);
+  --color-frost-border: rgba(58, 54, 52, 0.5);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
+  --shadow-aura: 0 0 40px rgba(196, 168, 130, 0.2);
+
+  /* Contextual — Banking */
+  --color-ctx-banking-bg: #141210;
+  --color-ctx-banking-surface: #1e1b18;
+  --color-ctx-banking-text: #ede8e1;
+  --color-ctx-banking-border: #3a3634;
+}
