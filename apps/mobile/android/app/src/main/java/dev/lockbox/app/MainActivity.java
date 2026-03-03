@@ -9,6 +9,7 @@ import dev.lockbox.app.qrscanner.QRScannerPlugin;
 import dev.lockbox.app.autofill.AutofillPlugin;
 import dev.lockbox.app.storage.StoragePlugin;
 import dev.lockbox.app.credentialprovider.CredentialManagerPlugin;
+import dev.lockbox.app.fido2.Fido2Plugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -18,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AutofillPlugin.class);
         registerPlugin(StoragePlugin.class);
         registerPlugin(CredentialManagerPlugin.class);
+        registerPlugin(Fido2Plugin.class);
         super.onCreate(savedInstanceState);
     }
 }
