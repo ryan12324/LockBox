@@ -182,7 +182,7 @@ export default defineContentScript({
             authenticatorAttachment: data.authenticatorAttachment || 'platform',
             clientExtensionResults: isCreate ? { credProps: { rk: true } } : {},
           };
-          const resp: Record<string, string> = {};
+          const resp: Record<string, unknown> = {};
           if (data.response.clientDataJSON) resp.clientDataJSON = data.response.clientDataJSON;
           if (data.response.attestationObject)
             resp.attestationObject = data.response.attestationObject;
@@ -190,6 +190,12 @@ export default defineContentScript({
             resp.authenticatorData = data.response.authenticatorData;
           if (data.response.signature) resp.signature = data.response.signature;
           if (data.response.userHandle) resp.userHandle = data.response.userHandle;
+          if (isCreate) {
+            if (data.response.transports) resp.transports = data.response.transports;
+            if (data.response.publicKey) resp.publicKey = data.response.publicKey;
+            if (data.response.publicKeyAlgorithm !== undefined)
+              resp.publicKeyAlgorithm = data.response.publicKeyAlgorithm;
+          }
           json.response = resp;
           return json;
         },

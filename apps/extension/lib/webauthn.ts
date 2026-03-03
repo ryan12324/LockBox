@@ -258,7 +258,7 @@ export function spkiToCOSE(spki: Uint8Array): Uint8Array {
   //   20 01              — crv: P-256 (-1 → major 1, value 0; 1)
   //   21 5820 <x>        — x: bstr(32)
   //   22 5820 <y>        — y: bstr(32)
-  const cbor = new Uint8Array(2 + 2 + 2 + 2 + 2 + 1 + 32 + 2 + 1 + 32);
+  const cbor = new Uint8Array(1 + 2 + 2 + 2 + 3 + 32 + 3 + 32);
   let off = 0;
 
   // Map(5)
