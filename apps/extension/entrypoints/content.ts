@@ -669,7 +669,18 @@ export default defineContentScript({
     );
 
     // Listen for phishing warnings from background
-    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    chrome.runtime.onMessage.addListener((message, _sender, rawSendResponse) => {
+      // Wrap sendResponse to handle extension context invalidation.
+      // If the extension reloads while an async handler (e.g. consent dialog) is
+      // pending, the message channel dies and sendResponse throws.
+      const sendResponse = (data: unknown) => {
+        try {
+          rawSendResponse(data);
+        } catch {
+          /* extension context invalidated — response channel dead */
+        }
+      };
+
       if (message.type === 'webauthn-create-consent') {
         showCreateConsent(message.params)
           .then((confirmed) => sendResponse({ confirmed }))

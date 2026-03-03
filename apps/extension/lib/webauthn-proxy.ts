@@ -232,7 +232,10 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
 
       proxy.completeCreateRequest({
         requestId: details.requestId,
-        responseJson: JSON.stringify(credential),
+        responseJson: JSON.stringify({
+          ...credential,
+          clientExtensionResults: { credProps: { rk: true } },
+        }),
       });
     } catch {
       proxy.completeCreateRequest({
@@ -374,7 +377,10 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
 
       proxy.completeGetRequest({
         requestId: details.requestId,
-        responseJson: JSON.stringify(credential),
+        responseJson: JSON.stringify({
+          ...credential,
+          clientExtensionResults: {},
+        }),
       });
     } catch {
       proxy.completeGetRequest({
