@@ -111,6 +111,16 @@ export function isProxyActive(): boolean {
   return proxyActive;
 }
 
+async function sendToActiveTab<T>(message: object): Promise<T | null> {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return null;
+    return (await chrome.tabs.sendMessage(tab.id, message)) as T;
+  } catch {
+    return null;
+  }
+}
+
 export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
   const proxy = (chrome as unknown as { webAuthenticationProxy?: WebAuthenticationProxy })
     .webAuthenticationProxy;
@@ -135,6 +145,7 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
     if (cancelledRequests.delete(details.requestId)) return;
 
     if (!handlers.isUnlocked()) {
+      await sendToActiveTab({ type: 'webauthn-vault-locked' });
       proxy.completeCreateRequest({
         requestId: details.requestId,
         error: { name: 'NotAllowedError', message: 'Vault is locked' },
@@ -146,6 +157,26 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
       const options = JSON.parse(details.requestDetailsJson);
       const rpId = options.rp?.id ?? new URL(options.origin ?? '').hostname;
       const origin = options.origin ?? '';
+
+      const consent = await sendToActiveTab<{ confirmed: boolean }>({
+        type: 'webauthn-create-consent',
+        params: {
+          rpName: options.rp?.name ?? rpId,
+          rpId,
+          userName: options.user?.name ?? '',
+          userDisplayName: options.user?.displayName ?? options.user?.name ?? '',
+        },
+      });
+
+      if (!consent?.confirmed) {
+        proxy.completeCreateRequest({
+          requestId: details.requestId,
+          error: { name: 'NotAllowedError', message: 'User denied' },
+        });
+        return;
+      }
+
+      if (cancelledRequests.delete(details.requestId)) return;
 
       const { publicKeySPKI, privateKeyPKCS8, publicKeyCOSE } = await generatePasskeyKeyPair();
 
@@ -215,6 +246,7 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
     if (cancelledRequests.delete(details.requestId)) return;
 
     if (!handlers.isUnlocked()) {
+      await sendToActiveTab({ type: 'webauthn-vault-locked' });
       proxy.completeGetRequest({
         requestId: details.requestId,
         error: { name: 'NotAllowedError', message: 'Vault is locked' },
@@ -248,7 +280,61 @@ export function initWebAuthnProxy(handlers: WebAuthnProxyHandlers): boolean {
         return;
       }
 
-      const match = matches[0];
+      let match: (typeof matches)[0];
+
+      if (matches.length > 1) {
+        const pickerResult = await sendToActiveTab<{ selected: { credentialId: string } | null }>({
+          type: 'webauthn-pick-passkey',
+          passkeys: matches.map((m) => ({
+            credentialId: m.credentialId,
+            userName: m.userName,
+            userDisplayName: m.userName,
+            rpName: m.rpName,
+          })),
+        });
+
+        if (!pickerResult?.selected) {
+          proxy.completeGetRequest({
+            requestId: details.requestId,
+            error: { name: 'NotAllowedError', message: 'User cancelled' },
+          });
+          return;
+        }
+
+        const picked = matches.find((m) => m.credentialId === pickerResult.selected!.credentialId);
+        if (!picked) {
+          proxy.completeGetRequest({
+            requestId: details.requestId,
+            error: { name: 'NotAllowedError' },
+          });
+          return;
+        }
+        match = picked;
+      } else {
+        match = matches[0];
+
+        const consent = await sendToActiveTab<{ confirmed: boolean }>({
+          type: 'webauthn-get-consent',
+          params: {
+            rpName: match.rpName,
+            rpId,
+            userName: match.userName,
+            userDisplayName: match.userName,
+            credentialId: match.credentialId,
+          },
+        });
+
+        if (!consent?.confirmed) {
+          proxy.completeGetRequest({
+            requestId: details.requestId,
+            error: { name: 'NotAllowedError', message: 'User denied' },
+          });
+          return;
+        }
+      }
+
+      if (cancelledRequests.delete(details.requestId)) return;
+
       if (!match.privateKey) {
         proxy.completeGetRequest({
           requestId: details.requestId,

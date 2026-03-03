@@ -1222,9 +1222,18 @@ async function handleMessage(message: Message): Promise<unknown> {
           };
         }
 
-        // Single match (or allowCredentials specified) — sign directly
         const match = matches[0];
-        return signPasskeyAssertion(match.credentialId, rpId, getOpts.challenge, origin);
+        return {
+          needsConsent: true,
+          consentData: {
+            rpName: match.rpName,
+            rpId,
+            userName: match.userName,
+            userDisplayName: match.userDisplayName,
+            credentialId: match.credentialId,
+          },
+          _context: { rpId, origin, challenge: getOpts.challenge },
+        };
       } catch (err) {
         console.error('[Lockbox] WebAuthn get failed:', err);
         return { fallback: true };

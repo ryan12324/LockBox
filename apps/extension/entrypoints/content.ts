@@ -17,6 +17,12 @@ import {
   createStatusDropdown,
 } from '../lib/autofill.js';
 import { initSaveDetector } from '../lib/save-detector.js';
+import {
+  showCreateConsent,
+  showGetConsent,
+  showPasskeyPicker,
+  showVaultLockedToast,
+} from '../lib/webauthn-ui.js';
 import type { VaultItem, LoginItem, IdentityItem } from '@lockbox/types';
 
 // Track injected overlays to avoid duplicates
@@ -444,91 +450,6 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
   document.body.prepend(host);
 }
 
-/**
- * Show a Shadow DOM passkey picker when multiple passkeys match a WebAuthn request.
- * Returns the selected passkey or null if the user dismisses.
- */
-function showPasskeyPicker(
-  passkeys: Array<{
-    credentialId: string;
-    userName: string;
-    userDisplayName: string;
-    rpName: string;
-  }>
-): Promise<{ credentialId: string } | null> {
-  if (!chrome.runtime?.id) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const host = document.createElement('div');
-    host.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;z-index:2147483647;`;
-    const shadow = host.attachShadow({ mode: 'open' });
-    shadow.innerHTML = `
-      <style>
-        .overlay { position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
-        .modal { background:white;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.25);max-width:380px;width:90%;overflow:hidden; }
-        .modal-header { padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px; }
-        .modal-header svg { width:20px;height:20px;color:#6366f1;flex-shrink:0; }
-        .modal-title { font-size:15px;font-weight:600;color:#1e293b; }
-        .modal-subtitle { font-size:12px;color:#64748b;margin-top:2px; }
-        .passkey-list { max-height:240px;overflow-y:auto; }
-        .passkey-item { padding:12px 20px;cursor:pointer;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;gap:12px;transition:background 0.1s; }
-        .passkey-item:last-child { border-bottom:none; }
-        .passkey-item:hover { background:#f0f9ff; }
-        .passkey-icon { width:32px;height:32px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px; }
-        .passkey-info { min-width:0; }
-        .passkey-name { font-size:14px;font-weight:500;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        .passkey-detail { font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        .cancel-btn { width:100%;padding:12px;border:none;background:#f8fafc;color:#64748b;font-size:13px;cursor:pointer;border-top:1px solid #e2e8f0; }
-        .cancel-btn:hover { background:#f1f5f9;color:#475569; }
-      </style>
-      <div class="overlay">
-        <div class="modal">
-          <div class="modal-header">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7A5 5 0 0 1 7 7h2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            <div>
-              <div class="modal-title">Choose a passkey</div>
-              <div class="modal-subtitle">Sign in to ${passkeys[0]?.rpName || 'this site'}</div>
-            </div>
-          </div>
-          <div class="passkey-list"></div>
-          <button class="cancel-btn">Cancel</button>
-        </div>
-      </div>
-    `;
-
-    const listEl = shadow.querySelector('.passkey-list')!;
-    for (const pk of passkeys) {
-      const item = document.createElement('div');
-      item.className = 'passkey-item';
-      item.innerHTML = `
-        <div class="passkey-icon">🔑</div>
-        <div class="passkey-info">
-          <div class="passkey-name">${pk.userDisplayName || pk.userName}</div>
-          <div class="passkey-detail">${pk.userName}</div>
-        </div>
-      `;
-      item.addEventListener('click', () => {
-        host.remove();
-        resolve({ credentialId: pk.credentialId });
-      });
-      listEl.appendChild(item);
-    }
-
-    shadow.querySelector('.cancel-btn')!.addEventListener('click', () => {
-      host.remove();
-      resolve(null);
-    });
-
-    shadow.querySelector('.overlay')!.addEventListener('click', (e) => {
-      if (e.target === e.currentTarget) {
-        host.remove();
-        resolve(null);
-      }
-    });
-
-    document.documentElement.appendChild(host);
-  });
-}
-
 /** WXT content script export. */
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -558,6 +479,39 @@ export default defineContentScript({
 
         if (event.data.type === 'lockbox-webauthn-create') {
           try {
+            const opts = event.data.options;
+            const unlocked = await isVaultUnlocked();
+            if (!unlocked) {
+              showVaultLockedToast(() => openExtensionPopup());
+              window.postMessage(
+                {
+                  type: 'lockbox-webauthn-response',
+                  requestId: event.data.requestId,
+                  fallback: true,
+                },
+                '*'
+              );
+              return;
+            }
+
+            const confirmed = await showCreateConsent({
+              rpName: opts.rp?.name ?? '',
+              rpId: opts.rp?.id ?? new URL(event.data.origin).hostname,
+              userName: opts.user?.name ?? '',
+              userDisplayName: opts.user?.displayName ?? opts.user?.name ?? '',
+            });
+            if (!confirmed) {
+              window.postMessage(
+                {
+                  type: 'lockbox-webauthn-response',
+                  requestId: event.data.requestId,
+                  fallback: true,
+                },
+                '*'
+              );
+              return;
+            }
+
             const result = await sendMessage<{
               credential?: object;
               error?: string;
@@ -566,14 +520,10 @@ export default defineContentScript({
               type: 'WEBAUTHN_CREATE',
               requestId: event.data.requestId,
               origin: event.data.origin,
-              options: event.data.options,
+              options: opts,
             });
             window.postMessage(
-              {
-                type: 'lockbox-webauthn-response',
-                requestId: event.data.requestId,
-                ...result,
-              },
+              { type: 'lockbox-webauthn-response', requestId: event.data.requestId, ...result },
               '*'
             );
           } catch {
@@ -590,11 +540,33 @@ export default defineContentScript({
 
         if (event.data.type === 'lockbox-webauthn-get') {
           try {
+            const unlocked = await isVaultUnlocked();
+            if (!unlocked) {
+              showVaultLockedToast(() => openExtensionPopup());
+              window.postMessage(
+                {
+                  type: 'lockbox-webauthn-response',
+                  requestId: event.data.requestId,
+                  fallback: true,
+                },
+                '*'
+              );
+              return;
+            }
+
             const result = await sendMessage<{
               credential?: object;
               error?: string;
               fallback?: boolean;
               selectPasskey?: boolean;
+              needsConsent?: boolean;
+              consentData?: {
+                rpName: string;
+                rpId: string;
+                userName: string;
+                userDisplayName: string;
+                credentialId: string;
+              };
               matches?: Array<{
                 credentialId: string;
                 userName: string;
@@ -609,7 +581,6 @@ export default defineContentScript({
               options: event.data.options,
             });
 
-            // If multiple passkeys match, show a picker for the user to select
             if (result.selectPasskey && result.matches && result._context) {
               const selected = await showPasskeyPicker(result.matches);
               if (!selected) {
@@ -623,7 +594,6 @@ export default defineContentScript({
                 );
                 return;
               }
-              // Sign with the selected passkey
               const signResult = await sendMessage<{
                 credential?: object;
                 fallback?: boolean;
@@ -645,12 +615,42 @@ export default defineContentScript({
               return;
             }
 
+            if (result.needsConsent && result.consentData && result._context) {
+              const confirmed = await showGetConsent(result.consentData);
+              if (!confirmed) {
+                window.postMessage(
+                  {
+                    type: 'lockbox-webauthn-response',
+                    requestId: event.data.requestId,
+                    fallback: true,
+                  },
+                  '*'
+                );
+                return;
+              }
+              const signResult = await sendMessage<{
+                credential?: object;
+                fallback?: boolean;
+              }>({
+                type: 'WEBAUTHN_GET_SELECTED',
+                credentialId: result.consentData.credentialId,
+                rpId: result._context.rpId,
+                challenge: result._context.challenge,
+                origin: result._context.origin,
+              });
+              window.postMessage(
+                {
+                  type: 'lockbox-webauthn-response',
+                  requestId: event.data.requestId,
+                  ...signResult,
+                },
+                '*'
+              );
+              return;
+            }
+
             window.postMessage(
-              {
-                type: 'lockbox-webauthn-response',
-                requestId: event.data.requestId,
-                ...result,
-              },
+              { type: 'lockbox-webauthn-response', requestId: event.data.requestId, ...result },
               '*'
             );
           } catch {
@@ -670,7 +670,25 @@ export default defineContentScript({
 
     // Listen for phishing warnings from background
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-      if (message.type === 'phishing-warning') {
+      if (message.type === 'webauthn-create-consent') {
+        showCreateConsent(message.params)
+          .then((confirmed) => sendResponse({ confirmed }))
+          .catch(() => sendResponse({ confirmed: false }));
+        return true;
+      } else if (message.type === 'webauthn-get-consent') {
+        showGetConsent(message.params)
+          .then((confirmed) => sendResponse({ confirmed }))
+          .catch(() => sendResponse({ confirmed: false }));
+        return true;
+      } else if (message.type === 'webauthn-pick-passkey') {
+        showPasskeyPicker(message.passkeys)
+          .then((selected) => sendResponse({ selected }))
+          .catch(() => sendResponse({ selected: null }));
+        return true;
+      } else if (message.type === 'webauthn-vault-locked') {
+        showVaultLockedToast(() => openExtensionPopup());
+        sendResponse({ shown: true });
+      } else if (message.type === 'phishing-warning') {
         injectPhishingWarning(message);
       } else if (message.type === 'get-password-field-metadata') {
         // Extract metadata from the first password field on the page
