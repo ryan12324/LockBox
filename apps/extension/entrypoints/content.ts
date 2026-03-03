@@ -743,10 +743,17 @@ export default defineContentScript({
       injectOverlays();
     });
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
+    const startObserver = () => {
+      observer.observe(document.body, { childList: true, subtree: true });
+    };
+    if (document.body) {
+      startObserver();
+    } else {
+      document.addEventListener('DOMContentLoaded', startObserver, {
+        once: true,
+        signal: ctx.signal,
+      });
+    }
     ctx.onInvalidated(() => observer.disconnect());
 
     // Track user activity for auto-lock
