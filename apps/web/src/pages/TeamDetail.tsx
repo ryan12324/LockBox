@@ -272,23 +272,25 @@ export default function TeamDetail() {
   const roleColor = (role: string) => {
     switch (role) {
       case 'owner':
-        return 'bg-indigo-500/20 text-indigo-300';
+        return 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]';
       case 'admin':
-        return 'bg-purple-500/20 text-purple-300';
+        return 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]';
       default:
-        return 'bg-white/[0.08] text-white/50';
+        return 'bg-[var(--color-surface)] text-[var(--color-text-tertiary)]';
     }
   };
 
   const permColor = (perm: string) =>
-    perm === 'read_write' ? 'bg-green-500/20 text-green-300' : 'bg-white/[0.08] text-white/50';
+    perm === 'read_write'
+      ? 'bg-[var(--color-success-subtle)] text-[var(--color-success)]'
+      : 'bg-[var(--color-surface)] text-[var(--color-text-tertiary)]';
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6">
-        <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <h2 className="text-xl font-medium text-white mb-2">Loading Team</h2>
-        <p className="text-white/60">Fetching team details…</p>
+        <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin mb-4" />
+        <h2 className="text-xl font-medium text-[var(--color-text)] mb-2">Loading Team</h2>
+        <p className="text-[var(--color-text-secondary)]">Fetching team details…</p>
       </div>
     );
   }
@@ -298,7 +300,10 @@ export default function TeamDetail() {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate('/teams')} className="text-white/40 hover:text-white/70">
+          <button
+            onClick={() => navigate('/teams')}
+            className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
+          >
             ← Back
           </button>
           {editingName ? (
@@ -314,12 +319,12 @@ export default function TeamDetail() {
                     setEditName(teamName);
                   }
                 }}
-                className="px-3 py-1 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white text-2xl font-bold"
+                className="px-3 py-1 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] text-2xl font-bold"
                 autoFocus
               />
               <button
                 onClick={handleRename}
-                className="px-2 py-1 text-xs bg-indigo-600/80 text-white rounded hover:bg-indigo-500/90"
+                className="px-2 py-1 text-xs bg-[var(--color-primary)] text-[var(--color-primary-fg)] rounded hover:bg-[var(--color-primary-hover)]"
               >
                 ✓
               </button>
@@ -328,14 +333,14 @@ export default function TeamDetail() {
                   setEditingName(false);
                   setEditName(teamName);
                 }}
-                className="px-2 py-1 text-xs text-white/30 hover:text-white/60"
+                className="px-2 py-1 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
               >
                 ✕
               </button>
             </div>
           ) : (
             <h1
-              className={`text-2xl font-bold text-white ${isAdmin ? 'cursor-pointer hover:text-indigo-300 transition-colors' : ''}`}
+              className={`text-2xl font-bold text-[var(--color-text)] ${isAdmin ? 'cursor-pointer hover:text-[var(--color-primary)] transition-colors' : ''}`}
               onClick={() => isAdmin && setEditingName(true)}
               title={isAdmin ? 'Click to rename' : undefined}
             >
@@ -345,31 +350,33 @@ export default function TeamDetail() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+          <div className="mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--color-error-subtle)] border border-[var(--color-error)] text-[var(--color-error)] text-sm">
             {error}
           </div>
         )}
         {success && (
-          <div className="mb-4 p-3 rounded-lg bg-green-500/20 border border-green-500/30 text-green-300 text-sm">
+          <div className="mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--color-success-subtle)] border border-[var(--color-success)] text-[var(--color-success)] text-sm">
             {success}
           </div>
         )}
 
         <div className="space-y-6">
           {/* Members */}
-          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Members ({members.length})</h2>
+          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+              Members ({members.length})
+            </h2>
             <div className="space-y-3">
               {members.map((member) => (
                 <div key={member.userId} className="flex items-center justify-between py-2">
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="w-8 h-8 rounded-full bg-white/[0.08] flex items-center justify-center text-sm text-white/60 shrink-0">
+                    <div className="w-8 h-8 rounded-[var(--radius-full)] bg-[var(--color-surface)] flex items-center justify-center text-sm text-[var(--color-text-secondary)] shrink-0">
                       {member.email.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm text-white truncate">{member.email}</p>
+                      <p className="text-sm text-[var(--color-text)] truncate">{member.email}</p>
                       <span
-                        className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium capitalize mt-0.5 ${roleColor(member.role)}`}
+                        className={`inline-block px-2 py-0.5 rounded-[var(--radius-full)] text-[10px] font-medium capitalize mt-0.5 ${roleColor(member.role)}`}
                       >
                         {member.role}
                       </span>
@@ -380,14 +387,14 @@ export default function TeamDetail() {
                       <select
                         value={member.role}
                         onChange={(e) => handleChangeRole(member.userId, e.target.value)}
-                        className="px-2 py-1 text-xs border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                        className="px-2 py-1 text-xs border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                       >
                         <option value="member">Member</option>
                         <option value="admin">Admin</option>
                       </select>
                       <button
                         onClick={() => handleRemoveMember(member.userId)}
-                        className="text-red-400 hover:text-red-300 text-xs transition-colors"
+                        className="text-[var(--color-error)] hover:text-[var(--color-error)] text-xs transition-colors"
                       >
                         Remove
                       </button>
@@ -400,8 +407,8 @@ export default function TeamDetail() {
 
           {/* Invite member */}
           {isAdmin && (
-            <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Invite Member</h2>
+            <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Invite Member</h2>
               <div className="flex gap-2">
                 <input
                   type="email"
@@ -409,12 +416,12 @@ export default function TeamDetail() {
                   onChange={(e) => setInviteEmail(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
                   placeholder="email@example.com"
-                  className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30"
+                  className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
                 />
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
-                  className="px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                  className="px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                 >
                   <option value="member">Member</option>
                   <option value="admin">Admin</option>
@@ -422,7 +429,7 @@ export default function TeamDetail() {
                 <button
                   onClick={handleInvite}
                   disabled={inviting || !inviteEmail.trim()}
-                  className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   {inviting ? 'Sending…' : 'Invite'}
                 </button>
@@ -432,29 +439,29 @@ export default function TeamDetail() {
 
           {/* Pending invites */}
           {isAdmin && invites.length > 0 && (
-            <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">
+            <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
                 Pending Invites ({invites.length})
               </h2>
               <div className="space-y-3">
                 {invites.map((invite) => (
                   <div key={invite.id} className="flex items-center justify-between py-2">
                     <div>
-                      <p className="text-sm text-white">{invite.email}</p>
+                      <p className="text-sm text-[var(--color-text)]">{invite.email}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${roleColor(invite.role)}`}
+                          className={`px-2 py-0.5 rounded-[var(--radius-full)] text-[10px] font-medium capitalize ${roleColor(invite.role)}`}
                         >
                           {invite.role}
                         </span>
-                        <span className="text-[10px] text-white/40">
+                        <span className="text-[10px] text-[var(--color-text-tertiary)]">
                           Expires {new Date(invite.expiresAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
                     <button
                       onClick={() => handleCancelInvite(invite.id)}
-                      className="text-red-400 hover:text-red-300 text-xs transition-colors"
+                      className="text-[var(--color-error)] hover:text-[var(--color-error)] text-xs transition-colors"
                     >
                       Cancel
                     </button>
@@ -465,15 +472,15 @@ export default function TeamDetail() {
           )}
 
           {/* Shared folders */}
-          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
+          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">
+              <h2 className="text-lg font-semibold text-[var(--color-text)]">
                 Shared Folders ({sharedFolders.length})
               </h2>
               {isAdmin && hasKeyPair && (
                 <button
                   onClick={() => setShowShareFolder(!showShareFolder)}
-                  className="text-sm text-indigo-300 hover:text-indigo-200 hover:underline transition-colors"
+                  className="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline transition-colors"
                 >
                   {showShareFolder ? 'Cancel' : '+ Share a Folder'}
                 </button>
@@ -481,13 +488,15 @@ export default function TeamDetail() {
             </div>
 
             {showShareFolder && (
-              <div className="mb-4 p-4 rounded-xl border border-white/[0.08] bg-white/[0.03] space-y-3">
+              <div className="mb-4 p-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-subtle)] space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Folder</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Folder
+                  </label>
                   <select
                     value={selectedFolderId}
                     onChange={(e) => setSelectedFolderId(e.target.value)}
-                    className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white"
+                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                   >
                     <option value="">Select a folder…</option>
                     {userFolders
@@ -500,16 +509,18 @@ export default function TeamDetail() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-1">Permission</label>
+                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                    Permission
+                  </label>
                   <div className="flex gap-2">
                     {(['read_write', 'read_only'] as const).map((perm) => (
                       <button
                         key={perm}
                         onClick={() => setSharePermission(perm)}
-                        className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                        className={`flex-1 py-2 text-sm font-medium rounded-[var(--radius-md)] border transition-colors ${
                           sharePermission === perm
-                            ? 'border-indigo-500/60 bg-indigo-500/15 text-indigo-300'
-                            : 'border-white/[0.12] text-white/60 hover:border-white/[0.2]'
+                            ? 'border-[var(--color-primary)] bg-[var(--color-aura-dim)] text-[var(--color-primary)]'
+                            : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)]'
                         }`}
                       >
                         {perm === 'read_write' ? 'Read & Write' : 'Read Only'}
@@ -520,7 +531,7 @@ export default function TeamDetail() {
                 <button
                   onClick={handleShareFolder}
                   disabled={sharing || !selectedFolderId}
-                  className="w-full px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  className="w-full px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   {sharing ? 'Sharing…' : 'Share Folder'}
                 </button>
@@ -528,19 +539,21 @@ export default function TeamDetail() {
             )}
 
             {sharedFolders.length === 0 ? (
-              <p className="text-sm text-white/40">No folders shared with this team yet.</p>
+              <p className="text-sm text-[var(--color-text-tertiary)]">
+                No folders shared with this team yet.
+              </p>
             ) : (
               <div className="space-y-2">
                 {sharedFolders.map((sf) => (
                   <div
                     key={sf.folderId}
-                    className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-white/[0.04] transition-colors"
+                    className="flex items-center justify-between py-2.5 px-3 rounded-[var(--radius-md)] hover:bg-[var(--color-bg-subtle)] transition-colors"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm">📁</span>
-                      <span className="text-sm text-white">{sf.folderName}</span>
+                      <span className="text-sm text-[var(--color-text)]">{sf.folderName}</span>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${permColor(sf.permissionLevel)}`}
+                        className={`px-2 py-0.5 rounded-[var(--radius-full)] text-[10px] font-medium ${permColor(sf.permissionLevel)}`}
                       >
                         {sf.permissionLevel === 'read_write' ? 'Read & Write' : 'Read Only'}
                       </span>
@@ -548,7 +561,7 @@ export default function TeamDetail() {
                     {isAdmin && (
                       <button
                         onClick={() => handleUnshareFolder(sf.folderId)}
-                        className="text-red-400 hover:text-red-300 text-xs transition-colors"
+                        className="text-[var(--color-error)] hover:text-[var(--color-error)] text-xs transition-colors"
                       >
                         Unshare
                       </button>
@@ -561,11 +574,11 @@ export default function TeamDetail() {
 
           {/* Danger zone */}
           {isOwner && (
-            <section className="backdrop-blur-xl bg-red-500/[0.05] border border-red-500/[0.15] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-              <h2 className="text-lg font-semibold text-red-400 mb-4">Danger Zone</h2>
+            <section className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+              <h2 className="text-lg font-semibold text-[var(--color-error)] mb-4">Danger Zone</h2>
               {confirmDelete ? (
                 <div>
-                  <p className="text-sm text-white/70 mb-3">
+                  <p className="text-sm text-[var(--color-text-secondary)] mb-3">
                     Are you sure? This will permanently delete the team and remove all shared folder
                     access for members.
                   </p>
@@ -573,13 +586,13 @@ export default function TeamDetail() {
                     <button
                       onClick={handleDeleteTeam}
                       disabled={deleting}
-                      className="px-4 py-2 bg-red-500/80 hover:bg-red-400/90 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      className="px-4 py-2 bg-[var(--color-error)] hover:bg-[var(--color-error)] text-[var(--color-text)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
                     >
                       {deleting ? 'Deleting…' : 'Yes, Delete Team'}
                     </button>
                     <button
                       onClick={() => setConfirmDelete(false)}
-                      className="px-4 py-2 text-white/40 hover:text-white/70 text-sm transition-colors"
+                      className="px-4 py-2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] text-sm transition-colors"
                     >
                       Cancel
                     </button>
@@ -588,7 +601,7 @@ export default function TeamDetail() {
               ) : (
                 <button
                   onClick={() => setConfirmDelete(true)}
-                  className="px-4 py-2 border border-red-500/30 text-red-400 hover:bg-red-500/10 rounded-lg text-sm font-medium transition-colors"
+                  className="px-4 py-2 border border-[var(--color-error)] text-[var(--color-error)] hover:bg-[var(--color-error-subtle)] rounded-[var(--radius-md)] text-sm font-medium transition-colors"
                 >
                   Delete Team
                 </button>

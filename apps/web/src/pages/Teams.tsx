@@ -98,20 +98,20 @@ export default function Teams() {
   const roleColor = (role: string) => {
     switch (role) {
       case 'owner':
-        return 'bg-indigo-500/20 text-indigo-300';
+        return 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]';
       case 'admin':
-        return 'bg-purple-500/20 text-purple-300';
+        return 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]';
       default:
-        return 'bg-white/[0.08] text-white/50';
+        return 'bg-[var(--color-surface)] text-[var(--color-text-tertiary)]';
     }
   };
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6">
-        <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-        <h2 className="text-xl font-medium text-white mb-2">Loading Teams</h2>
-        <p className="text-white/60">Fetching your teams…</p>
+        <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin mb-4" />
+        <h2 className="text-xl font-medium text-[var(--color-text)] mb-2">Loading Teams</h2>
+        <p className="text-[var(--color-text-secondary)]">Fetching your teams…</p>
       </div>
     );
   }
@@ -123,48 +123,50 @@ export default function Teams() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/vault')}
-              className="text-white/40 hover:text-white/70"
+              className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
             >
               ← Back
             </button>
-            <h1 className="text-2xl font-bold text-white">Teams</h1>
+            <h1 className="text-2xl font-bold text-[var(--color-text)]">Teams</h1>
           </div>
           <button
             onClick={() => setShowCreate(true)}
-            className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg text-sm font-medium transition-colors"
+            className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors"
           >
             Create Team
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-sm">
+          <div className="mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--color-error-subtle)] border border-[var(--color-error)] text-[var(--color-error)] text-sm">
             {error}
           </div>
         )}
 
         <div className="space-y-6">
-          {/* Key pair setup banner */}
           {!hasKeyPair && (
-            <section className="backdrop-blur-xl bg-amber-500/[0.08] border border-amber-500/[0.2] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-              <h2 className="text-lg font-semibold text-white mb-2">Set Up Encryption Keys</h2>
-              <p className="text-sm text-white/60 mb-4">
+            <section className="bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">
+                Set Up Encryption Keys
+              </h2>
+              <p className="text-sm text-[var(--color-text-secondary)] mb-4">
                 You need an RSA key pair to share folders and access shared items. This is a
                 one-time setup.
               </p>
               <button
                 onClick={handleSetupKeyPair}
                 disabled={setupLoading}
-                className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {setupLoading ? 'Setting up…' : 'Generate Key Pair'}
               </button>
             </section>
           )}
 
-          {/* Accept invite */}
-          <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Accept an Invite</h2>
+          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+              Accept an Invite
+            </h2>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -172,22 +174,21 @@ export default function Teams() {
                 onChange={(e) => setInviteToken(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAcceptInvite()}
                 placeholder="Paste invite token"
-                className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30"
+                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
               />
               <button
                 onClick={handleAcceptInvite}
                 disabled={acceptingInvite || !inviteToken.trim()}
-                className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {acceptingInvite ? 'Accepting…' : 'Accept'}
               </button>
             </div>
           </section>
 
-          {/* Create team inline form */}
           {showCreate && (
-            <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Create a Team</h2>
+            <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Create a Team</h2>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -201,13 +202,13 @@ export default function Teams() {
                     }
                   }}
                   placeholder="Team name"
-                  className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white placeholder-white/30"
+                  className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
                   autoFocus
                 />
                 <button
                   onClick={handleCreateTeam}
                   disabled={creating || !newTeamName.trim()}
-                  className="px-4 py-2 bg-indigo-600/80 hover:bg-indigo-500/90 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   {creating ? 'Creating…' : 'Create'}
                 </button>
@@ -216,7 +217,7 @@ export default function Teams() {
                     setShowCreate(false);
                     setNewTeamName('');
                   }}
-                  className="px-3 py-2 text-white/40 hover:text-white/70 text-sm transition-colors"
+                  className="px-3 py-2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] text-sm transition-colors"
                 >
                   Cancel
                 </button>
@@ -224,14 +225,13 @@ export default function Teams() {
             </section>
           )}
 
-          {/* Teams list */}
           {teams.length === 0 ? (
-            <section className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-12 text-center">
-              <div className="w-20 h-20 rounded-full bg-white/[0.06] border border-white/[0.1] flex items-center justify-center mx-auto mb-6 text-white/40 text-3xl">
+            <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-12 text-center">
+              <div className="w-20 h-20 rounded-[var(--radius-full)] bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center mx-auto mb-6 text-[var(--color-text-tertiary)] text-3xl">
                 👥
               </div>
-              <h2 className="text-2xl font-medium text-white mb-3">No Teams Yet</h2>
-              <p className="text-white/60 max-w-md mx-auto">
+              <h2 className="text-2xl font-medium text-[var(--color-text)] mb-3">No Teams Yet</h2>
+              <p className="text-[var(--color-text-secondary)] max-w-md mx-auto">
                 Create a team to start sharing folders and passwords with others.
               </p>
             </section>
@@ -241,19 +241,19 @@ export default function Teams() {
                 <button
                   key={team.id}
                   onClick={() => navigate(`/teams/${team.id}`)}
-                  className="w-full text-left backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-5 hover:bg-white/[0.09] transition-colors group"
+                  className="w-full text-left bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-5 hover:bg-[var(--color-surface-raised)] transition-colors group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-white group-hover:text-indigo-300 transition-colors">
+                      <h3 className="text-lg font-semibold text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors">
                         {team.name}
                       </h3>
-                      <p className="text-xs text-white/40 mt-1">
+                      <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
                         Created {new Date(team.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize ${roleColor(team.role)}`}
+                      className={`px-2.5 py-1 rounded-[var(--radius-full)] text-xs font-medium capitalize ${roleColor(team.role)}`}
                     >
                       {team.role}
                     </span>

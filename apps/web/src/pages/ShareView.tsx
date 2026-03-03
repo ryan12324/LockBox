@@ -45,7 +45,8 @@ export default function ShareView() {
         setMaxViews(response.maxViews);
       } catch (err: unknown) {
         console.error('Share redemption error:', err);
-        const message = err instanceof Error ? err.message : 'Failed to decrypt or load shared item.';
+        const message =
+          err instanceof Error ? err.message : 'Failed to decrypt or load shared item.';
         setError(message);
       } finally {
         setLoading(false);
@@ -65,11 +66,11 @@ export default function ShareView() {
   const renderCopyButton = (text: string, field: string, title: string) => (
     <button
       onClick={() => copyToClipboard(text, field)}
-      className="p-2 border border-white/[0.12] rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/70 hover:text-white transition-colors"
+      className="p-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
       title={title}
     >
       {copiedField === field ? (
-        <span className="text-xs font-medium text-green-400">Copied!</span>
+        <span className="text-xs font-medium text-[var(--color-success)]">Copied!</span>
       ) : (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -90,13 +91,15 @@ export default function ShareView() {
       <>
         {loginItem.username && (
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">Username</label>
+            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+              Username
+            </label>
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 readOnly
                 value={loginItem.username}
-                className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white outline-none focus:border-indigo-500/50 transition-colors"
+                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] transition-colors"
               />
               {renderCopyButton(loginItem.username, 'username', 'Copy username')}
             </div>
@@ -104,17 +107,19 @@ export default function ShareView() {
         )}
         {loginItem.password && (
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">Password</label>
+            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+              Password
+            </label>
             <div className="flex items-center gap-2">
               <input
                 type={showPassword ? 'text' : 'password'}
                 readOnly
                 value={loginItem.password}
-                className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono outline-none focus:border-indigo-500/50 transition-colors"
+                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono outline-none focus:border-[var(--color-border-strong)] transition-colors"
               />
               <button
                 onClick={() => setShowPassword(!showPassword)}
-                className="p-2 border border-white/[0.12] rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/70 hover:text-white transition-colors"
+                className="p-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
                 title={showPassword ? 'Hide password' : 'Show password'}
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -141,13 +146,15 @@ export default function ShareView() {
         )}
         {loginItem.totp && (
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">TOTP Secret</label>
+            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+              TOTP Secret
+            </label>
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 readOnly
                 value={loginItem.totp}
-                className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono outline-none focus:border-indigo-500/50 transition-colors"
+                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono outline-none focus:border-[var(--color-border-strong)] transition-colors"
               />
               {renderCopyButton(loginItem.totp, 'totp', 'Copy TOTP')}
             </div>
@@ -155,7 +162,9 @@ export default function ShareView() {
         )}
         {loginItem.uris && loginItem.uris.length > 0 && loginItem.uris[0] && (
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">URLs</label>
+            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+              URLs
+            </label>
             <div className="space-y-2">
               {loginItem.uris.filter(Boolean).map((uri: string, idx: number) => (
                 <div key={idx} className="flex items-center gap-2">
@@ -163,7 +172,7 @@ export default function ShareView() {
                     href={uri.startsWith('http') ? uri : `https://${uri}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-indigo-300 hover:text-indigo-200 hover:bg-white/[0.1] transition-colors truncate"
+                    className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:bg-[var(--color-surface-raised)] transition-colors truncate"
                   >
                     {uri}
                   </a>
@@ -181,12 +190,14 @@ export default function ShareView() {
     const noteItem = item as SecureNoteItem;
     return (
       <div>
-        <label className="block text-sm font-medium text-white/70 mb-1">Content</label>
+        <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+          Content
+        </label>
         <textarea
           readOnly
           value={noteItem.content || ''}
           rows={10}
-          className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white outline-none focus:border-indigo-500/50 transition-colors whitespace-pre-wrap font-mono text-sm resize-none"
+          className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] transition-colors whitespace-pre-wrap font-mono text-sm resize-none"
         />
       </div>
     );
@@ -199,28 +210,32 @@ export default function ShareView() {
       <div className="space-y-4">
         {cardItem.cardholderName && (
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">Cardholder Name</label>
+            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+              Cardholder Name
+            </label>
             <input
               type="text"
               readOnly
               value={cardItem.cardholderName}
-              className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white outline-none"
+              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] outline-none"
             />
           </div>
         )}
         {cardItem.number && (
           <div>
-            <label className="block text-sm font-medium text-white/70 mb-1">Card Number</label>
+            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+              Card Number
+            </label>
             <div className="flex items-center gap-2">
               <input
                 type={showCardNumber ? 'text' : 'password'}
                 readOnly
                 value={cardItem.number}
-                className="flex-1 px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono tracking-wider outline-none"
+                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono tracking-wider outline-none"
               />
               <button
                 onClick={() => setShowCardNumber(!showCardNumber)}
-                className="p-2 border border-white/[0.12] rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/70 hover:text-white transition-colors"
+                className="p-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   {showCardNumber ? (
@@ -246,26 +261,30 @@ export default function ShareView() {
         )}
         <div className="flex gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-white/70 mb-1">Expiration</label>
+            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+              Expiration
+            </label>
             <input
               type="text"
               readOnly
               value={`${cardItem.expMonth || ''} / ${cardItem.expYear || ''}`}
-              className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono outline-none"
+              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono outline-none"
             />
           </div>
           <div className="flex-1">
-            <label className="block text-sm font-medium text-white/70 mb-1">CVV</label>
+            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+              CVV
+            </label>
             <div className="flex items-center gap-2">
               <input
                 type={showCvv ? 'text' : 'password'}
                 readOnly
                 value={cardItem.cvv || ''}
-                className="w-full px-3 py-2 border border-white/[0.12] rounded-lg bg-white/[0.06] text-white font-mono outline-none"
+                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono outline-none"
               />
               <button
                 onClick={() => setShowCvv(!showCvv)}
-                className="p-2 border border-white/[0.12] rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/70 hover:text-white transition-colors"
+                className="p-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   {showCvv ? (
@@ -293,20 +312,21 @@ export default function ShareView() {
   };
 
   return (
-    <div className="min-h-screen p-6 text-white selection:bg-indigo-500/30">
+    <div className="min-h-screen p-6 text-[var(--color-text)] selection:bg-[var(--color-aura-dim)]">
       <div className="max-w-2xl mx-auto mt-12">
-        <div className="backdrop-blur-xl bg-white/[0.07] border border-white/[0.12] rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.25)] p-6 relative overflow-hidden">
-          {/* Subtle ambient light effect behind the card */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/20 rounded-full blur-[80px] pointer-events-none" />
+        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6 relative overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[var(--color-aura)] rounded-[var(--radius-full)] blur-[80px] pointer-events-none" />
 
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16 space-y-6 relative z-10">
-              <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-white/70 animate-pulse font-medium">Decrypting shared item...</p>
+              <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin" />
+              <p className="text-[var(--color-text-secondary)] animate-pulse font-medium">
+                Decrypting shared item...
+              </p>
             </div>
           ) : error ? (
             <div className="py-12 relative z-10 text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 text-red-400 mb-2">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-[var(--radius-full)] bg-[var(--color-error-subtle)] text-[var(--color-error)] mb-2">
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
@@ -316,18 +336,22 @@ export default function ShareView() {
                   />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-white">Share Link Unavailable</h2>
-              <p className="text-white/70 max-w-md mx-auto">{error}</p>
+              <h2 className="text-xl font-bold text-[var(--color-text)]">Share Link Unavailable</h2>
+              <p className="text-[var(--color-text-secondary)] max-w-md mx-auto">{error}</p>
             </div>
           ) : item ? (
             <div className="relative z-10 space-y-6">
-              <div className="flex justify-between items-start border-b border-white/[0.12] pb-6">
+              <div className="flex justify-between items-start border-b border-[var(--color-border)] pb-6">
                 <div>
-                  <h1 className="text-2xl font-bold text-white tracking-tight">{item.name}</h1>
-                  <p className="text-sm text-white/50 mt-1 capitalize">{item.type} Item</p>
+                  <h1 className="text-2xl font-bold text-[var(--color-text)] tracking-tight">
+                    {item.name}
+                  </h1>
+                  <p className="text-sm text-[var(--color-text-tertiary)] mt-1 capitalize">
+                    {item.type} Item
+                  </p>
                 </div>
                 {maxViews > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-[var(--radius-full)] text-xs font-medium bg-[var(--color-aura-dim)] text-[var(--color-primary)] border border-[var(--color-primary)]">
                     View {viewCount} of {maxViews}
                   </span>
                 )}
@@ -341,10 +365,10 @@ export default function ShareView() {
               </div>
 
               {/* Security Notice */}
-              <div className="pt-6 mt-8 border-t border-white/[0.12] text-center">
-                <div className="inline-flex items-center justify-center space-x-2 text-xs text-white/40">
+              <div className="pt-6 mt-8 border-t border-[var(--color-border)] text-center">
+                <div className="inline-flex items-center justify-center space-x-2 text-xs text-[var(--color-text-tertiary)]">
                   <svg
-                    className="w-4 h-4 text-indigo-400"
+                    className="w-4 h-4 text-[var(--color-primary)]"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
