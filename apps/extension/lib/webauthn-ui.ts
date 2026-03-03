@@ -16,7 +16,7 @@ const BASE_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   .overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.45); display: flex; align-items: center;
+    background: rgba(44,40,37,0.4); display: flex; align-items: center;
     justify-content: center; font-family: -apple-system, BlinkMacSystemFont,
     'Segoe UI', Roboto, sans-serif; z-index: 2147483647;
     animation: fadeIn 0.15s ease-out;
@@ -27,58 +27,58 @@ const BASE_STYLES = `
     to   { opacity: 1; transform: translateY(0); }
   }
   .modal {
-    background: #1e1e2e; border-radius: 14px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08);
+    background: #FDFCFA; border-radius: 24px;
+    box-shadow: 0 12px 40px rgba(44,40,37,0.12), 0 0 0 1px #DDD6CC;
     max-width: 400px; width: 90%; overflow: hidden;
     animation: slideUp 0.2s ease-out;
   }
   .modal-header {
     padding: 18px 20px 14px; display: flex; align-items: center; gap: 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid #DDD6CC;
   }
-  .modal-header svg { width: 22px; height: 22px; color: #818cf8; flex-shrink: 0; }
-  .modal-title { font-size: 15px; font-weight: 600; color: #e2e8f0; }
-  .modal-subtitle { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+  .modal-header svg { width: 22px; height: 22px; color: #8B7355; flex-shrink: 0; }
+  .modal-title { font-size: 15px; font-weight: 600; color: #2C2825; }
+  .modal-subtitle { font-size: 12px; color: #7A7168; margin-top: 2px; }
   .modal-body { padding: 16px 20px; }
   .info-row {
     display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-    background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 8px;
+    background: #EAE6DF; border-radius: 10px; margin-bottom: 8px;
   }
   .info-row:last-child { margin-bottom: 0; }
   .info-icon {
-    width: 36px; height: 36px; border-radius: 8px; background: rgba(99,102,241,0.15);
+    width: 36px; height: 36px; border-radius: 10px; background: rgba(139,115,85,0.15);
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     font-size: 16px;
   }
-  .info-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .info-label { font-size: 11px; color: #7A7168; text-transform: uppercase; letter-spacing: 0.5px; }
   .info-value {
-    font-size: 14px; color: #e2e8f0; font-weight: 500;
+    font-size: 14px; color: #2C2825; font-weight: 500;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px;
   }
   .modal-actions {
     display: flex; gap: 10px; padding: 14px 20px;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid #DDD6CC;
   }
   .btn {
-    flex: 1; padding: 10px 16px; border-radius: 8px; font-size: 13px;
+    flex: 1; padding: 10px 16px; border-radius: 10px; font-size: 13px;
     font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
   }
   .btn-primary {
-    background: #6366f1; color: #fff;
+    background: #8B7355; color: #fff;
   }
-  .btn-primary:hover { background: #818cf8; }
+  .btn-primary:hover { background: #7A6348; }
   .btn-secondary {
-    background: rgba(255,255,255,0.08); color: #94a3b8;
-    border: 1px solid rgba(255,255,255,0.1);
+    background: #EAE6DF; color: #7A7168;
+    border: 1px solid #DDD6CC;
   }
-  .btn-secondary:hover { background: rgba(255,255,255,0.12); color: #e2e8f0; }
+  .btn-secondary:hover { background: #DDD6CC; color: #2C2825; }
   .security-badge {
     display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
-    border-radius: 4px; font-size: 10px; font-weight: 600;
+    border-radius: 10px; font-size: 10px; font-weight: 600;
     text-transform: uppercase; letter-spacing: 0.4px;
   }
-  .badge-secure { background: rgba(34,197,94,0.15); color: #4ade80; }
-  .badge-warning { background: rgba(251,191,36,0.15); color: #fbbf24; }
+  .badge-secure { background: rgba(94,138,94,0.1); color: #5E8A5E; }
+  .badge-warning { background: rgba(181,142,58,0.1); color: #B58E3A; }
 `;
 
 // ─── Passkey picker styles (for multi-match assertion) ──────────────────────
@@ -87,32 +87,32 @@ const PICKER_STYLES = `
   .passkey-list { max-height: 240px; overflow-y: auto; }
   .passkey-item {
     padding: 12px 20px; cursor: pointer;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
+    border-bottom: 1px solid #DDD6CC;
     display: flex; align-items: center; gap: 12px; transition: background 0.1s;
   }
   .passkey-item:last-child { border-bottom: none; }
-  .passkey-item:hover { background: rgba(99,102,241,0.1); }
+  .passkey-item:hover { background: rgba(196,168,130,0.1); }
   .passkey-icon {
-    width: 36px; height: 36px; border-radius: 8px; background: rgba(99,102,241,0.15);
+    width: 36px; height: 36px; border-radius: 10px; background: rgba(139,115,85,0.15);
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     font-size: 16px;
   }
   .passkey-info { min-width: 0; flex: 1; }
   .passkey-name {
-    font-size: 14px; font-weight: 500; color: #e2e8f0;
+    font-size: 14px; font-weight: 500; color: #2C2825;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .passkey-detail {
-    font-size: 12px; color: #64748b;
+    font-size: 12px; color: #7A7168;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .cancel-btn {
     width: 100%; padding: 12px; border: none;
-    background: rgba(255,255,255,0.04); color: #64748b;
+    background: #EAE6DF; color: #7A7168;
     font-size: 13px; cursor: pointer;
-    border-top: 1px solid rgba(255,255,255,0.08);
+    border-top: 1px solid #DDD6CC;
   }
-  .cancel-btn:hover { background: rgba(255,255,255,0.08); color: #94a3b8; }
+  .cancel-btn:hover { background: #DDD6CC; color: #2C2825; }
 `;
 
 // ─── Toast styles (non-modal notification) ──────────────────────────────────
@@ -122,10 +122,10 @@ const TOAST_STYLES = `
     position: fixed; bottom: 20px; right: 20px;
     display: flex; align-items: flex-start; gap: 12px;
     padding: 14px 18px; max-width: 360px;
-    background: #1e1e2e;
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    background: #FDFCFA;
+    border: 1px solid #DDD6CC;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(44,40,37,0.12);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     animation: slideInRight 0.25s ease-out;
     z-index: 2147483647;
@@ -136,19 +136,19 @@ const TOAST_STYLES = `
   }
   .toast-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
   .toast-text { flex: 1; min-width: 0; }
-  .toast-title { font-size: 13px; font-weight: 600; color: #e2e8f0; margin-bottom: 3px; }
-  .toast-desc { font-size: 12px; color: #94a3b8; line-height: 1.4; }
+  .toast-title { font-size: 13px; font-weight: 600; color: #2C2825; margin-bottom: 3px; }
+  .toast-desc { font-size: 12px; color: #7A7168; line-height: 1.4; }
   .toast-action {
     display: inline-block; margin-top: 6px; padding: 4px 10px;
-    background: #6366f1; color: #fff; border: none; border-radius: 5px;
+    background: #8B7355; color: #fff; border: none; border-radius: 10px;
     font-size: 11px; font-weight: 600; cursor: pointer;
   }
-  .toast-action:hover { background: #818cf8; }
+  .toast-action:hover { background: #7A6348; }
   .toast-dismiss {
-    background: none; border: none; color: rgba(255,255,255,0.3);
+    background: none; border: none; color: #A69E93;
     cursor: pointer; font-size: 16px; padding: 0; line-height: 1; flex-shrink: 0;
   }
-  .toast-dismiss:hover { color: rgba(255,255,255,0.6); }
+  .toast-dismiss:hover { color: #2C2825; }
 `;
 
 // ─── Key SVG icon (shared across overlays) ──────────────────────────────────
@@ -482,8 +482,8 @@ export function showVaultLockedToast(onOpenLockbox?: () => void): void {
 const UNLOCK_PROMPT_STYLES = `
   .spinner {
     display: inline-block; width: 16px; height: 16px;
-    border: 2px solid rgba(255,255,255,0.2);
-    border-top-color: #818cf8;
+    border: 2px solid rgba(139,115,85,0.2);
+    border-top-color: #8B7355;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
@@ -491,10 +491,10 @@ const UNLOCK_PROMPT_STYLES = `
   .status-row {
     display: flex; align-items: center; gap: 8px;
     padding: 10px 12px; margin-top: 8px;
-    background: rgba(99,102,241,0.08); border-radius: 8px;
-    font-size: 13px; color: #94a3b8;
+    background: rgba(139,115,85,0.08); border-radius: 10px;
+    font-size: 13px; color: #7A7168;
   }
-  .status-row.unlocked { color: #4ade80; }
+  .status-row.unlocked { color: #5E8A5E; }
 `;
 
 export interface UnlockPromptParams {

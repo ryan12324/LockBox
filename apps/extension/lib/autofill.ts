@@ -50,10 +50,7 @@ export function fillForm(form: DetectedForm, username: string, password: string)
  * Uses position:fixed to avoid stacking-context issues with the input.
  * Shadow DOM isolates styles from the page.
  */
-export function createLockIconOverlay(
-  field: HTMLInputElement,
-  onClick: () => void,
-): HTMLElement {
+export function createLockIconOverlay(field: HTMLInputElement, onClick: () => void): HTMLElement {
   const host = document.createElement('div');
   host.className = 'lockbox-lock-overlay';
 
@@ -147,7 +144,7 @@ export function createLockIconOverlay(
 export function createSuggestionDropdown(
   anchorField: HTMLInputElement,
   items: Array<{ id: string; name: string; username: string }>,
-  onSelect: (item: { id: string; name: string; username: string }) => void,
+  onSelect: (item: { id: string; name: string; username: string }) => void
 ): HTMLElement {
   const host = document.createElement('div');
 
@@ -162,39 +159,39 @@ export function createSuggestionDropdown(
 
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
-    <style>
-      .dropdown {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        overflow: hidden;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-size: 13px;
-      }
-      .header {
-        padding: 6px 12px;
-        background: #f8fafc;
-        border-bottom: 1px solid #e2e8f0;
-        font-size: 11px;
-        color: #64748b;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-      .item {
-        padding: 8px 12px;
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        border-bottom: 1px solid #f1f5f9;
-      }
-      .item:last-child { border-bottom: none; }
-      .item:hover { background: #f0f9ff; }
-      .item-name { font-weight: 500; color: #1e293b; }
-      .item-username { color: #64748b; font-size: 12px; }
-    </style>
+     <style>
+       .dropdown {
+         background: #FDFCFA;
+         border: 1px solid #DDD6CC;
+         border-radius: 10px;
+         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+         overflow: hidden;
+         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         font-size: 13px;
+       }
+       .header {
+         padding: 6px 12px;
+         background: #EAE6DF;
+         border-bottom: 1px solid #DDD6CC;
+         font-size: 11px;
+         color: #7A7168;
+         font-weight: 600;
+         text-transform: uppercase;
+         letter-spacing: 0.05em;
+       }
+       .item {
+         padding: 8px 12px;
+         cursor: pointer;
+         display: flex;
+         flex-direction: column;
+         gap: 2px;
+         border-bottom: 1px solid #DDD6CC;
+       }
+       .item:last-child { border-bottom: none; }
+       .item:hover { background: rgba(196,168,130,0.1); }
+       .item-name { font-weight: 500; color: #2C2825; }
+       .item-username { color: #7A7168; font-size: 12px; }
+     </style>
     <div class="dropdown">
       <div class="header">🔐 Lockbox</div>
       ${items
@@ -204,7 +201,7 @@ export function createSuggestionDropdown(
           <span class="item-name">${escapeHtml(item.name)}</span>
           <span class="item-username">${escapeHtml(item.username)}</span>
         </div>
-      `,
+      `
         )
         .join('')}
     </div>
@@ -245,16 +242,16 @@ function escapeHtml(str: string): string {
 const IDENTITY_FIELD_MAP: Record<IdentityFieldType | 'email', keyof IdentityItem | undefined> = {
   'first-name': 'firstName',
   'last-name': 'lastName',
-  'name': 'firstName', // fallback: use firstName for generic name fields
-  'phone': 'phone',
+  name: 'firstName', // fallback: use firstName for generic name fields
+  phone: 'phone',
   'address-line1': 'address1',
   'address-line2': 'address2',
-  'city': 'city',
-  'state': 'state',
+  city: 'city',
+  state: 'state',
   'postal-code': 'postalCode',
-  'country': 'country',
-  'organization': 'company',
-  'email': 'email',
+  country: 'country',
+  organization: 'company',
+  email: 'email',
 };
 
 /**
@@ -289,7 +286,7 @@ export function fillIdentityForm(form: DetectedIdentityForm, identityItem: Ident
 export function createIdentitySuggestionDropdown(
   anchorField: HTMLInputElement,
   items: Array<{ id: string; name: string; detail: string }>,
-  onSelect: (item: { id: string; name: string; detail: string }) => void,
+  onSelect: (item: { id: string; name: string; detail: string }) => void
 ): HTMLElement {
   const host = document.createElement('div');
 
@@ -304,41 +301,41 @@ export function createIdentitySuggestionDropdown(
 
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
-    <style>
-      .dropdown {
-        background: white;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        overflow: hidden;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        font-size: 13px;
-      }
-      .header {
-        padding: 6px 12px;
-        background: #f8fafc;
-        border-bottom: 1px solid #e2e8f0;
-        font-size: 11px;
-        color: #64748b;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-      .item {
-        padding: 8px 12px;
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        border-bottom: 1px solid #f1f5f9;
-      }
-      .item:last-child { border-bottom: none; }
-      .item:hover { background: #f0f9ff; }
-      .item-name { font-weight: 500; color: #1e293b; }
-      .item-detail { color: #64748b; font-size: 12px; }
-    </style>
-    <div class="dropdown">
-      <div class="header">🆔 Lockbox Identity</div>
+     <style>
+       .dropdown {
+         background: #FDFCFA;
+         border: 1px solid #DDD6CC;
+         border-radius: 10px;
+         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+         overflow: hidden;
+         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         font-size: 13px;
+       }
+       .header {
+         padding: 6px 12px;
+         background: #EAE6DF;
+         border-bottom: 1px solid #DDD6CC;
+         font-size: 11px;
+         color: #7A7168;
+         font-weight: 600;
+         text-transform: uppercase;
+         letter-spacing: 0.05em;
+       }
+       .item {
+         padding: 8px 12px;
+         cursor: pointer;
+         display: flex;
+         flex-direction: column;
+         gap: 2px;
+         border-bottom: 1px solid #DDD6CC;
+       }
+       .item:last-child { border-bottom: none; }
+       .item:hover { background: rgba(196,168,130,0.1); }
+       .item-name { font-weight: 500; color: #2C2825; }
+       .item-detail { color: #7A7168; font-size: 12px; }
+     </style>
+     <div class="dropdown">
+       <div class="header">🆔 Lockbox Identity</div>
       ${items
         .map(
           (item) => `
@@ -346,7 +343,7 @@ export function createIdentitySuggestionDropdown(
           <span class="item-name">${escapeHtml(item.name)}</span>
           <span class="item-detail">${escapeHtml(item.detail)}</span>
         </div>
-      `,
+      `
         )
         .join('')}
     </div>
@@ -390,7 +387,7 @@ export interface StatusDropdownAction {
 export function createStatusDropdown(
   anchorField: HTMLInputElement,
   type: StatusDropdownType,
-  actions: StatusDropdownAction[],
+  actions: StatusDropdownAction[]
 ): HTMLElement {
   // Remove any existing status dropdown
   document.getElementById('lockbox-status-dropdown')?.remove();
@@ -433,61 +430,61 @@ export function createStatusDropdown(
 
   const style = document.createElement('style');
   style.textContent = `
-    .dropdown {
-      background: white;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      font-size: 13px;
-    }
-    .header {
-      padding: 6px 12px;
-      background: #f8fafc;
-      border-bottom: 1px solid #e2e8f0;
-      font-size: 11px;
-      color: #64748b;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .body {
-      padding: 12px;
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-    }
-    .icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
-    .text { flex: 1; min-width: 0; }
-    .title { font-weight: 600; color: #1e293b; margin-bottom: 2px; }
-    .desc { color: #64748b; font-size: 12px; line-height: 1.4; }
-    .actions {
-      padding: 8px 12px;
-      border-top: 1px solid #e2e8f0;
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-    }
-    .btn {
-      padding: 5px 12px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      cursor: pointer;
-      border: 1px solid #e2e8f0;
-      background: white;
-      color: #374151;
-      transition: background 0.15s;
-    }
-    .btn:hover { background: #f1f5f9; }
-    .btn-primary {
-      background: #4f46e5;
-      color: white;
-      border-color: #4f46e5;
-    }
-    .btn-primary:hover { background: #4338ca; }
-  `;
+     .dropdown {
+       background: #FDFCFA;
+       border: 1px solid #DDD6CC;
+       border-radius: 10px;
+       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+       overflow: hidden;
+       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+       font-size: 13px;
+     }
+     .header {
+       padding: 6px 12px;
+       background: #EAE6DF;
+       border-bottom: 1px solid #DDD6CC;
+       font-size: 11px;
+       color: #7A7168;
+       font-weight: 600;
+       text-transform: uppercase;
+       letter-spacing: 0.05em;
+     }
+     .body {
+       padding: 12px;
+       display: flex;
+       align-items: flex-start;
+       gap: 10px;
+     }
+     .icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+     .text { flex: 1; min-width: 0; }
+     .title { font-weight: 600; color: #2C2825; margin-bottom: 2px; }
+     .desc { color: #7A7168; font-size: 12px; line-height: 1.4; }
+     .actions {
+       padding: 8px 12px;
+       border-top: 1px solid #DDD6CC;
+       display: flex;
+       gap: 8px;
+       justify-content: flex-end;
+     }
+     .btn {
+       padding: 5px 12px;
+       border-radius: 10px;
+       font-size: 12px;
+       font-weight: 500;
+       cursor: pointer;
+       border: 1px solid #DDD6CC;
+       background: #FDFCFA;
+       color: #7A7168;
+       transition: background 0.15s;
+     }
+     .btn:hover { background: #EAE6DF; }
+     .btn-primary {
+       background: #8B7355;
+       color: white;
+       border-color: #8B7355;
+     }
+     .btn-primary:hover { background: #7A6348; }
+   `;
 
   const dropdown = document.createElement('div');
   dropdown.className = 'dropdown';

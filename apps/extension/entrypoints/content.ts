@@ -252,46 +252,46 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
 
   const style = document.createElement('style');
   style.textContent = `
-    .badge {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      padding: 12px 16px;
-      background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
-      color: #fff;
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 13px;
-      line-height: 1.4;
-      border-radius: 10px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
-      max-width: 340px;
-    }
-    .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
-    .text { flex: 1; min-width: 0; }
-    .title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
-    .desc { font-size: 12px; opacity: 0.85; }
-    .methods { font-size: 11px; opacity: 0.7; margin-top: 4px; }
-    .link {
-      color: #c7d2fe;
-      text-decoration: underline;
-      font-size: 11px;
-      margin-top: 4px;
-      display: inline-block;
-      cursor: pointer;
-    }
-    .link:hover { color: #fff; }
-    .dismiss {
-      background: none;
-      border: none;
-      color: rgba(255,255,255,0.5);
-      cursor: pointer;
-      font-size: 14px;
-      padding: 0;
-      line-height: 1;
-      flex-shrink: 0;
-    }
-    .dismiss:hover { color: #fff; }
-  `;
+     .badge {
+       display: flex;
+       align-items: flex-start;
+       gap: 10px;
+       padding: 12px 16px;
+       background: linear-gradient(135deg, #8B7355 0%, #6B5640 100%);
+       color: #fff;
+       font-family: system-ui, -apple-system, sans-serif;
+       font-size: 13px;
+       line-height: 1.4;
+       border-radius: 20px;
+       box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+       max-width: 340px;
+     }
+     .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+     .text { flex: 1; min-width: 0; }
+     .title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+     .desc { font-size: 12px; opacity: 0.85; }
+     .methods { font-size: 11px; opacity: 0.7; margin-top: 4px; }
+     .link {
+       color: #C4A882;
+       text-decoration: underline;
+       font-size: 11px;
+       margin-top: 4px;
+       display: inline-block;
+       cursor: pointer;
+     }
+     .link:hover { color: #fff; }
+     .dismiss {
+       background: none;
+       border: none;
+       color: rgba(255,255,255,0.5);
+       cursor: pointer;
+       font-size: 14px;
+       padding: 0;
+       line-height: 1;
+       flex-shrink: 0;
+     }
+     .dismiss:hover { color: #fff; }
+   `;
 
   const badge = document.createElement('div');
   badge.className = 'badge';
@@ -387,42 +387,42 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
 
   const style = document.createElement('style');
   style.textContent = `
-    .banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 16px;
-      background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
-      color: #fff;
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 13px;
-      line-height: 1.4;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-    }
-    .info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex: 1;
-      min-width: 0;
-    }
-    .icon { font-size: 18px; flex-shrink: 0; }
-    .text strong { display: block; margin-bottom: 2px; font-size: 14px; }
-    .text span { opacity: 0.9; font-size: 12px; }
-    .dismiss {
-      background: rgba(255,255,255,0.2);
-      border: 1px solid rgba(255,255,255,0.3);
-      color: #fff;
-      padding: 6px 14px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 600;
-      flex-shrink: 0;
-      margin-left: 12px;
-    }
-    .dismiss:hover { background: rgba(255,255,255,0.3); }
-  `;
+     .banner {
+       display: flex;
+       align-items: center;
+       justify-content: space-between;
+       padding: 10px 16px;
+       background: linear-gradient(135deg, #B5553A 0%, #8B3D2A 100%);
+       color: #fff;
+       font-family: system-ui, -apple-system, sans-serif;
+       font-size: 13px;
+       line-height: 1.4;
+       box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+     }
+     .info {
+       display: flex;
+       align-items: center;
+       gap: 10px;
+       flex: 1;
+       min-width: 0;
+     }
+     .icon { font-size: 18px; flex-shrink: 0; }
+     .text strong { display: block; margin-bottom: 2px; font-size: 14px; }
+     .text span { opacity: 0.9; font-size: 12px; }
+     .dismiss {
+       background: rgba(255,255,255,0.2);
+       border: 1px solid rgba(255,255,255,0.3);
+       color: #fff;
+       padding: 6px 14px;
+       border-radius: 10px;
+       cursor: pointer;
+       font-size: 12px;
+       font-weight: 600;
+       flex-shrink: 0;
+       margin-left: 12px;
+     }
+     .dismiss:hover { background: rgba(255,255,255,0.3); }
+   `;
 
   const banner = document.createElement('div');
   banner.className = 'banner';
