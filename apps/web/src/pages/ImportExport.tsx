@@ -10,9 +10,21 @@ import {
   parseCSV,
   type ImportFormat,
 } from '../lib/importers/index.js';
+import { Button, Card, Badge, Select } from '@lockbox/design';
+import { useToast } from '../providers/ToastProvider.js';
 import type { VaultItem } from '@lockbox/types';
 
 type ImportStep = 'select' | 'preview' | 'importing' | 'done';
+
+const FORMAT_OPTIONS: Array<{ value: ImportFormat; label: string }> = [
+  { value: 'unknown', label: 'Auto-detect' },
+  { value: 'bitwarden', label: 'Bitwarden' },
+  { value: 'chrome', label: 'Google Chrome' },
+  { value: 'firefox', label: 'Mozilla Firefox' },
+  { value: 'onepassword', label: '1Password' },
+  { value: 'lastpass', label: 'LastPass' },
+  { value: 'keepass', label: 'KeePass' },
+];
 
 const FORMAT_LABELS: Record<ImportFormat, string> = {
   bitwarden: 'Bitwarden',
@@ -27,6 +39,7 @@ const FORMAT_LABELS: Record<ImportFormat, string> = {
 export default function ImportExport() {
   const navigate = useNavigate();
   const { session, userKey } = useAuthStore();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Import state
@@ -43,7 +56,6 @@ export default function ImportExport() {
 
   // Export state
   const [exportLoading, setExportLoading] = useState(false);
-  const [exportError, setExportError] = useState('');
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -142,7 +154,6 @@ export default function ImportExport() {
 
   async function handleExport() {
     setExportLoading(true);
-    setExportError('');
     try {
       const data = (await api.vault.list(session!.token)) as {
         items: Array<{
@@ -155,9 +166,6 @@ export default function ImportExport() {
           revisionDate: string;
         }>;
       };
-      // Export encrypted items as Bitwarden CSV (names will be item IDs since we can't decrypt here)
-      // For a real export, we'd need to decrypt each item first using userKey
-      // We export the raw encrypted data in a lockbox-native format
       const csvContent = exportToBitwardenCSV(
         data.items.map((item) => ({
           id: item.id,
@@ -168,7 +176,6 @@ export default function ImportExport() {
           createdAt: item.revisionDate,
           updatedAt: item.revisionDate,
           revisionDate: item.revisionDate,
-          // Login-specific fields (empty since encrypted)
           username: '',
           password: '',
           uris: [],
@@ -183,7 +190,7 @@ export default function ImportExport() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : 'Export failed');
+      toast(err instanceof Error ? err.message : 'Export failed', 'error');
     } finally {
       setExportLoading(false);
     }
@@ -195,8 +202,7 @@ export default function ImportExport() {
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Import / Export</h1>
 
         <div className="space-y-6">
-          {/* Import Section */}
-          <section className="bg-[var(--color-surface)] rounded-[var(--radius-lg)] shadow-sm p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-1">Import</h2>
             <p className="text-sm text-[var(--color-text-secondary)] mb-4">
               Import passwords from Bitwarden, Chrome, Firefox, 1Password, LastPass, or KeePass.
@@ -204,25 +210,13 @@ export default function ImportExport() {
 
             {importStep === 'select' && (
               <div className="space-y-4">
-                {/* Format selector */}
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-                    Format
-                  </label>
-                  <select
-                    value={selectedFormat}
-                    onChange={(e) => setSelectedFormat(e.target.value as ImportFormat)}
-                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
-                  >
-                    {(Object.keys(FORMAT_LABELS) as ImportFormat[]).map((fmt) => (
-                      <option key={fmt} value={fmt}>
-                        {FORMAT_LABELS[fmt]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  label="Format"
+                  value={selectedFormat}
+                  onChange={(e) => setSelectedFormat(e.target.value as ImportFormat)}
+                  options={FORMAT_OPTIONS}
+                />
 
-                {/* File picker */}
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                     CSV File
@@ -265,22 +259,24 @@ export default function ImportExport() {
                       </div>
                     )}
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".csv,text/csv"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
+                  {/* Hidden file picker — no design system equivalent for type="file" */}
+                  {React.createElement('input', {
+                    ref: fileInputRef,
+                    type: 'file',
+                    accept: '.csv,text/csv',
+                    className: 'hidden',
+                    onChange: handleFileChange,
+                  })}
                 </div>
 
-                <button
+                <Button
+                  variant="primary"
                   onClick={handlePreview}
                   disabled={!fileContent}
-                  className="w-full py-2.5 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-50 text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
+                  style={{ width: '100%' }}
                 >
                   Preview Import
-                </button>
+                </Button>
               </div>
             )}
 
@@ -293,7 +289,6 @@ export default function ImportExport() {
                   </p>
                 </div>
 
-                {/* Preview table */}
                 <div className="max-h-64 overflow-y-auto border border-[var(--color-border)] rounded-[var(--radius-md)]">
                   <table className="w-full text-sm">
                     <thead className="bg-[var(--color-surface-raised)] sticky top-0">
@@ -340,18 +335,12 @@ export default function ImportExport() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button
-                    onClick={handleReset}
-                    className="flex-1 py-2.5 px-4 border border-[var(--color-border)] text-[var(--color-text-secondary)] font-medium rounded-[var(--radius-md)] hover:bg-[var(--color-surface)] transition-colors"
-                  >
+                  <Button variant="secondary" onClick={handleReset} style={{ flex: 1 }}>
                     Cancel
-                  </button>
-                  <button
-                    onClick={handleImport}
-                    className="flex-1 py-2.5 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
-                  >
+                  </Button>
+                  <Button variant="primary" onClick={handleImport} style={{ flex: 1 }}>
                     Import {previewItems.length} Items
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -399,25 +388,18 @@ export default function ImportExport() {
                 )}
 
                 <div className="flex gap-3">
-                  <button
-                    onClick={handleReset}
-                    className="flex-1 py-2.5 px-4 border border-[var(--color-border)] text-[var(--color-text-secondary)] font-medium rounded-[var(--radius-md)] hover:bg-[var(--color-surface)] transition-colors"
-                  >
+                  <Button variant="secondary" onClick={handleReset} style={{ flex: 1 }}>
                     Import More
-                  </button>
-                  <button
-                    onClick={() => navigate('/vault')}
-                    className="flex-1 py-2.5 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
-                  >
+                  </Button>
+                  <Button variant="primary" onClick={() => navigate('/vault')} style={{ flex: 1 }}>
                     Go to Vault
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
-          </section>
+          </Card>
 
-          {/* Export Section */}
-          <section className="bg-[var(--color-surface)] rounded-[var(--radius-lg)] shadow-sm p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-1">Export</h2>
             <p className="text-sm text-[var(--color-text-secondary)] mb-4">
               Download your vault as a Bitwarden-compatible CSV file.
@@ -430,23 +412,18 @@ export default function ImportExport() {
               </p>
             </div>
 
-            {exportError && (
-              <div className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)] p-3 mb-4 text-sm text-[var(--color-error)]">
-                {exportError}
-              </div>
-            )}
-
-            <button
+            <Button
+              variant="secondary"
               onClick={handleExport}
               disabled={exportLoading}
-              className="w-full py-2.5 px-4 border border-[var(--color-border)] text-[var(--color-text-secondary)] font-medium rounded-[var(--radius-md)] hover:bg-[var(--color-surface)] disabled:opacity-50 transition-colors"
+              loading={exportLoading}
+              style={{ width: '100%' }}
             >
               {exportLoading ? 'Preparing export…' : '⬇️ Download CSV Export'}
-            </button>
-          </section>
+            </Button>
+          </Card>
 
-          {/* Format Guide */}
-          <section className="bg-[var(--color-surface)] rounded-[var(--radius-lg)] shadow-sm p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-3">
               Supported Formats
             </h2>
@@ -468,7 +445,7 @@ export default function ImportExport() {
                 </div>
               ))}
             </div>
-          </section>
+          </Card>
         </div>
       </div>
     </div>

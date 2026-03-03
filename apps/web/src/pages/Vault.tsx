@@ -3,8 +3,10 @@ import { useAuthStore } from '../store/auth.js';
 import { useSearchStore } from '../store/search.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
+import { copyWithFeedback } from '../lib/copy-utils.js';
 import { useVaultFilterStore } from '../store/vault.js';
-import type { VaultItem, Folder, PasskeyItem } from '@lockbox/types';
+import type { VaultItem, Folder, PasskeyItem, LoginItem } from '@lockbox/types';
+import { Card, Badge, Button, Input } from '@lockbox/design';
 import ItemPanel from '../components/ItemPanel.js';
 
 interface EncryptedItem {
@@ -18,6 +20,15 @@ interface EncryptedItem {
   createdAt: string;
   deletedAt: string | null;
 }
+
+const typeLabels: Record<string, string> = {
+  login: 'Login',
+  card: 'Card',
+  note: 'Note',
+  identity: 'Identity',
+  passkey: 'Passkey',
+  document: 'Document',
+};
 
 export default function Vault() {
   const { session, userKey } = useAuthStore();
@@ -106,14 +117,21 @@ export default function Vault() {
     return true;
   });
 
-  async function copyToClipboard(text: string, id: string) {
-    await navigator.clipboard.writeText(text);
+  async function copyToClipboard(text: string, id: string, element?: HTMLElement | null) {
+    await copyWithFeedback(text, element);
     setCopiedId(id);
     setTimeout(() => {
       navigator.clipboard.writeText('').catch(() => {});
       setCopiedId(null);
     }, 30_000);
   }
+
+  // Dispatch search event for Aura when query changes
+  useEffect(() => {
+    if (search.trim()) {
+      window.dispatchEvent(new CustomEvent('lockbox:search'));
+    }
+  }, [search]);
 
   const typeIcon = (type: string): string =>
     ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' })[
@@ -122,13 +140,14 @@ export default function Vault() {
   return (
     <>
       <div className="p-4 border-b border-[var(--color-border)] bg-[var(--color-surface)] flex gap-3">
-        <div className="relative flex-1">
-          <input
+        <div
+          className={`relative flex-1${search.trim() && searching ? ' type-searching' : ''}${search.trim() && !searching && displayItems.length > 0 ? ' type-found' : ''}`}
+        >
+          <Input
             type="search"
             placeholder="Search vault..."
             value={search}
             onChange={(e) => performSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
           />
           {indexed && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
@@ -141,12 +160,7 @@ export default function Vault() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setPanelState({ mode: 'add', item: null })}
-          className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
-        >
-          + Add
-        </button>
+        <Button onClick={() => setPanelState({ mode: 'add', item: null })}>+ Add</Button>
       </div>
 
       {/* Item list */}
@@ -166,10 +180,12 @@ export default function Vault() {
         ) : (
           <div className="space-y-2">
             {displayItems.map(({ item, score }) => (
-              <div
+              <Card
                 key={item.id}
+                variant="surface"
+                padding="sm"
                 onClick={() => setPanelState({ mode: 'view', item })}
-                className="bg-[var(--color-surface)] rounded-[var(--radius-organic-lg)] border border-[var(--color-border)] p-4 flex items-center gap-4 hover:bg-[var(--color-surface-raised)] hover:border-[var(--color-border-strong)] transition-all cursor-pointer relative overflow-hidden"
+                style={{ position: 'relative', overflow: 'hidden' }}
               >
                 {search && indexed && score < 1 && (
                   <div
@@ -177,69 +193,115 @@ export default function Vault() {
                     style={{ opacity: Math.max(0.1, score) }}
                   />
                 )}
-                <div className="text-2xl">{typeIcon(item.type)}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-[var(--color-text)] truncate">{item.name}</p>
-                    {search && indexed && score < 1 && (
-                      <span className="text-[10px] text-[var(--color-text-tertiary)] bg-[var(--color-surface)] px-1.5 rounded">
-                        {(score * 100).toFixed(0)}%
-                      </span>
+                <div className="flex items-center gap-4">
+                  <div className="text-2xl">{typeIcon(item.type)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-[var(--color-text)] truncate">{item.name}</p>
+                      <Badge variant="default">{typeLabels[item.type] ?? item.type}</Badge>
+                      {search && indexed && score < 1 && (
+                        <span className="text-[10px] text-[var(--color-text-tertiary)] bg-[var(--color-surface)] px-1.5 rounded">
+                          {(score * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
+                    {item.type === 'login' && (
+                      <p className="text-sm text-[var(--color-text-tertiary)] truncate">
+                        {(item as LoginItem).username ?? ''}
+                      </p>
+                    )}
+                    {item.type === 'passkey' && (
+                      <p className="text-sm text-[var(--color-text-tertiary)] truncate">
+                        {(item as PasskeyItem).rpName}
+                        {(item as PasskeyItem).userName
+                          ? ` (${(item as PasskeyItem).userName})`
+                          : ''}
+                      </p>
                     )}
                   </div>
-                  {item.type === 'login' && (
-                    <p className="text-sm text-[var(--color-text-tertiary)] truncate">
-                      {(item as { username?: string }).username ?? ''}
-                    </p>
-                  )}
-                  {item.type === 'passkey' && (
-                    <p className="text-sm text-[var(--color-text-tertiary)] truncate">
-                      {(item as PasskeyItem).rpName}
-                      {(item as PasskeyItem).userName ? ` (${(item as PasskeyItem).userName})` : ''}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-1 z-10">
+                    {item.type === 'login' && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyToClipboard(
+                              (item as LoginItem).username ?? '',
+                              `${item.id}-user`,
+                              e.currentTarget
+                            );
+                          }}
+                        >
+                          {copiedId === `${item.id}-user` ? '✓' : '👤'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyToClipboard(
+                              (item as LoginItem).password ?? '',
+                              item.id,
+                              e.currentTarget
+                            );
+                          }}
+                        >
+                          {copiedId === item.id ? '✓ Copied' : '🔒 Copy'}
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                      style={{ color: item.favorite ? 'var(--color-warning)' : undefined }}
+                    >
+                      {item.favorite ? '⭐' : '☆'}
+                    </Button>
+                  </div>
                 </div>
-                {item.type === 'login' && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard((item as { password?: string }).password ?? '', item.id);
-                    }}
-                    className="px-3 py-1.5 text-xs bg-[var(--color-surface)] hover:bg-[var(--color-primary)]/20 text-[var(--color-text-secondary)] rounded-[var(--radius-sm)] transition-colors z-10"
-                  >
-                    {copiedId === item.id ? '✓ Copied' : 'Copy Password'}
-                  </button>
-                )}
-                {item.favorite && <span className="text-[var(--color-warning)] z-10">⭐</span>}
-              </div>
+              </Card>
             ))}
             {corruptItems.map((ci) => (
-              <div
+              <Card
                 key={ci.id}
-                className="bg-[var(--color-error-subtle)] rounded-[var(--radius-lg)] border border-[var(--color-error)] p-4 flex items-center gap-4"
+                variant="surface"
+                padding="sm"
+                style={{
+                  background: 'var(--color-error-subtle)',
+                  borderColor: 'var(--color-error)',
+                }}
               >
-                <div className="text-2xl">⚠️</div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-[var(--color-text)]">Undecryptable item</p>
-                  <p className="text-sm text-[var(--color-text-tertiary)] truncate">
-                    Type: {ci.type} · Created: {new Date(ci.createdAt).toLocaleDateString()}
-                  </p>
+                <div className="flex items-center gap-4">
+                  <div className="text-2xl">⚠️</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-[var(--color-text)]">Undecryptable item</p>
+                    <p className="text-sm text-[var(--color-text-tertiary)] truncate">
+                      Type: {ci.type} · Created: {new Date(ci.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Badge variant="error">Corrupt</Badge>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={async () => {
+                      if (!session) return;
+                      try {
+                        await api.vault.deleteItem(ci.id, session.token);
+                        loadVault();
+                      } catch (err) {
+                        console.error('Failed to delete corrupt item:', err);
+                      }
+                    }}
+                  >
+                    Delete
+                  </Button>
                 </div>
-                <button
-                  onClick={async () => {
-                    if (!session) return;
-                    try {
-                      await api.vault.deleteItem(ci.id, session.token);
-                      loadVault();
-                    } catch (err) {
-                      console.error('Failed to delete corrupt item:', err);
-                    }
-                  }}
-                  className="px-3 py-1.5 text-xs bg-[var(--color-error)] hover:bg-[var(--color-error)] text-[var(--color-primary-fg)] rounded-[var(--radius-sm)] transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
+              </Card>
             ))}
           </div>
         )}

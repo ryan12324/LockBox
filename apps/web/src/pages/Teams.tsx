@@ -4,17 +4,19 @@ import { useAuthStore } from '../store/auth.js';
 import { useTeamsStore } from '../store/teams.js';
 import { api } from '../lib/api.js';
 import { createKeyPair } from '../lib/team-crypto.js';
+import { useToast } from '../providers/ToastProvider.js';
+import { Button, Input, Card, Badge } from '@lockbox/design';
 
 export default function Teams() {
   const navigate = useNavigate();
   const { session, userKey } = useAuthStore();
   const { teams, setTeams, hasKeyPair, setHasKeyPair, loading, setLoading } = useTeamsStore();
+  const { toast } = useToast();
 
   const [showCreate, setShowCreate] = useState(false);
   const [newTeamName, setNewTeamName] = useState('');
   const [creating, setCreating] = useState(false);
   const [setupLoading, setSetupLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [inviteToken, setInviteToken] = useState('');
   const [acceptingInvite, setAcceptingInvite] = useState(false);
 
@@ -49,13 +51,12 @@ export default function Teams() {
   async function handleSetupKeyPair() {
     if (!session || !userKey) return;
     setSetupLoading(true);
-    setError(null);
     try {
       const kp = await createKeyPair(userKey);
       await api.keypair.create(kp, session.token);
       setHasKeyPair(true);
     } catch (err) {
-      setError('Failed to set up encryption keys.');
+      toast('Failed to set up encryption keys.', 'error');
       console.error(err);
     } finally {
       setSetupLoading(false);
@@ -65,14 +66,13 @@ export default function Teams() {
   async function handleCreateTeam() {
     if (!session || !newTeamName.trim()) return;
     setCreating(true);
-    setError(null);
     try {
       await api.teams.create({ name: newTeamName.trim() }, session.token);
       setNewTeamName('');
       setShowCreate(false);
       await loadTeams();
     } catch (err) {
-      setError('Failed to create team.');
+      toast('Failed to create team.', 'error');
       console.error(err);
     } finally {
       setCreating(false);
@@ -82,29 +82,17 @@ export default function Teams() {
   async function handleAcceptInvite() {
     if (!session || !inviteToken.trim()) return;
     setAcceptingInvite(true);
-    setError(null);
     try {
       await api.teams.acceptInvite({ token: inviteToken.trim() }, session.token);
       setInviteToken('');
       await loadTeams();
     } catch (err) {
-      setError('Failed to accept invite. Check the token and try again.');
+      toast('Failed to accept invite. Check the token and try again.', 'error');
       console.error(err);
     } finally {
       setAcceptingInvite(false);
     }
   }
-
-  const roleColor = (role: string) => {
-    switch (role) {
-      case 'owner':
-        return 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]';
-      case 'admin':
-        return 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]';
-      default:
-        return 'bg-[var(--color-surface)] text-[var(--color-text-tertiary)]';
-    }
-  };
 
   if (loading) {
     return (
@@ -121,31 +109,26 @@ export default function Teams() {
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/vault')}
-              className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
-            >
+            <Button variant="ghost" size="sm" onClick={() => navigate('/vault')}>
               ← Back
-            </button>
+            </Button>
             <h1 className="text-2xl font-bold text-[var(--color-text)]">Teams</h1>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors"
-          >
+          <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
             Create Team
-          </button>
+          </Button>
         </div>
-
-        {error && (
-          <div className="mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--color-error-subtle)] border border-[var(--color-error)] text-[var(--color-error)] text-sm">
-            {error}
-          </div>
-        )}
 
         <div className="space-y-6">
           {!hasKeyPair && (
-            <section className="bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+            <Card
+              variant="surface"
+              padding="md"
+              style={{
+                background: 'var(--color-warning-subtle)',
+                border: '1px solid var(--color-warning)',
+              }}
+            >
               <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">
                 Set Up Encryption Keys
               </h2>
@@ -153,44 +136,48 @@ export default function Teams() {
                 You need an RSA key pair to share folders and access shared items. This is a
                 one-time setup.
               </p>
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleSetupKeyPair}
                 disabled={setupLoading}
-                className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
+                loading={setupLoading}
               >
                 {setupLoading ? 'Setting up…' : 'Generate Key Pair'}
-              </button>
-            </section>
+              </Button>
+            </Card>
           )}
 
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
               Accept an Invite
             </h2>
             <div className="flex gap-2">
-              <input
+              <Input
                 type="text"
                 value={inviteToken}
                 onChange={(e) => setInviteToken(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAcceptInvite()}
                 placeholder="Paste invite token"
-                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
+                className="flex-1"
               />
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={handleAcceptInvite}
                 disabled={acceptingInvite || !inviteToken.trim()}
-                className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
+                loading={acceptingInvite}
               >
                 {acceptingInvite ? 'Accepting…' : 'Accept'}
-              </button>
+              </Button>
             </div>
-          </section>
+          </Card>
 
           {showCreate && (
-            <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+            <Card variant="surface" padding="md">
               <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Create a Team</h2>
               <div className="flex gap-2">
-                <input
+                <Input
                   type="text"
                   value={newTeamName}
                   onChange={(e) => setNewTeamName(e.target.value)}
@@ -202,31 +189,34 @@ export default function Teams() {
                     }
                   }}
                   placeholder="Team name"
-                  className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
+                  className="flex-1"
                   autoFocus
                 />
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={handleCreateTeam}
                   disabled={creating || !newTeamName.trim()}
-                  className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
+                  loading={creating}
                 >
                   {creating ? 'Creating…' : 'Create'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setShowCreate(false);
                     setNewTeamName('');
                   }}
-                  className="px-3 py-2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] text-sm transition-colors"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
-            </section>
+            </Card>
           )}
 
           {teams.length === 0 ? (
-            <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-12 text-center">
+            <Card variant="surface" padding="lg" style={{ textAlign: 'center' }}>
               <div className="w-20 h-20 rounded-[var(--radius-full)] bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center mx-auto mb-6 text-[var(--color-text-tertiary)] text-3xl">
                 👥
               </div>
@@ -234,31 +224,34 @@ export default function Teams() {
               <p className="text-[var(--color-text-secondary)] max-w-md mx-auto">
                 Create a team to start sharing folders and passwords with others.
               </p>
-            </section>
+            </Card>
           ) : (
             <div className="space-y-3">
               {teams.map((team) => (
-                <button
+                <Card
                   key={team.id}
+                  variant="surface"
+                  padding="md"
                   onClick={() => navigate(`/teams/${team.id}`)}
-                  className="w-full text-left bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-5 hover:bg-[var(--color-surface-raised)] transition-colors group"
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors">
+                      <h3 className="text-lg font-semibold text-[var(--color-text)]">
                         {team.name}
                       </h3>
                       <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
                         Created {new Date(team.createdAt).toLocaleDateString()}
                       </p>
                     </div>
-                    <span
-                      className={`px-2.5 py-1 rounded-[var(--radius-full)] text-xs font-medium capitalize ${roleColor(team.role)}`}
+                    <Badge
+                      variant={
+                        team.role === 'owner' || team.role === 'admin' ? 'primary' : 'default'
+                      }
                     >
                       {team.role}
-                    </span>
+                    </Badge>
                   </div>
-                </button>
+                </Card>
               ))}
             </div>
           )}

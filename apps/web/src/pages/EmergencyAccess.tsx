@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
+import { useToast } from '../providers/ToastProvider.js';
+import { Button, Input, Card, Badge, Select } from '@lockbox/design';
 import type { EmergencyAccessGrant, EmergencyAccessRequest } from '@lockbox/types';
 
 type TabId = 'trusted' | 'requests';
@@ -13,50 +15,27 @@ const WAIT_PERIODS = [
   { label: '30 days', value: 30 },
 ];
 
+const STATUS_VARIANT: Record<string, 'default' | 'primary' | 'error' | 'success' | 'warning'> = {
+  pending: 'warning',
+  confirmed: 'primary',
+  waiting: 'warning',
+  approved: 'success',
+  rejected: 'error',
+  revoked: 'default',
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  waiting: 'Waiting',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  revoked: 'Revoked',
+};
+
 function statusBadge(status: string) {
-  const map: Record<string, { bg: string; text: string; label: string }> = {
-    pending: {
-      bg: 'bg-[var(--color-warning-subtle)]',
-      text: 'text-[var(--color-warning)]',
-      label: 'Pending',
-    },
-    confirmed: {
-      bg: 'bg-[var(--color-aura-dim)]',
-      text: 'text-[var(--color-primary)]',
-      label: 'Confirmed',
-    },
-    waiting: {
-      bg: 'bg-[var(--color-warning-subtle)]',
-      text: 'text-[var(--color-warning)]',
-      label: 'Waiting',
-    },
-    approved: {
-      bg: 'bg-[var(--color-success-subtle)]',
-      text: 'text-[var(--color-success)]',
-      label: 'Approved',
-    },
-    rejected: {
-      bg: 'bg-[var(--color-error-subtle)]',
-      text: 'text-[var(--color-error)]',
-      label: 'Rejected',
-    },
-    revoked: {
-      bg: 'bg-[var(--color-surface)]',
-      text: 'text-[var(--color-text-tertiary)]',
-      label: 'Revoked',
-    },
-  };
-  const s = map[status] ?? {
-    bg: 'bg-[var(--color-surface)]',
-    text: 'text-[var(--color-text-tertiary)]',
-    label: status,
-  };
   return (
-    <span
-      className={`px-2 py-0.5 rounded-[var(--radius-full)] text-xs font-medium ${s.bg} ${s.text}`}
-    >
-      {s.label}
-    </span>
+    <Badge variant={STATUS_VARIANT[status] ?? 'default'}>{STATUS_LABEL[status] ?? status}</Badge>
   );
 }
 
@@ -75,7 +54,7 @@ export default function EmergencyAccess() {
     })[]
   >([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Add form
   const [showAdd, setShowAdd] = useState(false);
@@ -86,7 +65,6 @@ export default function EmergencyAccess() {
   const loadData = useCallback(async () => {
     if (!session) return;
     setLoading(true);
-    setError(null);
     try {
       const [gRes, rRes] = await Promise.all([
         api.emergency.listGrants(session.token),
@@ -95,7 +73,7 @@ export default function EmergencyAccess() {
       setGrants(gRes.grants ?? []);
       setRequests(rRes.requests ?? []);
     } catch (err) {
-      setError('Failed to load emergency access data.');
+      toast('Failed to load emergency access data.', 'error');
       console.error(err);
     } finally {
       setLoading(false);
@@ -109,7 +87,6 @@ export default function EmergencyAccess() {
   async function handleCreateGrant() {
     if (!session || !addEmail.trim()) return;
     setAdding(true);
-    setError(null);
     try {
       await api.emergency.createGrant(
         {
@@ -123,7 +100,7 @@ export default function EmergencyAccess() {
       setShowAdd(false);
       await loadData();
     } catch (err) {
-      setError('Failed to create grant.');
+      toast('Failed to create grant.', 'error');
       console.error(err);
     } finally {
       setAdding(false);
@@ -136,7 +113,7 @@ export default function EmergencyAccess() {
       await api.emergency.revokeGrant(id, session.token);
       await loadData();
     } catch (err) {
-      setError('Failed to revoke grant.');
+      toast('Failed to revoke grant.', 'error');
       console.error(err);
     }
   }
@@ -147,7 +124,7 @@ export default function EmergencyAccess() {
       await api.emergency.confirmGrant(id, session.token);
       await loadData();
     } catch (err) {
-      setError('Failed to confirm grant.');
+      toast('Failed to confirm grant.', 'error');
       console.error(err);
     }
   }
@@ -158,7 +135,7 @@ export default function EmergencyAccess() {
       await api.emergency.requestAccess(grantId, session.token);
       await loadData();
     } catch (err) {
-      setError('Failed to request access.');
+      toast('Failed to request access.', 'error');
       console.error(err);
     }
   }
@@ -184,26 +161,17 @@ export default function EmergencyAccess() {
           to you by others.
         </p>
 
-        {error && (
-          <div className="mb-4 p-3 bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)] text-[var(--color-error)] text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-[var(--color-surface)] p-1 rounded-[var(--radius-md)]">
           {[
             { id: 'trusted' as TabId, label: 'Trusted Contacts', count: grants.length },
             { id: 'requests' as TabId, label: 'Access Requests', count: requests.length },
           ].map((tab) => (
-            <button
+            <Button
               key={tab.id}
+              variant={activeTab === tab.id ? 'primary' : 'ghost'}
+              size="sm"
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 px-4 py-2 rounded-[var(--radius-sm)] text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] shadow-sm'
-                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]'
-              }`}
+              style={{ flex: 1 }}
             >
               {tab.label}
               {tab.count > 0 && (
@@ -211,82 +179,71 @@ export default function EmergencyAccess() {
                   {tab.count}
                 </span>
               )}
-            </button>
+            </Button>
           ))}
         </div>
 
-        {/* Trusted Contacts Tab */}
         {activeTab === 'trusted' && (
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-[var(--color-text)]">
                 Your Trusted Contacts
               </h2>
-              <button
-                onClick={() => setShowAdd(true)}
-                className="px-4 py-2 bg-[var(--color-primary)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors"
-              >
+              <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>
                 + Add Trusted Contact
-              </button>
+              </Button>
             </div>
 
             {showAdd && (
-              <div className="mb-6 p-4 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)]">
+              <Card variant="surface" padding="md" style={{ marginBottom: 24 }}>
                 <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">
                   Add Trusted Contact
                 </h3>
                 <div className="space-y-3">
+                  <Input
+                    type="email"
+                    label="Email address"
+                    value={addEmail}
+                    onChange={(e) => setAddEmail(e.target.value)}
+                    placeholder="trusted@example.com"
+                  />
                   <div>
-                    <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                      Email address
-                    </label>
-                    <input
-                      type="email"
-                      value={addEmail}
-                      onChange={(e) => setAddEmail(e.target.value)}
-                      placeholder="trusted@example.com"
-                      className="w-full px-3 py-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] text-sm text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-[var(--color-text-secondary)] mb-1">
-                      Wait period
-                    </label>
-                    <select
-                      value={addWait}
+                    <Select
+                      label="Wait period"
+                      value={String(addWait)}
                       onChange={(e) => setAddWait(Number(e.target.value))}
-                      className="w-full px-3 py-2 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] text-sm text-[var(--color-text)]"
-                    >
-                      {WAIT_PERIODS.map((p) => (
-                        <option key={p.value} value={p.value}>
-                          {p.label}
-                        </option>
-                      ))}
-                    </select>
+                      options={WAIT_PERIODS.map((p) => ({
+                        value: String(p.value),
+                        label: p.label,
+                      }))}
+                    />
                     <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
                       Time to wait after access is requested before it's automatically approved.
                     </p>
                   </div>
                   <div className="flex gap-2 pt-1">
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={handleCreateGrant}
                       disabled={adding || !addEmail.trim()}
-                      className="px-4 py-2 bg-[var(--color-primary)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors disabled:opacity-50"
+                      loading={adding}
                     >
                       {adding ? 'Creating…' : 'Create Grant'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => {
                         setShowAdd(false);
                         setAddEmail('');
                       }}
-                      className="px-4 py-2 text-[var(--color-text-secondary)] hover:text-[var(--color-text)] text-sm transition-colors"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
-              </div>
+              </Card>
             )}
 
             {grants.length === 0 ? (
@@ -300,9 +257,15 @@ export default function EmergencyAccess() {
             ) : (
               <div className="space-y-3">
                 {grants.map((grant) => (
-                  <div
+                  <Card
                     key={grant.id}
-                    className="p-4 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] flex items-center justify-between"
+                    variant="surface"
+                    padding="md"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
                   >
                     <div>
                       <div className="flex items-center gap-2 mb-1">
@@ -318,21 +281,17 @@ export default function EmergencyAccess() {
                       </p>
                     </div>
                     {grant.status !== 'expired' && grant.status !== 'rejected' && (
-                      <button
-                        onClick={() => handleRevoke(grant.id)}
-                        className="px-3 py-1.5 text-xs text-[var(--color-error)] hover:bg-[var(--color-error-subtle)] rounded-[var(--radius-md)] transition-colors"
-                      >
+                      <Button variant="danger" size="sm" onClick={() => handleRevoke(grant.id)}>
                         Revoke
-                      </button>
+                      </Button>
                     )}
-                  </div>
+                  </Card>
                 ))}
               </div>
             )}
           </div>
         )}
 
-        {/* Access Requests Tab */}
         {activeTab === 'requests' && (
           <div>
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
@@ -350,10 +309,7 @@ export default function EmergencyAccess() {
             ) : (
               <div className="space-y-3">
                 {requests.map((grant) => (
-                  <div
-                    key={grant.id}
-                    className="p-4 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)]"
-                  >
+                  <Card key={grant.id} variant="surface" padding="md">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
@@ -369,29 +325,31 @@ export default function EmergencyAccess() {
                       </div>
                       <div className="flex gap-2">
                         {grant.status === 'pending' && (
-                          <button
+                          <Button
+                            variant="primary"
+                            size="sm"
                             onClick={() => handleConfirm(grant.id)}
-                            className="px-3 py-1.5 text-xs bg-[var(--color-primary)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] hover:bg-[var(--color-primary-hover)] transition-colors"
                           >
                             Confirm
-                          </button>
+                          </Button>
                         )}
                         {grant.status === 'confirmed' && (
-                          <button
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => handleRequestAccess(grant.id)}
-                            className="px-3 py-1.5 text-xs bg-[var(--color-warning)] text-[var(--color-text)] rounded-[var(--radius-md)] hover:bg-[var(--color-warning)] transition-colors"
                           >
                             Request Access
-                          </button>
+                          </Button>
                         )}
                         {grant.status === 'approved' && (
-                          <button className="px-3 py-1.5 text-xs bg-[var(--color-success)] text-[var(--color-text)] rounded-[var(--radius-md)] hover:bg-[var(--color-success)] transition-colors">
+                          <Button variant="primary" size="sm">
                             View Vault
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
             )}

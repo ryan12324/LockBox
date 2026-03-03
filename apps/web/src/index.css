@@ -56,3 +56,150 @@ body::after {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-strong);
 }
+
+/* ═══ Strategic Animations ═══ */
+
+/* Copy-to-clipboard feedback: elastic squish */
+@keyframes squish-bounce {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(0.92);
+  }
+  60% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.squish {
+  animation: squish-bounce 300ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Search typography: font-weight oscillation while searching */
+@keyframes type-search-pulse {
+  0%,
+  100% {
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  50% {
+    font-weight: 300;
+    letter-spacing: 0.02em;
+  }
+}
+.type-searching {
+  animation: type-search-pulse 1.5s ease-in-out infinite;
+}
+
+/* Search typography: bold snap when match found */
+@keyframes type-found-snap {
+  0% {
+    font-weight: 400;
+  }
+  40% {
+    font-weight: 650;
+  }
+  100% {
+    font-weight: 400;
+  }
+}
+.type-found {
+  animation: type-found-snap 600ms ease-out forwards;
+}
+
+/* Page transition: fade in + slight upward movement */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-in {
+  animation: fade-in-up 250ms ease-out forwards;
+}
+
+/* Aura states */
+@keyframes aura-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+.aura-idle {
+  animation: aura-breathe 4s ease-in-out infinite;
+}
+
+@keyframes aura-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+.aura-active {
+  animation: aura-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes aura-think {
+  0% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.08) rotate(3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.7;
+  }
+}
+.aura-thinking {
+  animation: aura-think 1.2s ease-in-out infinite;
+}
+
+/* Toast entrance */
+@keyframes toast-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.toast-enter {
+  animation: toast-slide-up 200ms ease-out forwards;
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .squish,
+  .type-searching,
+  .type-found,
+  .fade-in,
+  .aura-idle,
+  .aura-active,
+  .aura-thinking,
+  .toast-enter {
+    animation: none !important;
+    transition: none !important;
+  }
+}

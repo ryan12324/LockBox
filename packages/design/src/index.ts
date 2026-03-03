@@ -13,3 +13,6 @@ export { Card, type CardProps, type CardVariant } from './components/Card.js';
 export { Badge, type BadgeProps, type BadgeVariant } from './components/Badge.js';
 export { Toast, type ToastProps, type ToastVariant } from './components/Toast.js';
 export { Aura, type AuraProps, type AuraState, type AuraPosition } from './components/Aura.js';
+export { Select, type SelectProps } from './components/Select.js';
+export { Textarea, type TextareaProps } from './components/Textarea.js';
+export { Modal, type ModalProps } from './components/Modal.js';

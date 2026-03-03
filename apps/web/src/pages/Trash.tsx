@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/auth.js';
 import { useVaultFilterStore } from '../store/vault.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
+import { Button, Card, Badge } from '@lockbox/design';
 import type { VaultItem } from '@lockbox/types';
 
 interface EncryptedItemWithTrash {
@@ -117,66 +118,66 @@ export default function Trash() {
         ) : (
           <div className="space-y-2">
             {items.map((item) => (
-              <div
+              <Card
                 key={item.id}
-                className="bg-[var(--color-surface)] rounded-[var(--radius-lg)] border border-[var(--color-border)] p-4 flex items-center gap-4 relative overflow-hidden"
+                variant="surface"
+                padding="md"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 16,
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
               >
                 <div className="text-2xl">{typeIcon(item.type)}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-[var(--color-text)] truncate">{item.name}</p>
-                    <span className="text-[10px] text-[var(--color-text-secondary)] bg-[var(--color-surface-raised)] px-2 py-0.5 rounded">
-                      {item.daysRemaining} days left
-                    </span>
+                    <Badge>{item.daysRemaining} days left</Badge>
                   </div>
                   <p className="text-sm text-[var(--color-text-tertiary)] truncate capitalize">
                     {item.type}
                   </p>
                 </div>
-                <button
-                  onClick={() => handleRestore(item.id)}
-                  className="px-3 py-1.5 text-xs bg-[var(--color-aura-dim)] hover:bg-[var(--color-aura)] text-[var(--color-primary)] rounded-[var(--radius-sm)] transition-colors"
-                >
+                <Button variant="secondary" size="sm" onClick={() => handleRestore(item.id)}>
                   Restore
-                </button>
-                <button
-                  onClick={() => handlePermanentDelete(item.id)}
-                  className="px-3 py-1.5 text-xs bg-[var(--color-error-subtle)] hover:bg-[var(--color-error-subtle)] text-[var(--color-error)] rounded-[var(--radius-sm)] transition-colors"
-                >
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => handlePermanentDelete(item.id)}>
                   Delete Permanently
-                </button>
-              </div>
+                </Button>
+              </Card>
             ))}
             {corruptItems.map((ci) => (
-              <div
+              <Card
                 key={ci.id}
-                className="bg-[var(--color-error-subtle)] rounded-[var(--radius-lg)] border border-[var(--color-error)] p-4 flex items-center gap-4"
+                variant="surface"
+                padding="md"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 16,
+                  background: 'var(--color-error-subtle)',
+                  border: '1px solid var(--color-error)',
+                }}
               >
                 <div className="text-2xl">⚠️</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-[var(--color-text)]">Undecryptable item</p>
-                    <span className="text-[10px] text-[var(--color-text-secondary)] bg-[var(--color-surface-raised)] px-2 py-0.5 rounded">
-                      {ci.daysRemaining} days left
-                    </span>
+                    <Badge>{ci.daysRemaining} days left</Badge>
                   </div>
                   <p className="text-sm text-[var(--color-text-tertiary)] truncate">
                     Type: {ci.type}
                   </p>
                 </div>
-                <button
-                  onClick={() => handleRestore(ci.id)}
-                  className="px-3 py-1.5 text-xs bg-[var(--color-aura-dim)] hover:bg-[var(--color-aura)] text-[var(--color-primary)] rounded-[var(--radius-sm)] transition-colors"
-                >
+                <Button variant="secondary" size="sm" onClick={() => handleRestore(ci.id)}>
                   Restore
-                </button>
-                <button
-                  onClick={() => handlePermanentDelete(ci.id)}
-                  className="px-3 py-1.5 text-xs bg-[var(--color-error)] hover:bg-[var(--color-error)] text-[var(--color-text)] rounded-[var(--radius-sm)] transition-colors"
-                >
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => handlePermanentDelete(ci.id)}>
                   Delete Permanently
-                </button>
-              </div>
+                </Button>
+              </Card>
             ))}
           </div>
         )}

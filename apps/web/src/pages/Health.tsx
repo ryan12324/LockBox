@@ -2,8 +2,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.js';
 import { useHealthStore } from '../store/health.js';
+import { useAura } from '../providers/AuraProvider.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
+import { Card, Badge, Button } from '@lockbox/design';
 import HealthScore from '../components/HealthScore.js';
 import IssueList from '../components/IssueList.js';
 import type { VaultItem } from '@lockbox/types';
@@ -33,6 +35,7 @@ export default function Health() {
   const navigate = useNavigate();
   const { session, userKey } = useAuthStore();
   const { summary, reports, loading, setSummary, setReports, setLoading } = useHealthStore();
+  const aura = useAura();
   const [items, setItems] = useState<VaultItem[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [posture, setPosture] = useState<SecurityPosture | null>(null);
@@ -135,6 +138,18 @@ export default function Health() {
           2
       )
     : 100;
+
+  // Wire Aura state to health score
+  useEffect(() => {
+    if (!summary || loading || analyzing) return;
+    if (finalScore >= 80) {
+      aura.setState('idle');
+    } else if (finalScore >= 50) {
+      aura.setState('active');
+    } else {
+      aura.setState('thinking');
+    }
+  }, [finalScore, summary, loading, analyzing]);
 
   const loadAndAnalyzeVault = useCallback(async () => {
     if (!session || !userKey) return;
@@ -252,53 +267,64 @@ export default function Health() {
           <h1 className="text-3xl font-bold tracking-tight text-[var(--color-text)] drop-shadow-sm">
             Security Health
           </h1>
-          <button
-            onClick={loadAndAnalyzeVault}
-            className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors"
-          >
+          <Button variant="primary" size="sm" onClick={loadAndAnalyzeVault}>
             Re-Analyze
-          </button>
+          </Button>
         </div>
 
         {!summary || summary.totalItems === 0 ? (
-          <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-12 text-center">
-            <div className="w-20 h-20 rounded-[var(--radius-full)] bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center mx-auto mb-6 text-[var(--color-text-tertiary)] text-3xl">
-              🛡️
+          <Card variant="raised" padding="lg">
+            <div className="text-center">
+              <div className="w-20 h-20 rounded-[var(--radius-full)] bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center mx-auto mb-6 text-[var(--color-text-tertiary)] text-3xl">
+                🛡️
+              </div>
+              <h2 className="text-2xl font-medium text-[var(--color-text)] mb-3">
+                Your Vault is Empty
+              </h2>
+              <p className="text-[var(--color-text-secondary)] max-w-md mx-auto">
+                Add some passwords to your vault to see your security score and get actionable
+                advice on how to improve it.
+              </p>
             </div>
-            <h2 className="text-2xl font-medium text-[var(--color-text)] mb-3">
-              Your Vault is Empty
-            </h2>
-            <p className="text-[var(--color-text-secondary)] max-w-md mx-auto">
-              Add some passwords to your vault to see your security score and get actionable advice
-              on how to improve it.
-            </p>
-          </div>
+          </Card>
         ) : (
           <div className="space-y-8">
             {/* Top Section: Score & Summaries */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Score Card */}
-              <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-8 flex flex-col items-center justify-center md:col-span-1 min-h-[280px]">
+              <Card
+                variant="raised"
+                padding="lg"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: 280,
+                }}
+              >
                 <HealthScore
                   score={finalScore}
                   size={posture && posture.actions.length > 0 ? 140 : 180}
                   label="Vault Score"
                 />
                 {posture && (
-                  <div
-                    className={`mt-4 px-3 py-1 rounded-[var(--radius-full)] text-sm font-medium ${
-                      posture.trend === 'improving'
-                        ? 'bg-[var(--color-success-subtle)] text-[var(--color-success)]'
+                  <div className="mt-4">
+                    <Badge
+                      variant={
+                        posture.trend === 'improving'
+                          ? 'success'
+                          : posture.trend === 'declining'
+                            ? 'error'
+                            : 'warning'
+                      }
+                    >
+                      {posture.trend === 'improving'
+                        ? '↗ Improving'
                         : posture.trend === 'declining'
-                          ? 'bg-[var(--color-error-subtle)] text-[var(--color-error)]'
-                          : 'bg-[var(--color-warning-subtle)] text-[var(--color-warning)]'
-                    }`}
-                  >
-                    {posture.trend === 'improving'
-                      ? '↗ Improving'
-                      : posture.trend === 'declining'
-                        ? '↘ Declining'
-                        : '→ Stable'}
+                          ? '↘ Declining'
+                          : '→ Stable'}
+                    </Badge>
                   </div>
                 )}
                 {posture && posture.actions.length > 0 && (
@@ -307,32 +333,61 @@ export default function Health() {
                       Top Actions
                     </h3>
                     {posture.actions.slice(0, 3).map((action, idx) => (
-                      <div
+                      <Card
                         key={idx}
-                        className={`p-3 rounded-[var(--radius-lg)] border text-sm flex flex-col gap-1 ${
-                          action.priority === 'critical'
-                            ? 'bg-[var(--color-error-subtle)] border-[var(--color-error)] text-[var(--color-error)]'
-                            : action.priority === 'high'
-                              ? 'bg-[var(--color-warning-subtle)] border-[var(--color-warning)] text-[var(--color-warning)]'
+                        variant="surface"
+                        padding="sm"
+                        style={{
+                          borderColor:
+                            action.priority === 'critical' || action.priority === 'high'
+                              ? 'var(--color-error)'
                               : action.priority === 'medium'
-                                ? 'bg-[var(--color-warning-subtle)] border-[var(--color-warning)] text-[var(--color-warning)]'
-                                : 'bg-[var(--color-aura-dim)] border-[var(--color-primary)] text-[var(--color-primary)]'
-                        }`}
+                                ? 'var(--color-warning)'
+                                : 'var(--color-primary)',
+                          background:
+                            action.priority === 'critical' || action.priority === 'high'
+                              ? 'var(--color-error-subtle)'
+                              : action.priority === 'medium'
+                                ? 'var(--color-warning-subtle)'
+                                : 'var(--color-aura-dim)',
+                        }}
                       >
-                        <span className="font-medium">{action.message}</span>
-                        <span className="text-xs opacity-70">
+                        <span
+                          className="font-medium text-sm"
+                          style={{
+                            color:
+                              action.priority === 'critical' || action.priority === 'high'
+                                ? 'var(--color-error)'
+                                : action.priority === 'medium'
+                                  ? 'var(--color-warning)'
+                                  : 'var(--color-primary)',
+                          }}
+                        >
+                          {action.message}
+                        </span>
+                        <span className="text-xs opacity-70 block mt-1">
                           {action.affectedItems.length} items affected
                         </span>
-                      </div>
+                      </Card>
                     ))}
                   </div>
                 )}
-              </div>
+              </Card>
 
               {/* Issue Cards */}
               <div className="grid grid-cols-2 gap-4 md:col-span-2">
-                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6 flex flex-col justify-between group hover:bg-[var(--color-surface-raised)] transition-colors relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Card
+                  variant="surface"
+                  padding="md"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
                     <span className="text-6xl">⚠️</span>
                   </div>
                   <div>
@@ -361,10 +416,20 @@ export default function Health() {
                     </span>
                     <span className="text-[var(--color-text-tertiary)] text-sm">passwords</span>
                   </div>
-                </div>
+                </Card>
 
-                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6 flex flex-col justify-between group hover:bg-[var(--color-surface-raised)] transition-colors relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Card
+                  variant="surface"
+                  padding="md"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
                     <span className="text-6xl">🔄</span>
                   </div>
                   <div>
@@ -393,10 +458,20 @@ export default function Health() {
                     </span>
                     <span className="text-[var(--color-text-tertiary)] text-sm">passwords</span>
                   </div>
-                </div>
+                </Card>
 
-                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6 flex flex-col justify-between group hover:bg-[var(--color-surface-raised)] transition-colors relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Card
+                  variant="surface"
+                  padding="md"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
                     <span className="text-6xl">⏳</span>
                   </div>
                   <div>
@@ -425,10 +500,20 @@ export default function Health() {
                     </span>
                     <span className="text-[var(--color-text-tertiary)] text-sm">passwords</span>
                   </div>
-                </div>
+                </Card>
 
-                <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6 flex flex-col justify-between group hover:bg-[var(--color-surface-raised)] transition-colors relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Card
+                  variant="surface"
+                  padding="md"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
                     <span className="text-6xl">💀</span>
                   </div>
                   <div>
@@ -457,7 +542,7 @@ export default function Health() {
                     </span>
                     <span className="text-[var(--color-text-tertiary)] text-sm">passwords</span>
                   </div>
-                </div>
+                </Card>
               </div>
             </div>
 
@@ -478,22 +563,30 @@ export default function Health() {
                         : `${diffDays} days remaining`;
 
                     return (
-                      <div
+                      <Card
                         key={schedule.itemId}
-                        className={`flex items-center justify-between p-4 border rounded-[var(--radius-lg)] ${
-                          schedule.urgency === 'overdue'
-                            ? 'bg-[var(--color-error-subtle)] border-[var(--color-error)]'
-                            : 'bg-[var(--color-warning-subtle)] border-[var(--color-warning)]'
-                        }`}
+                        variant="surface"
+                        padding="md"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderColor:
+                            schedule.urgency === 'overdue'
+                              ? 'var(--color-error)'
+                              : 'var(--color-warning)',
+                          background:
+                            schedule.urgency === 'overdue'
+                              ? 'var(--color-error-subtle)'
+                              : 'var(--color-warning-subtle)',
+                        }}
                       >
                         <div className="flex flex-col">
                           <div className="flex items-center gap-3">
                             <span className="font-medium text-[var(--color-text)]">
                               {item.name}
                             </span>
-                            <span className="px-2 py-0.5 rounded-[var(--radius-full)] text-xs font-medium bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] capitalize">
-                              {category}
-                            </span>
+                            <Badge variant="default">{category}</Badge>
                           </div>
                           <span
                             className={`text-sm mt-1 ${schedule.urgency === 'overdue' ? 'text-[var(--color-error)]' : 'text-[var(--color-warning)]'}`}
@@ -501,13 +594,14 @@ export default function Health() {
                             {timeText}
                           </span>
                         </div>
-                        <button
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => handleItemClick(item.id)}
-                          className="px-4 py-2 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text)] text-sm font-medium rounded-[var(--radius-md)] transition-colors"
                         >
                           Rotate Now
-                        </button>
-                      </div>
+                        </Button>
+                      </Card>
                     );
                   })}
                 </div>
@@ -519,15 +613,20 @@ export default function Health() {
               <div className="mb-8">
                 <div className="flex items-center gap-3 mb-6">
                   <h2 className="text-xl font-medium text-[var(--color-text)]">Enable 2FA</h2>
-                  <span className="px-2.5 py-0.5 rounded-[var(--radius-full)] bg-[var(--color-aura-dim)] text-[var(--color-primary)] text-xs font-bold">
-                    {tfaIssues.length} Sites
-                  </span>
+                  <Badge variant="primary">{tfaIssues.length} Sites</Badge>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {tfaIssues.map(({ item, info }) => (
-                    <div
+                    <Card
                       key={item.id}
-                      className="bg-[var(--color-bg-subtle)] border border-[var(--color-border)] rounded-[var(--radius-xl)] p-5 hover:bg-[var(--color-surface)] transition-colors flex flex-col justify-between h-full"
+                      variant="surface"
+                      padding="md"
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        height: '100%',
+                      }}
                     >
                       <div>
                         <div className="flex items-center justify-between mb-2">
@@ -536,12 +635,9 @@ export default function Health() {
                           </h3>
                           <div className="flex gap-1">
                             {info.tfa.map((method) => (
-                              <span
-                                key={method}
-                                className="px-2 py-1 bg-[var(--color-surface-raised)] rounded text-[10px] font-bold text-[var(--color-text-secondary)] uppercase tracking-wider"
-                              >
+                              <Badge key={method} variant="default">
                                 {method}
-                              </span>
+                              </Badge>
                             ))}
                           </div>
                         </div>
@@ -551,24 +647,22 @@ export default function Health() {
                       </div>
 
                       <div className="flex items-center gap-3 mt-auto">
-                        <button
+                        <Button
+                          variant="primary"
+                          size="sm"
                           onClick={() => handleItemClick(item.id)}
-                          className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors"
                         >
                           Add TOTP Key
-                        </button>
+                        </Button>
                         {info.documentation && (
-                          <a
-                            href={info.documentation}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="px-4 py-2 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text)] rounded-[var(--radius-md)] text-sm font-medium transition-colors"
-                          >
-                            Docs ↗
+                          <a href={info.documentation} target="_blank" rel="noreferrer">
+                            <Button variant="secondary" size="sm" tabIndex={-1}>
+                              Docs ↗
+                            </Button>
                           </a>
                         )}
                       </div>
-                    </div>
+                    </Card>
                   ))}
                 </div>
               </div>

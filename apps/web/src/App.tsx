@@ -17,6 +17,8 @@ import AppLayout from './components/AppLayout.js';
 import Teams from './pages/Teams.js';
 import TeamDetail from './pages/TeamDetail.js';
 import EmergencyAccess from './pages/EmergencyAccess.js';
+import { AuraProvider } from './providers/AuraProvider.js';
+import { ToastProvider } from './providers/ToastProvider.js';
 const AUTO_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -56,8 +58,18 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/unlock" element={<Unlock />} />
       <Route path="/share/:shareId" element={<ShareView />} />
-      
-      <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+
+      <Route
+        element={
+          <ProtectedRoute>
+            <AuraProvider>
+              <ToastProvider>
+                <AppLayout />
+              </ToastProvider>
+            </AuraProvider>
+          </ProtectedRoute>
+        }
+      >
         <Route path="/vault" element={<Vault />} />
         <Route path="/trash" element={<Trash />} />
         <Route path="/generator" element={<Generator />} />
@@ -70,7 +82,7 @@ export default function App() {
         <Route path="/teams/:teamId" element={<TeamDetail />} />
         <Route path="/emergency-access" element={<EmergencyAccess />} />
       </Route>
-      
+
       <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />
     </Routes>
   );

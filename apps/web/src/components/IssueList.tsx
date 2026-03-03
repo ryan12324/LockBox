@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Card, Badge, Button } from '@lockbox/design';
 import type { PasswordHealthReport, VaultItem } from '@lockbox/types';
 
 interface IssueListProps {
@@ -12,7 +13,6 @@ type FilterType = 'all' | 'weak' | 'reused' | 'old' | 'breached';
 export default function IssueList({ reports, items, onItemClick }: IssueListProps) {
   const [filter, setFilter] = useState<FilterType>('all');
 
-  // Filter reports that actually have issues
   const problematicReports = reports.filter((r) => r.issues.length > 0);
 
   const filteredReports = problematicReports.filter((report) => {
@@ -25,39 +25,27 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
       switch (issue.type) {
         case 'weak':
           return (
-            <span
-              key={idx}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-error-subtle)] text-[var(--color-error)] border border-[var(--color-error)]"
-            >
+            <Badge key={idx} variant="error">
               Weak
-            </span>
+            </Badge>
           );
         case 'reused':
           return (
-            <span
-              key={idx}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-warning-subtle)] text-[var(--color-warning)] border border-[var(--color-warning)]"
-            >
+            <Badge key={idx} variant="warning">
               Reused
-            </span>
+            </Badge>
           );
         case 'old':
           return (
-            <span
-              key={idx}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-warning-subtle)] text-[var(--color-warning)] border border-[var(--color-warning)]"
-            >
+            <Badge key={idx} variant="warning">
               Old
-            </span>
+            </Badge>
           );
         case 'breached':
           return (
-            <span
-              key={idx}
-              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-error-subtle)] text-[var(--color-error)] border border-[var(--color-error)]"
-            >
+            <Badge key={idx} variant="error">
               💀 Breached
-            </span>
+            </Badge>
           );
         default:
           return null;
@@ -66,7 +54,6 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
   };
 
   const getScoreColor = (score: number) => {
-    // Score is 0-4 (zxcvbn scale)
     if (score < 2) return 'text-[var(--color-error)]';
     if (score === 2) return 'text-[var(--color-warning)]';
     if (score === 3) return 'text-[var(--color-primary)]';
@@ -106,25 +93,20 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
 
   return (
     <div className="flex flex-col space-y-6">
-      {/* Filter Tabs */}
       <div className="flex overflow-x-auto pb-2 -mx-2 px-2 space-x-2 scrollbar-hide">
         {tabs.map((tab) => (
-          <button
+          <Button
             key={tab.id}
+            variant={filter === tab.id ? 'primary' : 'secondary'}
+            size="sm"
             onClick={() => setFilter(tab.id)}
-            className={`whitespace-nowrap px-4 py-2 rounded-[var(--radius-md)] text-sm font-medium transition-colors ${
-              filter === tab.id
-                ? 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] border border-[var(--color-primary)]'
-                : 'bg-[var(--color-surface)] text-[var(--color-text-secondary)] border border-[var(--color-border)] hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-text)]'
-            }`}
           >
             {tab.label}
-          </button>
+          </Button>
         ))}
       </div>
 
-      {/* List */}
-      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] overflow-hidden">
+      <Card variant="surface" padding="sm" style={{ overflow: 'hidden' }}>
         {filteredReports.length === 0 ? (
           <div className="p-8 text-center text-[var(--color-text-tertiary)]">
             No items match this filter.
@@ -137,12 +119,21 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
 
               return (
                 <li key={report.itemId}>
-                  <button
+                  <Card
+                    variant="surface"
+                    padding="md"
                     onClick={() => onItemClick(item.id)}
-                    className="w-full text-left px-6 py-4 hover:bg-[var(--color-bg-subtle)] transition-colors flex items-center justify-between group"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderRadius: 0,
+                      border: 'none',
+                      boxShadow: 'none',
+                      cursor: 'pointer',
+                    }}
                   >
                     <div className="flex items-center space-x-4">
-                      {/* Item Icon Placeholder */}
                       <div className="w-10 h-10 rounded-[var(--radius-full)] bg-[var(--color-surface)] flex items-center justify-center border border-[var(--color-border)] flex-shrink-0 text-[var(--color-text-secondary)]">
                         {item.type === 'login' ? '🔑' : '📄'}
                       </div>
@@ -155,7 +146,7 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end opacity-80 group-hover:opacity-100 transition-opacity">
+                    <div className="flex flex-col items-end">
                       <span className={`text-sm font-bold ${getScoreColor(report.score)}`}>
                         {getScoreLabel(report.score)}
                       </span>
@@ -163,13 +154,13 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
                         Score: {report.score}/4
                       </span>
                     </div>
-                  </button>
+                  </Card>
                 </li>
               );
             })}
           </ul>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

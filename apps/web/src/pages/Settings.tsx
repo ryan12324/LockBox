@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
 import { encryptString, decryptString } from '@lockbox/crypto';
 import { QRCodeSVG } from 'qrcode.react';
+import { Button, Input, Select, Card } from '@lockbox/design';
 
 type Theme = 'system' | 'light' | 'dark';
 type AutoLockMinutes = 1 | 5 | 15 | 30 | 60;
@@ -431,7 +432,7 @@ export default function Settings() {
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Settings</h1>
         <div className="space-y-6">
           {/* Account */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Account</h2>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
@@ -454,17 +455,25 @@ export default function Settings() {
                   </span>
                 </div>
               )}
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => navigate('/settings/import-export')}
-                className="w-full mt-2 py-2 text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline text-left"
+                style={{
+                  width: '100%',
+                  justifyContent: 'flex-start',
+                  marginTop: 8,
+                  padding: '8px 0',
+                  color: 'var(--color-primary)',
+                }}
               >
                 Import / Export →
-              </button>
+              </Button>
             </div>
-          </section>
+          </Card>
 
           {/* Two-Factor Authentication */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
               Two-Factor Authentication
             </h2>
@@ -496,21 +505,24 @@ export default function Settings() {
                         </code>
                       ))}
                     </div>
-                    <button
+                    <Button
+                      variant="primary"
+                      size="sm"
                       onClick={copyBackupCodes}
-                      className="w-full py-1.5 text-xs bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded"
+                      style={{ width: '100%' }}
                     >
                       Copy All
-                    </button>
+                    </Button>
                   </div>
                 )}
-                <button
+                <Button
+                  variant="danger"
+                  size="sm"
                   onClick={handleDisable2FA}
                   disabled={twoFaLoading}
-                  className="px-4 py-2 text-sm bg-[var(--color-error-subtle)] hover:bg-[var(--color-error)] text-[var(--color-error)] rounded transition-colors disabled:opacity-50"
                 >
                   Disable 2FA
-                </button>
+                </Button>
                 {twoFaError && (
                   <p className="text-sm text-[var(--color-error)] mt-2">{twoFaError}</p>
                 )}
@@ -533,22 +545,23 @@ export default function Settings() {
                     Enter 6-digit verification code
                   </label>
                   <div className="flex gap-2">
-                    <input
+                    <Input
                       type="text"
                       required
                       pattern="[0-9]{6}"
                       value={verifyCode}
                       onChange={(e) => setVerifyCode(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded bg-[var(--color-surface)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)]"
                       placeholder="000000"
+                      className="flex-1"
                     />
-                    <button
+                    <Button
                       type="submit"
+                      variant="primary"
+                      size="sm"
                       disabled={twoFaLoading || verifyCode.length !== 6}
-                      className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-40 text-[var(--color-primary-fg)] rounded transition-colors"
                     >
                       Verify
-                    </button>
+                    </Button>
                   </div>
                   {twoFaError && (
                     <p className="text-sm text-[var(--color-error)] mt-2">{twoFaError}</p>
@@ -561,22 +574,23 @@ export default function Settings() {
                   Add an extra layer of security to your account by requiring a code from your
                   authenticator app when you sign in.
                 </p>
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={handleEnable2FA}
                   disabled={twoFaLoading}
-                  className="px-4 py-2 text-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded transition-colors disabled:opacity-50"
                 >
                   Enable 2FA
-                </button>
+                </Button>
                 {twoFaError && (
                   <p className="text-sm text-[var(--color-error)] mt-2">{twoFaError}</p>
                 )}
               </div>
             )}
-          </section>
+          </Card>
 
           {/* AI & Intelligence */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
               AI & Intelligence
             </h2>
@@ -584,16 +598,23 @@ export default function Settings() {
               Configure AI-powered features: password health, breach monitoring, smart autofill, and
               chat assistant.
             </p>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => navigate('/settings/ai')}
-              className="w-full py-2 text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline text-left"
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                padding: '8px 0',
+                color: 'var(--color-primary)',
+              }}
             >
               Configure AI Features →
-            </button>
-          </section>
+            </Button>
+          </Card>
 
           {/* Email Aliases */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Email Aliases</h2>
             <p className="text-sm text-[var(--color-text-tertiary)] mb-4">
               Generate unique email aliases for each login using SimpleLogin or AnonAddy. API keys
@@ -604,14 +625,14 @@ export default function Settings() {
                 <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
                   Provider
                 </label>
-                <select
+                <Select
                   value={aliasProvider}
                   onChange={(e) => setAliasProvider(e.target.value as AliasProvider)}
-                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
-                >
-                  <option value="simplelogin">SimpleLogin</option>
-                  <option value="anonaddy">AnonAddy</option>
-                </select>
+                  options={[
+                    { value: 'simplelogin', label: 'SimpleLogin' },
+                    { value: 'anonaddy', label: 'AnonAddy' },
+                  ]}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
@@ -620,12 +641,11 @@ export default function Settings() {
                     <span className="text-xs text-[var(--color-success)] ml-1">(configured)</span>
                   )}
                 </label>
-                <input
+                <Input
                   type="password"
                   value={aliasApiKey}
                   onChange={(e) => setAliasApiKey(e.target.value)}
                   placeholder={aliasConfigured ? 'Enter new key to update' : 'Paste your API key'}
-                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                 />
               </div>
               <div>
@@ -635,7 +655,7 @@ export default function Settings() {
                     (optional, for self-hosted)
                   </span>
                 </label>
-                <input
+                <Input
                   type="text"
                   value={aliasBaseUrl}
                   onChange={(e) => setAliasBaseUrl(e.target.value)}
@@ -644,31 +664,29 @@ export default function Settings() {
                       ? 'https://app.simplelogin.io'
                       : 'https://app.anonaddy.com'
                   }
-                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
                 />
               </div>
               <div className="flex gap-2">
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={handleSaveAlias}
                   disabled={aliasSaving}
-                  className="px-4 py-2 text-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded transition-colors disabled:opacity-50"
                 >
                   {aliasSaving ? 'Saving...' : 'Save'}
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={handleTestAlias}
                   disabled={aliasTesting}
-                  className="px-4 py-2 text-sm bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded transition-colors disabled:opacity-50"
                 >
                   {aliasTesting ? 'Testing...' : 'Test Connection'}
-                </button>
+                </Button>
                 {aliasConfigured && (
-                  <button
-                    onClick={handleDeleteAlias}
-                    className="px-4 py-2 text-sm bg-[var(--color-error-subtle)] hover:bg-[var(--color-error)] text-[var(--color-error)] rounded transition-colors"
-                  >
+                  <Button variant="danger" size="sm" onClick={handleDeleteAlias}>
                     Remove
-                  </button>
+                  </Button>
                 )}
               </div>
               {aliasError && <p className="text-sm text-[var(--color-error)]">{aliasError}</p>}
@@ -676,53 +694,44 @@ export default function Settings() {
                 <p className="text-sm text-[var(--color-success)]">{aliasSuccess}</p>
               )}
             </div>
-          </section>
+          </Card>
 
           {/* Security */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Security</h2>
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
-                  Auto-lock timeout
-                </label>
-                <select
-                  value={settings.autoLockMinutes}
-                  onChange={(e) =>
-                    update('autoLockMinutes', Number(e.target.value) as AutoLockMinutes)
-                  }
-                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
-                >
-                  <option value={1}>1 minute</option>
-                  <option value={5}>5 minutes</option>
-                  <option value={15}>15 minutes</option>
-                  <option value={30}>30 minutes</option>
-                  <option value={60}>1 hour</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
-                  Clipboard clear time
-                </label>
-                <select
-                  value={settings.clipboardSeconds}
-                  onChange={(e) =>
-                    update('clipboardSeconds', Number(e.target.value) as ClipboardSeconds)
-                  }
-                  className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
-                >
-                  <option value={10}>10 seconds</option>
-                  <option value={20}>20 seconds</option>
-                  <option value={30}>30 seconds</option>
-                  <option value={60}>60 seconds</option>
-                </select>
-              </div>
+              <Select
+                label="Auto-lock timeout"
+                value={String(settings.autoLockMinutes)}
+                onChange={(e) =>
+                  update('autoLockMinutes', Number(e.target.value) as AutoLockMinutes)
+                }
+                options={[
+                  { value: '1', label: '1 minute' },
+                  { value: '5', label: '5 minutes' },
+                  { value: '15', label: '15 minutes' },
+                  { value: '30', label: '30 minutes' },
+                  { value: '60', label: '1 hour' },
+                ]}
+              />
+              <Select
+                label="Clipboard clear time"
+                value={String(settings.clipboardSeconds)}
+                onChange={(e) =>
+                  update('clipboardSeconds', Number(e.target.value) as ClipboardSeconds)
+                }
+                options={[
+                  { value: '10', label: '10 seconds' },
+                  { value: '20', label: '20 seconds' },
+                  { value: '30', label: '30 seconds' },
+                  { value: '60', label: '60 seconds' },
+                ]}
+              />
             </div>
-          </section>
+          </Card>
 
           {/* Appearance */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Appearance</h2>
             <div>
               <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
@@ -730,24 +739,22 @@ export default function Settings() {
               </label>
               <div className="flex gap-3">
                 {(['system', 'light', 'dark'] as Theme[]).map((t) => (
-                  <button
+                  <Button
                     key={t}
+                    variant={settings.theme === t ? 'primary' : 'secondary'}
+                    size="sm"
                     onClick={() => update('theme', t)}
-                    className={`flex-1 py-2 text-sm font-medium rounded-[var(--radius-md)] border transition-colors capitalize ${
-                      settings.theme === t
-                        ? 'border-[var(--color-primary)] bg-[var(--color-aura-dim)] text-[var(--color-primary)]'
-                        : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)]'
-                    }`}
+                    style={{ flex: 1, textTransform: 'capitalize' }}
                   >
                     {t === 'system' ? '🖥️ System' : t === 'light' ? '☀️ Light' : '🌙 Dark'}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
-          </section>
+          </Card>
 
           {/* Travel Mode */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">🧳 Travel Mode</h2>
             <p className="text-sm text-[var(--color-text-secondary)] mb-4">
               When enabled, only folders marked as travel-safe will sync. Non-safe folders and their
@@ -763,7 +770,8 @@ export default function Settings() {
                   Hide sensitive folders when traveling
                 </p>
               </div>
-              <button
+              <Button
+                variant="ghost"
                 onClick={() => {
                   if (!travelEnabled) {
                     setShowTravelConfirm(true);
@@ -772,12 +780,24 @@ export default function Settings() {
                   }
                 }}
                 disabled={travelLoading}
-                className={`relative w-12 h-6 rounded-[var(--radius-full)] transition-colors ${travelEnabled ? 'bg-[var(--color-primary)]' : 'bg-[var(--color-surface-raised)]'}`}
+                style={{
+                  position: 'relative',
+                  width: 48,
+                  height: 24,
+                  padding: 0,
+                  minHeight: 'auto',
+                  borderRadius: 'var(--radius-full)',
+                  background: travelEnabled
+                    ? 'var(--color-primary)'
+                    : 'var(--color-surface-raised)',
+                  border: 'none',
+                  boxShadow: 'none',
+                }}
               >
                 <span
                   className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-[var(--radius-full)] transition-transform ${travelEnabled ? 'translate-x-6' : ''}`}
                 />
-              </button>
+              </Button>
             </div>
 
             {showTravelConfirm && (
@@ -787,21 +807,20 @@ export default function Settings() {
                   Only safe folders will be accessible.
                 </p>
                 <div className="flex gap-2">
-                  <button
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={() => {
                       setShowTravelConfirm(false);
                       handleTravelToggle(true);
                     }}
-                    className="px-3 py-1.5 bg-[var(--color-warning)] text-[var(--color-primary-fg)] text-sm rounded-[var(--radius-md)] hover:bg-[var(--color-warning)]"
+                    style={{ background: 'var(--color-warning)' }}
                   >
                     Enable
-                  </button>
-                  <button
-                    onClick={() => setShowTravelConfirm(false)}
-                    className="px-3 py-1.5 text-[var(--color-text-secondary)] text-sm hover:text-[var(--color-text)]"
-                  >
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setShowTravelConfirm(false)}>
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
@@ -818,23 +837,36 @@ export default function Settings() {
                       className="flex items-center justify-between p-2 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)]"
                     >
                       <span className="text-sm text-[var(--color-text)]">📁 {f.name}</span>
-                      <button
+                      <Button
+                        variant="ghost"
                         onClick={() => handleFolderTravel(f.id, !f.travelSafe)}
-                        className={`relative w-10 h-5 rounded-[var(--radius-full)] transition-colors ${f.travelSafe ? 'bg-[var(--color-success)]' : 'bg-[var(--color-surface-raised)]'}`}
+                        style={{
+                          position: 'relative',
+                          width: 40,
+                          height: 20,
+                          padding: 0,
+                          minHeight: 'auto',
+                          borderRadius: 'var(--radius-full)',
+                          background: f.travelSafe
+                            ? 'var(--color-success)'
+                            : 'var(--color-surface-raised)',
+                          border: 'none',
+                          boxShadow: 'none',
+                        }}
                       >
                         <span
                           className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-[var(--radius-full)] transition-transform ${f.travelSafe ? 'translate-x-5' : ''}`}
                         />
-                      </button>
+                      </Button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </section>
+          </Card>
 
           {/* Hardware Security Keys */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">
               🔐 Hardware Security Keys
             </h2>
@@ -843,13 +875,15 @@ export default function Settings() {
               key is wrapped with the hardware key's public key.
             </p>
 
-            <button
+            <Button
+              variant="primary"
+              size="sm"
               onClick={handleRegisterHardwareKey}
               disabled={hwKeyLoading}
-              className="px-4 py-2 text-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] transition-colors disabled:opacity-50 mb-4"
+              style={{ marginBottom: 16 }}
             >
               {hwKeyLoading ? 'Registering...' : 'Register Hardware Key'}
-            </button>
+            </Button>
 
             {hwKeyError && <p className="text-sm text-[var(--color-error)] mb-3">{hwKeyError}</p>}
             {hwKeySuccess && (
@@ -875,33 +909,35 @@ export default function Settings() {
                         {key.id.slice(0, 8)}…
                       </p>
                     </div>
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={() => handleRevokeHardwareKey(key.id)}
-                      className="px-3 py-1.5 text-xs bg-[var(--color-error-subtle)] hover:bg-[var(--color-error)] text-[var(--color-error)] rounded-[var(--radius-md)] transition-colors"
                     >
                       Revoke
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
             )}
-          </section>
+          </Card>
 
           {/* Device Sync */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">📱 Device Sync</h2>
             <p className="text-sm text-[var(--color-text-secondary)] mb-4">
               Add a new device by scanning a QR code. Uses ECDH key exchange to securely transfer
               your session key. QR codes expire after 30 seconds.
             </p>
 
-            <button
+            <Button
+              variant="primary"
+              size="sm"
               onClick={handleGenerateQrSync}
               disabled={showQrSync && qrCountdown > 0}
-              className="px-4 py-2 text-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] transition-colors disabled:opacity-50"
             >
               {showQrSync && qrCountdown > 0 ? `QR Active (${qrCountdown}s)` : 'Add Device'}
-            </button>
+            </Button>
 
             {showQrSync && qrPayload && qrCountdown > 0 && (
               <div className="mt-4 space-y-3">
@@ -932,17 +968,17 @@ export default function Settings() {
                 </p>
               </div>
             )}
-          </section>
+          </Card>
 
           {/* About */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">About</h2>
             <div className="space-y-2 text-sm text-[var(--color-text-tertiary)]">
               <p>Lockbox v0.0.1 — Self-Hosted Password Manager</p>
               <p>Zero-knowledge E2E encryption · Cloudflare Workers</p>
               <p>AES-256-GCM · Argon2id · HKDF-SHA-256</p>
             </div>
-          </section>
+          </Card>
         </div>
       </div>
     </div>

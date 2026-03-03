@@ -10,6 +10,7 @@ import {
   removeProviderConfig,
   testProviderConnection,
 } from '@lockbox/ai';
+import { Button, Input, Card } from '@lockbox/design';
 
 const PROVIDERS: { id: AIProvider; name: string; description: string; requiresKey: boolean }[] = [
   {
@@ -99,10 +100,8 @@ const FEATURE_LABELS: {
 export default function AISettings() {
   const navigate = useNavigate();
 
-  // Feature flags
   const [flags, setFlags] = useState<AIFeatureFlags>(DEFAULT_AI_FLAGS);
 
-  // Provider config
   const [selectedProvider, setSelectedProvider] = useState<AIProvider | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
@@ -115,13 +114,11 @@ export default function AISettings() {
   } | null>(null);
   const [configuredProviders, setConfiguredProviders] = useState<AIProviderConfig[]>([]);
 
-  // Load state on mount
   useEffect(() => {
     setFlags(loadFeatureFlags());
     setConfiguredProviders(getAllProviderConfigs());
   }, []);
 
-  // Save flags on change
   useEffect(() => {
     saveFeatureFlags(flags);
   }, [flags]);
@@ -139,7 +136,6 @@ export default function AISettings() {
 
     const existing = configuredProviders.find((c) => c.provider === id);
     if (existing) {
-      // Don't show the actual key — just indicate it's set
       setBaseUrl(existing.baseUrl ?? '');
       setModel(existing.model ?? '');
     }
@@ -200,7 +196,6 @@ export default function AISettings() {
   }
 
   function handleClearAIData() {
-    // Clear cached embeddings, breach results, feature flags
     const keysToRemove = [
       'lockbox:ai:feature-flags',
       'lockbox:ai:providers',
@@ -225,7 +220,11 @@ export default function AISettings() {
 
         <div className="space-y-6">
           {/* Privacy Notice */}
-          <section className="bg-[var(--color-aura-dim)] border border-[var(--color-primary)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card
+            variant="surface"
+            padding="md"
+            style={{ background: 'var(--color-aura-dim)', borderColor: 'var(--color-primary)' }}
+          >
             <div className="flex items-start gap-3">
               <span className="text-xl shrink-0">🛡️</span>
               <div>
@@ -241,20 +240,14 @@ export default function AISettings() {
                 </p>
               </div>
             </div>
-          </section>
+          </Card>
 
           {/* Feature Toggles */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Features</h2>
             <div className="space-y-3">
               {FEATURE_LABELS.map(({ key, label, description, phase }) => (
-                <label key={key} className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={flags[key]}
-                    onChange={() => toggleFlag(key)}
-                    className="mt-0.5 rounded border-[var(--color-border-strong)] bg-[var(--color-surface-raised)] text-[var(--color-primary)] focus:ring-[var(--color-aura)]"
-                  />
+                <div key={key} className="flex items-center gap-3 group">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors">
@@ -268,13 +261,45 @@ export default function AISettings() {
                       {description}
                     </p>
                   </div>
-                </label>
+                  <Button
+                    variant="ghost"
+                    onClick={() => toggleFlag(key)}
+                    style={{
+                      position: 'relative',
+                      width: 40,
+                      height: 20,
+                      padding: 0,
+                      minHeight: 'auto',
+                      borderRadius: 'var(--radius-full)',
+                      background: flags[key]
+                        ? 'var(--color-primary)'
+                        : 'var(--color-surface-raised)',
+                      border: 'none',
+                      boxShadow: 'none',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: 2,
+                        left: 2,
+                        width: 16,
+                        height: 16,
+                        background: 'white',
+                        borderRadius: 'var(--radius-full)',
+                        transition: 'transform 150ms ease',
+                        transform: flags[key] ? 'translateX(20px)' : 'translateX(0)',
+                      }}
+                    />
+                  </Button>
+                </div>
               ))}
             </div>
-          </section>
+          </Card>
 
           {/* Provider Configuration */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
               LLM Provider (BYOK)
             </h2>
@@ -283,7 +308,6 @@ export default function AISettings() {
               master key.
             </p>
 
-            {/* Configured providers */}
             {configuredProviders.length > 0 && (
               <div className="space-y-2 mb-4">
                 {configuredProviders.map((config) => {
@@ -306,32 +330,42 @@ export default function AISettings() {
                           Active
                         </span>
                       </div>
-                      <button
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => handleRemoveProvider(config.provider)}
-                        className="text-xs text-[var(--color-error)] hover:text-[var(--color-error)] transition-colors"
                       >
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   );
                 })}
               </div>
             )}
 
-            {/* Add provider */}
             {!selectedProvider ? (
               <div className="grid grid-cols-2 gap-2">
                 {PROVIDERS.map((p) => {
                   const isConfigured = configuredProviders.some((c) => c.provider === p.id);
                   return (
-                    <button
+                    <Button
                       key={p.id}
+                      variant="secondary"
                       onClick={() => handleSelectProvider(p.id)}
-                      className={`text-left p-3 rounded-[var(--radius-md)] border transition-colors ${
-                        isConfigured
-                          ? 'border-[var(--color-primary)] bg-[var(--color-aura-dim)] hover:bg-[var(--color-surface)]'
-                          : 'border-[var(--color-border)] bg-[var(--color-bg-subtle)] hover:bg-[var(--color-surface)] hover:border-[var(--color-border-strong)]'
-                      }`}
+                      style={{
+                        textAlign: 'left' as const,
+                        display: 'flex',
+                        flexDirection: 'column' as const,
+                        alignItems: 'flex-start',
+                        padding: 12,
+                        ...(isConfigured
+                          ? {
+                              borderColor: 'var(--color-primary)',
+                              background: 'var(--color-aura-dim)',
+                            }
+                          : {}),
+                      }}
+                      size="sm"
                     >
                       <span className="text-sm font-medium text-[var(--color-text)] block">
                         {p.name}
@@ -339,7 +373,7 @@ export default function AISettings() {
                       <span className="text-[10px] text-[var(--color-text-tertiary)] block mt-0.5">
                         {p.description}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -349,63 +383,48 @@ export default function AISettings() {
                   <h3 className="text-sm font-semibold text-[var(--color-text)]">
                     {PROVIDERS.find((p) => p.id === selectedProvider)?.name}
                   </h3>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       setSelectedProvider(null);
                       setTestResult(null);
                     }}
-                    className="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
 
                 {PROVIDERS.find((p) => p.id === selectedProvider)?.requiresKey && (
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
-                      API Key
-                    </label>
-                    <input
-                      type="password"
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="sk-..."
-                      className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] text-sm"
-                    />
-                  </div>
+                  <Input
+                    type="password"
+                    label="API Key"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    placeholder="sk-..."
+                  />
                 )}
 
-                <div>
-                  <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
-                    Base URL <span className="text-[var(--color-text-tertiary)]">(optional)</span>
-                  </label>
-                  <input
-                    type="url"
-                    value={baseUrl}
-                    onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder={
-                      selectedProvider === 'ollama'
-                        ? 'http://localhost:11434'
-                        : 'Leave empty for default'
-                    }
-                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] text-sm"
-                  />
-                </div>
+                <Input
+                  type="text"
+                  label="Base URL (optional)"
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  placeholder={
+                    selectedProvider === 'ollama'
+                      ? 'http://localhost:11434'
+                      : 'Leave empty for default'
+                  }
+                />
 
-                <div>
-                  <label className="block text-xs font-medium text-[var(--color-text-secondary)] mb-1">
-                    Model <span className="text-[var(--color-text-tertiary)]">(optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={model}
-                    onChange={(e) => setModel(e.target.value)}
-                    placeholder="Leave empty for default"
-                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] text-sm"
-                  />
-                </div>
+                <Input
+                  type="text"
+                  label="Model (optional)"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="Leave empty for default"
+                />
 
-                {/* Test result */}
                 {testResult && (
                   <div
                     className={`p-3 rounded-[var(--radius-md)] border text-xs ${
@@ -421,41 +440,36 @@ export default function AISettings() {
                 )}
 
                 <div className="flex gap-2 pt-1">
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={handleTestConnection}
                     disabled={testing}
-                    className="px-3 py-1.5 text-sm bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors disabled:opacity-50"
                   >
                     {testing ? 'Testing...' : 'Test Connection'}
-                  </button>
-                  <button
-                    onClick={handleSaveProvider}
-                    className="px-3 py-1.5 text-sm bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] transition-colors"
-                  >
+                  </Button>
+                  <Button variant="primary" size="sm" onClick={handleSaveProvider}>
                     Save Provider
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}
-          </section>
+          </Card>
 
           {/* Data Management */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Data Management</h2>
             <p className="text-xs text-[var(--color-text-tertiary)] mb-4">
               Clear cached AI data including embeddings, breach check results, and provider
               configurations.
             </p>
-            <button
-              onClick={handleClearAIData}
-              className="px-4 py-2 text-sm text-[var(--color-error)] bg-[var(--color-error-subtle)] hover:bg-[var(--color-error-subtle)] rounded-[var(--radius-md)] transition-colors font-medium"
-            >
+            <Button variant="danger" size="sm" onClick={handleClearAIData}>
               Clear All AI Data
-            </button>
-          </section>
+            </Button>
+          </Card>
 
           {/* About */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
               About AI Features
             </h2>
@@ -477,7 +491,7 @@ export default function AISettings() {
                 copilot features require your own API key (BYOK).
               </p>
             </div>
-          </section>
+          </Card>
         </div>
       </div>
     </div>

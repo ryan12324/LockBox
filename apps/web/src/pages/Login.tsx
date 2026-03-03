@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { deriveKey, decryptUserKey, makeAuthHash, fromBase64, toBase64 } from '@lockbox/crypto';
+import { Button, Input, Card, Aura } from '@lockbox/design';
 import { api } from '../lib/api.js';
 import { useAuthStore } from '../store/auth.js';
+import { useToast } from '../providers/ToastProvider.js';
 import type { KdfConfig } from '@lockbox/types';
 
 export default function Login() {
   const navigate = useNavigate();
   const { setSession, setKeys } = useAuthStore();
+  const { toast } = useToast();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   // 2FA state
   const [tempToken, setTempToken] = useState('');
@@ -26,7 +28,6 @@ export default function Login() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
     setLoading(true);
 
     try {
@@ -86,11 +87,11 @@ export default function Login() {
       navigate('/vault');
     } catch (err) {
       if (err instanceof Error && err.message.includes('401')) {
-        setError('Invalid email or password');
+        toast('Invalid email or password', 'error');
       } else if (err instanceof Error) {
-        setError(err.message || 'Login failed. Please try again.');
+        toast(err.message || 'Login failed. Please try again.', 'error');
       } else {
-        setError('Login failed. Please try again.');
+        toast('Login failed. Please try again.', 'error');
       }
     } finally {
       if (!tempToken) setLoading(false);
@@ -99,7 +100,6 @@ export default function Login() {
 
   async function handle2FASubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
     setLoading(true);
 
     try {
@@ -130,16 +130,15 @@ export default function Login() {
       navigate('/vault');
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message);
+        toast(err.message, 'error');
       } else {
-        setError('Verification failed');
+        toast('Verification failed', 'error');
       }
       setLoading(false);
     }
   }
 
   async function handleHardwareKeyUnlock() {
-    setError('');
     setHwKeyLoading(true);
     try {
       // Step 1: Get challenge from server
@@ -191,9 +190,9 @@ export default function Login() {
       navigate('/vault');
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message);
+        toast(err.message, 'error');
       } else {
-        setError('Hardware key authentication failed');
+        toast('Hardware key authentication failed', 'error');
       }
     } finally {
       setHwKeyLoading(false);
@@ -201,7 +200,6 @@ export default function Login() {
   }
 
   async function handleQRScan() {
-    setError('');
     setQrScanning(true);
 
     // Capacitor injects window.Capacitor in the native WebView at runtime
@@ -218,15 +216,16 @@ export default function Login() {
       | undefined;
 
     if (!cap?.isNativePlatform()) {
-      setError(
-        'QR scanning is only available in the mobile app. Open Settings \u2192 Device Sync on your existing device to generate a QR code.'
+      toast(
+        'QR scanning is only available in the mobile app. Open Settings \u2192 Device Sync on your existing device to generate a QR code.',
+        'error'
       );
       setQrScanning(false);
       return;
     }
 
     if (!cap.isPluginAvailable('QRScanner')) {
-      setError('QR scanner plugin is not available on this device.');
+      toast('QR scanner plugin is not available on this device.', 'error');
       setQrScanning(false);
       return;
     }
@@ -237,7 +236,10 @@ export default function Login() {
         available: boolean;
       };
       if (!availResult.available) {
-        setError('Camera not available. Please grant camera permission in your device settings.');
+        toast(
+          'Camera not available. Please grant camera permission in your device settings.',
+          'error'
+        );
         return;
       }
 
@@ -257,7 +259,7 @@ export default function Login() {
       try {
         payload = JSON.parse(scanResult.value);
       } catch {
-        setError('Invalid QR code. Please scan a Lockbox device sync QR code.');
+        toast('Invalid QR code. Please scan a Lockbox device sync QR code.', 'error');
         return;
       }
 
@@ -268,16 +270,18 @@ export default function Login() {
         !payload.nonce ||
         !payload.expiresAt
       ) {
-        setError(
-          'Invalid QR code format. Please scan a Lockbox device sync QR code from Settings \u2192 Device Sync.'
+        toast(
+          'Invalid QR code format. Please scan a Lockbox device sync QR code from Settings \u2192 Device Sync.',
+          'error'
         );
         return;
       }
 
       // Check expiry
       if (new Date(payload.expiresAt).getTime() < Date.now()) {
-        setError(
-          'QR code has expired. Please generate a new one from Settings \u2192 Device Sync.'
+        toast(
+          'QR code has expired. Please generate a new one from Settings \u2192 Device Sync.',
+          'error'
         );
         return;
       }
@@ -286,7 +290,7 @@ export default function Login() {
       // The sender encrypted with ECDH self-derived key; the session data contains { sessionToken, userKey }
       const dotIdx = payload.encryptedSessionKey.indexOf('.');
       if (dotIdx === -1) {
-        setError('Malformed QR payload. Please generate a new QR code.');
+        toast('Malformed QR payload. Please generate a new QR code.', 'error');
         return;
       }
 
@@ -376,16 +380,20 @@ export default function Login() {
     } catch (err) {
       if (err instanceof Error) {
         if (err.message.includes('permission') || err.message.includes('Permission')) {
-          setError('Camera permission denied. Please grant camera access in your device settings.');
+          toast(
+            'Camera permission denied. Please grant camera access in your device settings.',
+            'error'
+          );
         } else if (err.name === 'OperationError') {
-          setError(
-            'Could not decrypt QR payload. The QR code may have been generated by a different device or session.'
+          toast(
+            'Could not decrypt QR payload. The QR code may have been generated by a different device or session.',
+            'error'
           );
         } else {
-          setError(err.message || 'QR scan failed. Please try again.');
+          toast(err.message || 'QR scan failed. Please try again.', 'error');
         }
       } else {
-        setError('QR scan failed. Please try again.');
+        toast('QR scan failed. Please try again.', 'error');
       }
     } finally {
       setQrScanning(false);
@@ -393,151 +401,122 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ position: 'relative', overflow: 'hidden' }}
+    >
+      <Aura state="idle" position="center" />
+      <div className="w-full max-w-md" style={{ position: 'relative', zIndex: 1 }}>
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-[var(--color-text)]">🔐 Lockbox</h1>
           <p className="mt-2 text-[var(--color-text-tertiary)]">Sign in to your vault</p>
         </div>
 
         {tempToken ? (
-          <form
-            onSubmit={handle2FASubmit}
-            className="bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-8 space-y-5"
-          >
-            {error && (
-              <div className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)] p-3 text-[var(--color-error)] text-sm">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-                {isBackupCode ? 'Backup Code' : 'Authenticator Code'}
-              </label>
-              <input
+          <Card variant="raised" padding="lg">
+            <form onSubmit={handle2FASubmit} className="space-y-5">
+              <Input
                 name="twoFaCode"
                 type="text"
                 required
                 value={twoFaCode}
                 onChange={(e) => setTwoFaCode(e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
+                label={isBackupCode ? 'Backup Code' : 'Authenticator Code'}
                 placeholder={isBackupCode ? '8-character code' : '6-digit code'}
               />
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-40 text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
-            >
-              {loading ? 'Verifying...' : 'Verify'}
-            </button>
+              <Button type="submit" variant="primary" loading={loading} style={{ width: '100%' }}>
+                Verify
+              </Button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setIsBackupCode(!isBackupCode);
-                setTwoFaCode('');
-                setError('');
-              }}
-              className="w-full py-2 text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline text-center"
-            >
-              {isBackupCode ? 'Use authenticator app' : 'Use backup code'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setTempToken('');
-                setMasterKeyCache(null);
-                setTwoFaCode('');
-                setError('');
-              }}
-              className="w-full py-2 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-text)] hover:underline text-center"
-            >
-              Cancel
-            </button>
-          </form>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsBackupCode(!isBackupCode);
+                  setTwoFaCode('');
+                }}
+                style={{ width: '100%' }}
+              >
+                {isBackupCode ? 'Use authenticator app' : 'Use backup code'}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setTempToken('');
+                  setMasterKeyCache(null);
+                  setTwoFaCode('');
+                }}
+                style={{ width: '100%', color: 'var(--color-text-tertiary)' }}
+              >
+                Cancel
+              </Button>
+            </form>
+          </Card>
         ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-8 space-y-5"
-          >
-            {error && (
-              <div className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)] p-3 text-[var(--color-error)] text-sm">
-                {error}
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-                Email
-              </label>
-              <input
+          <Card variant="raised" padding="lg">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <Input
                 name="email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
+                label="Email"
                 placeholder="you@example.com"
               />
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-                Master Password
-              </label>
-              <input
+              <Input
                 name="password"
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
+                label="Master Password"
                 placeholder="Master password"
               />
-            </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-40 text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
-            >
-              {loading ? 'Unlocking vault...' : 'Sign In'}
-            </button>
+              <Button type="submit" variant="primary" loading={loading} style={{ width: '100%' }}>
+                Sign In
+              </Button>
 
-            <p className="text-center text-sm text-[var(--color-text-tertiary)]">
-              Don't have an account?{' '}
-              <Link
-                to="/register"
-                className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
-              >
-                Create vault
-              </Link>
-            </p>
+              <p className="text-center text-sm text-[var(--color-text-tertiary)]">
+                Don't have an account?{' '}
+                <Link
+                  to="/register"
+                  className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
+                >
+                  Create vault
+                </Link>
+              </p>
 
-            <div className="mt-4 space-y-2">
-              <button
-                type="button"
-                onClick={handleHardwareKeyUnlock}
-                disabled={hwKeyLoading}
-                className="w-full py-2.5 px-4 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] font-medium rounded-[var(--radius-md)] transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
-              >
-                <span>🔐</span>
-                {hwKeyLoading ? 'Authenticating...' : 'Unlock with Hardware Key'}
-              </button>
-              <button
-                type="button"
-                onClick={handleQRScan}
-                disabled={qrScanning}
-                className="w-full py-2.5 px-4 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] font-medium rounded-[var(--radius-md)] transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
-              >
-                <span>📱</span>
-                {qrScanning ? 'Scanning...' : 'Scan QR Code'}
-              </button>
-            </div>
-          </form>
+              <div className="mt-4 space-y-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={hwKeyLoading}
+                  onClick={handleHardwareKeyUnlock}
+                  style={{ width: '100%' }}
+                >
+                  <span>🔐</span>
+                  Unlock with Hardware Key
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  loading={qrScanning}
+                  onClick={handleQRScan}
+                  style={{ width: '100%' }}
+                >
+                  <span>📱</span>
+                  Scan QR Code
+                </Button>
+              </div>
+            </form>
+          </Card>
         )}
       </div>
     </div>

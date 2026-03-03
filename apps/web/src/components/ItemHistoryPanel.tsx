@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { decryptVaultItem } from '../lib/crypto.js';
+import { Button } from '@lockbox/design';
+import { useToast } from '../providers/ToastProvider.js';
 import type { VaultItem } from '@lockbox/types';
 
 interface ItemHistoryPanelProps {
@@ -39,9 +41,9 @@ function formatRelativeTime(dateStr: string) {
 
 export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHistoryPanelProps) {
   const { session, userKey } = useAuthStore();
+  const { toast } = useToast();
   const [versions, setVersions] = useState<ItemVersion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   const [selectedVersion, setSelectedVersion] = useState<FetchedVersion | null>(null);
   const [decryptedData, setDecryptedData] = useState<VaultItem | null>(null);
@@ -59,14 +61,13 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
         if (data.error) throw new Error(data.error);
         setVersions(data.versions || []);
       })
-      .catch((err) => setError((err as Error).message))
+      .catch((err) => toast((err as Error).message, 'error'))
       .finally(() => setLoading(false));
   }, [itemId, session]);
 
   const handleView = async (versionId: string) => {
     if (!session || !userKey) return;
     setLoadingVersion(true);
-    setError('');
 
     try {
       const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/versions/${versionId}`, {
@@ -81,7 +82,7 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
       const decrypted = await decryptVaultItem(v.encryptedData, userKey, v.itemId, v.revisionDate);
       setDecryptedData(decrypted);
     } catch (err: Error | unknown) {
-      setError((err as Error).message || 'Failed to load version details');
+      toast((err as Error).message || 'Failed to load version details', 'error');
     } finally {
       setLoadingVersion(false);
     }
@@ -90,7 +91,6 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
   const handleRestore = async (versionId: string) => {
     if (!session) return;
     setRestoring(true);
-    setError('');
 
     try {
       const res = await fetch(
@@ -105,7 +105,7 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
 
       onRestore();
     } catch (err: Error | unknown) {
-      setError((err as Error).message || 'Failed to restore version');
+      toast((err as Error).message || 'Failed to restore version', 'error');
       setRestoring(false);
     }
   };
@@ -170,21 +170,12 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
       <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] border-l border-[var(--color-border)] z-[70] flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0">
         <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
           <h2 className="text-lg font-semibold text-[var(--color-text)]">Version History</h2>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors"
-          >
+          <Button variant="ghost" size="sm" onClick={onClose}>
             ✕
-          </button>
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {error && (
-            <div className="p-3 bg-[var(--color-error-subtle)] text-[var(--color-error)] border border-[var(--color-error)] text-sm rounded-[var(--radius-md)] mb-4">
-              {error}
-            </div>
-          )}
-
           {loading ? (
             <div className="text-[var(--color-text-tertiary)] text-sm text-center py-8">
               Loading history...
@@ -215,20 +206,18 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
                       </div>
                       <div className="flex gap-2">
                         {isSelected ? (
-                          <button
-                            disabled={restoring}
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            loading={restoring}
                             onClick={() => handleRestore(v.id)}
-                            className="px-3 py-1.5 text-xs bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] transition-colors disabled:opacity-50"
                           >
-                            {restoring ? 'Restoring...' : 'Restore'}
-                          </button>
+                            Restore
+                          </Button>
                         ) : (
-                          <button
-                            onClick={() => handleView(v.id)}
-                            className="px-3 py-1.5 text-xs bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-md)] transition-colors"
-                          >
+                          <Button variant="secondary" size="sm" onClick={() => handleView(v.id)}>
                             View
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>

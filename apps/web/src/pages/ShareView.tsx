@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { redeemShareLink, getShareAuthToken } from '../lib/team-crypto.js';
+import { Button, Input, Card, Badge, Textarea } from '@lockbox/design';
 import type { VaultItem, LoginItem, SecureNoteItem, CardItem } from '@lockbox/types';
+
 export default function ShareView() {
   const { shareId } = useParams<{ shareId: string }>();
   const [loading, setLoading] = useState(true);
@@ -11,9 +13,6 @@ export default function ShareView() {
   const [viewCount, setViewCount] = useState<number>(0);
   const [maxViews, setMaxViews] = useState<number>(0);
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showCardNumber, setShowCardNumber] = useState(false);
-  const [showCvv, setShowCvv] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,9 +63,10 @@ export default function ShareView() {
   }
 
   const renderCopyButton = (text: string, field: string, title: string) => (
-    <button
+    <Button
+      variant="secondary"
+      size="sm"
       onClick={() => copyToClipboard(text, field)}
-      className="p-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
       title={title}
     >
       {copiedField === field ? (
@@ -81,7 +81,7 @@ export default function ShareView() {
           />
         </svg>
       )}
-    </button>
+    </Button>
   );
 
   const renderLoginFields = (item: VaultItem) => {
@@ -90,74 +90,41 @@ export default function ShareView() {
     return (
       <>
         {loginItem.username && (
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              Username
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                readOnly
-                value={loginItem.username}
-                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] transition-colors"
-              />
-              {renderCopyButton(loginItem.username, 'username', 'Copy username')}
-            </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="text"
+              label="Username"
+              readOnly
+              value={loginItem.username}
+              className="flex-1"
+            />
+            {renderCopyButton(loginItem.username, 'username', 'Copy username')}
           </div>
         )}
         {loginItem.password && (
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              Password
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                readOnly
-                value={loginItem.password}
-                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono outline-none focus:border-[var(--color-border-strong)] transition-colors"
-              />
-              <button
-                onClick={() => setShowPassword(!showPassword)}
-                className="p-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-                title={showPassword ? 'Hide password' : 'Show password'}
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {showPassword ? (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                    />
-                  ) : (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  )}
-                </svg>
-              </button>
-              {renderCopyButton(loginItem.password, 'password', 'Copy password')}
-            </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="password"
+              label="Password"
+              readOnly
+              value={loginItem.password}
+              className="flex-1"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+            {renderCopyButton(loginItem.password, 'password', 'Copy password')}
           </div>
         )}
         {loginItem.totp && (
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              TOTP Secret
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                readOnly
-                value={loginItem.totp}
-                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono outline-none focus:border-[var(--color-border-strong)] transition-colors"
-              />
-              {renderCopyButton(loginItem.totp, 'totp', 'Copy TOTP')}
-            </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="text"
+              label="TOTP Secret"
+              readOnly
+              value={loginItem.totp}
+              className="flex-1"
+              style={{ fontFamily: 'var(--font-mono)' }}
+            />
+            {renderCopyButton(loginItem.totp, 'totp', 'Copy TOTP')}
           </div>
         )}
         {loginItem.uris && loginItem.uris.length > 0 && loginItem.uris[0] && (
@@ -189,17 +156,18 @@ export default function ShareView() {
     if (item.type !== 'note') return null;
     const noteItem = item as SecureNoteItem;
     return (
-      <div>
-        <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-          Content
-        </label>
-        <textarea
-          readOnly
-          value={noteItem.content || ''}
-          rows={10}
-          className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] outline-none focus:border-[var(--color-border-strong)] transition-colors whitespace-pre-wrap font-mono text-sm resize-none"
-        />
-      </div>
+      <Textarea
+        label="Content"
+        readOnly
+        value={noteItem.content || ''}
+        rows={10}
+        resize="none"
+        style={{
+          whiteSpace: 'pre-wrap',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 'var(--font-size-sm)',
+        }}
+      />
     );
   };
 
@@ -209,103 +177,38 @@ export default function ShareView() {
     return (
       <div className="space-y-4">
         {cardItem.cardholderName && (
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              Cardholder Name
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={cardItem.cardholderName}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] outline-none"
-            />
-          </div>
+          <Input type="text" label="Cardholder Name" readOnly value={cardItem.cardholderName} />
         )}
         {cardItem.number && (
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              Card Number
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type={showCardNumber ? 'text' : 'password'}
-                readOnly
-                value={cardItem.number}
-                className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono tracking-wider outline-none"
-              />
-              <button
-                onClick={() => setShowCardNumber(!showCardNumber)}
-                className="p-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {showCardNumber ? (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                    />
-                  ) : (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  )}
-                </svg>
-              </button>
-              {renderCopyButton(cardItem.number, 'card-number', 'Copy card number')}
-            </div>
+          <div className="flex items-center gap-2">
+            <Input
+              type="password"
+              label="Card Number"
+              readOnly
+              value={cardItem.number}
+              className="flex-1"
+              style={{ fontFamily: 'var(--font-mono)', letterSpacing: '0.05em' }}
+            />
+            {renderCopyButton(cardItem.number, 'card-number', 'Copy card number')}
           </div>
         )}
         <div className="flex gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              Expiration
-            </label>
-            <input
-              type="text"
-              readOnly
-              value={`${cardItem.expMonth || ''} / ${cardItem.expYear || ''}`}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono outline-none"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              CVV
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type={showCvv ? 'text' : 'password'}
-                readOnly
-                value={cardItem.cvv || ''}
-                className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] font-mono outline-none"
-              />
-              <button
-                onClick={() => setShowCvv(!showCvv)}
-                className="p-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  {showCvv ? (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                    />
-                  ) : (
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                    />
-                  )}
-                </svg>
-              </button>
-            </div>
-          </div>
+          <Input
+            type="text"
+            label="Expiration"
+            readOnly
+            value={`${cardItem.expMonth || ''} / ${cardItem.expYear || ''}`}
+            className="flex-1"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          />
+          <Input
+            type="password"
+            label="CVV"
+            readOnly
+            value={cardItem.cvv || ''}
+            className="flex-1"
+            style={{ fontFamily: 'var(--font-mono)' }}
+          />
         </div>
       </div>
     );
@@ -314,7 +217,7 @@ export default function ShareView() {
   return (
     <div className="min-h-screen p-6 text-[var(--color-text)] selection:bg-[var(--color-aura-dim)]">
       <div className="max-w-2xl mx-auto mt-12">
-        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6 relative overflow-hidden">
+        <Card variant="raised" padding="md" style={{ position: 'relative', overflow: 'hidden' }}>
           <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[var(--color-aura)] rounded-[var(--radius-full)] blur-[80px] pointer-events-none" />
 
           {loading ? (
@@ -351,20 +254,18 @@ export default function ShareView() {
                   </p>
                 </div>
                 {maxViews > 0 && (
-                  <span className="inline-flex items-center px-2.5 py-1 rounded-[var(--radius-full)] text-xs font-medium bg-[var(--color-aura-dim)] text-[var(--color-primary)] border border-[var(--color-primary)]">
+                  <Badge variant="primary" style={{ border: '1px solid var(--color-primary)' }}>
                     View {viewCount} of {maxViews}
-                  </span>
+                  </Badge>
                 )}
               </div>
 
-              {/* ITEM CONTENT */}
               <div className="space-y-5">
                 {renderLoginFields(item)}
                 {renderNoteFields(item)}
                 {renderCardFields(item)}
               </div>
 
-              {/* Security Notice */}
               <div className="pt-6 mt-8 border-t border-[var(--color-border)] text-center">
                 <div className="inline-flex items-center justify-center space-x-2 text-xs text-[var(--color-text-tertiary)]">
                   <svg
@@ -388,7 +289,7 @@ export default function ShareView() {
               </div>
             </div>
           ) : null}
-        </div>
+        </Card>
       </div>
     </div>
   );

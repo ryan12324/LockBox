@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@lockbox/crypto": "*",
+    "@lockbox/design": "*",
     "@lockbox/generator": "*",
     "@lockbox/totp": "*",
     "@lockbox/types": "*",

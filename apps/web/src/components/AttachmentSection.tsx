@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { encryptFile, decryptFile } from '../lib/file-crypto.js';
 import { encryptString, decryptString } from '@lockbox/crypto';
+import { Button } from '@lockbox/design';
+import { useToast } from '../providers/ToastProvider.js';
 
 interface Attachment {
   id: string;
@@ -37,9 +39,9 @@ function formatBytes(bytes: number, decimals = 2) {
 
 export default function AttachmentSection({ itemId, mode }: Props) {
   const { session, userKey } = useAuthStore();
+  const { toast } = useToast();
   const [attachments, setAttachments] = useState<DecryptedAttachment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
   const [isDragging, setIsDragging] = useState(false);
   const [quotaUsed, setQuotaUsed] = useState(0);
@@ -97,7 +99,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       // But the instructions say "Quota display: X MB / 100 MB used" - maybe just show this item's? Or assume total used is this item's unless there's an API for quota. We don't have a quota API.
       // Let's just track quota from the upload errors or sum all attachments across all items? We only have access to THIS item's attachments. I'll just show the item's attachment size sum for now, or omit it. The instructions say: "Quota display: 'X MB / 100 MB used' text". Let's approximate or just show local.
     } catch (err: any) {
-      setError(err.message);
+      toast(err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -110,12 +112,10 @@ export default function AttachmentSection({ itemId, mode }: Props) {
   const handleUpload = async (files: FileList | null) => {
     if (!files || files.length === 0 || !session?.token || !userKey) return;
 
-    setError('');
-
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (file.size > MAX_FILE_SIZE) {
-        setError(`File ${file.name} exceeds 10MB limit`);
+        toast(`File ${file.name} exceeds 10MB limit`, 'error');
         continue;
       }
 
@@ -193,7 +193,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
           });
         }, 1000);
       } catch (err: any) {
-        setError(err.message);
+        toast(err.message, 'error');
         setUploadProgress({});
       }
     }
@@ -240,7 +240,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       document.body.removeChild(aElem);
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      setError(err.message);
+      toast(err.message, 'error');
     }
   };
 
@@ -292,7 +292,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
 
       setAttachments((prev) => prev.filter((att) => att.id !== a.id));
     } catch (err: any) {
-      setError(err.message);
+      toast(err.message, 'error');
     }
   };
 
@@ -315,12 +315,6 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       <h3 className="text-sm font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider mb-2">
         Attachments
       </h3>
-
-      {error && (
-        <div className="mb-4 p-3 bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-lg)] text-[var(--color-error)] text-sm">
-          {error}
-        </div>
-      )}
 
       {/* Upload Zone */}
       {mode !== 'view' && (
@@ -423,32 +417,35 @@ export default function AttachmentSection({ itemId, mode }: Props) {
 
                 <div className="flex items-center space-x-2">
                   {isImage && !a.previewUrl && (
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
                         handlePreview(a);
                       }}
-                      className="px-2 py-1 text-xs bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-sm)] transition-colors"
                       title="Preview"
                     >
                       Preview
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => handleDownload(a)}
-                    className="px-2 py-1 text-xs bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] rounded-[var(--radius-sm)] transition-colors"
                     title="Download"
                   >
                     Download
-                  </button>
+                  </Button>
                   {mode !== 'view' && (
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={() => handleDelete(a)}
-                      className="px-2 py-1 text-xs bg-[var(--color-error-subtle)] hover:bg-[var(--color-error)] text-[var(--color-error)] rounded-[var(--radius-sm)] transition-colors"
                       title="Delete"
                     >
                       Delete
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>

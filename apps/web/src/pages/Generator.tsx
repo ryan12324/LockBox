@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { generatePassword, generatePassphrase, evaluateStrength } from '@lockbox/generator';
+import { Button, Input, Card, Badge } from '@lockbox/design';
 
 type Tab = 'password' | 'passphrase';
 
@@ -62,6 +63,13 @@ export default function Generator() {
     'bg-[var(--color-success)]',
   ];
   const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
+  const strengthVariants: Array<'error' | 'warning' | 'warning' | 'primary' | 'success'> = [
+    'error',
+    'warning',
+    'warning',
+    'primary',
+    'success',
+  ];
 
   async function copyToClipboard() {
     await navigator.clipboard.writeText(generated);
@@ -76,158 +84,155 @@ export default function Generator() {
     <div className="flex-1 overflow-y-auto p-6">
       <div className="max-w-lg mx-auto">
         <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Password Generator</h1>
-        <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-6 space-y-6">
-          {/* Tab toggle */}
-          <div className="flex rounded-[var(--radius-md)] bg-[var(--color-surface)] p-1">
-            {(['password', 'passphrase'] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`flex-1 py-2 text-sm font-medium rounded-[var(--radius-sm)] transition-colors capitalize ${
-                  tab === t
-                    ? 'bg-[var(--color-surface-raised)] text-[var(--color-text)] shadow-sm'
-                    : 'text-[var(--color-text-tertiary)]'
-                }`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
-          {/* Generated output */}
-          <div className="bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] p-4 border border-[var(--color-border)]">
-            <p
-              data-testid="generated-password"
-              className="font-mono text-lg text-[var(--color-text)] break-all min-h-[2rem]"
-            >
-              {generated || (
-                <span className="text-[var(--color-text-tertiary)]">
-                  Click generate to create a password
-                </span>
-              )}
-            </p>
-            {strength && generated && (
-              <div className="mt-3">
-                <div className="flex gap-1">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className={`h-1.5 flex-1 rounded-[var(--radius-full)] ${i <= strength.score ? strengthColors[strength.score] : 'bg-[var(--color-surface-raised)]'}`}
-                    />
-                  ))}
-                </div>
-                <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
-                  {strengthLabels[strength.score]} · {Math.round(strength.entropy)} bits entropy
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Options */}
-          {tab === 'password' ? (
-            <div className="space-y-4">
-              <div>
-                <label className="flex justify-between text-sm font-medium text-[var(--color-text-secondary)] mb-2">
-                  <span>Length</span>
-                  <span className="font-mono">{length}</span>
-                </label>
-                <input
-                  type="range"
-                  min={8}
-                  max={128}
-                  value={length}
-                  onChange={(e) => setLength(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
-
-              {[
-                { label: 'Uppercase (A-Z)', value: uppercase, set: setUppercase },
-                { label: 'Lowercase (a-z)', value: lowercase, set: setLowercase },
-                { label: 'Digits (0-9)', value: digits, set: setDigits },
-                { label: 'Symbols (!@#$...)', value: symbols, set: setSymbols },
-                {
-                  label: 'Exclude ambiguous (0O1lI)',
-                  value: excludeAmbiguous,
-                  set: setExcludeAmbiguous,
-                },
-              ].map(({ label, value, set }) => (
-                <label key={label} className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm text-[var(--color-text-secondary)]">{label}</span>
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={(e) => set(e.target.checked)}
-                    className="w-4 h-4 text-[var(--color-primary)] rounded border-[var(--color-border-strong)] bg-[var(--color-surface-raised)]"
-                  />
-                </label>
+        <Card variant="surface" padding="md">
+          <div className="space-y-6">
+            <div className="flex rounded-[var(--radius-md)] bg-[var(--color-surface)] p-1">
+              {(['password', 'passphrase'] as Tab[]).map((t) => (
+                <Button
+                  key={t}
+                  variant={tab === t ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setTab(t)}
+                  style={{ flex: 1, textTransform: 'capitalize' }}
+                >
+                  {t}
+                </Button>
               ))}
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label className="flex justify-between text-sm font-medium text-[var(--color-text-secondary)] mb-2">
-                  <span>Word Count</span>
-                  <span className="font-mono">{wordCount}</span>
-                </label>
-                <input
-                  type="range"
-                  min={3}
-                  max={10}
-                  value={wordCount}
-                  onChange={(e) => setWordCount(Number(e.target.value))}
-                  className="w-full"
-                />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-                  Separator
-                </label>
-                <input
+            <div className="bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] p-4 border border-[var(--color-border)]">
+              <p
+                data-testid="generated-password"
+                className="font-mono text-lg text-[var(--color-text)] break-all min-h-[2rem]"
+              >
+                {generated || (
+                  <span className="text-[var(--color-text-tertiary)]">
+                    Click generate to create a password
+                  </span>
+                )}
+              </p>
+              {strength && generated && (
+                <div className="mt-3">
+                  <div className="flex gap-1">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className={`h-1.5 flex-1 rounded-[var(--radius-full)] ${i <= strength.score ? strengthColors[strength.score] : 'bg-[var(--color-surface-raised)]'}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant={strengthVariants[strength.score]}>
+                      {strengthLabels[strength.score]}
+                    </Badge>
+                    <span className="text-xs text-[var(--color-text-tertiary)]">
+                      {Math.round(strength.entropy)} bits entropy
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {tab === 'password' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="flex justify-between text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                    <span>Length</span>
+                    <span className="font-mono">{length}</span>
+                  </label>
+                  {React.createElement('input', {
+                    type: 'range',
+                    min: 8,
+                    max: 128,
+                    value: length,
+                    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                      setLength(Number(e.target.value)),
+                    className: 'w-full',
+                  })}
+                </div>
+
+                {[
+                  { label: 'Uppercase (A-Z)', value: uppercase, set: setUppercase },
+                  { label: 'Lowercase (a-z)', value: lowercase, set: setLowercase },
+                  { label: 'Digits (0-9)', value: digits, set: setDigits },
+                  { label: 'Symbols (!@#$...)', value: symbols, set: setSymbols },
+                  {
+                    label: 'Exclude ambiguous (0O1lI)',
+                    value: excludeAmbiguous,
+                    set: setExcludeAmbiguous,
+                  },
+                ].map(({ label, value, set }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-sm text-[var(--color-text-secondary)]">{label}</span>
+                    <Button
+                      variant={value ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => set(!value)}
+                      style={{ minWidth: 52 }}
+                    >
+                      {value ? 'On' : 'Off'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="flex justify-between text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                    <span>Word Count</span>
+                    <span className="font-mono">{wordCount}</span>
+                  </label>
+                  {React.createElement('input', {
+                    type: 'range',
+                    min: 3,
+                    max: 10,
+                    value: wordCount,
+                    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+                      setWordCount(Number(e.target.value)),
+                    className: 'w-full',
+                  })}
+                </div>
+
+                <Input
                   type="text"
+                  label="Separator"
                   value={separator}
                   onChange={(e) => setSeparator(e.target.value)}
                   maxLength={3}
-                  className="w-20 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] text-center font-mono"
+                  style={{ width: 80, textAlign: 'center', fontFamily: 'var(--font-mono)' }}
                 />
+
+                {[
+                  { label: 'Capitalize words', value: capitalize, set: setCapitalize },
+                  { label: 'Include a number', value: includeNumber, set: setIncludeNumber },
+                ].map(({ label, value, set }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-sm text-[var(--color-text-secondary)]">{label}</span>
+                    <Button
+                      variant={value ? 'primary' : 'secondary'}
+                      size="sm"
+                      onClick={() => set(!value)}
+                      style={{ minWidth: 52 }}
+                    >
+                      {value ? 'On' : 'Off'}
+                    </Button>
+                  </div>
+                ))}
               </div>
-
-              {[
-                { label: 'Capitalize words', value: capitalize, set: setCapitalize },
-                { label: 'Include a number', value: includeNumber, set: setIncludeNumber },
-              ].map(({ label, value, set }) => (
-                <label key={label} className="flex items-center justify-between cursor-pointer">
-                  <span className="text-sm text-[var(--color-text-secondary)]">{label}</span>
-                  <input
-                    type="checkbox"
-                    checked={value}
-                    onChange={(e) => set(e.target.checked)}
-                    className="w-4 h-4 text-[var(--color-primary)] rounded border-[var(--color-border-strong)] bg-[var(--color-surface-raised)]"
-                  />
-                </label>
-              ))}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-3">
-            <button
-              onClick={generate}
-              className="flex-1 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
-            >
-              🎲 Generate
-            </button>
-            {generated && (
-              <button
-                onClick={copyToClipboard}
-                className="px-4 py-2.5 bg-[var(--color-surface)] hover:bg-[var(--color-surface-raised)] text-[var(--color-text-secondary)] font-medium rounded-[var(--radius-md)] transition-colors"
-              >
-                {copied ? '✓ Copied' : '📋 Copy'}
-              </button>
             )}
+
+            <div className="flex gap-3">
+              <Button variant="primary" onClick={generate} style={{ flex: 1 }}>
+                🎲 Generate
+              </Button>
+              {generated && (
+                <Button variant="secondary" onClick={copyToClipboard}>
+                  {copied ? '✓ Copied' : '📋 Copy'}
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

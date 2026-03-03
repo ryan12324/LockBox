@@ -9,9 +9,11 @@ import {
   toBase64,
 } from '@lockbox/crypto';
 import { evaluateStrength } from '@lockbox/generator';
+import { Button, Input, Card, Aura } from '@lockbox/design';
 import { api } from '../lib/api.js';
 import { generateEmergencyKitPDF } from '../lib/emergency-kit.js';
 import { useAuthStore } from '../store/auth.js';
+import { useToast } from '../providers/ToastProvider.js';
 import type { KdfConfig } from '@lockbox/types';
 
 const DEFAULT_KDF: KdfConfig = {
@@ -24,25 +26,23 @@ const DEFAULT_KDF: KdfConfig = {
 export default function Register() {
   const navigate = useNavigate();
   const { setSession, setKeys } = useAuthStore();
+  const { toast } = useToast();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const strength = password ? evaluateStrength(password) : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
-
     if (password !== confirm) {
-      setError('Passwords do not match');
+      toast('Passwords do not match', 'error');
       return;
     }
     if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+      toast('Password must be at least 8 characters', 'error');
       return;
     }
 
@@ -92,7 +92,7 @@ export default function Register() {
 
       navigate('/vault');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed');
+      toast(err instanceof Error ? err.message : 'Registration failed', 'error');
     } finally {
       setLoading(false);
     }
@@ -108,107 +108,87 @@ export default function Register() {
   const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ position: 'relative', overflow: 'hidden' }}
+    >
+      <Aura state="idle" position="center" />
+      <div className="w-full max-w-md" style={{ position: 'relative', zIndex: 1 }}>
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-[var(--color-text)]">🔐 Lockbox</h1>
           <p className="mt-2 text-[var(--color-text-tertiary)]">Create your secure vault</p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-8 space-y-5"
-        >
-          {error && (
-            <div className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)] p-3 text-[var(--color-error)] text-sm">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              Email
-            </label>
-            <input
+        <Card variant="raised" padding="lg">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Input
               name="email"
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
+              label="Email"
               placeholder="you@example.com"
             />
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              Master Password
-            </label>
-            <input
-              name="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
-              placeholder="Strong master password"
-            />
-            {strength && (
-              <div className="mt-2">
-                <div className="flex gap-1">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className={`h-1.5 flex-1 rounded-full ${i <= strength.score ? strengthColors[strength.score] : 'bg-[var(--color-surface-raised)]'}`}
-                    />
-                  ))}
+            <div>
+              <Input
+                name="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                label="Master Password"
+                placeholder="Strong master password"
+              />
+              {strength && (
+                <div className="mt-2">
+                  <div className="flex gap-1">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className={`h-1.5 flex-1 rounded-full ${i <= strength.score ? strengthColors[strength.score] : 'bg-[var(--color-surface-raised)]'}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                    {strengthLabels[strength.score]}
+                    {strength.feedback.length > 0 && ` — ${strength.feedback[0]}`}
+                  </p>
                 </div>
-                <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
-                  {strengthLabels[strength.score]}
-                  {strength.feedback.length > 0 && ` — ${strength.feedback[0]}`}
-                </p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              Confirm Password
-            </label>
-            <input
+            <Input
               name="confirmPassword"
               type="password"
               required
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
+              label="Confirm Password"
               placeholder="Confirm master password"
             />
-          </div>
 
-          <div className="bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-md)] p-3 text-[var(--color-warning)] text-xs">
-            ⚠️ Your master password cannot be recovered. An emergency kit PDF will be downloaded —
-            store it safely.
-          </div>
+            <div className="bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-md)] p-3 text-[var(--color-warning)] text-xs">
+              ⚠️ Your master password cannot be recovered. An emergency kit PDF will be downloaded —
+              store it safely.
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-40 text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
-          >
-            {loading ? 'Creating vault...' : 'Create Vault'}
-          </button>
+            <Button type="submit" variant="primary" loading={loading} style={{ width: '100%' }}>
+              Create Vault
+            </Button>
 
-          <p className="text-center text-sm text-[var(--color-text-tertiary)]">
-            Already have an account?{' '}
-            <Link
-              to="/login"
-              className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
-            >
-              Sign in
-            </Link>
-          </p>
-        </form>
+            <p className="text-center text-sm text-[var(--color-text-tertiary)]">
+              Already have an account?{' '}
+              <Link
+                to="/login"
+                className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
+              >
+                Sign in
+              </Link>
+            </p>
+          </form>
+        </Card>
       </div>
     </div>
   );

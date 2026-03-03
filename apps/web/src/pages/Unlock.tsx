@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deriveKey, decryptUserKey, fromBase64 } from '@lockbox/crypto';
+import { Button, Input, Card, Aura } from '@lockbox/design';
 import { useAuthStore } from '../store/auth.js';
+import { useToast } from '../providers/ToastProvider.js';
 
 export default function Unlock() {
   const navigate = useNavigate();
   const { session, setKeys, logout } = useAuthStore();
+  const { toast } = useToast();
 
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   if (!session) {
     navigate('/login');
@@ -18,7 +20,6 @@ export default function Unlock() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
     setLoading(true);
 
     try {
@@ -29,15 +30,19 @@ export default function Unlock() {
       setKeys(masterKey, userKey);
       navigate('/vault');
     } catch {
-      setError('Incorrect master password');
+      toast('Incorrect master password', 'error');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
+    <div
+      className="min-h-screen flex items-center justify-center px-4"
+      style={{ position: 'relative', overflow: 'hidden' }}
+    >
+      <Aura state="idle" position="center" />
+      <div className="w-full max-w-md" style={{ position: 'relative', zIndex: 1 }}>
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">🔒</div>
           <h1 className="text-2xl font-bold text-[var(--color-text)]">Vault Locked</h1>
@@ -46,48 +51,28 @@ export default function Unlock() {
           </p>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          className="bg-[var(--color-surface-raised)] border border-[var(--color-border)] rounded-[var(--radius-xl)] shadow-[var(--shadow-lg)] p-8 space-y-5"
-        >
-          {error && (
-            <div className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)] p-3 text-[var(--color-error)] text-sm">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-              Master Password
-            </label>
-            <input
+        <Card variant="raised" padding="lg">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Input
               name="masterPassword"
               type="password"
               required
               autoFocus
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-aura)] focus:border-[var(--color-border-strong)]"
+              label="Master Password"
               placeholder="Enter master password to unlock"
             />
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 px-4 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] disabled:opacity-40 text-[var(--color-primary-fg)] font-medium rounded-[var(--radius-md)] transition-colors"
-          >
-            {loading ? 'Unlocking...' : 'Unlock Vault'}
-          </button>
+            <Button type="submit" variant="primary" loading={loading} style={{ width: '100%' }}>
+              Unlock Vault
+            </Button>
 
-          <button
-            type="button"
-            onClick={logout}
-            className="w-full py-2 text-sm text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
-          >
-            Sign out and use a different account
-          </button>
-        </form>
+            <Button type="button" variant="ghost" onClick={logout} style={{ width: '100%' }}>
+              Sign out and use a different account
+            </Button>
+          </form>
+        </Card>
       </div>
     </div>
   );

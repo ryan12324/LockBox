@@ -9,6 +9,8 @@ import {
   loadPublicKey,
   createFolderKeyForMembers,
 } from '../lib/team-crypto.js';
+import { useToast } from '../providers/ToastProvider.js';
+import { Button, Input, Card, Badge, Select } from '@lockbox/design';
 
 interface Member {
   teamId: string;
@@ -56,8 +58,7 @@ export default function TeamDetail() {
   const [sharedFolders, setSharedFolders] = useState<SharedFolderInfo[]>([]);
   const [userFolders, setUserFolders] = useState<FolderOption[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const { toast } = useToast();
 
   // Inline editing
   const [editingName, setEditingName] = useState(false);
@@ -86,17 +87,7 @@ export default function TeamDetail() {
   const isAdmin = myRole === 'owner' || myRole === 'admin';
 
   const showMessage = (msg: string, type: 'error' | 'success') => {
-    if (type === 'error') {
-      setError(msg);
-      setSuccess(null);
-    } else {
-      setSuccess(msg);
-      setError(null);
-    }
-    setTimeout(() => {
-      setError(null);
-      setSuccess(null);
-    }, 4000);
+    toast(msg, type);
   };
 
   const loadTeamDetail = useCallback(async () => {
@@ -269,22 +260,6 @@ export default function TeamDetail() {
     }
   }
 
-  const roleColor = (role: string) => {
-    switch (role) {
-      case 'owner':
-        return 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]';
-      case 'admin':
-        return 'bg-[var(--color-aura-dim)] text-[var(--color-primary)]';
-      default:
-        return 'bg-[var(--color-surface)] text-[var(--color-text-tertiary)]';
-    }
-  };
-
-  const permColor = (perm: string) =>
-    perm === 'read_write'
-      ? 'bg-[var(--color-success-subtle)] text-[var(--color-success)]'
-      : 'bg-[var(--color-surface)] text-[var(--color-text-tertiary)]';
-
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-6">
@@ -298,17 +273,13 @@ export default function TeamDetail() {
   return (
     <div className="min-h-screen p-6">
       <div className="max-w-2xl mx-auto">
-        {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={() => navigate('/teams')}
-            className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
-          >
+          <Button variant="ghost" size="sm" onClick={() => navigate('/teams')}>
             ← Back
-          </button>
+          </Button>
           {editingName ? (
             <div className="flex items-center gap-2 flex-1">
-              <input
+              <Input
                 type="text"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
@@ -319,24 +290,23 @@ export default function TeamDetail() {
                     setEditName(teamName);
                   }
                 }}
-                className="px-3 py-1 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] text-2xl font-bold"
+                className="flex-1"
+                style={{ fontSize: '1.5rem', fontWeight: 'bold' }}
                 autoFocus
               />
-              <button
-                onClick={handleRename}
-                className="px-2 py-1 text-xs bg-[var(--color-primary)] text-[var(--color-primary-fg)] rounded hover:bg-[var(--color-primary-hover)]"
-              >
+              <Button variant="primary" size="sm" onClick={handleRename}>
                 ✓
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   setEditingName(false);
                   setEditName(teamName);
                 }}
-                className="px-2 py-1 text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]"
               >
                 ✕
-              </button>
+              </Button>
             </div>
           ) : (
             <h1
@@ -349,20 +319,8 @@ export default function TeamDetail() {
           )}
         </div>
 
-        {error && (
-          <div className="mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--color-error-subtle)] border border-[var(--color-error)] text-[var(--color-error)] text-sm">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-4 p-3 rounded-[var(--radius-md)] bg-[var(--color-success-subtle)] border border-[var(--color-success)] text-[var(--color-success)] text-sm">
-            {success}
-          </div>
-        )}
-
         <div className="space-y-6">
-          {/* Members */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
               Members ({members.length})
             </h2>
@@ -375,71 +333,80 @@ export default function TeamDetail() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm text-[var(--color-text)] truncate">{member.email}</p>
-                      <span
-                        className={`inline-block px-2 py-0.5 rounded-[var(--radius-full)] text-[10px] font-medium capitalize mt-0.5 ${roleColor(member.role)}`}
+                      <Badge
+                        variant={
+                          member.role === 'owner' || member.role === 'admin' ? 'primary' : 'default'
+                        }
+                        style={{ marginTop: 2, textTransform: 'capitalize' }}
                       >
                         {member.role}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
                   {isAdmin && member.userId !== currentUserId && member.role !== 'owner' && (
                     <div className="flex items-center gap-2 shrink-0">
-                      <select
+                      <Select
                         value={member.role}
                         onChange={(e) => handleChangeRole(member.userId, e.target.value)}
-                        className="px-2 py-1 text-xs border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
-                      >
-                        <option value="member">Member</option>
-                        <option value="admin">Admin</option>
-                      </select>
-                      <button
+                        options={[
+                          { value: 'member', label: 'Member' },
+                          { value: 'admin', label: 'Admin' },
+                        ]}
+                        style={{
+                          padding: '4px 28px 4px 8px',
+                          fontSize: 'var(--font-size-xs)',
+                          minWidth: 100,
+                        }}
+                      />
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => handleRemoveMember(member.userId)}
-                        className="text-[var(--color-error)] hover:text-[var(--color-error)] text-xs transition-colors"
                       >
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
               ))}
             </div>
-          </section>
+          </Card>
 
-          {/* Invite member */}
           {isAdmin && (
-            <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+            <Card variant="surface" padding="md">
               <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Invite Member</h2>
               <div className="flex gap-2">
-                <input
+                <Input
                   type="email"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
                   placeholder="email@example.com"
-                  className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)] placeholder-[var(--color-text-tertiary)]"
+                  className="flex-1"
                 />
-                <select
+                <Select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
-                  className="px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
-                >
-                  <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <button
+                  options={[
+                    { value: 'member', label: 'Member' },
+                    { value: 'admin', label: 'Admin' },
+                  ]}
+                />
+                <Button
+                  variant="primary"
+                  size="sm"
                   onClick={handleInvite}
                   disabled={inviting || !inviteEmail.trim()}
-                  className="px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
+                  loading={inviting}
                 >
                   {inviting ? 'Sending…' : 'Invite'}
-                </button>
+                </Button>
               </div>
-            </section>
+            </Card>
           )}
 
-          {/* Pending invites */}
           {isAdmin && invites.length > 0 && (
-            <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+            <Card variant="surface" padding="md">
               <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
                 Pending Invites ({invites.length})
               </h2>
@@ -449,92 +416,86 @@ export default function TeamDetail() {
                     <div>
                       <p className="text-sm text-[var(--color-text)]">{invite.email}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span
-                          className={`px-2 py-0.5 rounded-[var(--radius-full)] text-[10px] font-medium capitalize ${roleColor(invite.role)}`}
+                        <Badge
+                          variant={invite.role === 'admin' ? 'primary' : 'default'}
+                          style={{ textTransform: 'capitalize' }}
                         >
                           {invite.role}
-                        </span>
+                        </Badge>
                         <span className="text-[10px] text-[var(--color-text-tertiary)]">
                           Expires {new Date(invite.expiresAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={() => handleCancelInvite(invite.id)}
-                      className="text-[var(--color-error)] hover:text-[var(--color-error)] text-xs transition-colors"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
-            </section>
+            </Card>
           )}
 
-          {/* Shared folders */}
-          <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+          <Card variant="surface" padding="md">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-[var(--color-text)]">
                 Shared Folders ({sharedFolders.length})
               </h2>
               {isAdmin && hasKeyPair && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowShareFolder(!showShareFolder)}
-                  className="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline transition-colors"
                 >
                   {showShareFolder ? 'Cancel' : '+ Share a Folder'}
-                </button>
+                </Button>
               )}
             </div>
 
             {showShareFolder && (
               <div className="mb-4 p-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-subtle)] space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
-                    Folder
-                  </label>
-                  <select
-                    value={selectedFolderId}
-                    onChange={(e) => setSelectedFolderId(e.target.value)}
-                    className="w-full px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-text)]"
-                  >
-                    <option value="">Select a folder…</option>
-                    {userFolders
+                <Select
+                  label="Folder"
+                  value={selectedFolderId}
+                  onChange={(e) => setSelectedFolderId(e.target.value)}
+                  options={[
+                    { value: '', label: 'Select a folder…' },
+                    ...userFolders
                       .filter((f) => !sharedFolders.some((sf) => sf.folderId === f.id))
-                      .map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
+                      .map((f) => ({ value: f.id, label: f.name })),
+                  ]}
+                />
                 <div>
                   <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
                     Permission
                   </label>
                   <div className="flex gap-2">
                     {(['read_write', 'read_only'] as const).map((perm) => (
-                      <button
+                      <Button
                         key={perm}
+                        variant={sharePermission === perm ? 'primary' : 'secondary'}
+                        size="sm"
                         onClick={() => setSharePermission(perm)}
-                        className={`flex-1 py-2 text-sm font-medium rounded-[var(--radius-md)] border transition-colors ${
-                          sharePermission === perm
-                            ? 'border-[var(--color-primary)] bg-[var(--color-aura-dim)] text-[var(--color-primary)]'
-                            : 'border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-border-strong)]'
-                        }`}
+                        style={{ flex: 1 }}
                       >
                         {perm === 'read_write' ? 'Read & Write' : 'Read Only'}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
-                <button
+                <Button
+                  variant="primary"
                   onClick={handleShareFolder}
                   disabled={sharing || !selectedFolderId}
-                  className="w-full px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] text-[var(--color-primary-fg)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
+                  loading={sharing}
+                  style={{ width: '100%' }}
                 >
                   {sharing ? 'Sharing…' : 'Share Folder'}
-                </button>
+                </Button>
               </div>
             )}
 
@@ -552,29 +513,34 @@ export default function TeamDetail() {
                     <div className="flex items-center gap-2">
                       <span className="text-sm">📁</span>
                       <span className="text-sm text-[var(--color-text)]">{sf.folderName}</span>
-                      <span
-                        className={`px-2 py-0.5 rounded-[var(--radius-full)] text-[10px] font-medium ${permColor(sf.permissionLevel)}`}
-                      >
+                      <Badge variant={sf.permissionLevel === 'read_write' ? 'success' : 'default'}>
                         {sf.permissionLevel === 'read_write' ? 'Read & Write' : 'Read Only'}
-                      </span>
+                      </Badge>
                     </div>
                     {isAdmin && (
-                      <button
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => handleUnshareFolder(sf.folderId)}
-                        className="text-[var(--color-error)] hover:text-[var(--color-error)] text-xs transition-colors"
                       >
                         Unshare
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))}
               </div>
             )}
-          </section>
+          </Card>
 
-          {/* Danger zone */}
           {isOwner && (
-            <section className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-lg)] shadow-[var(--shadow-lg)] p-6">
+            <Card
+              variant="surface"
+              padding="md"
+              style={{
+                background: 'var(--color-error-subtle)',
+                border: '1px solid var(--color-error)',
+              }}
+            >
               <h2 className="text-lg font-semibold text-[var(--color-error)] mb-4">Danger Zone</h2>
               {confirmDelete ? (
                 <div>
@@ -583,30 +549,26 @@ export default function TeamDetail() {
                     access for members.
                   </p>
                   <div className="flex gap-2">
-                    <button
+                    <Button
+                      variant="danger"
+                      size="sm"
                       onClick={handleDeleteTeam}
                       disabled={deleting}
-                      className="px-4 py-2 bg-[var(--color-error)] hover:bg-[var(--color-error)] text-[var(--color-text)] rounded-[var(--radius-md)] text-sm font-medium transition-colors disabled:opacity-50"
+                      loading={deleting}
                     >
                       {deleting ? 'Deleting…' : 'Yes, Delete Team'}
-                    </button>
-                    <button
-                      onClick={() => setConfirmDelete(false)}
-                      className="px-4 py-2 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)] text-sm transition-colors"
-                    >
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={() => setConfirmDelete(true)}
-                  className="px-4 py-2 border border-[var(--color-error)] text-[var(--color-error)] hover:bg-[var(--color-error-subtle)] rounded-[var(--radius-md)] text-sm font-medium transition-colors"
-                >
+                <Button variant="danger" size="sm" onClick={() => setConfirmDelete(true)}>
                   Delete Team
-                </button>
+                </Button>
               )}
-            </section>
+            </Card>
           )}
         </div>
       </div>
