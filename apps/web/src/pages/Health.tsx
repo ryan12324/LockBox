@@ -569,9 +569,15 @@ export default function Health() {
                   </div>
                   <div className="flex items-baseline" style={{ gap: 8 }}>
                     <span
+                      className={
+                        cat.count > 0
+                          ? cat.key === 'weak' || cat.key === 'breached'
+                            ? 'kinetic-insecure'
+                            : 'kinetic-warning'
+                          : 'kinetic-secure'
+                      }
                       style={{
                         fontSize: 'var(--font-size-2xl)',
-                        fontWeight: 700,
                         color: 'var(--color-text)',
                       }}
                     >
@@ -631,8 +637,12 @@ export default function Health() {
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <div className="flex items-center" style={{ gap: 12 }}>
                             <span
+                              className={
+                                schedule.urgency === 'overdue'
+                                  ? 'kinetic-insecure'
+                                  : 'kinetic-warning'
+                              }
                               style={{
-                                fontWeight: 500,
                                 color: 'var(--color-text)',
                               }}
                             >

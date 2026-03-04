@@ -139,7 +139,9 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
                       </div>
 
                       <div className="flex flex-col">
-                        <span className="text-[var(--color-text)] font-medium text-base mb-1">
+                        <span
+                          className={`text-[var(--color-text)] text-base mb-1 ${report.issues.some((i) => i.type === 'weak' || i.type === 'breached') ? 'kinetic-insecure' : report.issues.length > 0 ? 'kinetic-warning' : 'kinetic-secure'}`}
+                        >
                           {item.name}
                         </span>
                         <div className="flex flex-wrap gap-2">{getBadges(report)}</div>

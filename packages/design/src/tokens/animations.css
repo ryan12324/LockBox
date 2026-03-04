@@ -142,3 +142,68 @@
 .fade-in {
   animation: fade-in var(--duration-normal) var(--ease-spring) both;
 }
+
+/* ── Kinetic Typography: security-driven weight instability ── */
+@keyframes weight-wobble {
+  0% {
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  15% {
+    font-weight: 310;
+    letter-spacing: 0.01em;
+  }
+  30% {
+    font-weight: 380;
+    letter-spacing: -0.005em;
+  }
+  50% {
+    font-weight: 290;
+    letter-spacing: 0.015em;
+  }
+  65% {
+    font-weight: 360;
+    letter-spacing: 0;
+  }
+  80% {
+    font-weight: 320;
+    letter-spacing: 0.008em;
+  }
+  100% {
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+}
+
+@keyframes weight-jitter {
+  0%,
+  100% {
+    font-weight: 450;
+    letter-spacing: 0;
+  }
+  25% {
+    font-weight: 380;
+    letter-spacing: 0.005em;
+  }
+  50% {
+    font-weight: 420;
+    letter-spacing: -0.003em;
+  }
+  75% {
+    font-weight: 390;
+    letter-spacing: 0.003em;
+  }
+}
+
+.kinetic-insecure {
+  animation: weight-wobble 2.5s var(--ease-smooth) infinite;
+  font-style: oblique 2deg;
+}
+.kinetic-warning {
+  animation: weight-jitter 3s var(--ease-smooth) infinite;
+}
+.kinetic-secure {
+  font-weight: 500;
+  letter-spacing: var(--letter-spacing-tight);
+  transition: font-weight var(--duration-normal) var(--ease-spring);
+}

@@ -173,7 +173,10 @@ export default function Register() {
                       />
                     ))}
                   </div>
-                  <p className="text-xs text-[var(--color-text-tertiary)]" style={{ marginTop: 6 }}>
+                  <p
+                    className={`text-xs text-[var(--color-text-tertiary)] ${strength.score <= 1 ? 'kinetic-insecure' : strength.score === 2 ? 'kinetic-warning' : 'kinetic-secure'}`}
+                    style={{ marginTop: 6 }}
+                  >
                     {strengthLabels[strength.score]}
                     {strength.feedback.length > 0 && ` — ${strength.feedback[0]}`}
                   </p>

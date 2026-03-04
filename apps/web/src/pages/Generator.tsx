@@ -130,10 +130,18 @@ export default function Generator() {
           <Card variant="frost" padding="lg" style={{ textAlign: 'center' }}>
             <p
               data-testid="generated-password"
+              className={
+                generated && strength
+                  ? strength.score <= 1
+                    ? 'kinetic-insecure'
+                    : strength.score === 2
+                      ? 'kinetic-warning'
+                      : 'kinetic-secure'
+                  : ''
+              }
               style={{
                 fontFamily: 'var(--font-mono, monospace)',
                 fontSize: 24,
-                fontWeight: 600,
                 color: 'var(--color-text)',
                 wordBreak: 'break-all',
                 minHeight: 40,
