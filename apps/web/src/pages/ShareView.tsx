@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { redeemShareLink, getShareAuthToken } from '../lib/team-crypto.js';
-import { Button, Input, Card, Badge, Textarea } from '@lockbox/design';
+import { Button, Input, Card, Badge, Textarea, Aura } from '@lockbox/design';
 import type { VaultItem, LoginItem, SecureNoteItem, CardItem } from '@lockbox/types';
 
 export default function ShareView() {
@@ -16,7 +16,6 @@ export default function ShareView() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
-    // Force dark mode for this standalone view
     document.documentElement.classList.add('dark');
     document.body.classList.add('bg-gray-900');
 
@@ -68,9 +67,18 @@ export default function ShareView() {
       size="sm"
       onClick={() => copyToClipboard(text, field)}
       title={title}
+      style={{ flexShrink: 0 }}
     >
       {copiedField === field ? (
-        <span className="text-xs font-medium text-[var(--color-success)]">Copied!</span>
+        <span
+          style={{
+            fontSize: 'var(--font-size-xs)',
+            fontWeight: 500,
+            color: 'var(--color-success)',
+          }}
+        >
+          Copied!
+        </span>
       ) : (
         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -90,7 +98,7 @@ export default function ShareView() {
     return (
       <>
         {loginItem.username && (
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Input
               type="text"
               label="Username"
@@ -102,7 +110,7 @@ export default function ShareView() {
           </div>
         )}
         {loginItem.password && (
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Input
               type="password"
               label="Password"
@@ -115,7 +123,7 @@ export default function ShareView() {
           </div>
         )}
         {loginItem.totp && (
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Input
               type="text"
               label="TOTP Secret"
@@ -129,17 +137,38 @@ export default function ShareView() {
         )}
         {loginItem.uris && loginItem.uris.length > 0 && loginItem.uris[0] && (
           <div>
-            <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+            <label
+              style={{
+                display: 'block',
+                fontSize: 'var(--font-size-sm)',
+                fontWeight: 500,
+                color: 'var(--color-text-secondary)',
+                marginBottom: 4,
+              }}
+            >
               URLs
             </label>
-            <div className="space-y-2">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {loginItem.uris.filter(Boolean).map((uri: string, idx: number) => (
-                <div key={idx} className="flex items-center gap-2">
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <a
                     href={uri.startsWith('http') ? uri : `https://${uri}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex-1 px-3 py-2 border border-[var(--color-border)] rounded-[var(--radius-md)] bg-[var(--color-surface)] text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:bg-[var(--color-surface-raised)] transition-colors truncate"
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: 'var(--radius-organic-lg)',
+                      background: 'var(--color-surface)',
+                      boxShadow: 'var(--shadow-sm)',
+                      color: 'var(--color-primary)',
+                      textDecoration: 'none',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      display: 'block',
+                      transition: 'box-shadow 0.15s',
+                    }}
                   >
                     {uri}
                   </a>
@@ -175,12 +204,12 @@ export default function ShareView() {
     if (item.type !== 'card') return null;
     const cardItem = item as CardItem;
     return (
-      <div className="space-y-4">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {cardItem.cardholderName && (
           <Input type="text" label="Cardholder Name" readOnly value={cardItem.cardholderName} />
         )}
         {cardItem.number && (
-          <div className="flex items-center gap-2">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Input
               type="password"
               label="Card Number"
@@ -192,7 +221,7 @@ export default function ShareView() {
             {renderCopyButton(cardItem.number, 'card-number', 'Copy card number')}
           </div>
         )}
-        <div className="flex gap-4">
+        <div style={{ display: 'flex', gap: 16 }}>
           <Input
             type="text"
             label="Expiration"
@@ -215,21 +244,64 @@ export default function ShareView() {
   };
 
   return (
-    <div className="min-h-screen p-6 text-[var(--color-text)] selection:bg-[var(--color-aura-dim)]">
-      <div className="max-w-2xl mx-auto mt-12">
-        <Card variant="raised" padding="md" style={{ position: 'relative', overflow: 'hidden' }}>
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[var(--color-aura)] rounded-[var(--radius-full)] blur-[80px] pointer-events-none" />
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-4"
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'var(--color-bg)',
+      }}
+    >
+      <Aura state="active" position="center" style={{ width: 400, height: 400, opacity: 0.85 }} />
 
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          width: '100%',
+          maxWidth: 480,
+        }}
+      >
+        <Card variant="frost" padding="lg" style={{ boxShadow: 'var(--shadow-xl)' }}>
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-16 space-y-6 relative z-10">
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '64px 0',
+                gap: 24,
+              }}
+            >
               <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin" />
-              <p className="text-[var(--color-text-secondary)] animate-pulse font-medium">
+              <p style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>
                 Decrypting shared item...
               </p>
             </div>
           ) : error ? (
-            <div className="py-12 relative z-10 text-center space-y-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-[var(--radius-full)] bg-[var(--color-error-subtle)] text-[var(--color-error)] mb-2">
+            <div
+              style={{
+                padding: '48px 0',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 'var(--radius-full)',
+                  background: 'var(--color-error-subtle)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--color-error)',
+                }}
+              >
                 <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
@@ -239,37 +311,85 @@ export default function ShareView() {
                   />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-[var(--color-text)]">Share Link Unavailable</h2>
-              <p className="text-[var(--color-text-secondary)] max-w-md mx-auto">{error}</p>
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-xl)',
+                  fontWeight: 700,
+                  color: 'var(--color-text)',
+                }}
+              >
+                Share Link Unavailable
+              </h2>
+              <p style={{ color: 'var(--color-text-secondary)', maxWidth: 400, margin: '0 auto' }}>
+                {error}
+              </p>
             </div>
           ) : item ? (
-            <div className="relative z-10 space-y-6">
-              <div className="flex justify-between items-start border-b border-[var(--color-border)] pb-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  paddingBottom: 24,
+                  borderBottom: '1px solid var(--color-surface-raised)',
+                }}
+              >
                 <div>
-                  <h1 className="text-2xl font-bold text-[var(--color-text)] tracking-tight">
+                  <h1
+                    style={{
+                      fontSize: 'var(--font-size-xl)',
+                      fontWeight: 700,
+                      color: 'var(--color-text)',
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
                     {item.name}
                   </h1>
-                  <p className="text-sm text-[var(--color-text-tertiary)] mt-1 capitalize">
+                  <p
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--color-text-tertiary)',
+                      marginTop: 4,
+                      textTransform: 'capitalize',
+                    }}
+                  >
                     {item.type} Item
                   </p>
                 </div>
                 {maxViews > 0 && (
-                  <Badge variant="primary" style={{ border: '1px solid var(--color-primary)' }}>
+                  <Badge variant="primary">
                     View {viewCount} of {maxViews}
                   </Badge>
                 )}
               </div>
 
-              <div className="space-y-5">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
                 {renderLoginFields(item)}
                 {renderNoteFields(item)}
                 {renderCardFields(item)}
               </div>
 
-              <div className="pt-6 mt-8 border-t border-[var(--color-border)] text-center">
-                <div className="inline-flex items-center justify-center space-x-2 text-xs text-[var(--color-text-tertiary)]">
+              <div
+                style={{
+                  paddingTop: 24,
+                  marginTop: 8,
+                  borderTop: '1px solid var(--color-surface-raised)',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    fontSize: 'var(--font-size-xs)',
+                    color: 'var(--color-text-tertiary)',
+                  }}
+                >
                   <svg
-                    className="w-4 h-4 text-[var(--color-primary)]"
+                    style={{ width: 16, height: 16, color: 'var(--color-primary)' }}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"

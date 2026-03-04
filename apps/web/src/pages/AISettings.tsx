@@ -214,26 +214,44 @@ export default function AISettings() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">AI & Intelligence</h1>
+    <div style={{ flex: 1, overflowY: 'auto', padding: 16, background: 'var(--color-bg)' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto' }}>
+        <h1
+          style={{
+            fontSize: 'var(--font-size-2xl)',
+            fontWeight: 700,
+            color: 'var(--color-text)',
+            marginBottom: 20,
+          }}
+        >
+          AI & Intelligence
+        </h1>
 
-        <div className="space-y-6">
-          {/* Privacy Notice */}
-          <Card
-            variant="surface"
-            padding="md"
-            style={{ background: 'var(--color-aura-dim)', borderColor: 'var(--color-primary)' }}
-          >
-            <div className="flex items-start gap-3">
-              <span className="text-xl shrink-0">🛡️</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card variant="frost" padding="lg" style={{ background: 'var(--color-aura-dim)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              <span style={{ fontSize: 24, flexShrink: 0, lineHeight: 1 }}>🛡️</span>
               <div>
-                <h2 className="text-sm font-semibold text-[var(--color-primary)] mb-1">
+                <h2
+                  style={{
+                    fontSize: 'var(--font-size-base)',
+                    fontWeight: 600,
+                    color: 'var(--color-primary)',
+                    marginBottom: 4,
+                  }}
+                >
                   Privacy-First AI
                 </h2>
-                <p className="text-xs text-[var(--color-text-tertiary)] leading-relaxed">
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-text-tertiary)',
+                    lineHeight: 1.6,
+                    margin: 0,
+                  }}
+                >
                   Passwords, card numbers, and TOTP secrets{' '}
-                  <strong className="text-[var(--color-text-secondary)]">never</strong> leave your
+                  <strong style={{ color: 'var(--color-text-secondary)' }}>never</strong> leave your
                   device. Health analysis and breach checking run entirely client-side. Chat
                   features use your own API keys (BYOK) — Lockbox servers never see your data or
                   your keys.
@@ -242,22 +260,60 @@ export default function AISettings() {
             </div>
           </Card>
 
-          {/* Feature Toggles */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Features</h2>
-            <div className="space-y-3">
+          <Card variant="surface" padding="lg">
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 16,
+              }}
+            >
+              Features
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {FEATURE_LABELS.map(({ key, label, description, phase }) => (
-                <div key={key} className="flex items-center gap-3 group">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-[var(--color-text)] group-hover:text-[var(--color-primary)] transition-colors">
+                <div
+                  key={key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span
+                        style={{
+                          fontSize: 'var(--font-size-sm)',
+                          fontWeight: 500,
+                          color: 'var(--color-text)',
+                        }}
+                      >
                         {label}
                       </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-[var(--radius-full)] bg-[var(--color-surface)] text-[var(--color-text-tertiary)] font-mono">
+                      <span
+                        style={{
+                          fontSize: 10,
+                          padding: '2px 6px',
+                          borderRadius: 'var(--radius-full)',
+                          background: 'var(--color-surface-raised)',
+                          color: 'var(--color-text-tertiary)',
+                          fontFamily: 'var(--font-mono, monospace)',
+                        }}
+                      >
                         P{phase}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">
+                    <p
+                      style={{
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-text-tertiary)',
+                        marginTop: 2,
+                        margin: 0,
+                        marginBlockStart: 2,
+                      }}
+                    >
                       {description}
                     </p>
                   </div>
@@ -298,35 +354,75 @@ export default function AISettings() {
             </div>
           </Card>
 
-          {/* Provider Configuration */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+          <Card variant="surface" padding="lg">
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 8,
+              }}
+            >
               LLM Provider (BYOK)
             </h2>
-            <p className="text-xs text-[var(--color-text-tertiary)] mb-4">
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-tertiary)',
+                marginBottom: 20,
+              }}
+            >
               Configure your own API key for chat and copilot features. Keys are encrypted with your
               master key.
             </p>
 
             {configuredProviders.length > 0 && (
-              <div className="space-y-2 mb-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
                 {configuredProviders.map((config) => {
                   const meta = PROVIDERS.find((p) => p.id === config.provider);
                   return (
                     <div
                       key={config.provider}
-                      className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 14,
+                        background: 'var(--color-bg-subtle)',
+                        borderRadius: 'var(--radius-md)',
+                      }}
                     >
                       <div>
-                        <span className="text-sm font-medium text-[var(--color-text)]">
+                        <span
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            fontWeight: 500,
+                            color: 'var(--color-text)',
+                          }}
+                        >
                           {meta?.name ?? config.provider}
                         </span>
                         {config.model && (
-                          <span className="text-xs text-[var(--color-text-tertiary)] ml-2">
+                          <span
+                            style={{
+                              fontSize: 'var(--font-size-sm)',
+                              color: 'var(--color-text-tertiary)',
+                              marginLeft: 8,
+                            }}
+                          >
                             ({config.model})
                           </span>
                         )}
-                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-[var(--radius-full)] bg-[var(--color-success-subtle)] text-[var(--color-success)]">
+                        <span
+                          style={{
+                            marginLeft: 8,
+                            fontSize: 10,
+                            padding: '2px 6px',
+                            borderRadius: 'var(--radius-full)',
+                            background: 'var(--color-success-subtle)',
+                            color: 'var(--color-success)',
+                          }}
+                        >
                           Active
                         </span>
                       </div>
@@ -344,43 +440,71 @@ export default function AISettings() {
             )}
 
             {!selectedProvider ? (
-              <div className="grid grid-cols-2 gap-2">
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: 10,
+                }}
+              >
                 {PROVIDERS.map((p) => {
                   const isConfigured = configuredProviders.some((c) => c.provider === p.id);
                   return (
-                    <Button
+                    <Card
                       key={p.id}
-                      variant="secondary"
+                      variant={isConfigured ? 'raised' : 'surface'}
+                      padding="md"
                       onClick={() => handleSelectProvider(p.id)}
                       style={{
-                        textAlign: 'left' as const,
-                        display: 'flex',
-                        flexDirection: 'column' as const,
-                        alignItems: 'flex-start',
-                        padding: 12,
+                        cursor: 'pointer',
                         ...(isConfigured
                           ? {
-                              borderColor: 'var(--color-primary)',
-                              background: 'var(--color-aura-dim)',
+                              boxShadow: `inset 0 0 0 2px var(--color-primary), var(--shadow-md)`,
                             }
                           : {}),
                       }}
-                      size="sm"
                     >
-                      <span className="text-sm font-medium text-[var(--color-text)] block">
+                      <span
+                        style={{
+                          display: 'block',
+                          fontSize: 'var(--font-size-sm)',
+                          fontWeight: 600,
+                          color: 'var(--color-text)',
+                        }}
+                      >
                         {p.name}
                       </span>
-                      <span className="text-[10px] text-[var(--color-text-tertiary)] block mt-0.5">
+                      <span
+                        style={{
+                          display: 'block',
+                          fontSize: 'var(--font-size-sm)',
+                          color: 'var(--color-text-tertiary)',
+                          marginTop: 4,
+                        }}
+                      >
                         {p.description}
                       </span>
-                    </Button>
+                    </Card>
                   );
                 })}
               </div>
             ) : (
-              <div className="space-y-3 p-4 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-[var(--color-text)]">
+              <Card variant="surface" padding="lg">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: 16,
+                  }}
+                >
+                  <h3
+                    style={{
+                      fontSize: 'var(--font-size-base)',
+                      fontWeight: 600,
+                      color: 'var(--color-text)',
+                    }}
+                  >
                     {PROVIDERS.find((p) => p.id === selectedProvider)?.name}
                   </h3>
                   <Button
@@ -395,71 +519,91 @@ export default function AISettings() {
                   </Button>
                 </div>
 
-                {PROVIDERS.find((p) => p.id === selectedProvider)?.requiresKey && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {PROVIDERS.find((p) => p.id === selectedProvider)?.requiresKey && (
+                    <Input
+                      type="password"
+                      label="API Key"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="sk-..."
+                    />
+                  )}
+
                   <Input
-                    type="password"
-                    label="API Key"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-..."
+                    type="text"
+                    label="Base URL (optional)"
+                    value={baseUrl}
+                    onChange={(e) => setBaseUrl(e.target.value)}
+                    placeholder={
+                      selectedProvider === 'ollama'
+                        ? 'http://localhost:11434'
+                        : 'Leave empty for default'
+                    }
                   />
-                )}
 
-                <Input
-                  type="text"
-                  label="Base URL (optional)"
-                  value={baseUrl}
-                  onChange={(e) => setBaseUrl(e.target.value)}
-                  placeholder={
-                    selectedProvider === 'ollama'
-                      ? 'http://localhost:11434'
-                      : 'Leave empty for default'
-                  }
-                />
+                  <Input
+                    type="text"
+                    label="Model (optional)"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="Leave empty for default"
+                  />
 
-                <Input
-                  type="text"
-                  label="Model (optional)"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="Leave empty for default"
-                />
+                  {testResult && (
+                    <div
+                      style={{
+                        padding: 14,
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 'var(--font-size-sm)',
+                        background: testResult.success
+                          ? 'var(--color-success-subtle)'
+                          : 'var(--color-error-subtle)',
+                        color: testResult.success ? 'var(--color-success)' : 'var(--color-error)',
+                      }}
+                    >
+                      {testResult.success
+                        ? `✓ Connection successful${testResult.latencyMs ? ` (${testResult.latencyMs}ms)` : ''}`
+                        : `✕ ${testResult.error}`}
+                    </div>
+                  )}
 
-                {testResult && (
-                  <div
-                    className={`p-3 rounded-[var(--radius-md)] border text-xs ${
-                      testResult.success
-                        ? 'bg-[var(--color-success-subtle)] border-[var(--color-success)] text-[var(--color-success)]'
-                        : 'bg-[var(--color-error-subtle)] border-[var(--color-error)] text-[var(--color-error)]'
-                    }`}
-                  >
-                    {testResult.success
-                      ? `✓ Connection successful${testResult.latencyMs ? ` (${testResult.latencyMs}ms)` : ''}`
-                      : `✕ ${testResult.error}`}
+                  <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleTestConnection}
+                      disabled={testing}
+                    >
+                      {testing ? 'Testing...' : 'Test Connection'}
+                    </Button>
+                    <Button variant="primary" size="sm" onClick={handleSaveProvider}>
+                      Save Provider
+                    </Button>
                   </div>
-                )}
-
-                <div className="flex gap-2 pt-1">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleTestConnection}
-                    disabled={testing}
-                  >
-                    {testing ? 'Testing...' : 'Test Connection'}
-                  </Button>
-                  <Button variant="primary" size="sm" onClick={handleSaveProvider}>
-                    Save Provider
-                  </Button>
                 </div>
-              </div>
+              </Card>
             )}
           </Card>
 
-          {/* Data Management */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Data Management</h2>
-            <p className="text-xs text-[var(--color-text-tertiary)] mb-4">
+          <Card variant="surface" padding="lg">
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 8,
+              }}
+            >
+              Data Management
+            </h2>
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-tertiary)',
+                marginBottom: 16,
+              }}
+            >
               Clear cached AI data including embeddings, breach check results, and provider
               configurations.
             </p>
@@ -468,28 +612,50 @@ export default function AISettings() {
             </Button>
           </Card>
 
-          {/* About */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+          <Card variant="surface" padding="lg">
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 16,
+              }}
+            >
               About AI Features
             </h2>
-            <div className="space-y-2 text-xs text-[var(--color-text-tertiary)]">
-              <p>
-                <strong className="text-[var(--color-text-secondary)]">Phase 1:</strong> Password
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-tertiary)',
+              }}
+            >
+              <p style={{ margin: 0 }}>
+                <strong style={{ color: 'var(--color-text-secondary)' }}>Phase 1:</strong> Password
                 health, breach monitoring, smart autofill
               </p>
-              <p>
-                <strong className="text-[var(--color-text-secondary)]">Phase 2:</strong> Semantic
+              <p style={{ margin: 0 }}>
+                <strong style={{ color: 'var(--color-text-secondary)' }}>Phase 2:</strong> Semantic
                 search, phishing detection, auto-categorization
               </p>
-              <p>
-                <strong className="text-[var(--color-text-secondary)]">Phase 3:</strong> Chat
+              <p style={{ margin: 0 }}>
+                <strong style={{ color: 'var(--color-text-secondary)' }}>Phase 3:</strong> Chat
                 assistant, security copilot
               </p>
-              <p className="pt-2 border-t border-[var(--color-border)]">
-                All AI features are privacy-first. Sensitive data never leaves your device. Chat and
-                copilot features require your own API key (BYOK).
-              </p>
+              <div
+                style={{
+                  paddingTop: 10,
+                  borderTop: '1px solid var(--color-border)',
+                  marginTop: 4,
+                }}
+              >
+                <p style={{ margin: 0 }}>
+                  All AI features are privacy-first. Sensitive data never leaves your device. Chat
+                  and copilot features require your own API key (BYOK).
+                </p>
+              </div>
             </div>
           </Card>
         </div>

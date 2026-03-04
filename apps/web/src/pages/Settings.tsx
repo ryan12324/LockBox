@@ -47,7 +47,6 @@ export default function Settings() {
   const [twoFaError, setTwoFaError] = useState('');
   const [twoFaLoading, setTwoFaLoading] = useState(false);
 
-  // Alias state
   type AliasProvider = 'simplelogin' | 'anonaddy';
   const { userKey } = useAuthStore();
   const [aliasProvider, setAliasProvider] = useState<AliasProvider>('simplelogin');
@@ -58,7 +57,6 @@ export default function Settings() {
   const [aliasTesting, setAliasTesting] = useState(false);
   const [aliasError, setAliasError] = useState('');
   const [aliasSuccess, setAliasSuccess] = useState('');
-  // Travel mode state
   const [travelEnabled, setTravelEnabled] = useState(false);
   const [travelLoading, setTravelLoading] = useState(false);
   const [travelFolders, setTravelFolders] = useState<
@@ -66,7 +64,6 @@ export default function Settings() {
   >([]);
   const [showTravelConfirm, setShowTravelConfirm] = useState(false);
 
-  // Hardware Key state
   const [hwKeys, setHwKeys] = useState<Array<{ id: string; keyType: string; createdAt: string }>>(
     []
   );
@@ -74,7 +71,6 @@ export default function Settings() {
   const [hwKeyError, setHwKeyError] = useState('');
   const [hwKeySuccess, setHwKeySuccess] = useState('');
 
-  // QR Sync state
   const [showQrSync, setShowQrSync] = useState(false);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
   const [qrCountdown, setQrCountdown] = useState(0);
@@ -100,7 +96,6 @@ export default function Settings() {
     check2FA();
   }, [session]);
 
-  // Load alias config
   useEffect(() => {
     async function loadAliasConfig() {
       if (!session) return;
@@ -119,19 +114,16 @@ export default function Settings() {
 
   useEffect(() => {
     saveSettings(settings);
-    // Apply theme
     if (settings.theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else if (settings.theme === 'light') {
       document.documentElement.classList.remove('dark');
     } else {
-      // System preference
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       document.documentElement.classList.toggle('dark', prefersDark);
     }
   }, [settings]);
 
-  // Load travel mode
   useEffect(() => {
     if (!session) return;
     api.settings
@@ -152,7 +144,6 @@ export default function Settings() {
       .catch(() => {});
   }, [session]);
 
-  // Load hardware keys
   useEffect(() => {
     if (!session) return;
     api.hardwareKey
@@ -161,7 +152,6 @@ export default function Settings() {
       .catch(() => {});
   }, [session]);
 
-  // QR countdown timer
   useEffect(() => {
     if (qrCountdown <= 0) {
       if (showQrSync) setQrPayload(null);
@@ -251,7 +241,6 @@ export default function Settings() {
   }
 
   function handleGenerateQrSync() {
-    // Generate ephemeral ECDH key pair and encode QR payload
     const expiresAt = new Date(Date.now() + 30 * 1000).toISOString();
     const ephemeralKey = crypto.getRandomValues(new Uint8Array(32));
     const nonce = crypto.getRandomValues(new Uint8Array(12));
@@ -426,31 +415,69 @@ export default function Settings() {
     }
   }
 
+  const sectionHeading: React.CSSProperties = {
+    fontSize: 'var(--font-size-lg)',
+    fontWeight: 600,
+    color: 'var(--color-text)',
+    marginBottom: 16,
+  };
+
+  const rowStyle: React.CSSProperties = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 'var(--font-size-sm)',
+    fontWeight: 500,
+    color: 'var(--color-text-tertiary)',
+  };
+
+  const valueStyle: React.CSSProperties = {
+    fontSize: 'var(--font-size-sm)',
+    fontWeight: 500,
+    color: 'var(--color-text)',
+  };
+
+  const descStyle: React.CSSProperties = {
+    fontSize: 'var(--font-size-sm)',
+    color: 'var(--color-text-tertiary)',
+    marginBottom: 16,
+  };
+
   return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Settings</h1>
-        <div className="space-y-6">
-          {/* Account */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Account</h2>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[var(--color-text-tertiary)]">Email</span>
-                <span className="text-sm font-medium text-[var(--color-text)]">
-                  {session?.email}
-                </span>
+    <div style={{ flex: 1, overflowY: 'auto', padding: 16, background: 'var(--color-bg)' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto' }}>
+        <h1
+          style={{
+            fontSize: 'var(--font-size-2xl)',
+            fontWeight: 700,
+            color: 'var(--color-text)',
+            marginBottom: 20,
+          }}
+        >
+          Settings
+        </h1>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card variant="surface" padding="lg">
+            <h2 style={sectionHeading}>Account</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={rowStyle}>
+                <span style={labelStyle}>Email</span>
+                <span style={valueStyle}>{session?.email}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-[var(--color-text-tertiary)]">KDF Algorithm</span>
-                <span className="text-sm font-medium text-[var(--color-text)]">
+              <div style={rowStyle}>
+                <span style={labelStyle}>KDF Algorithm</span>
+                <span style={valueStyle}>
                   {session?.kdfConfig.type === 'argon2id' ? 'Argon2id' : 'PBKDF2'}
                 </span>
               </div>
               {session?.kdfConfig.type === 'argon2id' && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-[var(--color-text-tertiary)]">Argon2id Memory</span>
-                  <span className="text-sm font-medium text-[var(--color-text)]">
+                <div style={rowStyle}>
+                  <span style={labelStyle}>Argon2id Memory</span>
+                  <span style={valueStyle}>
                     {((session.kdfConfig.memory ?? 65536) / 1024).toFixed(0)} MiB
                   </span>
                 </div>
@@ -472,34 +499,65 @@ export default function Settings() {
             </div>
           </Card>
 
-          {/* Two-Factor Authentication */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
-              Two-Factor Authentication
-            </h2>
+          <Card variant="surface" padding="lg">
+            <h2 style={sectionHeading}>Two-Factor Authentication</h2>
 
             {is2FAEnabled === null ? (
-              <p className="text-sm text-[var(--color-text-tertiary)]">Checking status...</p>
+              <p style={{ ...descStyle, marginBottom: 0 }}>Checking status...</p>
             ) : is2FAEnabled ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 text-[var(--color-success)] bg-[var(--color-success-subtle)] px-3 py-2 rounded border border-[var(--color-success)]">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    color: 'var(--color-success)',
+                    background: 'var(--color-success-subtle)',
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
                   <span>✅</span>
-                  <span className="text-sm font-medium">Two-Factor Authentication: Enabled</span>
+                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
+                    Two-Factor Authentication: Enabled
+                  </span>
                 </div>
                 {backupCodes && (
-                  <div className="bg-[var(--color-surface)] p-4 rounded-[var(--radius-md)] border border-[var(--color-border)]">
-                    <h3 className="text-sm font-medium text-[var(--color-text)] mb-2">
+                  <Card variant="surface" padding="lg">
+                    <h3
+                      style={{
+                        fontSize: 'var(--font-size-base)',
+                        fontWeight: 600,
+                        color: 'var(--color-text)',
+                        marginBottom: 8,
+                      }}
+                    >
                       Your Backup Codes
                     </h3>
-                    <p className="text-xs text-[var(--color-text-tertiary)] mb-3">
+                    <p style={{ ...descStyle, marginBottom: 12 }}>
                       Save these codes in a safe place. You can use them to sign in if you lose
                       access to your authenticator app.
                     </p>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: 8,
+                        marginBottom: 14,
+                      }}
+                    >
                       {backupCodes.map((c) => (
                         <code
                           key={c}
-                          className="text-xs font-mono bg-[var(--color-bg-subtle)] px-2 py-1 rounded text-center text-[var(--color-text)]"
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            fontFamily: 'var(--font-mono, monospace)',
+                            background: 'var(--color-bg-subtle)',
+                            padding: '6px 10px',
+                            borderRadius: 'var(--radius-sm)',
+                            textAlign: 'center',
+                            color: 'var(--color-text)',
+                          }}
                         >
                           {c}
                         </code>
@@ -513,7 +571,7 @@ export default function Settings() {
                     >
                       Copy All
                     </Button>
-                  </div>
+                  </Card>
                 )}
                 <Button
                   variant="danger"
@@ -524,27 +582,61 @@ export default function Settings() {
                   Disable 2FA
                 </Button>
                 {twoFaError && (
-                  <p className="text-sm text-[var(--color-error)] mt-2">{twoFaError}</p>
+                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-error)' }}>
+                    {twoFaError}
+                  </p>
                 )}
               </div>
             ) : twoFaSetup ? (
-              <div className="space-y-4">
-                <p className="text-sm text-[var(--color-text-secondary)]">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-text-secondary)',
+                    margin: 0,
+                  }}
+                >
                   Scan this QR code with your authenticator app (e.g. Google Authenticator, Authy,
                   FreeOTP):
                 </p>
-                <div className="bg-white p-4 rounded-[var(--radius-md)] inline-block">
+                <Card
+                  variant="frost"
+                  padding="lg"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    alignSelf: 'center',
+                    background: 'white',
+                  }}
+                >
                   <QRCodeSVG value={twoFaSetup.otpauthUri} size={150} />
-                </div>
-                <p className="text-xs text-[var(--color-text-tertiary)] break-all font-mono">
+                </Card>
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-text-tertiary)',
+                    wordBreak: 'break-all',
+                    fontFamily: 'var(--font-mono, monospace)',
+                    margin: 0,
+                  }}
+                >
                   Manual entry key: {twoFaSetup.secret}
                 </p>
 
-                <form onSubmit={handleVerify2FA} className="mt-4">
-                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                <form onSubmit={handleVerify2FA}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 'var(--font-size-sm)',
+                      fontWeight: 500,
+                      color: 'var(--color-text-secondary)',
+                      marginBottom: 8,
+                    }}
+                  >
                     Enter 6-digit verification code
                   </label>
-                  <div className="flex gap-2">
+                  <div style={{ display: 'flex', gap: 8 }}>
                     <Input
                       type="text"
                       required
@@ -552,7 +644,7 @@ export default function Settings() {
                       value={verifyCode}
                       onChange={(e) => setVerifyCode(e.target.value)}
                       placeholder="000000"
-                      className="flex-1"
+                      style={{ flex: 1 }}
                     />
                     <Button
                       type="submit"
@@ -564,13 +656,21 @@ export default function Settings() {
                     </Button>
                   </div>
                   {twoFaError && (
-                    <p className="text-sm text-[var(--color-error)] mt-2">{twoFaError}</p>
+                    <p
+                      style={{
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-error)',
+                        marginTop: 8,
+                      }}
+                    >
+                      {twoFaError}
+                    </p>
                   )}
                 </form>
               </div>
             ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-[var(--color-text-tertiary)]">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <p style={{ ...descStyle, marginBottom: 0 }}>
                   Add an extra layer of security to your account by requiring a code from your
                   authenticator app when you sign in.
                 </p>
@@ -583,18 +683,17 @@ export default function Settings() {
                   Enable 2FA
                 </Button>
                 {twoFaError && (
-                  <p className="text-sm text-[var(--color-error)] mt-2">{twoFaError}</p>
+                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-error)' }}>
+                    {twoFaError}
+                  </p>
                 )}
               </div>
             )}
           </Card>
 
-          {/* AI & Intelligence */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
-              AI & Intelligence
-            </h2>
-            <p className="text-sm text-[var(--color-text-tertiary)] mb-3">
+          <Card variant="surface" padding="lg">
+            <h2 style={sectionHeading}>AI & Intelligence</h2>
+            <p style={descStyle}>
               Configure AI-powered features: password health, breach monitoring, smart autofill, and
               chat assistant.
             </p>
@@ -613,16 +712,23 @@ export default function Settings() {
             </Button>
           </Card>
 
-          {/* Email Aliases */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Email Aliases</h2>
-            <p className="text-sm text-[var(--color-text-tertiary)] mb-4">
+          <Card variant="surface" padding="lg">
+            <h2 style={sectionHeading}>Email Aliases</h2>
+            <p style={descStyle}>
               Generate unique email aliases for each login using SimpleLogin or AnonAddy. API keys
               are encrypted client-side before storage.
             </p>
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 500,
+                    color: 'var(--color-text-secondary)',
+                    marginBottom: 8,
+                  }}
+                >
                   Provider
                 </label>
                 <Select
@@ -635,10 +741,26 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 500,
+                    color: 'var(--color-text-secondary)',
+                    marginBottom: 8,
+                  }}
+                >
                   API Key{' '}
                   {aliasConfigured && (
-                    <span className="text-xs text-[var(--color-success)] ml-1">(configured)</span>
+                    <span
+                      style={{
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-success)',
+                        marginLeft: 4,
+                      }}
+                    >
+                      (configured)
+                    </span>
                   )}
                 </label>
                 <Input
@@ -649,9 +771,19 @@ export default function Settings() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 500,
+                    color: 'var(--color-text-secondary)',
+                    marginBottom: 8,
+                  }}
+                >
                   Custom Base URL{' '}
-                  <span className="text-xs text-[var(--color-text-tertiary)]">
+                  <span
+                    style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}
+                  >
                     (optional, for self-hosted)
                   </span>
                 </label>
@@ -666,7 +798,7 @@ export default function Settings() {
                   }
                 />
               </div>
-              <div className="flex gap-2">
+              <div style={{ display: 'flex', gap: 8 }}>
                 <Button
                   variant="primary"
                   size="sm"
@@ -689,17 +821,34 @@ export default function Settings() {
                   </Button>
                 )}
               </div>
-              {aliasError && <p className="text-sm text-[var(--color-error)]">{aliasError}</p>}
+              {aliasError && (
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-error)',
+                    margin: 0,
+                  }}
+                >
+                  {aliasError}
+                </p>
+              )}
               {aliasSuccess && (
-                <p className="text-sm text-[var(--color-success)]">{aliasSuccess}</p>
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-success)',
+                    margin: 0,
+                  }}
+                >
+                  {aliasSuccess}
+                </p>
               )}
             </div>
           </Card>
 
-          {/* Security */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Security</h2>
-            <div className="space-y-4">
+          <Card variant="surface" padding="lg">
+            <h2 style={sectionHeading}>Security</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <Select
                 label="Auto-lock timeout"
                 value={String(settings.autoLockMinutes)}
@@ -730,14 +879,21 @@ export default function Settings() {
             </div>
           </Card>
 
-          {/* Appearance */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Appearance</h2>
+          <Card variant="surface" padding="lg">
+            <h2 style={sectionHeading}>Appearance</h2>
             <div>
-              <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 500,
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: 10,
+                }}
+              >
                 Theme
               </label>
-              <div className="flex gap-3">
+              <div style={{ display: 'flex', gap: 10 }}>
                 {(['system', 'light', 'dark'] as Theme[]).map((t) => (
                   <Button
                     key={t}
@@ -753,20 +909,47 @@ export default function Settings() {
             </div>
           </Card>
 
-          {/* Travel Mode */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">🧳 Travel Mode</h2>
-            <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+          <Card
+            variant="surface"
+            padding="lg"
+            style={{
+              borderLeft: '4px solid var(--color-warning)',
+            }}
+          >
+            <h2 style={{ ...sectionHeading, marginBottom: 8 }}>🧳 Travel Mode</h2>
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                marginBottom: 16,
+              }}
+            >
               When enabled, only folders marked as travel-safe will sync. Non-safe folders and their
               items are hidden.
             </p>
 
-            <div className="flex items-center justify-between mb-4 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)]">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 16,
+                padding: 14,
+                background: 'var(--color-bg-subtle)',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
               <div>
-                <span className="text-sm font-medium text-[var(--color-text)]">
-                  Enable Travel Mode
-                </span>
-                <p className="text-xs text-[var(--color-text-tertiary)]">
+                <span style={valueStyle}>Enable Travel Mode</span>
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-text-tertiary)',
+                    marginTop: 2,
+                    margin: 0,
+                    marginBlockStart: 2,
+                  }}
+                >
                   Hide sensitive folders when traveling
                 </p>
               </div>
@@ -795,18 +978,41 @@ export default function Settings() {
                 }}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-[var(--radius-full)] transition-transform ${travelEnabled ? 'translate-x-6' : ''}`}
+                  style={{
+                    position: 'absolute',
+                    top: 2,
+                    left: 2,
+                    width: 20,
+                    height: 20,
+                    background: 'white',
+                    borderRadius: 'var(--radius-full)',
+                    transition: 'transform 150ms ease',
+                    transform: travelEnabled ? 'translateX(24px)' : 'translateX(0)',
+                  }}
                 />
               </Button>
             </div>
 
             {showTravelConfirm && (
-              <div className="mb-4 p-4 bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-md)]">
-                <p className="text-sm text-[var(--color-warning)] mb-3">
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: 16,
+                  background: 'var(--color-warning-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-warning)',
+                    marginBottom: 12,
+                  }}
+                >
                   ⚠️ Travel mode will hide all non-travel-safe folders and their items from sync.
                   Only safe folders will be accessible.
                 </p>
-                <div className="flex gap-2">
+                <div style={{ display: 'flex', gap: 8 }}>
                   <Button
                     variant="primary"
                     size="sm"
@@ -827,16 +1033,32 @@ export default function Settings() {
 
             {travelFolders.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                <h3
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 500,
+                    color: 'var(--color-text-secondary)',
+                    marginBottom: 10,
+                  }}
+                >
                   Folder Settings
                 </h3>
-                <div className="space-y-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {travelFolders.map((f) => (
                     <div
                       key={f.id}
-                      className="flex items-center justify-between p-2 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)]"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        background: 'var(--color-bg-subtle)',
+                        borderRadius: 'var(--radius-md)',
+                      }}
                     >
-                      <span className="text-sm text-[var(--color-text)]">📁 {f.name}</span>
+                      <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text)' }}>
+                        📁 {f.name}
+                      </span>
                       <Button
                         variant="ghost"
                         onClick={() => handleFolderTravel(f.id, !f.travelSafe)}
@@ -855,7 +1077,17 @@ export default function Settings() {
                         }}
                       >
                         <span
-                          className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-[var(--radius-full)] transition-transform ${f.travelSafe ? 'translate-x-5' : ''}`}
+                          style={{
+                            position: 'absolute',
+                            top: 2,
+                            left: 2,
+                            width: 16,
+                            height: 16,
+                            background: 'white',
+                            borderRadius: 'var(--radius-full)',
+                            transition: 'transform 150ms ease',
+                            transform: f.travelSafe ? 'translateX(20px)' : 'translateX(0)',
+                          }}
                         />
                       </Button>
                     </div>
@@ -865,12 +1097,15 @@ export default function Settings() {
             )}
           </Card>
 
-          {/* Hardware Security Keys */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">
-              🔐 Hardware Security Keys
-            </h2>
-            <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+          <Card variant="surface" padding="lg">
+            <h2 style={{ ...sectionHeading, marginBottom: 8 }}>🔐 Hardware Security Keys</h2>
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                marginBottom: 16,
+              }}
+            >
               Register a FIDO2 hardware key (e.g. YubiKey) for passwordless vault unlock. The master
               key is wrapped with the hardware key's public key.
             </p>
@@ -885,47 +1120,92 @@ export default function Settings() {
               {hwKeyLoading ? 'Registering...' : 'Register Hardware Key'}
             </Button>
 
-            {hwKeyError && <p className="text-sm text-[var(--color-error)] mb-3">{hwKeyError}</p>}
+            {hwKeyError && (
+              <p
+                style={{
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-error)',
+                  marginBottom: 12,
+                }}
+              >
+                {hwKeyError}
+              </p>
+            )}
             {hwKeySuccess && (
-              <p className="text-sm text-[var(--color-success)] mb-3">{hwKeySuccess}</p>
+              <p
+                style={{
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-success)',
+                  marginBottom: 12,
+                }}
+              >
+                {hwKeySuccess}
+              </p>
             )}
 
             {hwKeys.length > 0 && (
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+              <div>
+                <h3
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 500,
+                    color: 'var(--color-text-secondary)',
+                    marginBottom: 10,
+                  }}
+                >
                   Registered Keys
                 </h3>
-                {hwKeys.map((key) => (
-                  <div
-                    key={key.id}
-                    className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]"
-                  >
-                    <div>
-                      <span className="text-sm font-medium text-[var(--color-text)]">
-                        🔑 {key.keyType.toUpperCase()}
-                      </span>
-                      <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5">
-                        Added {new Date(key.createdAt).toLocaleDateString()} • ID:{' '}
-                        {key.id.slice(0, 8)}…
-                      </p>
-                    </div>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => handleRevokeHardwareKey(key.id)}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {hwKeys.map((key) => (
+                    <div
+                      key={key.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 14,
+                        background: 'var(--color-bg-subtle)',
+                        borderRadius: 'var(--radius-md)',
+                      }}
                     >
-                      Revoke
-                    </Button>
-                  </div>
-                ))}
+                      <div>
+                        <span style={valueStyle}>🔑 {key.keyType.toUpperCase()}</span>
+                        <p
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            color: 'var(--color-text-tertiary)',
+                            marginTop: 2,
+                            margin: 0,
+                            marginBlockStart: 2,
+                          }}
+                        >
+                          Added {new Date(key.createdAt).toLocaleDateString()} • ID:{' '}
+                          {key.id.slice(0, 8)}…
+                        </p>
+                      </div>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleRevokeHardwareKey(key.id)}
+                      >
+                        Revoke
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </Card>
 
-          {/* Device Sync */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">📱 Device Sync</h2>
-            <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+          <Card variant="surface" padding="lg">
+            <h2 style={{ ...sectionHeading, marginBottom: 8 }}>📱 Device Sync</h2>
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                marginBottom: 16,
+              }}
+            >
               Add a new device by scanning a QR code. Uses ECDH key exchange to securely transfer
               your session key. QR codes expire after 30 seconds.
             </p>
@@ -940,43 +1220,100 @@ export default function Settings() {
             </Button>
 
             {showQrSync && qrPayload && qrCountdown > 0 && (
-              <div className="mt-4 space-y-3">
-                <div className="bg-white p-4 rounded-[var(--radius-md)] inline-block">
+              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <Card
+                  variant="frost"
+                  padding="lg"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    alignSelf: 'center',
+                    background: 'white',
+                  }}
+                >
                   <QRCodeSVG value={qrPayload} size={180} />
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 bg-[var(--color-surface)] rounded-[var(--radius-full)] h-2">
+                </Card>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div
+                    style={{
+                      flex: 1,
+                      background: 'var(--color-surface)',
+                      borderRadius: 'var(--radius-full)',
+                      height: 8,
+                      overflow: 'hidden',
+                    }}
+                  >
                     <div
-                      className="bg-[var(--color-primary)] h-2 rounded-[var(--radius-full)] transition-all duration-1000"
-                      style={{ width: `${(qrCountdown / 30) * 100}%` }}
+                      style={{
+                        background: 'var(--color-primary)',
+                        height: 8,
+                        borderRadius: 'var(--radius-full)',
+                        transition: 'width 1s linear',
+                        width: `${(qrCountdown / 30) * 100}%`,
+                      }}
                     />
                   </div>
-                  <span className="text-sm text-[var(--color-text-tertiary)] font-mono w-8 text-right">
+                  <span
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--color-text-tertiary)',
+                      fontFamily: 'var(--font-mono, monospace)',
+                      width: 32,
+                      textAlign: 'right',
+                    }}
+                  >
                     {qrCountdown}s
                   </span>
                 </div>
-                <p className="text-xs text-[var(--color-text-tertiary)]">
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-text-tertiary)',
+                    margin: 0,
+                  }}
+                >
                   Open Lockbox on your new device and select "Scan QR Code" to pair.
                 </p>
               </div>
             )}
 
             {showQrSync && qrCountdown <= 0 && (
-              <div className="mt-4 p-4 bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-md)]">
-                <p className="text-sm text-[var(--color-warning)]">
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: 16,
+                  background: 'var(--color-warning-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    color: 'var(--color-warning)',
+                    margin: 0,
+                  }}
+                >
                   QR code expired. Click "Add Device" to generate a new one.
                 </p>
               </div>
             )}
           </Card>
 
-          {/* About */}
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">About</h2>
-            <div className="space-y-2 text-sm text-[var(--color-text-tertiary)]">
-              <p>Lockbox v0.0.1 — Self-Hosted Password Manager</p>
-              <p>Zero-knowledge E2E encryption · Cloudflare Workers</p>
-              <p>AES-256-GCM · Argon2id · HKDF-SHA-256</p>
+          <Card variant="surface" padding="lg">
+            <h2 style={sectionHeading}>About</h2>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-tertiary)',
+              }}
+            >
+              <p style={{ margin: 0 }}>Lockbox v0.0.1 — Self-Hosted Password Manager</p>
+              <p style={{ margin: 0 }}>Zero-knowledge E2E encryption · Cloudflare Workers</p>
+              <p style={{ margin: 0 }}>AES-256-GCM · Argon2id · HKDF-SHA-256</p>
             </div>
           </Card>
         </div>

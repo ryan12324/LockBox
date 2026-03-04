@@ -400,21 +400,48 @@ export default function Login() {
     }
   }
 
+  const [altMethodsOpen, setAltMethodsOpen] = useState(false);
+
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ position: 'relative', overflow: 'hidden' }}
+      className="min-h-screen flex flex-col items-center justify-center px-4"
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'var(--color-bg)',
+      }}
     >
-      <Aura state="idle" position="center" />
-      <div className="w-full max-w-md" style={{ position: 'relative', zIndex: 1 }}>
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[var(--color-text)]">🔐 Lockbox</h1>
-          <p className="mt-2 text-[var(--color-text-tertiary)]">Sign in to your vault</p>
+      <Aura state="idle" position="center" style={{ width: 400, height: 400, opacity: 0.85 }} />
+
+      <div
+        className="w-full flex flex-col items-center"
+        style={{ position: 'relative', zIndex: 1, maxWidth: 420 }}
+      >
+        <div className="text-center" style={{ marginBottom: 32 }}>
+          <div
+            className="text-4xl font-bold text-[var(--color-text)]"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            🔐 Lockbox
+          </div>
+          <p
+            className="text-[var(--color-text-tertiary)]"
+            style={{ marginTop: 8, fontSize: 'var(--font-size-md)' }}
+          >
+            Sign in to your vault
+          </p>
         </div>
 
         {tempToken ? (
-          <Card variant="raised" padding="lg">
-            <form onSubmit={handle2FASubmit} className="space-y-5">
+          <Card
+            variant="frost"
+            padding="lg"
+            style={{ width: '100%', boxShadow: 'var(--shadow-xl)' }}
+          >
+            <form
+              onSubmit={handle2FASubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: 24 }}
+            >
               <Input
                 name="twoFaCode"
                 type="text"
@@ -425,40 +452,55 @@ export default function Login() {
                 placeholder={isBackupCode ? '8-character code' : '6-digit code'}
               />
 
-              <Button type="submit" variant="primary" loading={loading} style={{ width: '100%' }}>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                loading={loading}
+                style={{ width: '100%' }}
+              >
                 Verify
               </Button>
 
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setIsBackupCode(!isBackupCode);
-                  setTwoFaCode('');
-                }}
-                style={{ width: '100%' }}
-              >
-                {isBackupCode ? 'Use authenticator app' : 'Use backup code'}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setTempToken('');
-                  setMasterKeyCache(null);
-                  setTwoFaCode('');
-                }}
-                style={{ width: '100%', color: 'var(--color-text-tertiary)' }}
-              >
-                Cancel
-              </Button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setIsBackupCode(!isBackupCode);
+                    setTwoFaCode('');
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  {isBackupCode ? 'Use authenticator app' : 'Use backup code'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setTempToken('');
+                    setMasterKeyCache(null);
+                    setTwoFaCode('');
+                  }}
+                  style={{ width: '100%', color: 'var(--color-text-tertiary)' }}
+                >
+                  Cancel
+                </Button>
+              </div>
             </form>
           </Card>
         ) : (
-          <Card variant="raised" padding="lg">
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <Card
+            variant="frost"
+            padding="lg"
+            style={{ width: '100%', boxShadow: 'var(--shadow-xl)' }}
+          >
+            <form
+              onSubmit={handleSubmit}
+              style={{ display: 'flex', flexDirection: 'column', gap: 24 }}
+            >
               <Input
                 name="email"
                 type="email"
@@ -479,45 +521,68 @@ export default function Login() {
                 placeholder="Master password"
               />
 
-              <Button type="submit" variant="primary" loading={loading} style={{ width: '100%' }}>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                loading={loading}
+                style={{ width: '100%' }}
+              >
                 Sign In
               </Button>
 
-              <p className="text-center text-sm text-[var(--color-text-tertiary)]">
-                Don't have an account?{' '}
-                <Link
-                  to="/register"
-                  className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAltMethodsOpen(!altMethodsOpen)}
+                  style={{ width: '100%', color: 'var(--color-text-tertiary)' }}
                 >
-                  Create vault
-                </Link>
-              </p>
+                  {altMethodsOpen ? 'Hide other sign-in options' : 'Other sign-in options'}
+                </Button>
 
-              <div className="mt-4 space-y-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={hwKeyLoading}
-                  onClick={handleHardwareKeyUnlock}
-                  style={{ width: '100%' }}
-                >
-                  <span>🔐</span>
-                  Unlock with Hardware Key
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={qrScanning}
-                  onClick={handleQRScan}
-                  style={{ width: '100%' }}
-                >
-                  <span>📱</span>
-                  Scan QR Code
-                </Button>
+                {altMethodsOpen && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      loading={hwKeyLoading}
+                      onClick={handleHardwareKeyUnlock}
+                      style={{ width: '100%' }}
+                    >
+                      🔐 Unlock with Hardware Key
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      loading={qrScanning}
+                      onClick={handleQRScan}
+                      style={{ width: '100%' }}
+                    >
+                      📱 Scan QR Code
+                    </Button>
+                  </div>
+                )}
               </div>
             </form>
           </Card>
         )}
+
+        <p
+          className="text-center text-sm text-[var(--color-text-tertiary)]"
+          style={{ marginTop: 24 }}
+        >
+          Don&apos;t have an account?{' '}
+          <Link
+            to="/register"
+            className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
+          >
+            Create vault
+          </Link>
+        </p>
       </div>
     </div>
   );

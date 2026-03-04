@@ -43,11 +43,13 @@
   --color-frost: rgba(242, 239, 234, 0.75);
   --color-frost-border: rgba(196, 186, 172, 0.4);
 
-  /* Shadows (warm-tinted) */
-  --shadow-sm: 0 1px 3px rgba(44, 40, 37, 0.06);
-  --shadow-md: 0 4px 12px rgba(44, 40, 37, 0.08);
-  --shadow-lg: 0 12px 32px rgba(44, 40, 37, 0.12);
-  --shadow-aura: 0 0 40px rgba(196, 168, 130, 0.3);
+  /* Shadows — Frosted Clay: deep soft shadows that make tiles hover 2-5mm */
+  --shadow-sm: 0 2px 8px rgba(44, 40, 37, 0.06), 0 1px 2px rgba(44, 40, 37, 0.04);
+  --shadow-md: 0 8px 24px rgba(44, 40, 37, 0.1), 0 4px 8px rgba(44, 40, 37, 0.06);
+  --shadow-lg: 0 20px 48px rgba(44, 40, 37, 0.14), 0 8px 16px rgba(44, 40, 37, 0.08);
+  --shadow-xl: 0 32px 64px rgba(44, 40, 37, 0.16), 0 16px 32px rgba(44, 40, 37, 0.1);
+  --shadow-depress: 0 1px 2px rgba(44, 40, 37, 0.1) inset, 0 2px 4px rgba(44, 40, 37, 0.06);
+  --shadow-aura: 0 0 60px rgba(196, 168, 130, 0.35), 0 0 120px rgba(196, 168, 130, 0.15);
 
   /* Contextual — Banking mode (solid charcoal) */
   --color-ctx-banking-bg: #2c2825;
@@ -96,10 +98,12 @@
   --color-frost-border: rgba(58, 54, 52, 0.5);
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
-  --shadow-aura: 0 0 40px rgba(196, 168, 130, 0.2);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.35), 0 8px 16px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 32px 64px rgba(0, 0, 0, 0.4), 0 16px 32px rgba(0, 0, 0, 0.3);
+  --shadow-depress: 0 1px 3px rgba(0, 0, 0, 0.3) inset, 0 2px 6px rgba(0, 0, 0, 0.2);
+  --shadow-aura: 0 0 60px rgba(196, 168, 130, 0.25), 0 0 120px rgba(196, 168, 130, 0.1);
 
   /* Contextual — Banking */
   --color-ctx-banking-bg: #141210;

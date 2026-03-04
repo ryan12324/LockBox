@@ -7,7 +7,6 @@ type Tab = 'password' | 'passphrase';
 export default function Generator() {
   const [tab, setTab] = useState<Tab>('password');
 
-  // Password options
   const [length, setLength] = useState(20);
   const [uppercase, setUppercase] = useState(true);
   const [lowercase, setLowercase] = useState(true);
@@ -15,7 +14,6 @@ export default function Generator() {
   const [symbols, setSymbols] = useState(true);
   const [excludeAmbiguous, setExcludeAmbiguous] = useState(false);
 
-  // Passphrase options
   const [wordCount, setWordCount] = useState(5);
   const [separator, setSeparator] = useState('-');
   const [capitalize, setCapitalize] = useState(true);
@@ -55,13 +53,13 @@ export default function Generator() {
   ]);
 
   const strength = generated ? evaluateStrength(generated) : null;
-  const strengthColors = [
-    'bg-[var(--color-error)]',
-    'bg-[var(--color-warning)]',
-    'bg-[var(--color-warning)]',
-    'bg-[var(--color-primary)]',
-    'bg-[var(--color-success)]',
-  ];
+  const strengthColors: Record<number, string> = {
+    0: 'var(--color-error)',
+    1: 'var(--color-warning)',
+    2: 'var(--color-warning)',
+    3: 'var(--color-primary)',
+    4: 'var(--color-success)',
+  };
   const strengthLabels = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'];
   const strengthVariants: Array<'error' | 'warning' | 'warning' | 'primary' | 'success'> = [
     'error',
@@ -81,64 +79,163 @@ export default function Generator() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <div className="max-w-lg mx-auto">
-        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Password Generator</h1>
-        <Card variant="surface" padding="md">
-          <div className="space-y-6">
-            <div className="flex rounded-[var(--radius-md)] bg-[var(--color-surface)] p-1">
-              {(['password', 'passphrase'] as Tab[]).map((t) => (
-                <Button
-                  key={t}
-                  variant={tab === t ? 'primary' : 'ghost'}
-                  size="sm"
-                  onClick={() => setTab(t)}
-                  style={{ flex: 1, textTransform: 'capitalize' }}
-                >
-                  {t}
-                </Button>
-              ))}
-            </div>
+    <div style={{ flex: 1, overflowY: 'auto', padding: 16, background: 'var(--color-bg)' }}>
+      <div style={{ maxWidth: 520, margin: '0 auto' }}>
+        <h1
+          style={{
+            fontSize: 'var(--font-size-2xl)',
+            fontWeight: 700,
+            color: 'var(--color-text)',
+            marginBottom: 20,
+          }}
+        >
+          Password Generator
+        </h1>
 
-            <div className="bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] p-4 border border-[var(--color-border)]">
-              <p
-                data-testid="generated-password"
-                className="font-mono text-lg text-[var(--color-text)] break-all min-h-[2rem]"
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              padding: 4,
+              background: 'var(--color-surface)',
+              borderRadius: 'var(--radius-full)',
+              boxShadow: 'var(--shadow-sm)',
+            }}
+          >
+            {(['password', 'passphrase'] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                style={{
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 'var(--radius-full)',
+                  border: 'none',
+                  background: tab === t ? 'var(--color-primary)' : 'transparent',
+                  color: tab === t ? 'var(--color-primary-fg)' : 'var(--color-text-secondary)',
+                  fontWeight: 600,
+                  fontSize: 'var(--font-size-sm)',
+                  cursor: 'pointer',
+                  textTransform: 'capitalize',
+                  transition: 'all 150ms ease',
+                  boxShadow: tab === t ? 'var(--shadow-md)' : 'none',
+                }}
               >
-                {generated || (
-                  <span className="text-[var(--color-text-tertiary)]">
-                    Click generate to create a password
-                  </span>
-                )}
-              </p>
-              {strength && generated && (
-                <div className="mt-3">
-                  <div className="flex gap-1">
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className={`h-1.5 flex-1 rounded-[var(--radius-full)] ${i <= strength.score ? strengthColors[strength.score] : 'bg-[var(--color-surface-raised)]'}`}
-                      />
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant={strengthVariants[strength.score]}>
-                      {strengthLabels[strength.score]}
-                    </Badge>
-                    <span className="text-xs text-[var(--color-text-tertiary)]">
-                      {Math.round(strength.entropy)} bits entropy
-                    </span>
-                  </div>
-                </div>
+                {t}
+              </button>
+            ))}
+          </div>
+
+          <Card variant="frost" padding="lg" style={{ textAlign: 'center' }}>
+            <p
+              data-testid="generated-password"
+              style={{
+                fontFamily: 'var(--font-mono, monospace)',
+                fontSize: 24,
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                wordBreak: 'break-all',
+                minHeight: 40,
+                lineHeight: 1.4,
+                margin: 0,
+              }}
+            >
+              {generated || (
+                <span
+                  style={{
+                    color: 'var(--color-text-tertiary)',
+                    fontSize: 'var(--font-size-base)',
+                    fontWeight: 400,
+                  }}
+                >
+                  Click generate to create a {tab}
+                </span>
               )}
-            </div>
+            </p>
+
+            {strength && generated && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div
+                      key={i}
+                      style={{
+                        flex: 1,
+                        height: 6,
+                        borderRadius: 'var(--radius-full)',
+                        background:
+                          i <= strength.score
+                            ? strengthColors[strength.score]
+                            : 'var(--color-surface-raised)',
+                        transition: 'background 200ms ease',
+                      }}
+                    />
+                  ))}
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    marginTop: 8,
+                  }}
+                >
+                  <Badge variant={strengthVariants[strength.score]}>
+                    {strengthLabels[strength.score]}
+                  </Badge>
+                  <span
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--color-text-tertiary)',
+                    }}
+                  >
+                    {Math.round(strength.entropy)} bits entropy
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {generated && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={copyToClipboard}
+                style={{ marginTop: 16 }}
+              >
+                {copied ? '✓ Copied' : '📋 Copy'}
+              </Button>
+            )}
+          </Card>
+
+          <Card variant="surface" padding="lg">
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 16,
+              }}
+            >
+              Options
+            </h2>
 
             {tab === 'password' ? (
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
-                  <label className="flex justify-between text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                  <label
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: 'var(--font-size-sm)',
+                      fontWeight: 500,
+                      color: 'var(--color-text)',
+                      marginBottom: 8,
+                    }}
+                  >
                     <span>Length</span>
-                    <span className="font-mono">{length}</span>
+                    <span style={{ fontFamily: 'var(--font-mono, monospace)' }}>{length}</span>
                   </label>
                   {React.createElement('input', {
                     type: 'range',
@@ -147,7 +244,7 @@ export default function Generator() {
                     value: length,
                     onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
                       setLength(Number(e.target.value)),
-                    className: 'w-full',
+                    style: { width: '100%' },
                   })}
                 </div>
 
@@ -162,8 +259,23 @@ export default function Generator() {
                     set: setExcludeAmbiguous,
                   },
                 ].map(({ label, value, set }) => (
-                  <div key={label} className="flex items-center justify-between">
-                    <span className="text-sm text-[var(--color-text-secondary)]">{label}</span>
+                  <div
+                    key={label}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 500,
+                        color: 'var(--color-text)',
+                      }}
+                    >
+                      {label}
+                    </span>
                     <Button
                       variant={value ? 'primary' : 'secondary'}
                       size="sm"
@@ -176,11 +288,20 @@ export default function Generator() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
-                  <label className="flex justify-between text-sm font-medium text-[var(--color-text-secondary)] mb-2">
+                  <label
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: 'var(--font-size-sm)',
+                      fontWeight: 500,
+                      color: 'var(--color-text)',
+                      marginBottom: 8,
+                    }}
+                  >
                     <span>Word Count</span>
-                    <span className="font-mono">{wordCount}</span>
+                    <span style={{ fontFamily: 'var(--font-mono, monospace)' }}>{wordCount}</span>
                   </label>
                   {React.createElement('input', {
                     type: 'range',
@@ -189,7 +310,7 @@ export default function Generator() {
                     value: wordCount,
                     onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
                       setWordCount(Number(e.target.value)),
-                    className: 'w-full',
+                    style: { width: '100%' },
                   })}
                 </div>
 
@@ -206,8 +327,23 @@ export default function Generator() {
                   { label: 'Capitalize words', value: capitalize, set: setCapitalize },
                   { label: 'Include a number', value: includeNumber, set: setIncludeNumber },
                 ].map(({ label, value, set }) => (
-                  <div key={label} className="flex items-center justify-between">
-                    <span className="text-sm text-[var(--color-text-secondary)]">{label}</span>
+                  <div
+                    key={label}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 500,
+                        color: 'var(--color-text)',
+                      }}
+                    >
+                      {label}
+                    </span>
                     <Button
                       variant={value ? 'primary' : 'secondary'}
                       size="sm"
@@ -220,19 +356,12 @@ export default function Generator() {
                 ))}
               </div>
             )}
+          </Card>
 
-            <div className="flex gap-3">
-              <Button variant="primary" onClick={generate} style={{ flex: 1 }}>
-                🎲 Generate
-              </Button>
-              {generated && (
-                <Button variant="secondary" onClick={copyToClipboard}>
-                  {copied ? '✓ Copied' : '📋 Copy'}
-                </Button>
-              )}
-            </div>
-          </div>
-        </Card>
+          <Button variant="primary" size="lg" onClick={generate} style={{ width: '100%' }}>
+            🎲 Generate
+          </Button>
+        </div>
       </div>
     </div>
   );

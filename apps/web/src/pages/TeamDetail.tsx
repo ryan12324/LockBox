@@ -60,26 +60,21 @@ export default function TeamDetail() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Inline editing
   const [editingName, setEditingName] = useState(false);
   const [editName, setEditName] = useState('');
 
-  // Invite form
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
   const [inviting, setInviting] = useState(false);
 
-  // Share folder
   const [showShareFolder, setShowShareFolder] = useState(false);
   const [selectedFolderId, setSelectedFolderId] = useState('');
   const [sharePermission, setSharePermission] = useState('read_write');
   const [sharing, setSharing] = useState(false);
 
-  // Danger zone
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Determine current user's role
   const currentUserId = session?.userId;
   const myMembership = members.find((m) => m.userId === currentUserId);
   const myRole = myMembership?.role ?? 'member';
@@ -125,7 +120,6 @@ export default function TeamDetail() {
     loadTeamDetail();
   }, [loadTeamDetail]);
 
-  // Ensure private key is loaded for sharing ops
   useEffect(() => {
     if (!session || !userKey || privateKey || !hasKeyPair) return;
     (async () => {
@@ -207,7 +201,6 @@ export default function TeamDetail() {
     if (!session || !teamId || !selectedFolderId || !privateKey) return;
     setSharing(true);
     try {
-      // Get all member public keys
       const memberPubKeys = await Promise.all(
         members.map(async (m) => {
           const res = await api.keypair.getPublicKey(m.userId, session.token);
@@ -216,7 +209,6 @@ export default function TeamDetail() {
         })
       );
 
-      // Create folder key and wrap for each member
       const { memberKeys } = await createFolderKeyForMembers(memberPubKeys);
 
       await api.sharing.shareFolder(
@@ -262,23 +254,35 @@ export default function TeamDetail() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6">
+      <div
+        className="flex flex-col items-center justify-center min-h-screen"
+        style={{ padding: 16, background: 'var(--color-bg)' }}
+      >
         <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin mb-4" />
-        <h2 className="text-xl font-medium text-[var(--color-text)] mb-2">Loading Team</h2>
-        <p className="text-[var(--color-text-secondary)]">Fetching team details…</p>
+        <h2
+          style={{
+            fontSize: 'var(--font-size-lg)',
+            fontWeight: 600,
+            color: 'var(--color-text)',
+            marginBottom: 8,
+          }}
+        >
+          Loading Team
+        </h2>
+        <p style={{ color: 'var(--color-text-secondary)' }}>Fetching team details…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
+    <div style={{ minHeight: '100vh', padding: 16, background: 'var(--color-bg)' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <Button variant="ghost" size="sm" onClick={() => navigate('/teams')}>
             ← Back
           </Button>
           {editingName ? (
-            <div className="flex items-center gap-2 flex-1">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
               <Input
                 type="text"
                 value={editName}
@@ -291,7 +295,7 @@ export default function TeamDetail() {
                   }
                 }}
                 className="flex-1"
-                style={{ fontSize: '1.5rem', fontWeight: 'bold' }}
+                style={{ fontSize: 'var(--font-size-xl)', fontWeight: 700 }}
                 autoFocus
               />
               <Button variant="primary" size="sm" onClick={handleRename}>
@@ -310,7 +314,13 @@ export default function TeamDetail() {
             </div>
           ) : (
             <h1
-              className={`text-2xl font-bold text-[var(--color-text)] ${isAdmin ? 'cursor-pointer hover:text-[var(--color-primary)] transition-colors' : ''}`}
+              style={{
+                fontSize: 'var(--font-size-xl)',
+                fontWeight: 700,
+                color: 'var(--color-text)',
+                cursor: isAdmin ? 'pointer' : 'default',
+                transition: 'color 0.15s',
+              }}
               onClick={() => isAdmin && setEditingName(true)}
               title={isAdmin ? 'Click to rename' : undefined}
             >
@@ -319,20 +329,116 @@ export default function TeamDetail() {
           )}
         </div>
 
-        <div className="space-y-6">
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+        <Card
+          variant="frost"
+          padding="lg"
+          style={{ boxShadow: 'var(--shadow-xl)', marginBottom: 16 }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 12,
+            }}
+          >
+            <div>
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-xl)',
+                  fontWeight: 700,
+                  color: 'var(--color-text)',
+                }}
+              >
+                {teamName}
+              </h2>
+              <p
+                style={{
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-tertiary)',
+                  marginTop: 4,
+                }}
+              >
+                {members.length} {members.length === 1 ? 'member' : 'members'} ·{' '}
+                {sharedFolders.length} shared {sharedFolders.length === 1 ? 'folder' : 'folders'}
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Badge variant="primary" style={{ textTransform: 'capitalize' }}>
+                {myRole}
+              </Badge>
+              {hasKeyPair && <Badge variant="success">Keys Active</Badge>}
+            </div>
+          </div>
+        </Card>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card variant="surface" padding="md" style={{ boxShadow: 'var(--shadow-lg)' }}>
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 16,
+              }}
+            >
               Members ({members.length})
             </h2>
-            <div className="space-y-3">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: 12,
+              }}
+            >
               {members.map((member) => (
-                <div key={member.userId} className="flex items-center justify-between py-2">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="w-8 h-8 rounded-[var(--radius-full)] bg-[var(--color-surface)] flex items-center justify-center text-sm text-[var(--color-text-secondary)] shrink-0">
+                <div
+                  key={member.userId}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: 12,
+                    borderRadius: 'var(--radius-organic-lg)',
+                    background: 'var(--color-bg)',
+                    boxShadow: 'var(--shadow-md)',
+                    gap: 12,
+                  }}
+                >
+                  <div
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: 1 }}
+                  >
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 'var(--radius-full)',
+                        background: 'var(--color-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 600,
+                        color: 'white',
+                        flexShrink: 0,
+                      }}
+                    >
                       {member.email.charAt(0).toUpperCase()}
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm text-[var(--color-text)] truncate">{member.email}</p>
+                    <div style={{ minWidth: 0 }}>
+                      <p
+                        style={{
+                          fontSize: 'var(--font-size-sm)',
+                          color: 'var(--color-text)',
+                          fontWeight: 500,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {member.email}
+                      </p>
                       <Badge
                         variant={
                           member.role === 'owner' || member.role === 'admin' ? 'primary' : 'default'
@@ -344,7 +450,7 @@ export default function TeamDetail() {
                     </div>
                   </div>
                   {isAdmin && member.userId !== currentUserId && member.role !== 'owner' && (
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                       <Select
                         value={member.role}
                         onChange={(e) => handleChangeRole(member.userId, e.target.value)}
@@ -373,9 +479,18 @@ export default function TeamDetail() {
           </Card>
 
           {isAdmin && (
-            <Card variant="surface" padding="md">
-              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Invite Member</h2>
-              <div className="flex gap-2">
+            <Card variant="surface" padding="md" style={{ boxShadow: 'var(--shadow-lg)' }}>
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-text)',
+                  marginBottom: 16,
+                }}
+              >
+                Invite Member
+              </h2>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <Input
                   type="email"
                   value={inviteEmail}
@@ -406,23 +521,49 @@ export default function TeamDetail() {
           )}
 
           {isAdmin && invites.length > 0 && (
-            <Card variant="surface" padding="md">
-              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+            <Card variant="surface" padding="md" style={{ boxShadow: 'var(--shadow-lg)' }}>
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-text)',
+                  marginBottom: 16,
+                }}
+              >
                 Pending Invites ({invites.length})
               </h2>
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {invites.map((invite) => (
-                  <div key={invite.id} className="flex items-center justify-between py-2">
+                  <div
+                    key={invite.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 12,
+                      borderRadius: 'var(--radius-organic-lg)',
+                      background: 'var(--color-bg)',
+                      boxShadow: 'var(--shadow-md)',
+                    }}
+                  >
                     <div>
-                      <p className="text-sm text-[var(--color-text)]">{invite.email}</p>
-                      <div className="flex items-center gap-2 mt-1">
+                      <p
+                        style={{
+                          fontSize: 'var(--font-size-sm)',
+                          color: 'var(--color-text)',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {invite.email}
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
                         <Badge
                           variant={invite.role === 'admin' ? 'primary' : 'default'}
                           style={{ textTransform: 'capitalize' }}
                         >
                           {invite.role}
                         </Badge>
-                        <span className="text-[10px] text-[var(--color-text-tertiary)]">
+                        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>
                           Expires {new Date(invite.expiresAt).toLocaleDateString()}
                         </span>
                       </div>
@@ -440,9 +581,22 @@ export default function TeamDetail() {
             </Card>
           )}
 
-          <Card variant="surface" padding="md">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-[var(--color-text)]">
+          <Card variant="surface" padding="md" style={{ boxShadow: 'var(--shadow-lg)' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 16,
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-text)',
+                }}
+              >
                 Shared Folders ({sharedFolders.length})
               </h2>
               {isAdmin && hasKeyPair && (
@@ -457,7 +611,18 @@ export default function TeamDetail() {
             </div>
 
             {showShareFolder && (
-              <div className="mb-4 p-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-bg-subtle)] space-y-3">
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: 16,
+                  borderRadius: 'var(--radius-organic-lg)',
+                  background: 'var(--color-bg)',
+                  boxShadow: 'var(--shadow-md)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                }}
+              >
                 <Select
                   label="Folder"
                   value={selectedFolderId}
@@ -470,10 +635,18 @@ export default function TeamDetail() {
                   ]}
                 />
                 <div>
-                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 'var(--font-size-sm)',
+                      fontWeight: 500,
+                      color: 'var(--color-text-secondary)',
+                      marginBottom: 4,
+                    }}
+                  >
                     Permission
                   </label>
-                  <div className="flex gap-2">
+                  <div style={{ display: 'flex', gap: 8 }}>
                     {(['read_write', 'read_only'] as const).map((perm) => (
                       <Button
                         key={perm}
@@ -500,19 +673,42 @@ export default function TeamDetail() {
             )}
 
             {sharedFolders.length === 0 ? (
-              <p className="text-sm text-[var(--color-text-tertiary)]">
+              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}>
                 No folders shared with this team yet.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: 12,
+                }}
+              >
                 {sharedFolders.map((sf) => (
                   <div
                     key={sf.folderId}
-                    className="flex items-center justify-between py-2.5 px-3 rounded-[var(--radius-md)] hover:bg-[var(--color-bg-subtle)] transition-colors"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 12,
+                      borderRadius: 'var(--radius-organic-lg)',
+                      background: 'var(--color-bg)',
+                      boxShadow: 'var(--shadow-md)',
+                      transition: 'transform 0.15s, box-shadow 0.15s',
+                    }}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">📁</span>
-                      <span className="text-sm text-[var(--color-text)]">{sf.folderName}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 'var(--font-size-lg)' }}>🔒</span>
+                      <span
+                        style={{
+                          fontSize: 'var(--font-size-sm)',
+                          color: 'var(--color-text)',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {sf.folderName}
+                      </span>
                       <Badge variant={sf.permissionLevel === 'read_write' ? 'success' : 'default'}>
                         {sf.permissionLevel === 'read_write' ? 'Read & Write' : 'Read Only'}
                       </Badge>
@@ -537,18 +733,33 @@ export default function TeamDetail() {
               variant="surface"
               padding="md"
               style={{
-                background: 'var(--color-error-subtle)',
-                border: '1px solid var(--color-error)',
+                boxShadow: 'var(--shadow-lg)',
+                borderLeft: '4px solid var(--color-error)',
               }}
             >
-              <h2 className="text-lg font-semibold text-[var(--color-error)] mb-4">Danger Zone</h2>
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-error)',
+                  marginBottom: 16,
+                }}
+              >
+                Danger Zone
+              </h2>
               {confirmDelete ? (
                 <div>
-                  <p className="text-sm text-[var(--color-text-secondary)] mb-3">
+                  <p
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--color-text-secondary)',
+                      marginBottom: 12,
+                    }}
+                  >
                     Are you sure? This will permanently delete the team and remove all shared folder
                     access for members.
                   </p>
-                  <div className="flex gap-2">
+                  <div style={{ display: 'flex', gap: 8 }}>
                     <Button
                       variant="danger"
                       size="sm"

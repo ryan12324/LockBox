@@ -109,18 +109,39 @@ export default function Register() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ position: 'relative', overflow: 'hidden' }}
+      className="min-h-screen flex flex-col items-center justify-center px-4"
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'var(--color-bg)',
+      }}
     >
-      <Aura state="idle" position="center" />
-      <div className="w-full max-w-md" style={{ position: 'relative', zIndex: 1 }}>
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[var(--color-text)]">🔐 Lockbox</h1>
-          <p className="mt-2 text-[var(--color-text-tertiary)]">Create your secure vault</p>
+      <Aura state="idle" position="center" style={{ width: 400, height: 400, opacity: 0.85 }} />
+
+      <div
+        className="w-full flex flex-col items-center"
+        style={{ position: 'relative', zIndex: 1, maxWidth: 420 }}
+      >
+        <div className="text-center" style={{ marginBottom: 32 }}>
+          <div
+            className="text-4xl font-bold text-[var(--color-text)]"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            🔐 Lockbox
+          </div>
+          <p
+            className="text-[var(--color-text-tertiary)]"
+            style={{ marginTop: 8, fontSize: 'var(--font-size-md)' }}
+          >
+            Create your secure vault
+          </p>
         </div>
 
-        <Card variant="raised" padding="lg">
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <Card variant="frost" padding="lg" style={{ width: '100%', boxShadow: 'var(--shadow-xl)' }}>
+          <form
+            onSubmit={handleSubmit}
+            style={{ display: 'flex', flexDirection: 'column', gap: 24 }}
+          >
             <Input
               name="email"
               type="email"
@@ -142,16 +163,17 @@ export default function Register() {
                 placeholder="Strong master password"
               />
               {strength && (
-                <div className="mt-2">
+                <div style={{ marginTop: 10 }}>
                   <div className="flex gap-1">
                     {[0, 1, 2, 3, 4].map((i) => (
                       <div
                         key={i}
-                        className={`h-1.5 flex-1 rounded-full ${i <= strength.score ? strengthColors[strength.score] : 'bg-[var(--color-surface-raised)]'}`}
+                        className={`flex-1 rounded-full ${i <= strength.score ? strengthColors[strength.score] : 'bg-[var(--color-surface-raised)]'}`}
+                        style={{ height: 6 }}
                       />
                     ))}
                   </div>
-                  <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                  <p className="text-xs text-[var(--color-text-tertiary)]" style={{ marginTop: 6 }}>
                     {strengthLabels[strength.score]}
                     {strength.feedback.length > 0 && ` — ${strength.feedback[0]}`}
                   </p>
@@ -169,26 +191,44 @@ export default function Register() {
               placeholder="Confirm master password"
             />
 
-            <div className="bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-md)] p-3 text-[var(--color-warning)] text-xs">
+            <div
+              style={{
+                background: 'var(--color-warning-subtle)',
+                borderRadius: 'var(--radius-md)',
+                padding: 14,
+                color: 'var(--color-warning)',
+                fontSize: 'var(--font-size-xs)',
+                lineHeight: 1.5,
+              }}
+            >
               ⚠️ Your master password cannot be recovered. An emergency kit PDF will be downloaded —
               store it safely.
             </div>
 
-            <Button type="submit" variant="primary" loading={loading} style={{ width: '100%' }}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              loading={loading}
+              style={{ width: '100%' }}
+            >
               Create Vault
             </Button>
-
-            <p className="text-center text-sm text-[var(--color-text-tertiary)]">
-              Already have an account?{' '}
-              <Link
-                to="/login"
-                className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
-              >
-                Sign in
-              </Link>
-            </p>
           </form>
         </Card>
+
+        <p
+          className="text-center text-sm text-[var(--color-text-tertiary)]"
+          style={{ marginTop: 24 }}
+        >
+          Already have an account?{' '}
+          <Link
+            to="/login"
+            className="text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] hover:underline"
+          >
+            Sign in
+          </Link>
+        </p>
       </div>
     </div>
   );

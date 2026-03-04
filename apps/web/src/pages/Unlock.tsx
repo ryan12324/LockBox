@@ -38,21 +38,40 @@ export default function Unlock() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ position: 'relative', overflow: 'hidden' }}
+      className="min-h-screen flex flex-col items-center justify-center px-4"
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'var(--color-bg)',
+      }}
     >
-      <Aura state="idle" position="center" />
-      <div className="w-full max-w-md" style={{ position: 'relative', zIndex: 1 }}>
-        <div className="text-center mb-8">
-          <div className="text-5xl mb-4">🔒</div>
-          <h1 className="text-2xl font-bold text-[var(--color-text)]">Vault Locked</h1>
-          <p className="mt-2 text-[var(--color-text-tertiary)]">
+      <Aura state="idle" position="center" style={{ width: 320, height: 320, opacity: 0.8 }} />
+
+      <div
+        className="w-full flex flex-col items-center"
+        style={{ position: 'relative', zIndex: 1, maxWidth: 380 }}
+      >
+        <div className="text-center" style={{ marginBottom: 28 }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🔒</div>
+          <div
+            className="text-2xl font-bold text-[var(--color-text)]"
+            style={{ letterSpacing: '-0.02em' }}
+          >
+            Vault Locked
+          </div>
+          <p
+            className="text-[var(--color-text-tertiary)]"
+            style={{ marginTop: 8, fontSize: 'var(--font-size-sm)' }}
+          >
             Signed in as <strong>{session.email}</strong>
           </p>
         </div>
 
-        <Card variant="raised" padding="lg">
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <Card variant="frost" padding="lg" style={{ width: '100%', boxShadow: 'var(--shadow-xl)' }}>
+          <form
+            onSubmit={handleSubmit}
+            style={{ display: 'flex', flexDirection: 'column', gap: 24 }}
+          >
             <Input
               name="masterPassword"
               type="password"
@@ -64,15 +83,27 @@ export default function Unlock() {
               placeholder="Enter master password to unlock"
             />
 
-            <Button type="submit" variant="primary" loading={loading} style={{ width: '100%' }}>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              loading={loading}
+              style={{ width: '100%' }}
+            >
               Unlock Vault
-            </Button>
-
-            <Button type="button" variant="ghost" onClick={logout} style={{ width: '100%' }}>
-              Sign out and use a different account
             </Button>
           </form>
         </Card>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={logout}
+          style={{ marginTop: 20, color: 'var(--color-text-tertiary)' }}
+        >
+          Sign out and use a different account
+        </Button>
       </div>
     </div>
   );

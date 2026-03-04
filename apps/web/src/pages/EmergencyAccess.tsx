@@ -56,7 +56,6 @@ export default function EmergencyAccess() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  // Add form
   const [showAdd, setShowAdd] = useState(false);
   const [addEmail, setAddEmail] = useState('');
   const [addWait, setAddWait] = useState(7);
@@ -142,26 +141,60 @@ export default function EmergencyAccess() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6">
+      <div
+        className="flex flex-col items-center justify-center min-h-screen"
+        style={{ padding: 16, background: 'var(--color-bg)' }}
+      >
         <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin mb-4" />
-        <h2 className="text-xl font-medium text-[var(--color-text)] mb-2">
+        <h2
+          style={{
+            fontSize: 'var(--font-size-lg)',
+            fontWeight: 600,
+            color: 'var(--color-text)',
+            marginBottom: 8,
+          }}
+        >
           Loading Emergency Access
         </h2>
-        <p className="text-[var(--color-text-secondary)]">Fetching your emergency contacts…</p>
+        <p style={{ color: 'var(--color-text-secondary)' }}>Fetching your emergency contacts…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-1">🛡️ Emergency Access</h1>
-        <p className="text-[var(--color-text-secondary)] mb-6">
+    <div style={{ minHeight: '100vh', padding: 16, background: 'var(--color-bg)' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <h1
+          style={{
+            fontSize: 'var(--font-size-xl)',
+            fontWeight: 700,
+            color: 'var(--color-text)',
+            marginBottom: 4,
+          }}
+        >
+          🛡️ Emergency Access
+        </h1>
+        <p
+          style={{
+            color: 'var(--color-text-secondary)',
+            marginBottom: 16,
+            fontSize: 'var(--font-size-sm)',
+          }}
+        >
           Grant trusted contacts access to your vault in case of emergency, or manage access granted
           to you by others.
         </p>
 
-        <div className="flex gap-1 mb-6 bg-[var(--color-surface)] p-1 rounded-[var(--radius-md)]">
+        <Card
+          variant="surface"
+          padding="sm"
+          style={{
+            display: 'flex',
+            gap: 4,
+            marginBottom: 16,
+            boxShadow: 'var(--shadow-md)',
+          }}
+        >
           {[
             { id: 'trusted' as TabId, label: 'Trusted Contacts', count: grants.length },
             { id: 'requests' as TabId, label: 'Access Requests', count: requests.length },
@@ -175,18 +208,32 @@ export default function EmergencyAccess() {
             >
               {tab.label}
               {tab.count > 0 && (
-                <span className="ml-2 px-1.5 py-0.5 rounded-[var(--radius-full)] bg-[var(--color-surface-raised)] text-xs">
+                <span
+                  style={{
+                    marginLeft: 8,
+                    padding: '2px 6px',
+                    borderRadius: 'var(--radius-full)',
+                    background: 'var(--color-surface-raised)',
+                    fontSize: 'var(--font-size-xs)',
+                  }}
+                >
                   {tab.count}
                 </span>
               )}
             </Button>
           ))}
-        </div>
+        </Card>
 
         {activeTab === 'trusted' && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-[var(--color-text)]">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-text)',
+                }}
+              >
                 Your Trusted Contacts
               </h2>
               <Button variant="primary" size="sm" onClick={() => setShowAdd(true)}>
@@ -195,11 +242,18 @@ export default function EmergencyAccess() {
             </div>
 
             {showAdd && (
-              <Card variant="surface" padding="md" style={{ marginBottom: 24 }}>
-                <h3 className="text-sm font-semibold text-[var(--color-text)] mb-3">
+              <Card variant="surface" padding="md" style={{ boxShadow: 'var(--shadow-lg)' }}>
+                <h3
+                  style={{
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 600,
+                    color: 'var(--color-text)',
+                    marginBottom: 12,
+                  }}
+                >
                   Add Trusted Contact
                 </h3>
-                <div className="space-y-3">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <Input
                     type="email"
                     label="Email address"
@@ -217,11 +271,17 @@ export default function EmergencyAccess() {
                         label: p.label,
                       }))}
                     />
-                    <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                    <p
+                      style={{
+                        fontSize: 'var(--font-size-xs)',
+                        color: 'var(--color-text-tertiary)',
+                        marginTop: 4,
+                      }}
+                    >
                       Time to wait after access is requested before it's automatically approved.
                     </p>
                   </div>
-                  <div className="flex gap-2 pt-1">
+                  <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
                     <Button
                       variant="primary"
                       size="sm"
@@ -247,83 +307,256 @@ export default function EmergencyAccess() {
             )}
 
             {grants.length === 0 ? (
-              <div className="text-center py-12 text-[var(--color-text-tertiary)]">
-                <p className="text-4xl mb-3">🛡️</p>
-                <p className="font-medium mb-1">No trusted contacts yet</p>
-                <p className="text-sm">
+              <Card
+                variant="surface"
+                padding="lg"
+                style={{ textAlign: 'center', boxShadow: 'var(--shadow-lg)' }}
+              >
+                <div
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 'var(--radius-full)',
+                    background: 'var(--color-bg)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 24px',
+                    fontSize: 'var(--font-size-xl)',
+                    color: 'var(--color-text-tertiary)',
+                    boxShadow: 'var(--shadow-md)',
+                  }}
+                >
+                  🛡️
+                </div>
+                <h2
+                  style={{
+                    fontSize: 'var(--font-size-lg)',
+                    fontWeight: 600,
+                    color: 'var(--color-text)',
+                    marginBottom: 4,
+                  }}
+                >
+                  No trusted contacts yet
+                </h2>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}>
                   Add someone you trust to access your vault in an emergency.
                 </p>
-              </div>
+              </Card>
             ) : (
-              <div className="space-y-3">
-                {grants.map((grant) => (
-                  <Card
-                    key={grant.id}
-                    variant="surface"
-                    padding="md"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[var(--color-text)] font-medium text-sm">
-                          {grant.granteeEmail}
-                        </span>
-                        {statusBadge(grant.status)}
+              <Card variant="surface" padding="md" style={{ boxShadow: 'var(--shadow-lg)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {grants.map((grant) => (
+                    <div
+                      key={grant.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 12,
+                        borderRadius: 'var(--radius-organic-lg)',
+                        background: 'var(--color-bg)',
+                        boxShadow: 'var(--shadow-md)',
+                        gap: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          flex: 1,
+                          minWidth: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 'var(--radius-full)',
+                            background: 'var(--color-primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 'var(--font-size-sm)',
+                            fontWeight: 600,
+                            color: 'white',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {(grant.granteeEmail ?? '?').charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              marginBottom: 2,
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: 'var(--color-text)',
+                                fontWeight: 500,
+                                fontSize: 'var(--font-size-sm)',
+                              }}
+                            >
+                              {grant.granteeEmail}
+                            </span>
+                            {statusBadge(grant.status)}
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 'var(--font-size-xs)',
+                              color: 'var(--color-text-tertiary)',
+                            }}
+                          >
+                            Wait period: {grant.waitPeriodDays}{' '}
+                            {grant.waitPeriodDays === 1 ? 'day' : 'days'} · Created{' '}
+                            {new Date(grant.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-[var(--color-text-tertiary)]">
-                        Wait period: {grant.waitPeriodDays}{' '}
-                        {grant.waitPeriodDays === 1 ? 'day' : 'days'} · Created{' '}
-                        {new Date(grant.createdAt).toLocaleDateString()}
-                      </p>
+                      {grant.status !== 'expired' && grant.status !== 'rejected' && (
+                        <Button variant="danger" size="sm" onClick={() => handleRevoke(grant.id)}>
+                          Revoke
+                        </Button>
+                      )}
                     </div>
-                    {grant.status !== 'expired' && grant.status !== 'rejected' && (
-                      <Button variant="danger" size="sm" onClick={() => handleRevoke(grant.id)}>
-                        Revoke
-                      </Button>
-                    )}
-                  </Card>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </Card>
             )}
           </div>
         )}
 
         {activeTab === 'requests' && (
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+              }}
+            >
               Grants Available to You
             </h2>
 
             {requests.length === 0 ? (
-              <div className="text-center py-12 text-[var(--color-text-tertiary)]">
-                <p className="text-4xl mb-3">📬</p>
-                <p className="font-medium mb-1">No access grants</p>
-                <p className="text-sm">
+              <Card
+                variant="surface"
+                padding="lg"
+                style={{ textAlign: 'center', boxShadow: 'var(--shadow-lg)' }}
+              >
+                <div
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 'var(--radius-full)',
+                    background: 'var(--color-bg)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 24px',
+                    fontSize: 'var(--font-size-xl)',
+                    color: 'var(--color-text-tertiary)',
+                    boxShadow: 'var(--shadow-md)',
+                  }}
+                >
+                  📬
+                </div>
+                <h2
+                  style={{
+                    fontSize: 'var(--font-size-lg)',
+                    fontWeight: 600,
+                    color: 'var(--color-text)',
+                    marginBottom: 4,
+                  }}
+                >
+                  No access grants
+                </h2>
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-tertiary)' }}>
                   No one has granted you emergency access to their vault yet.
                 </p>
-              </div>
+              </Card>
             ) : (
-              <div className="space-y-3">
-                {requests.map((grant) => (
-                  <Card key={grant.id} variant="surface" padding="md">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[var(--color-text)] font-medium text-sm">
-                            {grant.grantorEmail ?? grant.granteeEmail ?? 'Unknown'}
-                          </span>
-                          {grant.status && statusBadge(grant.status)}
+              <Card variant="surface" padding="md" style={{ boxShadow: 'var(--shadow-lg)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {requests.map((grant) => (
+                    <div
+                      key={grant.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 12,
+                        borderRadius: 'var(--radius-organic-lg)',
+                        background: 'var(--color-bg)',
+                        boxShadow: 'var(--shadow-md)',
+                        gap: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          flex: 1,
+                          minWidth: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 'var(--radius-full)',
+                            background: 'var(--color-primary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 'var(--font-size-sm)',
+                            fontWeight: 600,
+                            color: 'white',
+                            flexShrink: 0,
+                          }}
+                        >
+                          {(grant.grantorEmail ?? grant.granteeEmail ?? '?')
+                            .charAt(0)
+                            .toUpperCase()}
                         </div>
-                        <p className="text-xs text-[var(--color-text-tertiary)]">
-                          Wait period: {grant.waitPeriodDays ?? '?'}{' '}
-                          {grant.waitPeriodDays === 1 ? 'day' : 'days'}
-                        </p>
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              marginBottom: 2,
+                            }}
+                          >
+                            <span
+                              style={{
+                                color: 'var(--color-text)',
+                                fontWeight: 500,
+                                fontSize: 'var(--font-size-sm)',
+                              }}
+                            >
+                              {grant.grantorEmail ?? grant.granteeEmail ?? 'Unknown'}
+                            </span>
+                            {grant.status && statusBadge(grant.status)}
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 'var(--font-size-xs)',
+                              color: 'var(--color-text-tertiary)',
+                            }}
+                          >
+                            Wait period: {grant.waitPeriodDays ?? '?'}{' '}
+                            {grant.waitPeriodDays === 1 ? 'day' : 'days'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
+                      <div style={{ display: 'flex', gap: 8 }}>
                         {grant.status === 'pending' && (
                           <Button
                             variant="primary"
@@ -349,9 +582,9 @@ export default function EmergencyAccess() {
                         )}
                       </div>
                     </div>
-                  </Card>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </Card>
             )}
           </div>
         )}

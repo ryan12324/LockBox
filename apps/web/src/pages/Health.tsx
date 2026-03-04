@@ -5,7 +5,7 @@ import { useHealthStore } from '../store/health.js';
 import { useAura } from '../providers/AuraProvider.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
-import { Card, Badge, Button } from '@lockbox/design';
+import { Card, Badge, Button, Aura } from '@lockbox/design';
 import HealthScore from '../components/HealthScore.js';
 import IssueList from '../components/IssueList.js';
 import type { VaultItem } from '@lockbox/types';
@@ -43,13 +43,11 @@ export default function Health() {
     { schedule: RotationSchedule; item: VaultItem; category: string }[]
   >([]);
 
-  // 2FA state
   const [tfaData, setTfaData] = useState<Map<string, TFAData> | null>(null);
   const [tfaIssues, setTfaIssues] = useState<{ item: LoginItem; info: TFAData }[]>([]);
   const [tfaScore, setTfaScore] = useState<number>(100);
   const [tfaCapableCount, setTfaCapableCount] = useState(0);
 
-  // Load 2FA Directory
   useEffect(() => {
     async function loadTFA() {
       try {
@@ -81,7 +79,6 @@ export default function Health() {
     loadTFA();
   }, []);
 
-  // Compute 2FA issues
   useEffect(() => {
     if (!tfaData || !items.length) return;
 
@@ -139,7 +136,6 @@ export default function Health() {
       )
     : 100;
 
-  // Wire Aura state to health score
   useEffect(() => {
     if (!summary || loading || analyzing) return;
     if (finalScore >= 80) {
@@ -179,7 +175,6 @@ export default function Health() {
         const logins = decrypted.filter(
           (i) => i.type === 'login'
         ) as import('@lockbox/types').LoginItem[];
-        // We catch this in case @lockbox/ai isn't fully implemented yet
         try {
           const summaryResult = await analyzeVaultHealth(logins);
           const reportsResult = await Promise.all(
@@ -204,7 +199,6 @@ export default function Health() {
           setDueItems(itemsWithDueInfo);
         } catch (err) {
           console.warn('Health analysis failed or not fully implemented:', err);
-          // Fallback empty state if analysis fails
           setSummary({
             totalItems: decrypted.length,
             weak: 0,
@@ -237,16 +231,38 @@ export default function Health() {
   }, [session, userKey, setLoading, setSummary, setReports]);
 
   useEffect(() => {
-    // Only analyze if we don't have recent reports or if forced
     loadAndAnalyzeVault();
   }, [loadAndAnalyzeVault]);
 
   if (loading || analyzing) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin mb-4" />
-        <h2 className="text-xl font-medium text-[var(--color-text)] mb-2">Analyzing Vault</h2>
-        <p className="text-[var(--color-text-secondary)]">
+      <div
+        style={{ background: 'var(--color-bg)', padding: 16 }}
+        className="flex-1 flex flex-col items-center justify-center"
+      >
+        <div style={{ position: 'relative', width: 120, height: 120, marginBottom: 24 }}>
+          <Aura state="thinking" position="center" />
+          <div
+            className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+            }}
+          />
+        </div>
+        <h2
+          style={{
+            fontSize: 'var(--font-size-xl)',
+            fontWeight: 600,
+            color: 'var(--color-text)',
+            marginBottom: 8,
+          }}
+        >
+          Analyzing Vault
+        </h2>
+        <p style={{ color: 'var(--color-text-secondary)' }}>
           Checking passwords for vulnerabilities...
         </p>
       </div>
@@ -254,17 +270,24 @@ export default function Health() {
   }
 
   const handleItemClick = (itemId: string) => {
-    // Navigate back to vault and somehow select this item
-    // For now we just go to vault
     navigate('/vault');
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 md:p-8">
-      <div className="max-w-5xl mx-auto w-full">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-[var(--color-text)] drop-shadow-sm">
+    <div className="flex-1 overflow-y-auto" style={{ background: 'var(--color-bg)', padding: 16 }}>
+      <div
+        className="max-w-5xl mx-auto w-full"
+        style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
+      >
+        <div className="flex items-center justify-between">
+          <h1
+            style={{
+              fontSize: 'var(--font-size-2xl)',
+              fontWeight: 700,
+              color: 'var(--color-text)',
+              letterSpacing: '-0.025em',
+            }}
+          >
             Security Health
           </h1>
           <Button variant="primary" size="sm" onClick={loadAndAnalyzeVault}>
@@ -273,34 +296,65 @@ export default function Health() {
         </div>
 
         {!summary || summary.totalItems === 0 ? (
-          <Card variant="raised" padding="lg">
-            <div className="text-center">
-              <div className="w-20 h-20 rounded-[var(--radius-full)] bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center mx-auto mb-6 text-[var(--color-text-tertiary)] text-3xl">
+          <Card variant="frost" padding="lg" style={{ boxShadow: 'var(--shadow-xl)' }}>
+            <div className="text-center" style={{ padding: '24px 0' }}>
+              <div
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 'var(--radius-full)',
+                  background: 'var(--color-surface)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 24px',
+                  fontSize: 'var(--font-size-2xl)',
+                  color: 'var(--color-text-tertiary)',
+                  boxShadow: 'var(--shadow-md)',
+                }}
+              >
                 🛡️
               </div>
-              <h2 className="text-2xl font-medium text-[var(--color-text)] mb-3">
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-xl)',
+                  fontWeight: 600,
+                  color: 'var(--color-text)',
+                  marginBottom: 12,
+                }}
+              >
                 Your Vault is Empty
               </h2>
-              <p className="text-[var(--color-text-secondary)] max-w-md mx-auto">
+              <p style={{ color: 'var(--color-text-secondary)', maxWidth: 420, margin: '0 auto' }}>
                 Add some passwords to your vault to see your security score and get actionable
                 advice on how to improve it.
               </p>
             </div>
           </Card>
         ) : (
-          <div className="space-y-8">
-            {/* Top Section: Score & Summaries */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Score Card */}
-              <Card
-                variant="raised"
-                padding="lg"
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <Card
+              variant="frost"
+              padding="lg"
+              style={{
+                boxShadow: 'var(--shadow-xl)',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              <Aura
+                state={finalScore >= 80 ? 'idle' : finalScore >= 50 ? 'active' : 'thinking'}
+                position="center"
+                style={{ opacity: 0.15, width: 400, height: 400 }}
+              />
+              <div
                 style={{
+                  position: 'relative',
+                  zIndex: 1,
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  minHeight: 280,
+                  gap: 16,
                 }}
               >
                 <HealthScore
@@ -309,27 +363,42 @@ export default function Health() {
                   label="Vault Score"
                 />
                 {posture && (
-                  <div className="mt-4">
-                    <Badge
-                      variant={
-                        posture.trend === 'improving'
-                          ? 'success'
-                          : posture.trend === 'declining'
-                            ? 'error'
-                            : 'warning'
-                      }
-                    >
-                      {posture.trend === 'improving'
-                        ? '↗ Improving'
+                  <Badge
+                    variant={
+                      posture.trend === 'improving'
+                        ? 'success'
                         : posture.trend === 'declining'
-                          ? '↘ Declining'
-                          : '→ Stable'}
-                    </Badge>
-                  </div>
+                          ? 'error'
+                          : 'warning'
+                    }
+                  >
+                    {posture.trend === 'improving'
+                      ? '↗ Improving'
+                      : posture.trend === 'declining'
+                        ? '↘ Declining'
+                        : '→ Stable'}
+                  </Badge>
                 )}
                 {posture && posture.actions.length > 0 && (
-                  <div className="mt-6 w-full space-y-2">
-                    <h3 className="text-[var(--color-text-secondary)] text-xs font-semibold uppercase tracking-wider mb-2">
+                  <div
+                    style={{
+                      width: '100%',
+                      maxWidth: 480,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <h3
+                      style={{
+                        color: 'var(--color-text-secondary)',
+                        fontSize: 'var(--font-size-xs)',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: 4,
+                      }}
+                    >
                       Top Actions
                     </h3>
                     {posture.actions.slice(0, 3).map((action, idx) => (
@@ -338,12 +407,6 @@ export default function Health() {
                         variant="surface"
                         padding="sm"
                         style={{
-                          borderColor:
-                            action.priority === 'critical' || action.priority === 'high'
-                              ? 'var(--color-error)'
-                              : action.priority === 'medium'
-                                ? 'var(--color-warning)'
-                                : 'var(--color-primary)',
                           background:
                             action.priority === 'critical' || action.priority === 'high'
                               ? 'var(--color-error-subtle)'
@@ -353,8 +416,9 @@ export default function Health() {
                         }}
                       >
                         <span
-                          className="font-medium text-sm"
                           style={{
+                            fontWeight: 500,
+                            fontSize: 'var(--font-size-sm)',
                             color:
                               action.priority === 'critical' || action.priority === 'high'
                                 ? 'var(--color-error)'
@@ -365,194 +429,180 @@ export default function Health() {
                         >
                           {action.message}
                         </span>
-                        <span className="text-xs opacity-70 block mt-1">
+                        <span
+                          style={{
+                            fontSize: 'var(--font-size-xs)',
+                            opacity: 0.7,
+                            display: 'block',
+                            marginTop: 4,
+                          }}
+                        >
                           {action.affectedItems.length} items affected
                         </span>
                       </Card>
                     ))}
                   </div>
                 )}
-              </Card>
-
-              {/* Issue Cards */}
-              <div className="grid grid-cols-2 gap-4 md:col-span-2">
-                <Card
-                  variant="surface"
-                  padding="md"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <span className="text-6xl">⚠️</span>
-                  </div>
-                  <div>
-                    <div className="w-10 h-10 rounded-[var(--radius-full)] bg-[var(--color-error-subtle)] text-[var(--color-error)] flex items-center justify-center mb-4">
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-[var(--color-text-secondary)] text-sm font-medium mb-1 uppercase tracking-wider">
-                      Weak
-                    </h3>
-                  </div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-4xl font-bold text-[var(--color-text)]">
-                      {summary.weak}
-                    </span>
-                    <span className="text-[var(--color-text-tertiary)] text-sm">passwords</span>
-                  </div>
-                </Card>
-
-                <Card
-                  variant="surface"
-                  padding="md"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <span className="text-6xl">🔄</span>
-                  </div>
-                  <div>
-                    <div className="w-10 h-10 rounded-[var(--radius-full)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)] flex items-center justify-center mb-4">
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-[var(--color-text-secondary)] text-sm font-medium mb-1 uppercase tracking-wider">
-                      Reused
-                    </h3>
-                  </div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-4xl font-bold text-[var(--color-text)]">
-                      {summary.reused}
-                    </span>
-                    <span className="text-[var(--color-text-tertiary)] text-sm">passwords</span>
-                  </div>
-                </Card>
-
-                <Card
-                  variant="surface"
-                  padding="md"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <span className="text-6xl">⏳</span>
-                  </div>
-                  <div>
-                    <div className="w-10 h-10 rounded-[var(--radius-full)] bg-[var(--color-warning-subtle)] text-[var(--color-warning)] flex items-center justify-center mb-4">
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-[var(--color-text-secondary)] text-sm font-medium mb-1 uppercase tracking-wider">
-                      Old
-                    </h3>
-                  </div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-4xl font-bold text-[var(--color-text)]">
-                      {summary.old}
-                    </span>
-                    <span className="text-[var(--color-text-tertiary)] text-sm">passwords</span>
-                  </div>
-                </Card>
-
-                <Card
-                  variant="surface"
-                  padding="md"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <span className="text-6xl">💀</span>
-                  </div>
-                  <div>
-                    <div className="w-10 h-10 rounded-[var(--radius-full)] bg-[var(--color-error-subtle)] text-[var(--color-error)] border border-[var(--color-error)] flex items-center justify-center mb-4">
-                      <svg
-                        className="w-5 h-5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                        />
-                      </svg>
-                    </div>
-                    <h3 className="text-[var(--color-text-secondary)] text-sm font-medium mb-1 uppercase tracking-wider">
-                      Breached
-                    </h3>
-                  </div>
-                  <div className="flex items-baseline space-x-2">
-                    <span className="text-4xl font-bold text-[var(--color-text)]">
-                      {summary.breached}
-                    </span>
-                    <span className="text-[var(--color-text-tertiary)] text-sm">passwords</span>
-                  </div>
-                </Card>
               </div>
+            </Card>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gap: 16,
+              }}
+            >
+              {[
+                {
+                  key: 'weak',
+                  label: 'Weak',
+                  count: summary.weak,
+                  iconBg: 'var(--color-error-subtle)',
+                  iconColor: 'var(--color-error)',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                  ),
+                },
+                {
+                  key: 'reused',
+                  label: 'Reused',
+                  count: summary.reused,
+                  iconBg: 'var(--color-warning-subtle)',
+                  iconColor: 'var(--color-warning)',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                      />
+                    </svg>
+                  ),
+                },
+                {
+                  key: 'old',
+                  label: 'Old',
+                  count: summary.old,
+                  iconBg: 'var(--color-warning-subtle)',
+                  iconColor: 'var(--color-warning)',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  ),
+                },
+                {
+                  key: 'breached',
+                  label: 'Breached',
+                  count: summary.breached,
+                  iconBg: 'var(--color-error-subtle)',
+                  iconColor: 'var(--color-error)',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                      />
+                    </svg>
+                  ),
+                },
+              ].map((cat) => (
+                <Card
+                  key={cat.key}
+                  variant="surface"
+                  padding="md"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    minHeight: 160,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    boxShadow: 'var(--shadow-lg)',
+                  }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 'var(--radius-full)',
+                        background: cat.iconBg,
+                        color: cat.iconColor,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginBottom: 16,
+                        boxShadow: 'var(--shadow-sm)',
+                      }}
+                    >
+                      {cat.icon}
+                    </div>
+                    <h3
+                      style={{
+                        color: 'var(--color-text-secondary)',
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 500,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em',
+                        marginBottom: 4,
+                      }}
+                    >
+                      {cat.label}
+                    </h3>
+                  </div>
+                  <div className="flex items-baseline" style={{ gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 'var(--font-size-2xl)',
+                        fontWeight: 700,
+                        color: 'var(--color-text)',
+                      }}
+                    >
+                      {cat.count}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-text-tertiary)',
+                      }}
+                    >
+                      passwords
+                    </span>
+                  </div>
+                </Card>
+              ))}
             </div>
 
-            {/* Rotation Section */}
             {dueItems.length > 0 && (
-              <div className="mb-8">
-                <h2 className="text-xl font-medium text-[var(--color-text)] mb-6">
+              <Card variant="surface" padding="lg" style={{ boxShadow: 'var(--shadow-lg)' }}>
+                <h2
+                  style={{
+                    fontSize: 'var(--font-size-lg)',
+                    fontWeight: 600,
+                    color: 'var(--color-text)',
+                    marginBottom: 16,
+                  }}
+                >
                   Due for Rotation
                 </h2>
-                <div className="space-y-3">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {dueItems.map(({ schedule, item, category }) => {
                     const diffTime =
                       new Date(schedule.nextRotation).getTime() - new Date().getTime();
@@ -567,29 +617,38 @@ export default function Health() {
                         key={schedule.itemId}
                         variant="surface"
                         padding="md"
+                        onClick={() => handleItemClick(item.id)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          borderColor:
-                            schedule.urgency === 'overdue'
-                              ? 'var(--color-error)'
-                              : 'var(--color-warning)',
                           background:
                             schedule.urgency === 'overdue'
                               ? 'var(--color-error-subtle)'
                               : 'var(--color-warning-subtle)',
                         }}
                       >
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-3">
-                            <span className="font-medium text-[var(--color-text)]">
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <div className="flex items-center" style={{ gap: 12 }}>
+                            <span
+                              style={{
+                                fontWeight: 500,
+                                color: 'var(--color-text)',
+                              }}
+                            >
                               {item.name}
                             </span>
                             <Badge variant="default">{category}</Badge>
                           </div>
                           <span
-                            className={`text-sm mt-1 ${schedule.urgency === 'overdue' ? 'text-[var(--color-error)]' : 'text-[var(--color-warning)]'}`}
+                            style={{
+                              fontSize: 'var(--font-size-sm)',
+                              marginTop: 4,
+                              color:
+                                schedule.urgency === 'overdue'
+                                  ? 'var(--color-error)'
+                                  : 'var(--color-warning)',
+                            }}
                           >
                             {timeText}
                           </span>
@@ -605,22 +664,76 @@ export default function Health() {
                     );
                   })}
                 </div>
-              </div>
+              </Card>
             )}
 
-            {/* 2FA Section */}
             {tfaIssues.length > 0 && (
-              <div className="mb-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <h2 className="text-xl font-medium text-[var(--color-text)]">Enable 2FA</h2>
+              <Card variant="surface" padding="lg" style={{ boxShadow: 'var(--shadow-lg)' }}>
+                <div className="flex items-center" style={{ gap: 12, marginBottom: 16 }}>
+                  <h2
+                    style={{
+                      fontSize: 'var(--font-size-lg)',
+                      fontWeight: 600,
+                      color: 'var(--color-text)',
+                    }}
+                  >
+                    Enable 2FA
+                  </h2>
                   <Badge variant="primary">{tfaIssues.length} Sites</Badge>
+                  <div style={{ marginLeft: 'auto' }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 14px',
+                        borderRadius: 'var(--radius-full)',
+                        background:
+                          tfaScore >= 80
+                            ? 'var(--color-success-subtle)'
+                            : tfaScore >= 50
+                              ? 'var(--color-warning-subtle)'
+                              : 'var(--color-error-subtle)',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 'var(--font-size-lg)',
+                          fontWeight: 700,
+                          color:
+                            tfaScore >= 80
+                              ? 'var(--color-success)'
+                              : tfaScore >= 50
+                                ? 'var(--color-warning)'
+                                : 'var(--color-error)',
+                        }}
+                      >
+                        {tfaScore}%
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 'var(--font-size-xs)',
+                          color: 'var(--color-text-secondary)',
+                        }}
+                      >
+                        2FA Coverage
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: 12,
+                  }}
+                >
                   {tfaIssues.map(({ item, info }) => (
                     <Card
                       key={item.id}
                       variant="surface"
                       padding="md"
+                      onClick={() => handleItemClick(item.id)}
                       style={{
                         display: 'flex',
                         flexDirection: 'column',
@@ -629,11 +742,24 @@ export default function Health() {
                       }}
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold text-[var(--color-text)] text-lg truncate pr-4">
+                        <div
+                          className="flex items-center justify-between"
+                          style={{ marginBottom: 8 }}
+                        >
+                          <h3
+                            style={{
+                              fontWeight: 600,
+                              color: 'var(--color-text)',
+                              fontSize: 'var(--font-size-base)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              paddingRight: 16,
+                            }}
+                          >
                             {item.name}
                           </h3>
-                          <div className="flex gap-1">
+                          <div className="flex" style={{ gap: 4 }}>
                             {info.tfa.map((method) => (
                               <Badge key={method} variant="default">
                                 {method}
@@ -641,12 +767,18 @@ export default function Health() {
                             ))}
                           </div>
                         </div>
-                        <p className="text-sm text-[var(--color-text-tertiary)] mb-4">
+                        <p
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            color: 'var(--color-text-tertiary)',
+                            marginBottom: 16,
+                          }}
+                        >
                           {info.domain}
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-3 mt-auto">
+                      <div className="flex items-center" style={{ gap: 12, marginTop: 'auto' }}>
                         <Button
                           variant="primary"
                           size="sm"
@@ -665,14 +797,22 @@ export default function Health() {
                     </Card>
                   ))}
                 </div>
-              </div>
+              </Card>
             )}
 
-            {/* Bottom Section: Issue List */}
-            <div>
-              <h2 className="text-xl font-medium text-[var(--color-text)] mb-6">Action Items</h2>
+            <Card variant="surface" padding="lg" style={{ boxShadow: 'var(--shadow-lg)' }}>
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-text)',
+                  marginBottom: 16,
+                }}
+              >
+                Action Items
+              </h2>
               <IssueList reports={reports} items={items} onItemClick={handleItemClick} />
-            </div>
+            </Card>
           </div>
         )}
       </div>

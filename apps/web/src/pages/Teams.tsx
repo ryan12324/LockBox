@@ -96,43 +96,83 @@ export default function Teams() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-6">
+      <div
+        className="flex flex-col items-center justify-center min-h-screen"
+        style={{ padding: 16, background: 'var(--color-bg)' }}
+      >
         <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin mb-4" />
-        <h2 className="text-xl font-medium text-[var(--color-text)] mb-2">Loading Teams</h2>
-        <p className="text-[var(--color-text-secondary)]">Fetching your teams…</p>
+        <h2
+          style={{
+            fontSize: 'var(--font-size-lg)',
+            fontWeight: 600,
+            color: 'var(--color-text)',
+            marginBottom: 8,
+          }}
+        >
+          Loading Teams
+        </h2>
+        <p style={{ color: 'var(--color-text-secondary)' }}>Fetching your teams…</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-6">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+    <div style={{ minHeight: '100vh', padding: 16, background: 'var(--color-bg)' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 16,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Button variant="ghost" size="sm" onClick={() => navigate('/vault')}>
               ← Back
             </Button>
-            <h1 className="text-2xl font-bold text-[var(--color-text)]">Teams</h1>
+            <h1
+              style={{
+                fontSize: 'var(--font-size-xl)',
+                fontWeight: 700,
+                color: 'var(--color-text)',
+              }}
+            >
+              Teams
+            </h1>
           </div>
           <Button variant="primary" size="sm" onClick={() => setShowCreate(true)}>
             Create Team
           </Button>
         </div>
 
-        <div className="space-y-6">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {!hasKeyPair && (
             <Card
-              variant="surface"
+              variant="frost"
               padding="md"
               style={{
-                background: 'var(--color-warning-subtle)',
-                border: '1px solid var(--color-warning)',
+                boxShadow: 'var(--shadow-lg)',
+                borderLeft: '4px solid var(--color-warning)',
               }}
             >
-              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-text)',
+                  marginBottom: 8,
+                }}
+              >
                 Set Up Encryption Keys
               </h2>
-              <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+              <p
+                style={{
+                  fontSize: 'var(--font-size-sm)',
+                  color: 'var(--color-text-secondary)',
+                  marginBottom: 16,
+                }}
+              >
                 You need an RSA key pair to share folders and access shared items. This is a
                 one-time setup.
               </p>
@@ -148,11 +188,18 @@ export default function Teams() {
             </Card>
           )}
 
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">
+          <Card variant="surface" padding="md" style={{ boxShadow: 'var(--shadow-lg)' }}>
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 16,
+              }}
+            >
               Accept an Invite
             </h2>
-            <div className="flex gap-2">
+            <div style={{ display: 'flex', gap: 8 }}>
               <Input
                 type="text"
                 value={inviteToken}
@@ -174,9 +221,18 @@ export default function Teams() {
           </Card>
 
           {showCreate && (
-            <Card variant="surface" padding="md">
-              <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Create a Team</h2>
-              <div className="flex gap-2">
+            <Card variant="surface" padding="md" style={{ boxShadow: 'var(--shadow-lg)' }}>
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-lg)',
+                  fontWeight: 600,
+                  color: 'var(--color-text)',
+                  marginBottom: 16,
+                }}
+              >
+                Create a Team
+              </h2>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <Input
                   type="text"
                   value={newTeamName}
@@ -216,30 +272,82 @@ export default function Teams() {
           )}
 
           {teams.length === 0 ? (
-            <Card variant="surface" padding="lg" style={{ textAlign: 'center' }}>
-              <div className="w-20 h-20 rounded-[var(--radius-full)] bg-[var(--color-surface)] border border-[var(--color-border)] flex items-center justify-center mx-auto mb-6 text-[var(--color-text-tertiary)] text-3xl">
+            <Card
+              variant="surface"
+              padding="lg"
+              style={{ textAlign: 'center', boxShadow: 'var(--shadow-lg)' }}
+            >
+              <div
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 'var(--radius-full)',
+                  background: 'var(--color-bg)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 24px',
+                  fontSize: 'var(--font-size-xl)',
+                  color: 'var(--color-text-tertiary)',
+                  boxShadow: 'var(--shadow-md)',
+                }}
+              >
                 👥
               </div>
-              <h2 className="text-2xl font-medium text-[var(--color-text)] mb-3">No Teams Yet</h2>
-              <p className="text-[var(--color-text-secondary)] max-w-md mx-auto">
+              <h2
+                style={{
+                  fontSize: 'var(--font-size-xl)',
+                  fontWeight: 700,
+                  color: 'var(--color-text)',
+                  marginBottom: 12,
+                }}
+              >
+                No Teams Yet
+              </h2>
+              <p style={{ color: 'var(--color-text-secondary)', maxWidth: 400, margin: '0 auto' }}>
                 Create a team to start sharing folders and passwords with others.
               </p>
             </Card>
           ) : (
-            <div className="space-y-3">
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: 16,
+              }}
+            >
               {teams.map((team) => (
                 <Card
                   key={team.id}
                   variant="surface"
                   padding="md"
                   onClick={() => navigate(`/teams/${team.id}`)}
+                  style={{ boxShadow: 'var(--shadow-lg)' }}
                 >
-                  <div className="flex items-center justify-between">
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
                     <div>
-                      <h3 className="text-lg font-semibold text-[var(--color-text)]">
+                      <h3
+                        style={{
+                          fontSize: 'var(--font-size-lg)',
+                          fontWeight: 600,
+                          color: 'var(--color-text)',
+                        }}
+                      >
                         {team.name}
                       </h3>
-                      <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                      <p
+                        style={{
+                          fontSize: 'var(--font-size-sm)',
+                          color: 'var(--color-text-tertiary)',
+                          marginTop: 4,
+                        }}
+                      >
                         Created {new Date(team.createdAt).toLocaleDateString()}
                       </p>
                     </div>

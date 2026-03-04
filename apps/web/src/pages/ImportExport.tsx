@@ -42,7 +42,6 @@ export default function ImportExport() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Import state
   const [importStep, setImportStep] = useState<ImportStep>('select');
   const [selectedFormat, setSelectedFormat] = useState<ImportFormat>('unknown');
   const [fileContent, setFileContent] = useState('');
@@ -54,7 +53,6 @@ export default function ImportExport() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [importedCount, setImportedCount] = useState(0);
 
-  // Export state
   const [exportLoading, setExportLoading] = useState(false);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -67,7 +65,6 @@ export default function ImportExport() {
       const text = ev.target?.result as string;
       setFileContent(text);
 
-      // Auto-detect format
       const rows = parseCSV(text);
       if (rows.length > 0) {
         const detected = detectFormat(rows[0]);
@@ -197,19 +194,49 @@ export default function ImportExport() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Import / Export</h1>
+    <div style={{ flex: 1, overflowY: 'auto', padding: 16, background: 'var(--color-bg)' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <h1
+          style={{
+            fontSize: 'var(--font-size-xl)',
+            fontWeight: 700,
+            color: 'var(--color-text)',
+            marginBottom: 16,
+          }}
+        >
+          Import / Export
+        </h1>
 
-        <div className="space-y-6">
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-1">Import</h2>
-            <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+            gap: 16,
+          }}
+        >
+          <Card variant="surface" padding="lg" style={{ boxShadow: 'var(--shadow-lg)' }}>
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 4,
+              }}
+            >
+              Import
+            </h2>
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                marginBottom: 16,
+              }}
+            >
               Import passwords from Bitwarden, Chrome, Firefox, 1Password, LastPass, or KeePass.
             </p>
 
             {importStep === 'select' && (
-              <div className="space-y-4">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <Select
                   label="Format"
                   value={selectedFormat}
@@ -218,11 +245,27 @@ export default function ImportExport() {
                 />
 
                 <div>
-                  <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 'var(--font-size-sm)',
+                      fontWeight: 500,
+                      color: 'var(--color-text-secondary)',
+                      marginBottom: 4,
+                    }}
+                  >
                     CSV File
                   </label>
                   <div
-                    className="border-2 border-dashed border-[var(--color-border)] rounded-[var(--radius-md)] p-6 text-center cursor-pointer hover:border-[var(--color-primary)] transition-colors"
+                    style={{
+                      border: '2px dashed var(--color-text-tertiary)',
+                      borderRadius: 'var(--radius-organic-lg)',
+                      padding: 24,
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.15s, background 0.15s',
+                      background: 'var(--color-bg)',
+                    }}
                     onClick={() => fileInputRef.current?.click()}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
@@ -238,28 +281,50 @@ export default function ImportExport() {
                   >
                     {fileName ? (
                       <div>
-                        <p className="text-sm font-medium text-[var(--color-text)]">
+                        <p
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            fontWeight: 500,
+                            color: 'var(--color-text)',
+                          }}
+                        >
                           📄 {fileName}
                         </p>
                         {detectedFormat !== 'unknown' && (
-                          <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                          <p
+                            style={{
+                              fontSize: 'var(--font-size-xs)',
+                              color: 'var(--color-text-secondary)',
+                              marginTop: 4,
+                            }}
+                          >
                             Detected: {FORMAT_LABELS[detectedFormat]}
                           </p>
                         )}
                       </div>
                     ) : (
                       <div>
-                        <p className="text-sm text-[var(--color-text-secondary)]">
+                        <p
+                          style={{
+                            fontSize: 'var(--font-size-sm)',
+                            color: 'var(--color-text-secondary)',
+                          }}
+                        >
                           Drop a CSV file here or{' '}
-                          <span className="text-[var(--color-primary)]">browse</span>
+                          <span style={{ color: 'var(--color-primary)' }}>browse</span>
                         </p>
-                        <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
+                        <p
+                          style={{
+                            fontSize: 'var(--font-size-xs)',
+                            color: 'var(--color-text-tertiary)',
+                            marginTop: 4,
+                          }}
+                        >
                           Supports .csv files
                         </p>
                       </div>
                     )}
                   </div>
-                  {/* Hidden file picker — no design system equivalent for type="file" */}
                   {React.createElement('input', {
                     ref: fileInputRef,
                     type: 'file',
@@ -281,39 +346,116 @@ export default function ImportExport() {
             )}
 
             {importStep === 'preview' && (
-              <div className="space-y-4">
-                <div className="bg-[var(--color-aura-dim)] border border-[var(--color-primary)] rounded-[var(--radius-md)] p-3">
-                  <p className="text-sm text-[var(--color-primary)]">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    borderRadius: 'var(--radius-organic-lg)',
+                    padding: 12,
+                    background: 'var(--color-bg)',
+                    boxShadow: 'var(--shadow-md)',
+                  }}
+                >
+                  <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-primary)' }}>
                     Found <strong>{previewItems.length}</strong> items to import from{' '}
                     <strong>{FORMAT_LABELS[selectedFormat]}</strong>
                   </p>
                 </div>
 
-                <div className="max-h-64 overflow-y-auto border border-[var(--color-border)] rounded-[var(--radius-md)]">
-                  <table className="w-full text-sm">
-                    <thead className="bg-[var(--color-surface-raised)] sticky top-0">
-                      <tr>
-                        <th className="text-left px-3 py-2 text-[var(--color-text-secondary)] font-medium">
+                <div
+                  style={{
+                    maxHeight: 256,
+                    overflowY: 'auto',
+                    borderRadius: 'var(--radius-organic-lg)',
+                    boxShadow: 'var(--shadow-md)',
+                    background: 'var(--color-bg)',
+                  }}
+                >
+                  <table
+                    style={{
+                      width: '100%',
+                      fontSize: 'var(--font-size-sm)',
+                      borderCollapse: 'collapse',
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{
+                          background: 'var(--color-surface-raised)',
+                          position: 'sticky',
+                          top: 0,
+                        }}
+                      >
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            color: 'var(--color-text-secondary)',
+                            fontWeight: 500,
+                          }}
+                        >
                           Name
                         </th>
-                        <th className="text-left px-3 py-2 text-[var(--color-text-secondary)] font-medium">
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            color: 'var(--color-text-secondary)',
+                            fontWeight: 500,
+                          }}
+                        >
                           Type
                         </th>
-                        <th className="text-left px-3 py-2 text-[var(--color-text-secondary)] font-medium">
+                        <th
+                          style={{
+                            textAlign: 'left',
+                            padding: '8px 12px',
+                            color: 'var(--color-text-secondary)',
+                            fontWeight: 500,
+                          }}
+                        >
                           Username
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[var(--color-border)]">
+                    <tbody>
                       {previewItems.slice(0, 50).map((item, i) => (
-                        <tr key={i} className="hover:bg-[var(--color-surface)]">
-                          <td className="px-3 py-2 text-[var(--color-text)] truncate max-w-[160px]">
+                        <tr
+                          key={i}
+                          style={{
+                            borderTop: i > 0 ? '1px solid var(--color-surface-raised)' : undefined,
+                          }}
+                        >
+                          <td
+                            style={{
+                              padding: '8px 12px',
+                              color: 'var(--color-text)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: 160,
+                            }}
+                          >
                             {item.name}
                           </td>
-                          <td className="px-3 py-2 text-[var(--color-text-secondary)] capitalize">
+                          <td
+                            style={{
+                              padding: '8px 12px',
+                              color: 'var(--color-text-secondary)',
+                              textTransform: 'capitalize',
+                            }}
+                          >
                             {item.type}
                           </td>
-                          <td className="px-3 py-2 text-[var(--color-text-secondary)] truncate max-w-[120px]">
+                          <td
+                            style={{
+                              padding: '8px 12px',
+                              color: 'var(--color-text-secondary)',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: 120,
+                            }}
+                          >
                             {item.type === 'login'
                               ? (item as unknown as { username: string }).username
                               : '—'}
@@ -324,7 +466,12 @@ export default function ImportExport() {
                         <tr>
                           <td
                             colSpan={3}
-                            className="px-3 py-2 text-center text-[var(--color-text-tertiary)] text-xs"
+                            style={{
+                              padding: '8px 12px',
+                              textAlign: 'center',
+                              color: 'var(--color-text-tertiary)',
+                              fontSize: 'var(--font-size-xs)',
+                            }}
                           >
                             … and {previewItems.length - 50} more items
                           </td>
@@ -334,7 +481,7 @@ export default function ImportExport() {
                   </table>
                 </div>
 
-                <div className="flex gap-3">
+                <div style={{ display: 'flex', gap: 12 }}>
                   <Button variant="secondary" onClick={handleReset} style={{ flex: 1 }}>
                     Cancel
                   </Button>
@@ -346,20 +493,43 @@ export default function ImportExport() {
             )}
 
             {importStep === 'importing' && (
-              <div className="space-y-4">
-                <div className="text-center py-4">
-                  <p className="text-sm text-[var(--color-text-secondary)] mb-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ textAlign: 'center', padding: 16 }}>
+                  <p
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      color: 'var(--color-text-secondary)',
+                      marginBottom: 12,
+                    }}
+                  >
                     Encrypting and uploading items…
                   </p>
-                  <div className="w-full bg-[var(--color-surface-raised)] rounded-[var(--radius-full)] h-2">
+                  <div
+                    style={{
+                      width: '100%',
+                      background: 'var(--color-surface-raised)',
+                      borderRadius: 'var(--radius-full)',
+                      height: 8,
+                      overflow: 'hidden',
+                    }}
+                  >
                     <div
-                      className="bg-[var(--color-primary)] h-2 rounded-[var(--radius-full)] transition-all duration-300"
                       style={{
+                        background: 'var(--color-primary)',
+                        height: 8,
+                        borderRadius: 'var(--radius-full)',
+                        transition: 'width 0.3s',
                         width: `${importTotal > 0 ? (importProgress / importTotal) * 100 : 0}%`,
                       }}
                     />
                   </div>
-                  <p className="text-xs text-[var(--color-text-secondary)] mt-2">
+                  <p
+                    style={{
+                      fontSize: 'var(--font-size-xs)',
+                      color: 'var(--color-text-secondary)',
+                      marginTop: 8,
+                    }}
+                  >
                     {importProgress} / {importTotal}
                   </p>
                 </div>
@@ -367,19 +537,59 @@ export default function ImportExport() {
             )}
 
             {importStep === 'done' && (
-              <div className="space-y-4">
-                <div className="bg-[var(--color-success-subtle)] border border-[var(--color-success)] rounded-[var(--radius-md)] p-4">
-                  <p className="text-sm font-medium text-[var(--color-success)]">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div
+                  style={{
+                    borderRadius: 'var(--radius-organic-lg)',
+                    padding: 16,
+                    background: 'var(--color-success-subtle)',
+                    boxShadow: 'var(--shadow-md)',
+                  }}
+                >
+                  <p
+                    style={{
+                      fontSize: 'var(--font-size-sm)',
+                      fontWeight: 500,
+                      color: 'var(--color-success)',
+                    }}
+                  >
                     ✅ Successfully imported {importedCount} item{importedCount !== 1 ? 's' : ''}
                   </p>
                 </div>
 
                 {importErrors.length > 0 && (
-                  <div className="bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-md)] p-4">
-                    <p className="text-sm font-medium text-[var(--color-error)] mb-2">
+                  <div
+                    style={{
+                      borderRadius: 'var(--radius-organic-lg)',
+                      padding: 16,
+                      background: 'var(--color-error-subtle)',
+                      boxShadow: 'var(--shadow-md)',
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 500,
+                        color: 'var(--color-error)',
+                        marginBottom: 8,
+                      }}
+                    >
                       {importErrors.length} item{importErrors.length !== 1 ? 's' : ''} failed:
                     </p>
-                    <ul className="text-xs text-[var(--color-error)] space-y-1 max-h-32 overflow-y-auto">
+                    <ul
+                      style={{
+                        fontSize: 'var(--font-size-xs)',
+                        color: 'var(--color-error)',
+                        maxHeight: 128,
+                        overflowY: 'auto',
+                        listStyle: 'none',
+                        padding: 0,
+                        margin: 0,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                      }}
+                    >
                       {importErrors.map((err, i) => (
                         <li key={i}>• {err}</li>
                       ))}
@@ -387,7 +597,7 @@ export default function ImportExport() {
                   </div>
                 )}
 
-                <div className="flex gap-3">
+                <div style={{ display: 'flex', gap: 12 }}>
                   <Button variant="secondary" onClick={handleReset} style={{ flex: 1 }}>
                     Import More
                   </Button>
@@ -399,14 +609,41 @@ export default function ImportExport() {
             )}
           </Card>
 
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-1">Export</h2>
-            <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+          <Card
+            variant="surface"
+            padding="lg"
+            style={{ boxShadow: 'var(--shadow-lg)', alignSelf: 'start' }}
+          >
+            <h2
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 4,
+              }}
+            >
+              Export
+            </h2>
+            <p
+              style={{
+                fontSize: 'var(--font-size-sm)',
+                color: 'var(--color-text-secondary)',
+                marginBottom: 16,
+              }}
+            >
               Download your vault as a Bitwarden-compatible CSV file.
             </p>
 
-            <div className="bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-md)] p-3 mb-4">
-              <p className="text-xs text-[var(--color-warning)]">
+            <div
+              style={{
+                borderRadius: 'var(--radius-organic-lg)',
+                padding: 12,
+                marginBottom: 16,
+                background: 'var(--color-warning-subtle)',
+                boxShadow: 'var(--shadow-sm)',
+              }}
+            >
+              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-warning)' }}>
                 ⚠️ <strong>Warning:</strong> The exported file will contain your passwords in
                 plaintext. Store it securely and delete it after use.
               </p>
@@ -417,33 +654,57 @@ export default function ImportExport() {
               onClick={handleExport}
               disabled={exportLoading}
               loading={exportLoading}
-              style={{ width: '100%' }}
+              style={{ width: '100%', marginBottom: 24 }}
             >
               {exportLoading ? 'Preparing export…' : '⬇️ Download CSV Export'}
             </Button>
-          </Card>
 
-          <Card variant="surface" padding="md">
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-3">
-              Supported Formats
-            </h2>
-            <div className="space-y-2 text-sm">
-              {[
-                { name: 'Bitwarden', desc: 'Export from Bitwarden → Tools → Export Vault → CSV' },
-                { name: 'Google Chrome', desc: 'Settings → Passwords → ⋮ → Export passwords' },
-                { name: 'Mozilla Firefox', desc: 'about:logins → ⋮ → Export Logins' },
-                { name: '1Password', desc: 'File → Export → All Items → CSV' },
-                {
-                  name: 'LastPass',
-                  desc: 'Account Options → Advanced → Export → LastPass CSV File',
-                },
-                { name: 'KeePass', desc: 'File → Export → KeePass CSV' },
-              ].map(({ name, desc }) => (
-                <div key={name} className="flex gap-3">
-                  <span className="font-medium text-[var(--color-text)] w-28 shrink-0">{name}</span>
-                  <span className="text-[var(--color-text-secondary)]">{desc}</span>
-                </div>
-              ))}
+            <div style={{ borderTop: '1px solid var(--color-surface-raised)', paddingTop: 16 }}>
+              <h3
+                style={{
+                  fontSize: 'var(--font-size-sm)',
+                  fontWeight: 600,
+                  color: 'var(--color-text)',
+                  marginBottom: 12,
+                }}
+              >
+                Supported Formats
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { name: 'Bitwarden', desc: 'Export from Bitwarden → Tools → Export Vault → CSV' },
+                  { name: 'Google Chrome', desc: 'Settings → Passwords → ⋮ → Export passwords' },
+                  { name: 'Mozilla Firefox', desc: 'about:logins → ⋮ → Export Logins' },
+                  { name: '1Password', desc: 'File → Export → All Items → CSV' },
+                  {
+                    name: 'LastPass',
+                    desc: 'Account Options → Advanced → Export → LastPass CSV File',
+                  },
+                  { name: 'KeePass', desc: 'File → Export → KeePass CSV' },
+                ].map(({ name, desc }) => (
+                  <div key={name} style={{ display: 'flex', gap: 12 }}>
+                    <span
+                      style={{
+                        fontWeight: 500,
+                        color: 'var(--color-text)',
+                        width: 112,
+                        flexShrink: 0,
+                        fontSize: 'var(--font-size-sm)',
+                      }}
+                    >
+                      {name}
+                    </span>
+                    <span
+                      style={{
+                        color: 'var(--color-text-secondary)',
+                        fontSize: 'var(--font-size-sm)',
+                      }}
+                    >
+                      {desc}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </Card>
         </div>

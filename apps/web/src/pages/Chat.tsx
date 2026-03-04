@@ -69,122 +69,250 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-medium text-[var(--color-text)]">Assistant</h1>
+    <div
+      className="flex flex-col h-full"
+      style={{
+        background: 'linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface) 100%)',
+      }}
+    >
+      <Card
+        variant="surface"
+        padding="md"
+        style={{
+          borderRadius: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: 'var(--shadow-md)',
+          position: 'relative',
+          zIndex: 10,
+        }}
+      >
+        <div className="flex items-center" style={{ gap: 12 }}>
+          <h1
+            style={{
+              fontSize: 'var(--font-size-xl)',
+              fontWeight: 600,
+              color: 'var(--color-text)',
+            }}
+          >
+            Assistant
+          </h1>
           <Aura state={chatAuraState} position="inline" />
         </div>
         <Button variant="ghost" size="sm" onClick={clearMessages}>
           Clear Chat
         </Button>
-      </div>
+      </Card>
 
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto" style={{ padding: 24, position: 'relative' }}>
         {messages.length === 0 && (
-          <div className="h-full flex items-center justify-center text-[var(--color-text-tertiary)]">
-            Start a conversation...
-          </div>
-        )}
-        {messages.map((msg) => (
-          <div key={msg.id} className="flex flex-col w-full">
-            {msg.role === 'user' ? (
-              <div className="ml-auto max-w-[80%]">
-                <Card
-                  variant="raised"
-                  padding="md"
-                  style={{
-                    background: 'var(--color-primary)',
-                    color: 'var(--color-text)',
-                    borderRadius: 'var(--radius-xl)',
-                    borderBottomRightRadius: 'var(--radius-sm)',
-                  }}
-                >
-                  {msg.content}
-                </Card>
-              </div>
-            ) : (
-              <div className="mr-auto max-w-[80%]">
-                <Card
-                  variant="surface"
-                  padding="md"
-                  style={{
-                    background: 'var(--color-aura-dim)',
-                    borderRadius: 'var(--radius-xl)',
-                    borderBottomLeftRadius: 'var(--radius-sm)',
-                  }}
-                >
-                  {msg.content}
-                  {msg.toolCalls?.map((tool, idx) => (
-                    <div
-                      key={idx}
-                      className="mt-2 px-3 py-1.5 bg-[var(--color-bg-subtle)] border border-[var(--color-border)] rounded-[var(--radius-md)] text-xs text-[var(--color-text-secondary)] flex items-center gap-2"
-                    >
-                      🔧 {tool.name} {tool.status === 'pending' ? '...' : `(${tool.status})`}
-                    </div>
-                  ))}
-                </Card>
-              </div>
-            )}
-          </div>
-        ))}
-        {loading && (
-          <div className="mr-auto max-w-[80%]">
-            <Card
-              variant="surface"
-              padding="md"
+          <div
+            className="h-full flex flex-col items-center justify-center"
+            style={{ position: 'relative' }}
+          >
+            <Aura
+              state={chatAuraState}
+              position="center"
+              style={{ width: 280, height: 280, opacity: 0.2 }}
+            />
+            <p
               style={{
-                background: 'var(--color-aura-dim)',
-                borderRadius: 'var(--radius-xl)',
-                borderBottomLeftRadius: 'var(--radius-sm)',
+                position: 'relative',
+                zIndex: 1,
+                color: 'var(--color-text-tertiary)',
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 500,
               }}
             >
-              <div className="flex gap-1">
-                <span className="animate-bounce">.</span>
-                <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>
-                  .
-                </span>
-                <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>
-                  .
-                </span>
-              </div>
-            </Card>
+              Start a conversation...
+            </p>
           </div>
         )}
-        <div ref={messagesEndRef} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {messages.map((msg) => (
+            <div key={msg.id} className="flex flex-col w-full">
+              {msg.role === 'user' ? (
+                <div style={{ marginLeft: 'auto', maxWidth: '80%' }}>
+                  <Card
+                    variant="raised"
+                    padding="md"
+                    style={{
+                      background: 'var(--color-primary)',
+                      color: 'white',
+                      borderRadius: 'var(--radius-organic-lg)',
+                      borderBottomRightRadius: 'var(--radius-sm)',
+                      boxShadow: 'var(--shadow-lg)',
+                    }}
+                  >
+                    <span style={{ lineHeight: 'var(--line-height-relaxed)' }}>{msg.content}</span>
+                  </Card>
+                </div>
+              ) : (
+                <div style={{ marginRight: 'auto', maxWidth: '80%' }}>
+                  <Card
+                    variant="surface"
+                    padding="md"
+                    style={{
+                      borderRadius: 'var(--radius-organic-lg)',
+                      borderBottomLeftRadius: 'var(--radius-sm)',
+                      boxShadow: 'var(--shadow-lg)',
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: 'var(--color-text)',
+                        lineHeight: 'var(--line-height-relaxed)',
+                      }}
+                    >
+                      {msg.content}
+                    </span>
+                    {msg.toolCalls?.map((tool, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          marginTop: 8,
+                          padding: '6px 12px',
+                          background: 'var(--color-bg-subtle)',
+                          borderRadius: 'var(--radius-md)',
+                          fontSize: 'var(--font-size-xs)',
+                          color: 'var(--color-text-secondary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        🔧 {tool.name} {tool.status === 'pending' ? '...' : `(${tool.status})`}
+                      </div>
+                    ))}
+                  </Card>
+                </div>
+              )}
+            </div>
+          ))}
+          {loading && (
+            <div style={{ marginRight: 'auto', maxWidth: '80%', position: 'relative' }}>
+              <Aura
+                state="thinking"
+                position="center"
+                style={{ width: 80, height: 80, opacity: 0.3 }}
+              />
+              <Card
+                variant="surface"
+                padding="md"
+                style={{
+                  borderRadius: 'var(--radius-organic-lg)',
+                  borderBottomLeftRadius: 'var(--radius-sm)',
+                  position: 'relative',
+                  zIndex: 1,
+                  boxShadow: 'var(--shadow-lg)',
+                }}
+              >
+                <div className="flex" style={{ gap: 4 }}>
+                  <span
+                    className="animate-bounce"
+                    style={{
+                      color: 'var(--color-primary)',
+                      fontSize: 'var(--font-size-lg)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    .
+                  </span>
+                  <span
+                    className="animate-bounce"
+                    style={{
+                      animationDelay: '0.2s',
+                      color: 'var(--color-primary)',
+                      fontSize: 'var(--font-size-lg)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    .
+                  </span>
+                  <span
+                    className="animate-bounce"
+                    style={{
+                      animationDelay: '0.4s',
+                      color: 'var(--color-primary)',
+                      fontSize: 'var(--font-size-lg)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    .
+                  </span>
+                </div>
+              </Card>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
-      <div className="p-4 border-t border-[var(--color-border)]">
-        <form onSubmit={handleSend} className="flex gap-2">
+      <Card
+        variant="surface"
+        padding="md"
+        style={{
+          borderRadius: 0,
+          boxShadow: 'var(--shadow-xl)',
+          position: 'relative',
+          zIndex: 10,
+        }}
+      >
+        <form onSubmit={handleSend} className="flex" style={{ gap: 12 }}>
           <Input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Message the assistant..."
-            style={{ flex: 1 }}
+            style={{
+              flex: 1,
+              borderRadius: 'var(--radius-organic-lg)',
+              fontSize: 'var(--font-size-base)',
+              padding: '12px 18px',
+            }}
           />
           <Button type="submit" variant="primary" disabled={!input.trim() || loading}>
             Send
           </Button>
         </form>
-      </div>
+      </Card>
 
       {confirmationRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{
+            background: 'rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+          }}
+        >
           <Card
-            variant="raised"
+            variant="frost"
             padding="lg"
-            style={{ maxWidth: '28rem', width: '100%', margin: '0 1rem' }}
+            style={{
+              maxWidth: '28rem',
+              width: '100%',
+              margin: '0 1rem',
+              boxShadow: 'var(--shadow-xl)',
+            }}
           >
-            <h3 className="text-lg font-medium text-[var(--color-text)] mb-2">
+            <h3
+              style={{
+                fontSize: 'var(--font-size-lg)',
+                fontWeight: 600,
+                color: 'var(--color-text)',
+                marginBottom: 8,
+              }}
+            >
               Permission Required
             </h3>
-            <p className="text-[var(--color-text-secondary)] mb-6">
+            <p style={{ color: 'var(--color-text-secondary)', marginBottom: 24 }}>
               The assistant wants to{' '}
-              <strong className="text-[var(--color-text)]">{confirmationRequest.callName}</strong>.
-              Allow?
+              <strong style={{ color: 'var(--color-text)' }}>{confirmationRequest.callName}</strong>
+              . Allow?
             </p>
-            <div className="flex gap-3 justify-end">
+            <div className="flex justify-end" style={{ gap: 12 }}>
               <Button variant="danger" onClick={handleDeny}>
                 Deny
               </Button>
