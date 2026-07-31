@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from '@lockbox/design';
+import { Button, Icon } from '@lockbox/design';
 import type { Folder } from '@lockbox/types';
 
 export interface ItemViewFooterProps {
@@ -39,7 +39,10 @@ export default function ItemViewFooter({
             <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase">
               Favorite
             </span>
-            <span className="text-sm text-[var(--color-warning)]">⭐ Yes</span>
+            <span className="text-sm text-[var(--color-warning)] flex items-center gap-1">
+              <Icon name="star" size={15} />
+              Yes
+            </span>
           </div>
         )}
       </div>
@@ -51,7 +54,7 @@ export default function ItemViewFooter({
             </p>
             <div className="flex gap-3">
               <Button variant="danger" size="sm" onClick={onDelete} disabled={loading}>
-                {loading ? 'Deleting...' : 'Yes, Delete'}
+                {loading ? 'Deleting…' : 'Delete item'}
               </Button>
               <Button
                 variant="secondary"
@@ -70,7 +73,8 @@ export default function ItemViewFooter({
             onClick={() => setShowConfirmDelete(true)}
             className="w-full px-4 py-2 text-[var(--color-error)] bg-[var(--color-error-subtle)] rounded-[var(--radius-md)] font-medium"
           >
-            Delete Item
+            <Icon name="trash" size={16} />
+            Delete item
           </Button>
         )}
       </div>

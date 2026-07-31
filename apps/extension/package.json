@@ -10,7 +10,7 @@
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
     "test": "wxt prepare && vitest run",
-    "lint": "eslint src",
+    "lint": "eslint src entrypoints lib",
     "typecheck": "wxt prepare && tsc --noEmit"
   },
   "devDependencies": {

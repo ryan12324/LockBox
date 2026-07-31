@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { redeemShareLink, getShareAuthToken } from '../lib/team-crypto.js';
-import { Button, Input, Card, Badge, Textarea, Aura } from '@lockbox/design';
+import { Button, Input, Card, Badge, Textarea, Icon, type IconName } from '@lockbox/design';
 import type { VaultItem, LoginItem, SecureNoteItem, CardItem } from '@lockbox/types';
 
 export default function ShareView() {
@@ -78,24 +78,12 @@ export default function ShareView() {
       style={{ flexShrink: 0 }}
     >
       {copiedField === field ? (
-        <span
-          style={{
-            fontSize: 'var(--font-size-xs)',
-            fontWeight: 500,
-            color: 'var(--color-success)',
-          }}
-        >
-          Copied!
-        </span>
+        <>
+          <Icon name="check" size={17} />
+          <span>Copied</span>
+        </>
       ) : (
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-          />
-        </svg>
+        <Icon name="copy" size={17} />
       )}
     </Button>
   );
@@ -162,16 +150,15 @@ export default function ShareView() {
                 const style: React.CSSProperties = {
                   flex: 1,
                   padding: '8px 12px',
-                  borderRadius: 'var(--radius-organic-lg)',
-                  background: 'var(--color-surface)',
-                  boxShadow: 'var(--shadow-sm)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--color-bg-subtle)',
+                  border: '1px solid var(--color-border)',
                   color: href ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                   textDecoration: 'none',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
                   display: 'block',
-                  transition: 'box-shadow 0.15s',
                 };
                 return (
                   <div key={uri} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -254,40 +241,70 @@ export default function ShareView() {
     );
   };
 
+  const typeIcons: Record<string, IconName> = {
+    login: 'key',
+    note: 'note',
+    card: 'credit-card',
+    identity: 'id',
+    passkey: 'fingerprint',
+    document: 'file-description',
+  };
+
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-4"
       style={{
         position: 'relative',
-        overflow: 'hidden',
         background: 'var(--color-bg)',
+        paddingTop: 32,
+        paddingBottom: 32,
       }}
     >
-      <Aura state="active" position="center" style={{ width: 400, height: 400, opacity: 0.85 }} />
-
       <div
         style={{
-          position: 'relative',
-          zIndex: 1,
           width: '100%',
-          maxWidth: 480,
+          maxWidth: 560,
         }}
       >
-        <Card variant="frost" padding="lg" style={{ boxShadow: 'var(--shadow-xl)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              width: 38,
+              height: 38,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-primary)',
+              color: 'var(--color-primary-contrast)',
+            }}
+          >
+            <Icon name="shield-lock" size={21} />
+          </span>
+          <div>
+            <strong style={{ display: 'block', color: 'var(--color-text)' }}>Lockbox</strong>
+            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}>
+              Encrypted share
+            </span>
+          </div>
+        </div>
+
+        <Card variant="surface" padding="lg">
           {loading ? (
             <div
+              role="status"
               style={{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '64px 0',
-                gap: 24,
+                gap: 16,
               }}
             >
-              <div className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin" />
+              <Icon name="loader-2" size={30} className="vault-state__spinner" />
               <p style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-                Decrypting shared item...
+                Decrypting shared item…
               </p>
             </div>
           ) : error ? (
@@ -305,7 +322,7 @@ export default function ShareView() {
                 style={{
                   width: 64,
                   height: 64,
-                  borderRadius: 'var(--radius-full)',
+                borderRadius: 'var(--radius-md)',
                   background: 'var(--color-error-subtle)',
                   display: 'flex',
                   alignItems: 'center',
@@ -313,14 +330,7 @@ export default function ShareView() {
                   color: 'var(--color-error)',
                 }}
               >
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
+                <Icon name="alert-triangle" size={30} />
               </div>
               <h2
                 style={{
@@ -329,7 +339,7 @@ export default function ShareView() {
                   color: 'var(--color-text)',
                 }}
               >
-                Share Link Unavailable
+                Share link unavailable
               </h2>
               <p style={{ color: 'var(--color-text-secondary)', maxWidth: 400, margin: '0 auto' }}>
                 {error}
@@ -343,16 +353,35 @@ export default function ShareView() {
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
                   paddingBottom: 24,
-                  borderBottom: '1px solid var(--color-surface-raised)',
+                  borderBottom: '1px solid var(--color-border)',
+                  gap: 12,
                 }}
               >
-                <div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, minWidth: 0 }}>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      width: 40,
+                      height: 40,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'var(--color-bg-subtle)',
+                      border: '1px solid var(--color-border)',
+                      color: 'var(--color-primary)',
+                      flex: '0 0 auto',
+                    }}
+                  >
+                    <Icon name={typeIcons[item.type] ?? 'file'} size={20} />
+                  </span>
+                  <div style={{ minWidth: 0 }}>
                   <h1
                     style={{
                       fontSize: 'var(--font-size-xl)',
                       fontWeight: 700,
                       color: 'var(--color-text)',
                       letterSpacing: '-0.02em',
+                      overflowWrap: 'anywhere',
                     }}
                   >
                     {item.name}
@@ -365,8 +394,9 @@ export default function ShareView() {
                       textTransform: 'capitalize',
                     }}
                   >
-                    {item.type} Item
+                    {item.type} item
                   </p>
+                  </div>
                 </div>
                 {maxViews > 0 && (
                   <Badge variant="primary">
@@ -385,33 +415,19 @@ export default function ShareView() {
                 style={{
                   paddingTop: 24,
                   marginTop: 8,
-                  borderTop: '1px solid var(--color-surface-raised)',
-                  textAlign: 'center',
+                  borderTop: '1px solid var(--color-border)',
                 }}
               >
                 <div
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
                     gap: 8,
                     fontSize: 'var(--font-size-xs)',
                     color: 'var(--color-text-tertiary)',
                   }}
                 >
-                  <svg
-                    style={{ width: 16, height: 16, color: 'var(--color-primary)' }}
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
+                  <Icon name="lock" size={16} style={{ color: 'var(--color-primary)', flex: '0 0 auto' }} />
                   <span>
                     This is an end-to-end encrypted share. The server never sees the decrypted
                     content.

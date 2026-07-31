@@ -1,6 +1,7 @@
 import type { VaultItem } from '@lockbox/types';
+import type { IconName } from '@lockbox/design';
 
-export type Tab = 'site' | 'vault' | 'shared' | 'generator' | 'totp';
+export type Tab = 'site' | 'vault' | 'more';
 
 export type ViewState =
   | { view: 'tabs' }
@@ -16,9 +17,15 @@ export async function sendMessage<T>(message: object): Promise<T> {
   return chrome.runtime.sendMessage(message) as Promise<T>;
 }
 
-export const typeIcon = (type: string) =>
-  ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🔑', document: '📄' })[type] ??
-  '📄';
+export const typeIcon = (type: string): IconName =>
+  ({
+    login: 'key',
+    note: 'note',
+    card: 'credit-card',
+    identity: 'id',
+    passkey: 'fingerprint',
+    document: 'file-description',
+  } satisfies Record<string, IconName>)[type] ?? 'file';
 
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

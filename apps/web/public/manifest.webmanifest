@@ -1,0 +1,23 @@
+{
+  "name": "Lockbox Password Manager",
+  "short_name": "Lockbox",
+  "description": "A self-hosted, zero-knowledge password manager.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f3ec",
+  "theme_color": "#735137",
+  "icons": [
+    {
+      "src": "/brand/app-icons/lockbox-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/brand/app-icons/lockbox-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

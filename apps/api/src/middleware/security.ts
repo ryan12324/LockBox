@@ -27,8 +27,8 @@ function isAllowedOrigin(origin: string, allowedOrigins: string[], extensionIds:
 /** CORS middleware — allows web vault and browser extension origins. */
 export const corsMiddleware = createMiddleware<Env>(async (c, next) => {
   const origin = c.req.header('Origin') ?? '';
-  const allowedOrigins = parseAllowedOrigins(c.env.CORS_ORIGINS);
-  const extensionIds = parseAllowedOrigins(c.env.EXTENSION_IDS);
+  const allowedOrigins = parseAllowedOrigins(c.env?.CORS_ORIGINS);
+  const extensionIds = parseAllowedOrigins(c.env?.EXTENSION_IDS);
 
   if (isAllowedOrigin(origin, allowedOrigins, extensionIds)) {
     c.header('Access-Control-Allow-Origin', origin);

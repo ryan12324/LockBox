@@ -1,7 +1,10 @@
 ext {
     minSdkVersion = 26  // Required for AutofillService API
-    compileSdkVersion = 36
-    targetSdkVersion = 36
+    // Capacitor 6 library modules still consume the legacy integer DSL.
+    // The app module itself compiles against API 36.1 and targets API 36.
+    compileSdkVersion = 35
+    targetSdkVersion = 35
+    buildToolsVersion = '36.1.0'
     androidxActivityVersion = '1.8.0'
     androidxAppCompatVersion = '1.6.1'
     androidxCoordinatorLayoutVersion = '1.2.0'

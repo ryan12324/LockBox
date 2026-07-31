@@ -5,6 +5,7 @@
  */
 
 import { detectForms } from './form-detector.js';
+import { iconifySvg } from './iconify.js';
 
 /** Credentials extracted from a form submission. */
 export interface ExtractedCredentials {
@@ -142,8 +143,9 @@ export function injectSaveBanner(
       align-items: center;
       justify-content: space-between;
       padding: 10px 16px;
-      background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
-      color: #fff;
+      background: #FDFCFA;
+      color: #2C2825;
+      border-bottom: 1px solid #DDD6CC;
       font-family: system-ui, -apple-system, sans-serif;
       font-size: 13px;
       line-height: 1.4;
@@ -156,7 +158,7 @@ export function injectSaveBanner(
       flex: 1;
       min-width: 0;
     }
-    .icon { font-size: 18px; flex-shrink: 0; }
+    .icon { color: #6B5640; display: flex; flex-shrink: 0; }
     .text { font-size: 13px; }
     .actions {
       display: flex;
@@ -166,23 +168,24 @@ export function injectSaveBanner(
     }
     .btn {
       padding: 6px 14px;
-      border-radius: 4px;
+      border-radius: 10px;
       cursor: pointer;
       font-size: 12px;
       font-weight: 600;
       border: none;
     }
     .btn-save {
-      background: #fff;
-      color: #4f46e5;
-    }
-    .btn-save:hover { background: #e0e7ff; }
-    .btn-dismiss {
-      background: rgba(255,255,255,0.2);
-      border: 1px solid rgba(255,255,255,0.3);
+      background: #6B5640;
       color: #fff;
     }
-    .btn-dismiss:hover { background: rgba(255,255,255,0.3); }
+    .btn-save:hover { background: #594839; }
+    .btn-dismiss {
+      background: transparent;
+      border: 1px solid #CFC6BB;
+      color: #5D554D;
+    }
+    .btn-dismiss:hover { background: #F1EDE7; }
+    .btn:focus-visible { outline: 2px solid #8B7355; outline-offset: 2px; }
   `;
 
   const banner = document.createElement('div');
@@ -197,7 +200,7 @@ export function injectSaveBanner(
   info.className = 'info';
   const icon = document.createElement('span');
   icon.className = 'icon';
-  icon.textContent = '🔐';
+  icon.innerHTML = iconifySvg('shield-lock', { size: 20 });
   const messageEl = document.createElement('span');
   messageEl.className = 'text';
   messageEl.textContent = message;

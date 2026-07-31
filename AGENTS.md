@@ -23,7 +23,7 @@
 
 - Strict TypeScript, `.js` extensions in all local imports
 - No `as any`, `@ts-ignore`, `@ts-expect-error`
-- Tailwind v4, indigo-600 primary, full dark mode (`dark:` variants)
+- Tailwind v4 with shared `@lockbox/design` OKLCH tokens and the local Iconify Tabler subset
 - Auth: `session` → sessionStorage; `userKey`/`masterKey` → memory-only, never persisted
 - Every feature must be implemented across all surfaces (web, extension, mobile) — no single-app features
 - Commit and push often
@@ -31,11 +31,32 @@
 ## Testing
 
 ```bash
-bun run test                           # All
-cd apps/web && npx vitest run          # 52 tests
-cd apps/api && npx vitest run          # 108 tests
-cd apps/extension && npx vitest run    # 51 tests
-cd apps/mobile && npx vitest run       # 84 tests
+bun run test                           # All workspaces
+cd apps/web && bun run test
+cd apps/api && bun run test
+cd apps/extension && bun run test
+cd apps/mobile && bun run test
+```
+
+## Android Build Environment
+
+- Build `apps/web` before Capacitor sync; Android packages `apps/web/dist`.
+- Use a JDK from 17 through 24 for both the Gradle client and daemon. On this machine both the system JDK and Android Studio's bundled JBR are Java 25, which fails with `Unsupported class file major version 69` or during test-task creation. `-Dorg.gradle.java.home` alone is insufficient because the wrapper client may already be running on Java 25.
+- In sandboxed Codex sessions, first check `/private/tmp/lockbox-jdk17/jdk-17.0.20+8/Contents/Home`. If it is absent, install a compatible JDK and update the command below; never assume Android Studio's JBR is compatible without checking `bin/java -version`.
+- Keep Gradle and Android tool caches in a writable temporary path in sandboxed sessions.
+- `local.properties` is ignored by git. Set `sdk.dir=/Users/ryan/Library/Android/sdk` when it is absent.
+- API 36.1 is installed as `platforms/android-36.1`; the app module uses AGP's `compileSdk { version = release(36) { minorApiLevel = 1 } }` DSL and targets 36. Capacitor 6 library modules still use the legacy integer DSL, so the root compatibility values remain at installed API 35. Root Gradle also pins all Android library modules to the installed Build Tools 36.1.0 because AGP's default 35.0.0 is absent.
+
+```bash
+cd apps/web && bun run build
+cd ../mobile && bun run build:android
+cd android
+JAVA_HOME="/private/tmp/lockbox-jdk17/jdk-17.0.20+8/Contents/Home" \
+./gradlew --no-daemon \
+  --gradle-user-home /private/tmp/lockbox-gradle-home \
+  -Duser.home=/private/tmp/lockbox-android-home \
+  -Dorg.gradle.java.home="/private/tmp/lockbox-jdk17/jdk-17.0.20+8/Contents/Home" \
+  testDebugUnitTest lintDebug assembleDebug
 ```
 
 ## Deployment

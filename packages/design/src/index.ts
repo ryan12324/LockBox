@@ -1,6 +1,8 @@
 export { themeColors, type ThemeMode } from './tokens/colors.js';
 export { radii } from './tokens/radii.js';
 export { durations } from './tokens/animations.js';
+export { Icon, type IconProps, type IconName } from './components/Icon.js';
+export { lockboxIcons } from './icons/generated.js';
 
 export {
   Button,

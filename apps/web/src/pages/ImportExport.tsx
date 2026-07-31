@@ -10,7 +10,7 @@ import {
   parseCSV,
   type ImportFormat,
 } from '../lib/importers/index.js';
-import { Button, Card, Select } from '@lockbox/design';
+import { Button, Card, Icon, Select } from '@lockbox/design';
 import { useToast } from '../providers/ToastProvider.js';
 import type { VaultItem } from '@lockbox/types';
 
@@ -280,7 +280,10 @@ export default function ImportExport() {
                             color: 'var(--color-text)',
                           }}
                         >
-                          📄 {fileName}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                            <Icon name="file-description" size={17} />
+                            {fileName}
+                          </span>
                         </p>
                         {detectedFormat !== 'unknown' && (
                           <p
@@ -545,7 +548,10 @@ export default function ImportExport() {
                       color: 'var(--color-success)',
                     }}
                   >
-                    ✅ Successfully imported {importedCount} item{importedCount !== 1 ? 's' : ''}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}>
+                      <Icon name="circle-check" size={17} />
+                      Successfully imported {importedCount} item{importedCount !== 1 ? 's' : ''}
+                    </span>
                   </p>
                 </div>
 
@@ -635,10 +641,10 @@ export default function ImportExport() {
                 boxShadow: 'var(--shadow-sm)',
               }}
             >
-              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-warning)' }}>
-                ⚠️ <strong>Warning:</strong> The exported file will contain your passwords in
-                plaintext. Store it securely and delete it after use.
-              </p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, fontSize: 'var(--font-size-xs)', color: 'var(--color-warning)' }}>
+                <Icon name="alert-triangle" size={16} style={{ flex: '0 0 auto' }} />
+                <span><strong>Warning:</strong> The exported file will contain your passwords in plaintext. Store it securely and delete it after use.</span>
+              </div>
             </div>
 
             <Button
@@ -648,7 +654,8 @@ export default function ImportExport() {
               loading={exportLoading}
               style={{ width: '100%', marginBottom: 24 }}
             >
-              {exportLoading ? 'Preparing export…' : '⬇️ Download CSV Export'}
+              {!exportLoading && <Icon name="download" size={17} />}
+              {exportLoading ? 'Preparing export…' : 'Download CSV export'}
             </Button>
 
             <div style={{ borderTop: '1px solid var(--color-surface-raised)', paddingTop: 16 }}>

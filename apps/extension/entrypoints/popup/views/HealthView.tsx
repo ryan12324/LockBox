@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Badge, Card } from '@lockbox/design';
+import { Button, Badge, Card, Icon } from '@lockbox/design';
 import type { VaultItem, VaultHealthSummary, PasswordHealthReport } from '@lockbox/types';
 import { sendMessage } from './shared.js';
 
@@ -88,18 +88,6 @@ export function HealthSummaryView({
     }
   }, [analyze]);
 
-  const score = summary?.overallScore ?? 100;
-  const scoreColor =
-    score < 40
-      ? 'text-[var(--color-error)]'
-      : score < 70
-        ? 'text-[var(--color-warning)]'
-        : score < 90
-          ? 'text-[var(--color-primary)]'
-          : 'text-[var(--color-success)]';
-  const strokeColor =
-    score < 40 ? '#f87171' : score < 70 ? '#fbbf24' : score < 90 ? '#818cf8' : '#34d399';
-
   const displayReports = filterBreached
     ? reports.filter((r) => r.issues.some((i) => i.type === 'breached'))
     : reports.filter((r) => r.issues.length > 0).sort((a, b) => b.issues.length - a.issues.length);
@@ -109,9 +97,10 @@ export function HealthSummaryView({
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            ←
+            <Icon name="arrow-left" size={17} />
+            <span className="sr-only">Back</span>
           </Button>
-          <span className="text-sm font-semibold text-[var(--color-text)]">Security Health</span>
+          <span className="text-sm font-semibold text-[var(--color-text)]">Security review</span>
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -121,10 +110,10 @@ export function HealthSummaryView({
             disabled={loading || breachChecking}
             title="Uses HIBP k-anonymity: only a five-character SHA-1 prefix leaves this device"
           >
-            {breachChecking ? 'Checking...' : 'Check Breaches'}
+            {breachChecking ? 'Checking…' : 'Check breaches'}
           </Button>
           <Button variant="primary" size="sm" onClick={analyze} disabled={loading}>
-            {loading ? 'Analyzing...' : 'Analyze Now'}
+            {loading ? 'Reviewing…' : 'Review again'}
           </Button>
         </div>
       </div>
@@ -143,42 +132,32 @@ export function HealthSummaryView({
 
         {loading && !summary ? (
           <div className="text-center text-[var(--color-text-tertiary)] text-sm mt-10">
-            Scanning vault...
+            Reviewing vault…
           </div>
         ) : (
           summary && (
             <>
-              <div className="flex items-center justify-center py-4">
-                <div className="relative flex items-center justify-center w-[80px] h-[80px]">
-                  <svg
-                    className="absolute inset-0 w-full h-full transform -rotate-90"
-                    viewBox="0 0 100 100"
-                  >
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      stroke="currentColor"
-                      strokeWidth="8"
-                      fill="transparent"
-                      className="text-[var(--color-text-tertiary)]"
-                    />
-                    <circle
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      stroke={strokeColor}
-                      strokeWidth="8"
-                      fill="transparent"
-                      strokeDasharray={`${(score / 100) * 251.2} 251.2`}
-                      className="transition-all duration-1000 ease-out"
-                    />
-                  </svg>
-                  <div className="flex flex-col items-center justify-center z-10">
-                    <span className={`text-xl font-bold ${scoreColor}`}>{score}</span>
+              <Card variant="surface" padding="sm">
+                <div className="flex items-start gap-2.5">
+                  <Icon
+                    name={summary.breached > 0 ? 'alert-circle' : 'shield-check'}
+                    size={22}
+                    className={summary.breached > 0 ? 'text-[var(--color-error)]' : 'text-[var(--color-primary)]'}
+                  />
+                  <div>
+                    <div className="text-sm font-semibold text-[var(--color-text)]">
+                      {summary.breached > 0
+                        ? 'Breach results need attention'
+                        : summary.weak + summary.reused + summary.old > 0
+                          ? 'Review the issues below'
+                          : 'No current password issues found'}
+                    </div>
+                    <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5 mb-0">
+                      Reviewed {summary.totalItems} {summary.totalItems === 1 ? 'login' : 'logins'} locally.
+                    </p>
                   </div>
                 </div>
-              </div>
+              </Card>
 
               <div className="grid grid-cols-2 gap-2">
                 <Card variant="surface" padding="sm">
@@ -218,7 +197,7 @@ export function HealthSummaryView({
                 {displayReports.length === 0 ? (
                   <Card variant="surface" padding="sm">
                     <div className="text-center text-xs text-[var(--color-text-tertiary)] py-2">
-                      No issues found!
+                      No issues found
                     </div>
                   </Card>
                 ) : (

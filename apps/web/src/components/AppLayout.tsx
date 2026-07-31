@@ -1,19 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { Aura, Button, Input } from '@lockbox/design';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { Button, Icon, Input, type IconName } from '@lockbox/design';
 import { useAuthStore } from '../store/auth.js';
 import { useVaultFilterStore } from '../store/vault.js';
-import { useAura } from '../providers/AuraProvider.js';
+import { useToast } from '../providers/ToastProvider.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem, encryptVaultItem } from '../lib/crypto.js';
 import { clearNativeAutofillIndex } from '../lib/native-autofill.js';
 import type { Folder, VaultItem } from '@lockbox/types';
 
+const vaultTypes: Array<{ type: string; label: string; icon: IconName }> = [
+  { type: 'login', label: 'Logins', icon: 'key' },
+  { type: 'note', label: 'Secure notes', icon: 'note' },
+  { type: 'card', label: 'Cards', icon: 'credit-card' },
+  { type: 'identity', label: 'Identities', icon: 'id' },
+  { type: 'passkey', label: 'Passkeys', icon: 'fingerprint' },
+  { type: 'document', label: 'Documents', icon: 'file-description' },
+];
+
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
   const { session, userKey, lock, logout } = useAuthStore();
-
   const {
     selectedFolder,
     setSelectedFolder,
@@ -26,27 +35,26 @@ export default function AppLayout() {
     triggerUpdate,
   } = useVaultFilterStore();
 
+  const [showNavigation, setShowNavigation] = useState(false);
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [editingFolder, setEditingFolder] = useState<{ id: string; name: string } | null>(null);
   const [deletingFolderId, setDeletingFolderId] = useState<string | null>(null);
   const [isTravelMode, setIsTravelMode] = useState(false);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const { state: auraState } = useAura();
 
   useEffect(() => {
-    if (session) {
-      api.vault
-        .list(session.token)
-        .then((res: { folders: Folder[] }) => setFolders(res.folders))
-        .catch(console.error);
+    if (!session) return;
+    api.vault
+      .list(session.token)
+      .then((response: { folders: Folder[] }) => setFolders(response.folders))
+      .catch(() => toast('Folders could not be loaded. Your vault items are unchanged.', 'error'));
+    api.settings
+      .getTravelMode(session.token)
+      .then((response) => setIsTravelMode(response.enabled))
+      .catch(() => toast('Travel mode status could not be checked.', 'warning'));
+  }, [session, setFolders, toast]);
 
-      api.settings
-        .getTravelMode(session.token)
-        .then((res) => setIsTravelMode(res.enabled))
-        .catch(console.error);
-    }
-  }, [session, setFolders]);
+  useEffect(() => setShowNavigation(false), [location.pathname]);
 
   async function handleLogout() {
     if (session) await api.auth.logout(session.token).catch(() => {});
@@ -55,10 +63,12 @@ export default function AppLayout() {
     navigate('/login');
   }
 
-  const typeIcon = (type: string): string =>
-    ({ login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' })[
-      type
-    ] ?? '📄';
+  async function refreshFolders() {
+    if (!session) return;
+    const response = await api.vault.list(session.token);
+    setFolders(response.folders);
+    triggerUpdate();
+  }
 
   async function handleCreateFolder() {
     if (!session || !newFolderName.trim()) return;
@@ -66,11 +76,10 @@ export default function AppLayout() {
       await api.vault.createFolder({ name: newFolderName.trim() }, session.token);
       setNewFolderName('');
       setShowNewFolder(false);
-      const res = await api.vault.list(session.token);
-      setFolders(res.folders);
-      triggerUpdate();
-    } catch (err) {
-      console.error('Failed to create folder:', err);
+      await refreshFolders();
+      toast('Folder created.', 'success');
+    } catch {
+      toast('Folder could not be created. Try again.', 'error');
     }
   }
 
@@ -83,11 +92,10 @@ export default function AppLayout() {
         session.token
       );
       setEditingFolder(null);
-      const res = await api.vault.list(session.token);
-      setFolders(res.folders);
-      triggerUpdate();
-    } catch (err) {
-      console.error('Failed to rename folder:', err);
+      await refreshFolders();
+      toast('Folder renamed.', 'success');
+    } catch {
+      toast('Folder could not be renamed. Try again.', 'error');
     }
   }
 
@@ -134,37 +142,27 @@ export default function AppLayout() {
       await api.vault.deleteFolder(id, session.token);
       setDeletingFolderId(null);
       if (selectedFolder === id) setSelectedFolder(null);
-      const res = await api.vault.list(session.token);
-      setFolders(res.folders);
-      triggerUpdate();
-    } catch (err) {
-      console.error('Failed to delete folder:', err);
+      await refreshFolders();
+      toast('Folder deleted. Its items remain in your vault.', 'success');
+    } catch {
+      toast('Folder could not be deleted. No items were intentionally removed.', 'error');
     }
   }
 
-  const navToVault = () => {
+  function showVault(filter?: { type?: string; folder?: string; favorites?: boolean }) {
+    setSelectedType(filter?.type ?? null);
+    setSelectedFolder(filter?.folder ?? null);
+    setShowFavorites(filter?.favorites ?? false);
     if (location.pathname !== '/vault') navigate('/vault');
-  };
+    setShowNavigation(false);
+  }
 
-  const isNavActive = (path: string) => location.pathname === path;
-  const isVaultActive = isNavActive('/vault');
-
-  const getPageTitle = (): string => {
-    if (location.pathname === '/vault') {
+  const isVaultRoute = location.pathname === '/vault';
+  const pageTitle = (() => {
+    if (isVaultRoute) {
       if (showFavorites) return 'Favorites';
-      if (selectedType) {
-        const labels: Record<string, string> = {
-          login: 'Logins',
-          note: 'Secure Notes',
-          card: 'Cards',
-          identity: 'Identities',
-          passkey: 'Passkeys',
-          document: 'Documents',
-        };
-        return labels[selectedType] ?? 'Vault';
-      }
-      const folder = folders.find((f) => f.id === selectedFolder);
-      if (folder) return folder.name;
+      if (selectedType) return vaultTypes.find((entry) => entry.type === selectedType)?.label ?? 'Vault';
+      if (selectedFolder) return folders.find((folder) => folder.id === selectedFolder)?.name ?? 'Vault';
       return 'Vault';
     }
     if (location.pathname === '/trash') return 'Trash';
@@ -173,512 +171,253 @@ export default function AppLayout() {
     if (location.pathname === '/generator') return 'Generator';
     if (location.pathname.startsWith('/settings')) return 'Settings';
     return 'Lockbox';
-  };
+  })();
 
-  /* ── Rail icon button style ── */
-  const getRailStyle = (isActive: boolean): React.CSSProperties => ({
-    width: 36,
-    height: 36,
-    minHeight: 36,
-    padding: 0,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 'var(--radius-md)',
-    boxShadow: 'none',
-    fontSize: '1rem',
-    borderLeft: isActive ? '2px solid var(--color-primary)' : '2px solid transparent',
-    background: isActive ? 'var(--color-aura-dim)' : 'transparent',
-    color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-    transition: 'all 150ms ease',
-  });
-
-  /* ── Filter panel nav item style ── */
-  const getFilterItemStyle = (isActive: boolean): React.CSSProperties => ({
-    width: '100%',
-    justifyContent: 'flex-start',
-    borderRadius: 'var(--radius-md)',
-    boxShadow: 'none',
-    ...(isActive
-      ? { background: 'var(--color-aura-dim)', color: 'var(--color-primary)' }
-      : { color: 'var(--color-text-secondary)' }),
-  });
+  const navButton = (
+    label: string,
+    icon: IconName,
+    active: boolean,
+    action: () => void,
+    options?: { danger?: boolean }
+  ) => (
+    <button
+      type="button"
+      className="app-nav__item"
+      data-active={active ? 'true' : undefined}
+      data-danger={options?.danger ? 'true' : undefined}
+      aria-current={active ? 'page' : undefined}
+      onClick={action}
+    >
+      <Icon name={icon} size={20} />
+      <span className="app-nav__label">{label}</span>
+    </button>
+  );
 
   return (
-    <div className="flex flex-col h-screen" style={{ background: 'var(--color-bg)' }}>
-      {/* ═══ Top Bar (56px) ═══ */}
-      <header
-        className="flex items-center shrink-0"
-        style={{
-          height: 56,
-          paddingRight: 16,
-          background: 'var(--color-surface)',
-          borderBottom: '1px solid var(--color-border)',
-        }}
-      >
-        {/* Logo — aligned with 48px rail */}
-        <div
-          className="flex items-center justify-center shrink-0"
-          style={{ width: 48, height: 56 }}
-        >
-          <span style={{ fontSize: '1.25rem' }}>🔐</span>
-        </div>
-
-        <h1 className="text-sm font-semibold ml-3" style={{ color: 'var(--color-text)' }}>
-          {getPageTitle()}
-        </h1>
-
-        <div className="flex-1" />
-
-        {/* User area */}
-        <div className="flex items-center gap-3">
-          <span
-            className="text-xs truncate hidden sm:block"
-            style={{ color: 'var(--color-text-tertiary)', maxWidth: 180 }}
-          >
-            {session?.email}
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-header__brand">
+          <span className="app-brandmark" aria-hidden="true">
+            <img src="/brand/lockbox-app-icon.png" alt="" />
           </span>
-          <div
-            className="flex items-center justify-center rounded-full text-xs font-bold shrink-0"
-            style={{
-              width: 30,
-              height: 30,
-              background: 'var(--color-aura-dim)',
-              color: 'var(--color-primary)',
-            }}
-          >
+          <span className="app-header__wordmark">Lockbox</span>
+        </div>
+        <button
+          type="button"
+          className="lb-icon-button app-header__menu"
+          aria-label="Open navigation"
+          aria-expanded={showNavigation}
+          onClick={() => setShowNavigation((open) => !open)}
+        >
+          <Icon name="menu-2" size={22} />
+        </button>
+        <h1 className="app-header__title">{pageTitle}</h1>
+        <div className="app-header__account" title={session?.email}>
+          <span className="app-header__email">{session?.email}</span>
+          <span className="app-avatar" aria-hidden="true">
             {session?.email?.[0]?.toUpperCase() ?? '?'}
-          </div>
+          </span>
         </div>
       </header>
 
-      {/* ═══ Body: Aura + Rail + Content ═══ */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Aura glow — 80px wide, bleeds 32px past the 48px rail into content */}
-        <Aura state={auraState} position="sidebar" style={{ zIndex: 1 }} />
-
-        {/* ── Icon Rail (48px) ── */}
-        <nav className="relative shrink-0 flex flex-col" style={{ width: 48, zIndex: 20 }}>
-          {/* Primary nav */}
-          <div className="flex flex-col items-center gap-0.5 pt-2 flex-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              title="All Items"
-              onClick={() => {
-                setSelectedFolder(null);
-                setSelectedType(null);
-                setShowFavorites(false);
-                navToVault();
-              }}
-              style={getRailStyle(
-                isVaultActive && !selectedFolder && !selectedType && !showFavorites
-              )}
-            >
-              📋
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Favorites"
-              onClick={() => {
-                setShowFavorites(true);
-                setSelectedType(null);
-                setSelectedFolder(null);
-                navToVault();
-              }}
-              style={getRailStyle(isVaultActive && showFavorites)}
-            >
-              ⭐
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Trash"
-              onClick={() => navigate('/trash')}
-              style={getRailStyle(isNavActive('/trash'))}
-            >
-              🗑️
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Security"
-              onClick={() => navigate('/health')}
-              style={getRailStyle(isNavActive('/health'))}
-            >
-              🛡️
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Teams"
-              onClick={() => navigate('/teams')}
-              style={getRailStyle(location.pathname.startsWith('/teams'))}
-            >
-              👥
-            </Button>
-
-            {/* Divider */}
-            <div
-              style={{
-                width: 20,
-                height: 1,
-                background: 'var(--color-border)',
-                margin: '4px 0',
-                opacity: 0.5,
-              }}
-            />
-
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Filters & Folders"
-              onClick={() => setShowFilterPanel(!showFilterPanel)}
-              style={getRailStyle(
-                showFilterPanel || (isVaultActive && (!!selectedType || !!selectedFolder))
-              )}
-            >
-              ≡
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Generator"
-              onClick={() => navigate('/generator')}
-              style={getRailStyle(isNavActive('/generator'))}
-            >
-              🎲
-            </Button>
-          </div>
-
-          {/* Bottom nav */}
-          <div className="flex flex-col items-center gap-0.5 pb-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Settings"
-              onClick={() => navigate('/settings')}
-              style={getRailStyle(location.pathname.startsWith('/settings'))}
-            >
-              ⚙️
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Lock"
-              onClick={lock}
-              style={{ ...getRailStyle(false), color: 'var(--color-text-secondary)' }}
-            >
-              🔒
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Sign Out"
-              onClick={handleLogout}
-              style={{ ...getRailStyle(false), color: 'var(--color-error)' }}
-            >
-              🚪
-            </Button>
-          </div>
-        </nav>
-
-        {/* ── Filter Panel (slide-over) ── */}
-        {showFilterPanel && (
-          <aside
-            className="overflow-y-auto shrink-0"
-            style={{
-              width: 220,
-              background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-              borderRight: '1px solid var(--color-border)',
-              padding: 12,
-              zIndex: 15,
-            }}
-          >
-            {/* Types */}
-            <p
-              className="text-xs font-semibold uppercase tracking-wider mb-2 px-2"
-              style={{ color: 'var(--color-text-tertiary)' }}
-            >
-              Types
-            </p>
-            <div className="space-y-0.5 mb-4">
-              {(['login', 'note', 'card', 'identity', 'passkey', 'document'] as const).map(
-                (type) => (
-                  <Button
-                    key={type}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedType(type);
-                      setSelectedFolder(null);
-                      setShowFavorites(false);
-                      navToVault();
-                      setShowFilterPanel(false);
-                    }}
-                    style={getFilterItemStyle(isVaultActive && selectedType === type)}
-                  >
-                    {typeIcon(type)}{' '}
-                    {type === 'login'
-                      ? 'Logins'
-                      : type === 'note'
-                        ? 'Secure Notes'
-                        : type === 'card'
-                          ? 'Cards'
-                          : type === 'identity'
-                            ? 'Identities'
-                            : type === 'passkey'
-                              ? 'Passkeys'
-                              : 'Documents'}
-                  </Button>
-                )
-              )}
-            </div>
-
-            {/* Folders */}
-            <div className="flex items-center justify-between mb-2">
-              <p
-                className="text-xs font-semibold uppercase tracking-wider px-2"
-                style={{ color: 'var(--color-text-tertiary)' }}
-              >
-                Folders
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowNewFolder(true)}
-                title="New folder"
-                style={{
-                  padding: '2px 8px',
-                  minHeight: 'auto',
-                  boxShadow: 'none',
-                  color: 'var(--color-text-tertiary)',
-                }}
-              >
-                +
-              </Button>
-            </div>
-
-            {showNewFolder && (
-              <div className="flex gap-1 px-1 mb-1">
-                <Input
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleCreateFolder();
-                    if (e.key === 'Escape') {
-                      setShowNewFolder(false);
-                      setNewFolderName('');
-                    }
-                  }}
-                  placeholder="Folder name"
-                  className="flex-1"
-                  style={{ padding: '4px 8px', fontSize: 'var(--font-size-sm)' }}
-                  autoFocus
-                />
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleCreateFolder}
-                  style={{
-                    padding: '4px 8px',
-                    minHeight: 'auto',
-                    fontSize: 'var(--font-size-xs)',
-                  }}
-                >
-                  ✓
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowNewFolder(false);
-                    setNewFolderName('');
-                  }}
-                  style={{
-                    padding: '4px 8px',
-                    minHeight: 'auto',
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--color-text-tertiary)',
-                    boxShadow: 'none',
-                  }}
-                >
-                  ✕
-                </Button>
-              </div>
-            )}
-
-            {folders.map((folder) =>
-              editingFolder?.id === folder.id ? (
-                <div key={folder.id} className="flex gap-1 px-1 mb-1">
-                  <Input
-                    value={editingFolder.name}
-                    onChange={(e) => setEditingFolder({ ...editingFolder, name: e.target.value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleRenameFolder();
-                      if (e.key === 'Escape') setEditingFolder(null);
-                    }}
-                    className="flex-1"
-                    style={{ padding: '4px 8px', fontSize: 'var(--font-size-sm)' }}
-                    autoFocus
-                  />
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleRenameFolder}
-                    style={{
-                      padding: '4px 8px',
-                      minHeight: 'auto',
-                      fontSize: 'var(--font-size-xs)',
-                    }}
-                  >
-                    ✓
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingFolder(null)}
-                    style={{
-                      padding: '4px 8px',
-                      minHeight: 'auto',
-                      fontSize: 'var(--font-size-xs)',
-                      color: 'var(--color-text-tertiary)',
-                      boxShadow: 'none',
-                    }}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              ) : deletingFolderId === folder.id ? (
-                <div key={folder.id} className="px-2 py-2">
-                  <p className="text-xs text-[var(--color-text-secondary)] mb-2">
-                    Delete &quot;{folder.name}&quot;? Items will be securely moved to root.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => handleDeleteFolder(folder.id)}
-                      style={{
-                        padding: '4px 8px',
-                        minHeight: 'auto',
-                        fontSize: 'var(--font-size-xs)',
-                      }}
-                    >
-                      Delete
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeletingFolderId(null)}
-                      style={{
-                        padding: '4px 8px',
-                        minHeight: 'auto',
-                        fontSize: 'var(--font-size-xs)',
-                        color: 'var(--color-text-tertiary)',
-                        boxShadow: 'none',
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div key={folder.id} className="group flex items-center">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedFolder(folder.id);
-                      setSelectedType(null);
-                      setShowFavorites(false);
-                      navToVault();
-                      setShowFilterPanel(false);
-                    }}
-                    style={{
-                      ...getFilterItemStyle(isVaultActive && selectedFolder === folder.id),
-                      flex: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    📁 {folder.name}
-                  </Button>
-                  <div className="hidden group-hover:flex gap-0.5 pr-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditingFolder({ id: folder.id, name: folder.name })}
-                      title="Rename"
-                      style={{
-                        padding: '4px',
-                        minHeight: 'auto',
-                        boxShadow: 'none',
-                        color: 'var(--color-text-tertiary)',
-                      }}
-                    >
-                      ✎
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDeletingFolderId(folder.id)}
-                      title="Delete"
-                      style={{
-                        padding: '4px',
-                        minHeight: 'auto',
-                        boxShadow: 'none',
-                        color: 'var(--color-text-tertiary)',
-                      }}
-                    >
-                      ✕
-                    </Button>
-                  </div>
-                </div>
-              )
-            )}
-          </aside>
+      <div className="app-shell__body">
+        {showNavigation && (
+          <button
+            type="button"
+            className="app-nav__scrim"
+            aria-label="Close navigation"
+            onClick={() => setShowNavigation(false)}
+          />
         )}
 
-        {/* ── Main Content ── */}
-        <main className="flex-1 flex flex-col overflow-hidden relative">
+        <aside className="app-sidebar" data-open={showNavigation ? 'true' : undefined}>
+          <nav className="app-nav" aria-label="Main navigation">
+            <div className="app-nav__primary">
+              {navButton(
+                'Vault',
+                'shield-lock',
+                isVaultRoute && !selectedFolder && !selectedType && !showFavorites,
+                () => showVault()
+              )}
+              {navButton('Favorites', 'star', isVaultRoute && showFavorites, () => showVault({ favorites: true }))}
+              {navButton('Security', 'shield-check', location.pathname === '/health', () => navigate('/health'))}
+              {navButton('Generator', 'wand', location.pathname === '/generator', () => navigate('/generator'))}
+              {navButton('Teams', 'users', location.pathname.startsWith('/teams'), () => navigate('/teams'))}
+            </div>
+
+            <div className="app-nav__section app-nav__browse">
+              <p className="app-nav__section-title">Types</p>
+              {vaultTypes.map((entry) => (
+                <div key={entry.type}>
+                  {navButton(
+                    entry.label,
+                    entry.icon,
+                    isVaultRoute && selectedType === entry.type,
+                    () => showVault({ type: entry.type })
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="app-nav__section app-nav__folders">
+              <div className="app-nav__section-heading">
+                <p className="app-nav__section-title">Folders</p>
+                <button
+                  type="button"
+                  className="lb-icon-button app-nav__folder-action"
+                  onClick={() => setShowNewFolder(true)}
+                  aria-label="Create folder"
+                >
+                  <Icon name="folder-plus" size={18} />
+                </button>
+              </div>
+
+              {showNewFolder && (
+                <form
+                  className="app-nav__folder-editor"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void handleCreateFolder();
+                  }}
+                >
+                  <Input
+                    value={newFolderName}
+                    onChange={(event) => setNewFolderName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        setShowNewFolder(false);
+                        setNewFolderName('');
+                      }
+                    }}
+                    placeholder="Folder name"
+                    aria-label="Folder name"
+                    autoFocus
+                  />
+                  <button type="submit" className="lb-icon-button" aria-label="Save folder">
+                    <Icon name="check" size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    className="lb-icon-button"
+                    aria-label="Cancel new folder"
+                    onClick={() => {
+                      setShowNewFolder(false);
+                      setNewFolderName('');
+                    }}
+                  >
+                    <Icon name="x" size={18} />
+                  </button>
+                </form>
+              )}
+
+              <div className="app-nav__folder-list">
+                {folders.length === 0 && !showNewFolder && (
+                  <p className="app-nav__empty">No folders yet</p>
+                )}
+                {folders.map((folder) => {
+                  if (editingFolder?.id === folder.id) {
+                    return (
+                      <form
+                        key={folder.id}
+                        className="app-nav__folder-editor"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void handleRenameFolder();
+                        }}
+                      >
+                        <Input
+                          value={editingFolder.name}
+                          onChange={(event) => setEditingFolder({ ...editingFolder, name: event.target.value })}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape') setEditingFolder(null);
+                          }}
+                          aria-label={`Rename ${folder.name}`}
+                          autoFocus
+                        />
+                        <button type="submit" className="lb-icon-button" aria-label="Save folder name">
+                          <Icon name="check" size={18} />
+                        </button>
+                        <button type="button" className="lb-icon-button" aria-label="Cancel rename" onClick={() => setEditingFolder(null)}>
+                          <Icon name="x" size={18} />
+                        </button>
+                      </form>
+                    );
+                  }
+
+                  if (deletingFolderId === folder.id) {
+                    return (
+                      <div key={folder.id} className="app-nav__folder-confirm" role="alert">
+                        <p>Delete “{folder.name}”? Its items move to the main vault.</p>
+                        <div>
+                          <Button variant="danger" size="sm" onClick={() => void handleDeleteFolder(folder.id)}>Delete</Button>
+                          <Button variant="ghost" size="sm" onClick={() => setDeletingFolderId(null)}>Cancel</Button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={folder.id} className="app-nav__folder-row">
+                      <button
+                        type="button"
+                        className="app-nav__item app-nav__folder-link"
+                        data-active={isVaultRoute && selectedFolder === folder.id ? 'true' : undefined}
+                        onClick={() => showVault({ folder: folder.id })}
+                      >
+                        <Icon name="folder" size={18} />
+                        <span>{folder.name}</span>
+                      </button>
+                      <div className="app-nav__folder-actions">
+                        <button
+                          type="button"
+                          className="lb-icon-button"
+                          onClick={() => setEditingFolder({ id: folder.id, name: folder.name })}
+                          aria-label={`Rename ${folder.name}`}
+                        >
+                          <Icon name="edit" size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="lb-icon-button"
+                          onClick={() => setDeletingFolderId(folder.id)}
+                          aria-label={`Delete ${folder.name}`}
+                        >
+                          <Icon name="trash" size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="app-nav__footer">
+              {navButton('Trash', 'trash', location.pathname === '/trash', () => navigate('/trash'))}
+              {navButton('Settings', 'settings', location.pathname.startsWith('/settings'), () => navigate('/settings'))}
+              {navButton('Lock vault', 'lock', false, lock)}
+              {navButton('Sign out', 'logout', false, () => void handleLogout(), { danger: true })}
+            </div>
+          </nav>
+        </aside>
+
+        <main className="app-main">
           {isTravelMode && (
-            <div className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-warning)] text-[var(--color-text)] px-4 py-2 text-sm flex items-center justify-between shadow-md z-50">
-              <span className="flex items-center gap-2 font-medium">
-                <span>⚠️</span>
-                Travel mode active — some items are hidden
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/settings')}
-                style={{
-                  textDecoration: 'underline',
-                  boxShadow: 'none',
-                  padding: '2px 4px',
-                  minHeight: 'auto',
-                }}
-              >
-                Settings
-              </Button>
+            <div className="app-travel" role="status">
+              <Icon name="alert-triangle" size={20} />
+              <span><strong>Travel mode is on.</strong> Items outside your travel folders are hidden.</span>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/settings')}>Review settings</Button>
             </div>
           )}
-          <div className="fade-in flex-1 flex flex-col overflow-hidden">
-            <Outlet />
-          </div>
+          <div className="app-main__route"><Outlet /></div>
         </main>
       </div>
+
+      <nav className="app-bottom-nav" aria-label="Mobile navigation">
+        {navButton('Vault', 'shield-lock', isVaultRoute, () => showVault())}
+        {navButton('Generator', 'wand', location.pathname === '/generator', () => navigate('/generator'))}
+        {navButton('Security', 'shield-check', location.pathname === '/health', () => navigate('/health'))}
+        {navButton('More', 'menu-2', showNavigation, () => setShowNavigation((open) => !open))}
+      </nav>
     </div>
   );
 }

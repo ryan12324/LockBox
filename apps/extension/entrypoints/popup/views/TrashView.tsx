@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@lockbox/design';
+import { Button, Icon } from '@lockbox/design';
 import type { VaultItem } from '@lockbox/types';
 import { sendMessage, typeIcon } from './shared.js';
 
@@ -75,9 +75,13 @@ export function TrashView({ onBack }: { onBack: () => void }) {
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--color-border)]">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          ←
+          <Icon name="arrow-left" size={17} />
+          <span className="sr-only">Back</span>
         </Button>
-        <span className="text-sm font-semibold text-[var(--color-text)]">🗑️ Trash</span>
+        <span className="text-sm font-semibold text-[var(--color-text)] flex items-center gap-1.5">
+          <Icon name="trash" size={16} />
+          Trash
+        </span>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -93,7 +97,7 @@ export function TrashView({ onBack }: { onBack: () => void }) {
           </div>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-center mt-6">
-            <div className="text-3xl mb-3">🗑️</div>
+            <Icon name="trash" size={30} className="mb-3" />
             <p className="text-sm text-[var(--color-text-secondary)] mb-1">No items in trash</p>
             <p className="text-xs text-[var(--color-text-tertiary)]">
               Deleted items appear here for 30 days before auto-purge.
@@ -104,7 +108,7 @@ export function TrashView({ onBack }: { onBack: () => void }) {
             <div key={item.id} className="p-3 border-b border-[var(--color-border)]">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <span className="text-sm shrink-0">{typeIcon(item.type)}</span>
+                  <Icon name={typeIcon(item.type)} size={16} className="shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-[var(--color-text)] truncate">
                       {item.name}
@@ -139,7 +143,8 @@ export function TrashView({ onBack }: { onBack: () => void }) {
                         size="sm"
                         onClick={() => setConfirmDeleteId(null)}
                       >
-                        ✕
+                        <Icon name="x" size={16} />
+                        <span className="sr-only">Cancel permanent deletion</span>
                       </Button>
                     </div>
                   ) : (

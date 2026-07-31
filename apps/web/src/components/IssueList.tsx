@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Badge, Button } from '@lockbox/design';
+import { Card, Badge, Button, Icon, type IconName } from '@lockbox/design';
 import type { PasswordHealthReport, VaultItem } from '@lockbox/types';
 
 interface IssueListProps {
@@ -44,7 +44,7 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
         case 'breached':
           return (
             <Badge key={idx} variant="error">
-              💀 Breached
+              Breached
             </Badge>
           );
         default:
@@ -53,22 +53,8 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
     });
   };
 
-  const getScoreColor = (score: number) => {
-    if (score < 2) return 'text-[var(--color-error)]';
-    if (score === 2) return 'text-[var(--color-warning)]';
-    if (score === 3) return 'text-[var(--color-primary)]';
-    return 'text-[var(--color-success)]';
-  };
-
-  const getScoreLabel = (score: number) => {
-    if (score < 2) return 'Poor';
-    if (score === 2) return 'Fair';
-    if (score === 3) return 'Good';
-    return 'Excellent';
-  };
-
   const tabs: { id: FilterType; label: string }[] = [
-    { id: 'all', label: 'All Issues' },
+    { id: 'all', label: 'All issues' },
     { id: 'weak', label: 'Weak' },
     { id: 'reused', label: 'Reused' },
     { id: 'old', label: 'Old' },
@@ -78,14 +64,12 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
   if (problematicReports.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="w-16 h-16 rounded-[var(--radius-full)] bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center mx-auto mb-4 border border-[var(--color-success)]">
-          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+        <div className="w-16 h-16 rounded-[var(--radius-md)] bg-[var(--color-success-subtle)] text-[var(--color-success)] flex items-center justify-center mx-auto mb-4 border border-[var(--color-success)]">
+          <Icon name="shield-check" size={30} />
         </div>
-        <h3 className="text-xl font-medium text-[var(--color-text)] mb-2">Looking Good</h3>
+        <h3 className="text-xl font-medium text-[var(--color-text)] mb-2">No issues found</h3>
         <p className="text-[var(--color-text-secondary)] max-w-sm mx-auto">
-          We didn't find any issues with your passwords. Keep up the good work!
+          The current local review did not flag any weak, reused, old, or breached passwords.
         </p>
       </div>
     );
@@ -116,6 +100,14 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
             {filteredReports.map((report) => {
               const item = items.find((i) => i.id === report.itemId);
               if (!item) return null;
+              const itemIcons: Record<string, IconName> = {
+                login: 'key',
+                note: 'note',
+                card: 'credit-card',
+                identity: 'id',
+                passkey: 'fingerprint',
+                document: 'file-description',
+              };
 
               return (
                 <li key={report.itemId}>
@@ -134,28 +126,19 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
                     }}
                   >
                     <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-[var(--radius-full)] bg-[var(--color-surface)] flex items-center justify-center border border-[var(--color-border)] flex-shrink-0 text-[var(--color-text-secondary)]">
-                        {item.type === 'login' ? '🔑' : '📄'}
+                      <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--color-surface)] flex items-center justify-center border border-[var(--color-border)] flex-shrink-0 text-[var(--color-text-secondary)]">
+                        <Icon name={itemIcons[item.type] ?? 'file'} size={18} />
                       </div>
 
                       <div className="flex flex-col">
-                        <span
-                          className={`text-[var(--color-text)] text-base mb-1 ${report.issues.some((i) => i.type === 'weak' || i.type === 'breached') ? 'kinetic-insecure' : report.issues.length > 0 ? 'kinetic-warning' : 'kinetic-secure'}`}
-                        >
+                        <span className="text-[var(--color-text)] text-base mb-1">
                           {item.name}
                         </span>
                         <div className="flex flex-wrap gap-2">{getBadges(report)}</div>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end">
-                      <span className={`text-sm font-bold ${getScoreColor(report.score)}`}>
-                        {getScoreLabel(report.score)}
-                      </span>
-                      <span className="text-xs text-[var(--color-text-tertiary)] mt-1">
-                        Score: {report.score}/4
-                      </span>
-                    </div>
+                    <Icon name="chevron-right" size={18} className="text-[var(--color-text-tertiary)]" />
                   </Card>
                 </li>
               );

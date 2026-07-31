@@ -1,6 +1,6 @@
 export const durations = {
-  fast: '150ms',
-  normal: '250ms',
-  slow: '400ms',
-  glacial: '800ms',
+  fast: '120ms',
+  normal: '200ms',
+  slow: '320ms',
+  glacial: '320ms',
 } as const;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Input, Select } from '@lockbox/design';
+import { Button, Icon, Input, Select } from '@lockbox/design';
 
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => {
   const m = (i + 1).toString().padStart(2, '0');
@@ -87,7 +87,7 @@ export default function CardFields({
                   onClick={() => setShowCardNumber(!showCardNumber)}
                   style={{ padding: '6px', minHeight: 'auto' }}
                 >
-                  {showCardNumber ? '👁️‍🗨️' : '👁️'}
+                  <Icon name={showCardNumber ? 'eye-off' : 'eye'} size={17} />
                 </Button>
                 <Button
                   variant="ghost"
@@ -95,7 +95,7 @@ export default function CardFields({
                   onClick={(e) => copyToClipboard(number, 'cardnum', e.currentTarget)}
                   style={{ padding: '6px', minHeight: 'auto' }}
                 >
-                  {copiedField === 'cardnum' ? '✓' : '📋'}
+                  <Icon name={copiedField === 'cardnum' ? 'check' : 'copy'} size={17} />
                 </Button>
               </div>
             </div>
@@ -126,7 +126,7 @@ export default function CardFields({
                     onClick={() => setShowCvv(!showCvv)}
                     style={{ padding: '6px', minHeight: 'auto' }}
                   >
-                    {showCvv ? '👁️‍🗨️' : '👁️'}
+                    <Icon name={showCvv ? 'eye-off' : 'eye'} size={17} />
                   </Button>
                   <Button
                     variant="ghost"
@@ -134,7 +134,7 @@ export default function CardFields({
                     onClick={(e) => copyToClipboard(cvv, 'cvv', e.currentTarget)}
                     style={{ padding: '6px', minHeight: 'auto' }}
                   >
-                    {copiedField === 'cvv' ? '✓' : '📋'}
+                    <Icon name={copiedField === 'cvv' ? 'check' : 'copy'} size={17} />
                   </Button>
                 </div>
               </div>

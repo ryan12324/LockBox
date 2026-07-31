@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Input } from '@lockbox/design';
+import { Button, Icon, Input } from '@lockbox/design';
+import { clearServerConnection } from '../../../lib/storage.js';
 import { sendMessage } from './shared.js';
 
 type UnlockResult = {
@@ -8,7 +9,13 @@ type UnlockResult = {
   error?: string;
 };
 
-export function LockedView({ onUnlock }: { onUnlock: () => void }) {
+export function LockedView({
+  onUnlock,
+  onServerReset,
+}: {
+  onUnlock: () => void;
+  onServerReset: () => void;
+}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
@@ -77,27 +84,29 @@ export function LockedView({ onUnlock }: { onUnlock: () => void }) {
     setError('');
   }
 
+  async function changeServer() {
+    await sendMessage({ type: 'lock' }).catch(() => {});
+    await clearServerConnection();
+    onServerReset();
+  }
+
   return (
-    <div className="p-6 flex flex-col gap-4">
-      <div className="text-center">
-        <div className="text-[32px] mb-2" aria-hidden="true">🔐</div>
-        <h1 className="text-lg font-bold text-[var(--color-text)]">Lockbox</h1>
-        <p className="text-sm text-[var(--color-text-tertiary)] mt-1">
-          {awaitingTwoFactor ? 'Verify this sign-in' : 'Sign in to your vault'}
-        </p>
+    <div className="extension-auth">
+      <div className="extension-auth__heading">
+        <img className="extension-auth__logo" src="/brand/lockbox-logo-horizontal.png" alt="Lockbox" />
+        <p>{awaitingTwoFactor ? 'Two-factor verification' : 'Vault locked'}</p>
+        <h1>{awaitingTwoFactor ? 'Verify this sign-in' : 'Unlock Lockbox'}</h1>
+        <small>{awaitingTwoFactor ? 'Confirm your second factor to finish unlocking.' : 'Your vault decrypts in the extension after sign-in.'}</small>
       </div>
 
       {error && (
-        <div
-          role="alert"
-          className="px-3 py-2 bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-sm)] text-[var(--color-error)] text-xs"
-        >
-          {error}
+        <div role="alert" className="extension-auth__error">
+          <Icon name="alert-circle" size={18} /> <span>{error}</span>
         </div>
       )}
 
       {awaitingTwoFactor ? (
-        <form onSubmit={handleVerification} className="flex flex-col gap-3">
+        <form onSubmit={handleVerification} className="extension-auth__form">
           <Input
             type="text"
             label={useBackupCode ? 'Backup code' : 'Authenticator code'}
@@ -116,8 +125,7 @@ export function LockedView({ onUnlock }: { onUnlock: () => void }) {
             type="submit"
             variant="primary"
             size="sm"
-            disabled={loading}
-            style={{ width: '100%' }}
+            loading={loading}
           >
             {loading ? 'Verifying…' : 'Verify and unlock'}
           </Button>
@@ -130,7 +138,6 @@ export function LockedView({ onUnlock }: { onUnlock: () => void }) {
               setVerificationCode('');
               setError('');
             }}
-            style={{ width: '100%' }}
           >
             {useBackupCode ? 'Use authenticator code' : 'Use a backup code'}
           </Button>
@@ -139,13 +146,12 @@ export function LockedView({ onUnlock }: { onUnlock: () => void }) {
             variant="ghost"
             size="sm"
             onClick={cancelVerification}
-            style={{ width: '100%' }}
           >
             Back to sign in
           </Button>
         </form>
       ) : (
-        <form onSubmit={handleCredentials} className="flex flex-col gap-3">
+        <form onSubmit={handleCredentials} className="extension-auth__form">
           <Input
             type="email"
             label="Email"
@@ -170,10 +176,17 @@ export function LockedView({ onUnlock }: { onUnlock: () => void }) {
             type="submit"
             variant="primary"
             size="sm"
-            disabled={loading}
-            style={{ width: '100%' }}
+            loading={loading}
           >
             {loading ? 'Signing in…' : 'Sign in'}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => void changeServer()}
+          >
+            Use a different web vault
           </Button>
         </form>
       )}

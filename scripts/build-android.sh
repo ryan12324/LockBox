@@ -79,6 +79,10 @@ find_compatible_jdk() {
     for d in /Library/Java/JavaVirtualMachines/*"$v"*/Contents/Home; do
       [ -x "$d/bin/java" ] && candidates+=("$d")
     done
+    # Ephemeral JDKs provisioned for sandboxed Codex sessions
+    for d in /private/tmp/lockbox-jdk*/*/Contents/Home; do
+      [ -x "$d/bin/java" ] && candidates+=("$d")
+    done
     # Android Studio bundled JDK
     for d in "$HOME/Android/android-studio/jbr" "$HOME/Library/Application Support/Google/AndroidStudio"*/jbr "/opt/android-studio/jbr"; do
       [ -x "$d/bin/java" ] && candidates+=("$d")

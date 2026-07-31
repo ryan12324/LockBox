@@ -1,115 +1,18 @@
-/* ──────────────────────────────────────────────
-   Aura & Architecture — Animation Tokens
-   Physics-inspired micro-interactions that make
-   the AI feel organic, not mechanical.
-   ────────────────────────────────────────────── */
-
 :root {
-  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-smooth: var(--ease-standard);
+  --ease-spring: var(--ease-enter);
+  --ease-out-back: var(--ease-enter);
 
-  --duration-fast: 150ms;
-  --duration-normal: 250ms;
-  --duration-slow: 400ms;
-  --duration-glacial: 800ms;
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+  --duration-slow: 320ms;
+  --duration-glacial: 320ms;
 }
 
-/* ── Aura: idle breathing glow ── */
-@keyframes aura-breathe {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: scale(1);
-    filter: blur(20px);
-  }
-  50% {
-    opacity: 0.6;
-    transform: scale(1.06);
-    filter: blur(24px);
-  }
-}
-
-/* ── Aura: active/engaged state ── */
-@keyframes aura-active {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(1);
-    filter: blur(18px);
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.12);
-    filter: blur(26px);
-  }
-}
-
-/* ── Aura: processing / thinking pulse ── */
-@keyframes aura-think {
-  0%,
-  100% {
-    opacity: 0.4;
-    transform: scale(1) rotate(0deg);
-    filter: blur(20px);
-  }
-  25% {
-    opacity: 0.7;
-    transform: scale(1.08) rotate(1deg);
-    filter: blur(22px);
-  }
-  75% {
-    opacity: 0.5;
-    transform: scale(0.96) rotate(-1deg);
-    filter: blur(18px);
-  }
-}
-
-/* ── Squish snap: form fill "pour" effect ── */
-@keyframes squish-snap {
-  0% {
-    transform: scale(1, 1);
-  }
-  25% {
-    transform: scale(1.015, 0.985);
-  }
-  50% {
-    transform: scale(0.993, 1.007);
-  }
-  75% {
-    transform: scale(1.003, 0.997);
-  }
-  100% {
-    transform: scale(1, 1);
-  }
-}
-
-/* ── Variable type: AI searching (weight thins out) ── */
-@keyframes type-searching {
-  0%,
-  100% {
-    font-weight: 400;
-  }
-  50% {
-    font-weight: 300;
-  }
-}
-
-/* ── Variable type: AI found a match (weight boldens) ── */
-@keyframes type-found {
-  0% {
-    font-weight: 400;
-  }
-  40% {
-    font-weight: 650;
-  }
-  100% {
-    font-weight: 400;
-  }
-}
-
-/* ── Gentle fade-in for content appearance ── */
-@keyframes fade-in {
+@keyframes lb-fade-in {
   from {
     opacity: 0;
     transform: translateY(4px);
@@ -120,90 +23,43 @@
   }
 }
 
-/* ── Utility classes ── */
-.aura-idle {
-  animation: aura-breathe 4s var(--ease-smooth) infinite;
+@keyframes lb-spin {
+  to {
+    transform: rotate(1turn);
+  }
 }
-.aura-active {
-  animation: aura-active 2.5s var(--ease-smooth) infinite;
+
+.fade-in,
+.toast-enter {
+  animation: lb-fade-in var(--duration-normal) var(--ease-enter) both;
 }
-.aura-thinking {
-  animation: aura-think 1.8s var(--ease-smooth) infinite;
-}
+
 .squish {
-  animation: squish-snap 0.4s var(--ease-out-back) both;
-}
-.type-searching {
-  animation: type-searching 1.5s var(--ease-smooth) infinite;
-}
-.type-found {
-  animation: type-found 0.6s var(--ease-spring) both;
-}
-.fade-in {
-  animation: fade-in var(--duration-normal) var(--ease-spring) both;
+  transform: translateY(1px);
+  transition: transform var(--duration-fast) var(--ease-standard);
 }
 
-/* ── Kinetic Typography: security-driven weight instability ── */
-@keyframes weight-wobble {
-  0% {
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-  15% {
-    font-weight: 310;
-    letter-spacing: 0.01em;
-  }
-  30% {
-    font-weight: 380;
-    letter-spacing: -0.005em;
-  }
-  50% {
-    font-weight: 290;
-    letter-spacing: 0.015em;
-  }
-  65% {
-    font-weight: 360;
-    letter-spacing: 0;
-  }
-  80% {
-    font-weight: 320;
-    letter-spacing: 0.008em;
-  }
-  100% {
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-}
-
-@keyframes weight-jitter {
-  0%,
-  100% {
-    font-weight: 450;
-    letter-spacing: 0;
-  }
-  25% {
-    font-weight: 380;
-    letter-spacing: 0.005em;
-  }
-  50% {
-    font-weight: 420;
-    letter-spacing: -0.003em;
-  }
-  75% {
-    font-weight: 390;
-    letter-spacing: 0.003em;
-  }
-}
-
-.kinetic-insecure {
-  animation: weight-wobble 2.5s var(--ease-smooth) infinite;
-  font-style: oblique 2deg;
-}
-.kinetic-warning {
-  animation: weight-jitter 3s var(--ease-smooth) infinite;
-}
+.type-searching,
+.type-found,
+.kinetic-insecure,
+.kinetic-warning,
 .kinetic-secure {
-  font-weight: 500;
-  letter-spacing: var(--letter-spacing-tight);
-  transition: font-weight var(--duration-normal) var(--ease-spring);
+  font-weight: var(--font-weight-medium);
+}
+
+.aura-idle,
+.aura-active,
+.aura-thinking {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

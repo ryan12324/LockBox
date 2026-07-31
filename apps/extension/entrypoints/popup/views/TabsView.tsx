@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Input, Select, Badge, Card } from '@lockbox/design';
+import { Button, Input, Select, Badge, Card, Icon, type IconName } from '@lockbox/design';
 import {
   generatePassword,
   generatePassphrase,
@@ -11,9 +11,21 @@ import { getRemainingSeconds } from '@lockbox/totp';
 import type { VaultItem, LoginItem, Folder } from '@lockbox/types';
 import type { SearchResult } from '@lockbox/ai';
 import type { PasswordRules, PasswordFieldMetadata } from '@lockbox/generator';
-import { sendMessage, typeIcon } from './shared.js';
+import { openWebVault } from '../../../lib/web-vault.js';
+import { sendMessage } from './shared.js';
 
-export function SiteTab({ items }: { items: VaultItem[] }) {
+const itemTypeIcon = (type: string): IconName =>
+  ({ login: 'key', note: 'note', card: 'credit-card', identity: 'id', passkey: 'fingerprint', document: 'file-description' })[type] as IconName ?? 'file';
+
+export function SiteTab({
+  items,
+  siteHost,
+  onOpenVault,
+}: {
+  items: VaultItem[];
+  siteHost: string;
+  onOpenVault: () => void;
+}) {
   const [copied, setCopied] = useState<string | null>(null);
 
   async function copyToClipboard(text: string, id: string) {
@@ -24,53 +36,61 @@ export function SiteTab({ items }: { items: VaultItem[] }) {
 
   if (items.length === 0) {
     return (
-      <div className="p-6 text-center text-[var(--color-text-tertiary)] text-sm">
-        <div className="text-2xl mb-2">🔍</div>
-        No saved passwords for this site
+      <div className="extension-site">
+        <div className="extension-section-heading">
+          <span>{siteHost}</span>
+          <small>Saved for this page</small>
+        </div>
+        <div className="extension-empty">
+          <span><Icon name="world" size={24} /></span>
+          <strong>No saved logins for this site</strong>
+          <p>Browse your full vault to find another item.</p>
+          <Button variant="secondary" size="sm" onClick={onOpenVault}>
+            <Icon name="shield-lock" size={16} />
+            Browse vault
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="overflow-y-auto">
+    <div className="extension-site">
+      <div className="extension-section-heading">
+        <span>{siteHost}</span>
+        <small>{items.length} {items.length === 1 ? 'saved item' : 'saved items'} for this page</small>
+      </div>
+      <div className="extension-site__list">
       {items.map((item) => (
-        <div
-          key={item.id}
-          className="p-3 border-b border-[var(--color-border)] hover:bg-[var(--color-bg-subtle)] transition-colors"
-        >
-          <div className="text-sm font-semibold text-[var(--color-text)] mb-1.5 truncate">
-            {item.name}
+        <article key={item.id} className="extension-site__item">
+          <div className="extension-site__title">
+            <span><Icon name={itemTypeIcon(item.type)} size={18} /></span>
+            <div><strong>{item.name}</strong><small>{item.type === 'login' ? (item as LoginItem).username : item.type}</small></div>
           </div>
           {item.type === 'login' && (
-            <div className="flex flex-col gap-1">
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-[var(--color-text-tertiary)] truncate pr-2">
-                  {(item as LoginItem).username}
-                </span>
+            <div className="extension-site__actions">
                 <Button
                   variant={copied === `u-${item.id}` ? 'primary' : 'secondary'}
                   size="sm"
                   onClick={() => copyToClipboard((item as LoginItem).username, `u-${item.id}`)}
-                  className="shrink-0"
                 >
-                  {copied === `u-${item.id}` ? '✓ Copied' : 'Copy User'}
+                  <Icon name={copied === `u-${item.id}` ? 'check' : 'user'} size={17} />
+                  {copied === `u-${item.id}` ? 'Copied' : 'Username'}
                 </Button>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-[var(--color-text-tertiary)]">••••••••</span>
                 <Button
                   variant={copied === `p-${item.id}` ? 'primary' : 'secondary'}
                   size="sm"
                   onClick={() => copyToClipboard((item as LoginItem).password, `p-${item.id}`)}
-                  className="shrink-0"
                 >
-                  {copied === `p-${item.id}` ? '✓ Copied' : 'Copy Pass'}
+                  <Icon name={copied === `p-${item.id}` ? 'check' : 'copy'} size={17} />
+                  {copied === `p-${item.id}` ? 'Copied' : 'Password'}
                 </Button>
-              </div>
             </div>
           )}
-        </div>
+        </article>
       ))}
+      </div>
+      <p className="extension-site__hint"><Icon name="info-circle" size={16} /> Use the Lockbox icon inside a form field to fill this page.</p>
     </div>
   );
 }
@@ -144,13 +164,14 @@ export function VaultTab({
         <div className="flex gap-1">
           <Input
             type="search"
-            placeholder="Search vault (semantic)..."
+            placeholder="Search vault"
+            aria-label="Search vault"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="flex-1"
           />
           <Button variant="primary" size="sm" onClick={onAddItem} title="Add item">
-            +
+            <Icon name="plus" size={19} />
           </Button>
         </div>
         {searchingRemote && (
@@ -158,7 +179,7 @@ export function VaultTab({
         )}
         {semanticResults && search.length >= 2 && !searchingRemote && (
           <div className="text-[10px] text-[var(--color-text-tertiary)] px-1">
-            🔍 {semanticResults.length} semantic result{semanticResults.length !== 1 ? 's' : ''}
+            {semanticResults.length} local result{semanticResults.length !== 1 ? 's' : ''}
           </div>
         )}
         {folders.length > 0 && (
@@ -167,7 +188,7 @@ export function VaultTab({
             onChange={(e) => setSelectedFolderId(e.target.value || null)}
             options={[
               { value: '', label: 'All folders' },
-              ...folders.map((f) => ({ value: f.id, label: `📁 ${f.name}` })),
+              ...folders.map((f) => ({ value: f.id, label: f.name })),
             ]}
           />
         )}
@@ -186,14 +207,20 @@ export function VaultTab({
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <span className="text-sm shrink-0">{typeIcon(item.type)}</span>
+                  <span className="extension-type-icon"><Icon name={itemTypeIcon(item.type)} size={17} /></span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1">
                       <div className="text-sm font-medium text-[var(--color-text)] truncate">
                         {item.name}
                       </div>
                       {(attachmentCounts.get(item.id) ?? 0) > 0 && (
-                        <Badge variant="primary">📎{attachmentCounts.get(item.id)}</Badge>
+                        <Badge variant="primary"><Icon name="paperclip" size={13} />{attachmentCounts.get(item.id)}</Badge>
+                      )}
+                      {rotationMap?.get(item.id) && (
+                        <Badge variant="warning">
+                          <Icon name="refresh" size={13} />
+                          {rotationMap.get(item.id) === 'overdue' ? 'Rotation due' : 'Due soon'}
+                        </Badge>
                       )}
                     </div>
                     {item.type === 'login' && (
@@ -214,7 +241,7 @@ export function VaultTab({
                       }}
                       title="Copy username"
                     >
-                      {copied === `u-${item.id}` ? '✓' : '👤'}
+                      <Icon name={copied === `u-${item.id}` ? 'check' : 'user'} size={17} />
                     </Button>
                     <Button
                       variant={copied === `p-${item.id}` ? 'primary' : 'secondary'}
@@ -225,11 +252,11 @@ export function VaultTab({
                       }}
                       title="Copy password"
                     >
-                      {copied === `p-${item.id}` ? '✓' : '🔑'}
+                      <Icon name={copied === `p-${item.id}` ? 'check' : 'copy'} size={17} />
                     </Button>
                   </div>
                 )}
-                {item.favorite && <span className="text-xs ml-0.5">⭐</span>}
+                {item.favorite && <Icon name="star" size={15} className="text-[var(--color-warning)]" label="Favorite" />}
               </div>
             </div>
           ))
@@ -256,6 +283,8 @@ export function SharedTab({
   onSelectItem: (item: VaultItem) => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [openingWebVault, setOpeningWebVault] = useState(false);
+  const [webVaultError, setWebVaultError] = useState('');
 
   async function copyToClipboard(text: string, id: string) {
     await navigator.clipboard.writeText(text);
@@ -263,16 +292,45 @@ export function SharedTab({
     setTimeout(() => setCopied(null), 2000);
   }
 
+  async function handleOpenTeams() {
+    setOpeningWebVault(true);
+    setWebVaultError('');
+
+    try {
+      await openWebVault('/teams');
+    } catch (error) {
+      setWebVaultError(
+        error instanceof Error ? error.message : 'Lockbox could not open the web vault.'
+      );
+    } finally {
+      setOpeningWebVault(false);
+    }
+  }
+
   if (!hasKeyPair) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-3xl mb-3">🔐</div>
+        <Icon name="shield-lock" size={30} className="mb-3 text-[var(--color-primary)]" />
         <p className="text-sm text-[var(--color-text-secondary)] mb-2">
           Encryption keys not set up
         </p>
-        <p className="text-xs text-[var(--color-text-tertiary)]">
+        <p className="text-xs text-[var(--color-text-tertiary)] mb-4 max-w-[28ch]">
           Set up your key pair in the web vault to access shared items.
         </p>
+        <Button
+          variant="primary"
+          size="sm"
+          loading={openingWebVault}
+          onClick={() => void handleOpenTeams()}
+        >
+          {!openingWebVault && <Icon name="external-link" size={16} />}
+          {openingWebVault ? 'Opening web vault…' : 'Set up sharing keys'}
+        </Button>
+        {webVaultError && (
+          <p role="alert" className="mt-3 text-xs text-[var(--color-error)] max-w-[32ch]">
+            {webVaultError}
+          </p>
+        )}
       </div>
     );
   }
@@ -280,11 +338,25 @@ export function SharedTab({
   if (sharedItems.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-        <div className="text-3xl mb-3">🤝</div>
+        <Icon name="users" size={30} className="mb-3 text-[var(--color-primary)]" />
         <p className="text-sm text-[var(--color-text-secondary)] mb-2">No shared items</p>
-        <p className="text-xs text-[var(--color-text-tertiary)]">
+        <p className="text-xs text-[var(--color-text-tertiary)] mb-4 max-w-[28ch]">
           Items shared with you through teams will appear here.
         </p>
+        <Button
+          variant="secondary"
+          size="sm"
+          loading={openingWebVault}
+          onClick={() => void handleOpenTeams()}
+        >
+          {!openingWebVault && <Icon name="external-link" size={16} />}
+          {openingWebVault ? 'Opening web vault…' : 'Manage teams'}
+        </Button>
+        {webVaultError && (
+          <p role="alert" className="mt-3 text-xs text-[var(--color-error)] max-w-[32ch]">
+            {webVaultError}
+          </p>
+        )}
       </div>
     );
   }
@@ -301,13 +373,13 @@ export function SharedTab({
           >
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <span className="text-sm shrink-0">{typeIcon(item.type)}</span>
+                <span className="extension-type-icon"><Icon name={itemTypeIcon(item.type)} size={17} /></span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-[1px]">
                     <div className="text-sm font-medium text-[var(--color-text)] truncate">
                       {item.name}
                     </div>
-                    {folderName && <Badge variant="default">📁 {folderName}</Badge>}
+                    {folderName && <Badge variant="default"><Icon name="folder" size={13} />{folderName}</Badge>}
                   </div>
                   {item.type === 'login' && (
                     <div className="text-xs text-[var(--color-text-tertiary)] truncate">
@@ -327,7 +399,7 @@ export function SharedTab({
                     }}
                     title="Copy username"
                   >
-                    {copied === `u-${item.id}` ? '✓' : '👤'}
+                    <Icon name={copied === `u-${item.id}` ? 'check' : 'user'} size={17} />
                   </Button>
                   <Button
                     variant={copied === `p-${item.id}` ? 'primary' : 'secondary'}
@@ -338,11 +410,11 @@ export function SharedTab({
                     }}
                     title="Copy password"
                   >
-                    {copied === `p-${item.id}` ? '✓' : '🔑'}
+                    <Icon name={copied === `p-${item.id}` ? 'check' : 'copy'} size={17} />
                   </Button>
                 </div>
               )}
-              {item.favorite && <span className="text-xs ml-0.5">⭐</span>}
+              {item.favorite && <Icon name="star" size={15} className="text-[var(--color-warning)]" label="Favorite" />}
             </div>
           </div>
         );
@@ -510,7 +582,14 @@ export function GeneratorTab() {
             }}
             disabled={detectingRules}
           >
-            {detectingRules ? 'Detecting...' : '🔍 Detect Site Rules'}
+            {detectingRules ? (
+              'Detecting…'
+            ) : (
+              <>
+                <Icon name="search" size={16} />
+                Detect site rules
+              </>
+            )}
           </Button>
           {detectedRules && (
             <Button
@@ -522,7 +601,8 @@ export function GeneratorTab() {
                 setGenerated(pw);
               }}
             >
-              ✨ Generate Compliant
+              <Icon name="wand" size={16} />
+              Generate compliant
             </Button>
           )}
         </div>
@@ -546,7 +626,8 @@ export function GeneratorTab() {
 
       <div className="flex gap-1.5 mt-1">
         <Button variant="secondary" size="sm" onClick={generate} className="flex-1">
-          ↻ Regenerate
+          <Icon name="refresh" size={16} />
+          Regenerate
         </Button>
         <Button
           variant={copied ? 'primary' : 'primary'}
@@ -554,7 +635,8 @@ export function GeneratorTab() {
           onClick={copy}
           className="flex-1"
         >
-          {copied ? '✓ Copied' : 'Copy'}
+          <Icon name={copied ? 'check' : 'copy'} size={16} />
+          {copied ? 'Copied' : 'Copy'}
         </Button>
       </div>
     </div>
@@ -604,23 +686,33 @@ function TotpItem({ item }: { item: LoginItem }) {
           {remaining}s
         </div>
         <Button variant={copied ? 'primary' : 'secondary'} size="sm" onClick={copy}>
-          {copied ? '✓' : 'Copy'}
+          <Icon name={copied ? 'check' : 'copy'} size={16} />
+          <span className="sr-only">{copied ? 'Copied' : 'Copy code'}</span>
         </Button>
       </div>
     </div>
   );
 }
 
-export function TotpTab({ items }: { items: VaultItem[] }) {
+export function TotpTab({ items, onAddItem }: { items: VaultItem[]; onAddItem: () => void }) {
   const totpItems = items.filter(
     (i): i is LoginItem => i.type === 'login' && Boolean((i as LoginItem).totp)
   );
 
   if (totpItems.length === 0) {
     return (
-      <div className="p-6 text-center text-[var(--color-text-tertiary)] text-sm">
-        <div className="text-2xl mb-2">🔑</div>
-        No TOTP codes configured
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+        <Icon name="key" size={26} className="mb-3 text-[var(--color-primary)]" />
+        <p className="text-sm text-[var(--color-text-secondary)] mb-2">
+          No authenticator codes
+        </p>
+        <p className="text-xs text-[var(--color-text-tertiary)] mb-4 max-w-[28ch]">
+          Add a TOTP secret to a login to generate codes here.
+        </p>
+        <Button variant="primary" size="sm" onClick={onAddItem}>
+          <Icon name="plus" size={16} />
+          Add a login
+        </Button>
       </div>
     );
   }

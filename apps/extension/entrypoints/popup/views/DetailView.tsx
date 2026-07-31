@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Card } from '@lockbox/design';
+import { Button, Card, Icon } from '@lockbox/design';
 import { getRemainingSeconds } from '@lockbox/totp';
 import type {
   VaultItem,
@@ -159,12 +159,22 @@ export function ItemDetailView({
           </span>
           <div className="flex gap-1 shrink-0">
             {opts?.toggle && (
-              <Button variant="ghost" size="sm" onClick={opts.toggle}>
-                {opts?.shown ? '🙈' : '👁️'}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={opts.toggle}
+                title={opts?.shown ? `Hide ${label}` : `Show ${label}`}
+              >
+                <Icon name={opts?.shown ? 'eye-off' : 'eye'} size={16} />
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={() => copyField(value, fieldId)}>
-              {copied === fieldId ? '✓' : '📋'}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => copyField(value, fieldId)}
+              title={`Copy ${label}`}
+            >
+              <Icon name={copied === fieldId ? 'check' : 'copy'} size={16} />
             </Button>
           </div>
         </div>
@@ -176,18 +186,23 @@ export function ItemDetailView({
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--color-border)]">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          ←
+          <Icon name="arrow-left" size={17} />
+          <span className="sr-only">Back</span>
         </Button>
-        <span className="text-lg">{typeIcon(item.type)}</span>
+        <Icon name={typeIcon(item.type)} size={18} />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-[var(--color-text)] truncate">{item.name}</div>
           {folder && (
-            <div className="text-xs text-[var(--color-text-tertiary)]">📁 {folder.name}</div>
+            <div className="text-xs text-[var(--color-text-tertiary)] flex items-center gap-1">
+              <Icon name="folder" size={13} />
+              {folder.name}
+            </div>
           )}
         </div>
         <div className="flex gap-1">
           <Button variant="secondary" size="sm" onClick={onHistory} title="Version History">
-            📜
+            <Icon name="history" size={16} />
+            <span className="sr-only">Version history</span>
           </Button>
           <Button variant="secondary" size="sm" onClick={onEdit}>
             Edit
@@ -197,7 +212,10 @@ export function ItemDetailView({
 
       <div className="flex-1 overflow-y-auto p-3">
         {item.favorite && (
-          <div className="text-xs text-[var(--color-warning)] mb-2">⭐ Favorite</div>
+          <div className="text-xs text-[var(--color-warning)] mb-2 flex items-center gap-1">
+            <Icon name="star" size={14} />
+            Favorite
+          </div>
         )}
 
         {login && (
@@ -226,7 +244,7 @@ export function ItemDetailView({
                         {totpRemaining}s
                       </span>
                       <Button variant="ghost" size="sm" onClick={() => copyField(totpCode, 'totp')}>
-                        {copied === 'totp' ? '✓' : '📋'}
+                        <Icon name={copied === 'totp' ? 'check' : 'copy'} size={16} />
                       </Button>
                     </div>
                   </div>
@@ -257,7 +275,7 @@ export function ItemDetailView({
                         size="sm"
                         onClick={() => copyField(uri, `uri-${idx}`)}
                       >
-                        {copied === `uri-${idx}` ? '✓' : '📋'}
+                        <Icon name={copied === `uri-${idx}` ? 'check' : 'copy'} size={16} />
                       </Button>
                     </div>
                   </Card>
@@ -346,7 +364,11 @@ export function ItemDetailView({
                       disabled={downloadingId === att.id}
                       className="shrink-0 ml-2"
                     >
-                      {downloadingId === att.id ? '...' : '⬇️'}
+                      {downloadingId === att.id ? (
+                        'Downloading…'
+                      ) : (
+                        <Icon name="download" size={16} />
+                      )}
                     </Button>
                   </div>
                 </Card>
@@ -477,14 +499,14 @@ export function ItemDetailView({
                                 setShowCustomHidden((prev) => ({ ...prev, [idx]: !prev[idx] }))
                               }
                             >
-                              {showCustomHidden[idx] ? '🙈' : '👁️'}
+                              <Icon name={showCustomHidden[idx] ? 'eye-off' : 'eye'} size={16} />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => copyField(cf.value, `cf-${idx}`)}
                             >
-                              {copied === `cf-${idx}` ? '✓' : '📋'}
+                              <Icon name={copied === `cf-${idx}` ? 'check' : 'copy'} size={16} />
                             </Button>
                           </div>
                         </div>
@@ -520,7 +542,10 @@ export function ItemDetailView({
             }}
             style={{ width: '100%', display: 'flex', justifyContent: 'space-between' }}
           >
-            <span>📜 Version History</span>
+            <span className="flex items-center gap-1.5">
+              <Icon name="history" size={15} />
+              Version history
+            </span>
             <span className="text-[var(--color-text-tertiary)]">{showVersions ? '▲' : '▼'}</span>
           </Button>
           {showVersions && (

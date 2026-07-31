@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
+import { Icon } from './Icon.js';
 
 export interface ModalProps {
   open: boolean;
@@ -9,120 +10,107 @@ export interface ModalProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
-const sizeMap: Record<'sm' | 'md' | 'lg', number> = {
-  sm: 400,
-  md: 520,
-  lg: 640,
+const sizeMap: Record<'sm' | 'md' | 'lg', string> = {
+  sm: '400px',
+  md: '520px',
+  lg: '680px',
 };
 
-export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
-  const [visible, setVisible] = React.useState(false);
+const focusableSelector = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
 
-  React.useEffect(() => {
-    if (open) {
-      requestAnimationFrame(() => setVisible(true));
-    } else {
-      setVisible(false);
-    }
-  }, [open]);
+export function Modal({ open, onClose, title, children, size = 'md' }: ModalProps) {
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const titleId = React.useId();
 
   React.useEffect(() => {
     if (!open) return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const panel = panelRef.current;
+    const firstFocusable = panel?.querySelector<HTMLElement>(focusableSelector);
+    (firstFocusable ?? panel)?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key !== 'Tab' || !panel) return;
+      const focusable = Array.from(panel.querySelectorAll<HTMLElement>(focusableSelector));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
 
-  const backdropStyle: React.CSSProperties = {
-    position: 'fixed',
-    inset: 0,
-    zIndex: 10000,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(0, 0, 0, 0.5)',
-    backdropFilter: 'blur(4px)',
-    WebkitBackdropFilter: 'blur(4px)',
-    opacity: visible ? 1 : 0,
-    transition: `opacity var(--duration-normal) var(--ease-spring)`,
-  };
-
-  const panelStyle: React.CSSProperties = {
-    position: 'relative',
-    width: '100%',
-    maxWidth: sizeMap[size],
-    maxHeight: 'calc(100vh - 80px)',
-    overflow: 'auto',
-    margin: '0 20px',
-    background: 'var(--color-frost)',
-    border: '1px solid var(--color-frost-border)',
-    boxShadow: 'var(--shadow-lg)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    borderRadius: 'var(--radius-organic-lg)',
-    padding: '24px',
-    fontFamily: 'var(--font-sans)',
-    transform: visible ? 'scale(1)' : 'scale(0.95)',
-    opacity: visible ? 1 : 0,
-    transition: `transform var(--duration-normal) var(--ease-spring), opacity var(--duration-normal) var(--ease-spring)`,
-  };
-
-  const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  };
-
-  const titleStyle: React.CSSProperties = {
-    fontSize: 'var(--font-size-lg)',
-    fontWeight: 'var(--font-weight-semibold)' as React.CSSProperties['fontWeight'],
-    color: 'var(--color-text)',
-    lineHeight: 'var(--line-height-tight)',
-    margin: 0,
-  };
-
-  const closeButtonStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 32,
-    height: 32,
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: 'var(--color-text-tertiary)',
-    fontSize: 'var(--font-size-lg)',
-    borderRadius: 'var(--radius-sm)',
-    transition: `color var(--duration-fast) var(--ease-smooth)`,
-    padding: 0,
-    lineHeight: 1,
-  };
-
   return ReactDOM.createPortal(
     <div
-      style={backdropStyle}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+      className="lb-modal"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
       }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title || 'Modal dialog'}
     >
-      <div style={panelStyle}>
-        {title !== undefined && (
-          <div style={headerStyle}>
-            <h2 style={titleStyle}>{title}</h2>
-            <button type="button" onClick={onClose} style={closeButtonStyle} aria-label="Close">
-              {'\u00D7'}
+      <div
+        ref={panelRef}
+        className="lb-modal__panel"
+        style={{ '--lb-modal-width': sizeMap[size] } as React.CSSProperties}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-label={title ? undefined : 'Dialog'}
+        tabIndex={-1}
+      >
+        {title ? (
+          <div className="lb-modal__header">
+            <h2 id={titleId} className="lb-modal__title">{title}</h2>
+            <button type="button" onClick={onClose} className="lb-icon-button" aria-label="Close dialog">
+              <Icon name="x" size={20} />
             </button>
           </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            className="lb-icon-button lb-modal__close--standalone"
+            aria-label="Close dialog"
+          >
+            <Icon name="x" size={20} />
+          </button>
         )}
         {children}
       </div>

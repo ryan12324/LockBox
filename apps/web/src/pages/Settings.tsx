@@ -12,7 +12,7 @@ import {
   toUtf8,
 } from '@lockbox/crypto';
 import { QRCodeSVG } from 'qrcode.react';
-import { Button, Input, Select, Card } from '@lockbox/design';
+import { Button, Input, Select, Card, Icon } from '@lockbox/design';
 import {
   getNativeAutofillStatus,
   openNativeAutofillSettings,
@@ -523,7 +523,7 @@ export default function Settings() {
                     borderRadius: 'var(--radius-md)',
                   }}
                 >
-                  <span>✅</span>
+                  <Icon name="circle-check" size={18} />
                   <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500 }}>
                     Two-Factor Authentication: Enabled
                   </span>
@@ -968,7 +968,8 @@ export default function Settings() {
                     onClick={() => update('theme', t)}
                     style={{ flex: 1, textTransform: 'capitalize' }}
                   >
-                    {t === 'system' ? '🖥️ System' : t === 'light' ? '☀️ Light' : '🌙 Dark'}
+                    <Icon name={t === 'system' ? 'device-desktop' : t === 'light' ? 'sun' : 'moon'} size={17} />
+                    {t === 'system' ? 'System' : t === 'light' ? 'Light' : 'Dark'}
                   </Button>
                 ))}
               </div>
@@ -982,7 +983,10 @@ export default function Settings() {
               borderLeft: '4px solid var(--color-warning)',
             }}
           >
-            <h2 style={{ ...sectionHeading, marginBottom: 8 }}>🧳 Travel Mode</h2>
+            <h2 style={{ ...sectionHeading, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="world" size={19} />
+              Travel mode
+            </h2>
             <p
               style={{
                 fontSize: 'var(--font-size-sm)',
@@ -1070,16 +1074,19 @@ export default function Settings() {
                   borderRadius: 'var(--radius-md)',
                 }}
               >
-                <p
+                <div
                   style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
                     fontSize: 'var(--font-size-sm)',
                     color: 'var(--color-warning)',
                     marginBottom: 12,
                   }}
                 >
-                  ⚠️ Travel mode will hide all non-travel-safe folders and their items from sync.
-                  Only safe folders will be accessible.
-                </p>
+                  <Icon name="alert-triangle" size={17} style={{ flex: '0 0 auto' }} />
+                  <span>Travel mode will hide all non-travel-safe folders and their items from sync. Only safe folders will be accessible.</span>
+                </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <Button
                     variant="primary"
@@ -1124,8 +1131,9 @@ export default function Settings() {
                         borderRadius: 'var(--radius-md)',
                       }}
                     >
-                      <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text)' }}>
-                        📁 {f.name}
+                      <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <Icon name="folder" size={16} />
+                        {f.name}
                       </span>
                       <Button
                         variant="ghost"

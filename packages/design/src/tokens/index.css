@@ -3,6 +3,7 @@
 @import './typography.css';
 @import './radii.css';
 @import './animations.css';
+@import '../components.css';
 
 body {
   background-color: var(--color-bg);

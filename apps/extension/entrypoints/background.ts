@@ -31,7 +31,6 @@ import {
   KeywordEmbeddingProvider,
   SecurityCopilot,
 } from '@lockbox/ai';
-import type { SearchResult, SecurityAlert } from '@lockbox/ai';
 import type { VaultItem, LoginItem, PasskeyItem, KdfConfig, Folder } from '@lockbox/types';
 import { api } from '../lib/api.js';
 import type { AuthenticatedLoginResponse } from '../lib/api.js';
@@ -83,7 +82,6 @@ let userKey: Uint8Array | null = null;
 let pendingTwoFactorToken: string | null = null;
 let pendingTwoFactorEmail: string | null = null;
 let vaultItems: Map<string, VaultItem> = new Map();
-let lastSyncTimestamp: string | null = null;
 let folders: Folder[] = [];
 let userId: string | null = null;
 let privateKey: CryptoKey | null = null;
@@ -181,7 +179,6 @@ async function loadVault(token: string): Promise<void> {
   vaultItems.clear();
   for (const [id, item] of nextItems) vaultItems.set(id, item);
   folders = res.folders ?? [];
-  lastSyncTimestamp = new Date().toISOString();
   searchEngine = null; // Reset search index when vault is reloaded
 }
 
@@ -231,7 +228,6 @@ const SYNC_ALARM = 'lockbox-sync';
 const COPILOT_ALARM = 'lockbox-copilot';
 const DEFAULT_LOCK_TIMEOUT = 30; // minutes
 const LOCK_TIMEOUT_KEY = 'lockTimeoutMinutes';
-let lastActivity = Date.now();
 /** Read the user-configured lock timeout (minutes). Falls back to 30. */
 async function getLockTimeout(): Promise<number> {
   const result = await chrome.storage.local.get(LOCK_TIMEOUT_KEY);
@@ -283,7 +279,6 @@ function lock() {
   pendingTwoFactorEmail = null;
   vaultItems.clear();
   folders = [];
-  lastSyncTimestamp = null;
   cachedBreachStatus = { breachedCount: 0, breachedItemIds: [], failedCount: 0 };
   searchEngine = null;
   userId = null;
@@ -632,7 +627,6 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
     }
 
     case 'activity': {
-      lastActivity = Date.now();
       // Reset auto-lock timer
       chrome.alarms.clear(LOCK_ALARM);
       await scheduleAutoLock();

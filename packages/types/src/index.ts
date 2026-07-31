@@ -127,3 +127,10 @@ export type {
   DeviceSyncResponse,
 } from './device-sync.js';
 
+// Lockbox instance discovery protocol
+export {
+  LOCKBOX_DISCOVERY_PATH,
+  LOCKBOX_PRODUCT,
+  LOCKBOX_PROTOCOL_VERSION,
+} from './discovery.js';
+export type { LockboxDiscoveryDocument, LockboxHealthResponse } from './discovery.js';

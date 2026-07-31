@@ -2,30 +2,38 @@
   "name": "@lockbox/design",
   "version": "1.0.0",
   "private": true,
-  "description": "Aura & Architecture design system — tokens, components, and Storybook",
+  "description": "Lockbox design system — accessible tokens, components, and local icons",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
+    "generate:icons": "node scripts/generate-icons.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "build": "tsc",
+    "test": "vitest run",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@iconify/react": "^6.0.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@iconify-json/tabler": "^1.2.38",
     "@storybook/addon-essentials": "^8.6.14",
     "@storybook/addon-themes": "^8.6.18",
     "@storybook/react-vite": "^8.6.18",
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^6.10.0",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "storybook": "^8.6.18",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "vite": "^7.3.6"
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10",
+    "jsdom": "^28.1.0"
   }
 }

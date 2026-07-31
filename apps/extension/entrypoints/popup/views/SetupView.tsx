@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Button, Input } from '@lockbox/design';
-import { setApiBaseUrl } from '../../../lib/storage.js';
+import { Button, Icon, Input } from '@lockbox/design';
+import { discoverLockboxServer } from '../../../lib/discovery.js';
+import { setServerConnection } from '../../../lib/storage.js';
 
 export function SetupView({ onComplete }: { onComplete: () => void }) {
   const [url, setUrl] = useState('');
@@ -17,56 +18,49 @@ export function SetupView({ onComplete }: { onComplete: () => void }) {
       return;
     }
 
-    let parsed: URL;
-    try {
-      parsed = new URL(trimmed);
-    } catch {
-      setError('Invalid URL. Example: https://lockbox-api.you.workers.dev');
-      return;
-    }
-
-    if (parsed.protocol !== 'https:') {
-      setError('URL must use HTTPS');
-      return;
-    }
-
     setSaving(true);
     try {
-      await setApiBaseUrl(parsed.origin);
+      const connection = await discoverLockboxServer(trimmed);
+      await setServerConnection(connection);
       onComplete();
-    } catch {
-      setError('Failed to save URL');
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : 'Lockbox could not discover the server for that web vault.',
+      );
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="p-6 flex flex-col gap-4">
-      <div className="text-center">
-        <div className="text-[32px] mb-2">🔐</div>
-        <h1 className="text-lg font-bold text-[var(--color-text)]">Lockbox</h1>
-        <p className="text-sm text-[var(--color-text-tertiary)] mt-1">Connect to your server</p>
+    <div className="extension-auth">
+      <div className="extension-auth__heading">
+        <img className="extension-auth__logo" src="/brand/lockbox-logo-horizontal.png" alt="Lockbox" />
+        <p>Set up Lockbox</p>
+        <h1>Connect your web vault</h1>
+        <small>Lockbox will discover and verify its API automatically.</small>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <form onSubmit={handleSubmit} className="extension-auth__form">
         {error && (
-          <div className="px-3 py-2 bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-sm)] text-[var(--color-error)] text-xs">
-            {error}
+          <div className="extension-auth__error" role="alert">
+            <Icon name="alert-circle" size={18} /> <span>{error}</span>
           </div>
         )}
 
         <div>
           <Input
             type="text"
-            label="Vault URL"
+            label="Web vault URL"
             required
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://lockbox-api.you.workers.dev"
+            placeholder="https://vault.example.com"
           />
-          <p className="text-xs text-[var(--color-text-tertiary)] mt-1">
-            The URL of your self-hosted Lockbox vault
+          <p className="extension-auth__hint">
+            Use the same address you open to access the Lockbox web app.
           </p>
         </div>
 
@@ -74,10 +68,9 @@ export function SetupView({ onComplete }: { onComplete: () => void }) {
           type="submit"
           variant="primary"
           size="sm"
-          disabled={saving}
-          style={{ width: '100%' }}
+          loading={saving}
         >
-          {saving ? 'Saving...' : 'Continue'}
+          {saving ? 'Checking connection…' : 'Connect vault'}
         </Button>
       </form>
     </div>

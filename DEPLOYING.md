@@ -90,6 +90,11 @@ The API URL is compiled into the Vite bundle:
 VITE_API_URL=https://lockbox-api.YOUR_SUBDOMAIN.workers.dev bun run deploy:web
 ```
 
+The same build emits `/.well-known/lockbox.json`. The browser extension uses this
+document to discover the Worker from the normal web-vault URL, then verifies the
+Worker's Lockbox identity and protocol version through `/health`. Do not edit the
+discovery document by hand; `VITE_API_URL` is its source of truth.
+
 The deploy script creates or reuses a Cloudflare Pages project named `lockbox-web`. Override the name if it is unavailable:
 
 ```bash
@@ -112,7 +117,10 @@ bunx wrangler pages deploy dist --project-name lockbox-web --commit-dirty=true
 
 ## 3. Build the browser extension
 
-The extension asks for the self-hosted API URL on first run and stores it locally. Build both targets:
+The extension asks for the normal web-vault URL on first run. It fetches the
+well-known discovery document, verifies the discovered Worker, and stores both
+origins locally. A direct Worker URL remains a compatibility fallback only when
+its `/health` response positively identifies it as Lockbox. Build both targets:
 
 ```bash
 bun run --filter @lockbox/extension build
@@ -271,7 +279,12 @@ Use the exact origin shown in the browser console, without a path or trailing sl
 
 ### Extension cannot reach the API
 
-Confirm the extension's saved API URL uses HTTPS and returns a successful `/health` response. Rebuild after permission or manifest changes. If the browser enforces extension-origin CORS for the request path, add its actual origin ID through `EXTENSION_IDS` and redeploy.
+Enter the web-vault URL, not the Worker URL. Confirm the web deployment returns
+valid JSON from `/.well-known/lockbox.json`, and that its `apiBaseUrl` returns a
+Lockbox-identified `/health` response. Redeploy the API first and the web vault
+second when upgrading this protocol. If the browser enforces extension-origin
+CORS for the request path, add its actual origin ID through `EXTENSION_IDS` and
+redeploy.
 
 ### Android app cannot reach the API
 

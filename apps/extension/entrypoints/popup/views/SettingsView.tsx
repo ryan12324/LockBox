@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Input, Select, Card } from '@lockbox/design';
+import { Button, Input, Select, Card, Icon } from '@lockbox/design';
 import { sendMessage } from './shared.js';
 
 export function SettingsView({ onBack }: { onBack: () => void }) {
@@ -228,14 +228,19 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--color-border)]">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          ←
+          <Icon name="arrow-left" size={17} />
+          <span className="sr-only">Back</span>
         </Button>
-        <span className="text-sm font-semibold text-[var(--color-text)]">⚙️ Settings</span>
+        <span className="text-sm font-semibold text-[var(--color-text)] flex items-center gap-1.5">
+          <Icon name="settings" size={16} />
+          Settings
+        </span>
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5">
         <div>
-          <h3 className="text-xs font-semibold text-[var(--color-text)] uppercase tracking-wider mb-2">
-            ⏰ Auto-Lock Timeout
+          <h3 className="text-xs font-semibold text-[var(--color-text)] mb-2 flex items-center gap-1.5">
+            <Icon name="clock" size={15} />
+            Auto-lock timeout
           </h3>
           <Card variant="surface" padding="sm">
             <div className="flex items-center justify-between">
@@ -269,8 +274,9 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="border-t border-[var(--color-border)] pt-4">
-          <h3 className="text-xs font-semibold text-[var(--color-text)] uppercase tracking-wider mb-2">
-            🔐 Two-Factor Authentication
+          <h3 className="text-xs font-semibold text-[var(--color-text)] mb-2 flex items-center gap-1.5">
+            <Icon name="fingerprint" size={15} />
+            Two-factor authentication
           </h3>
           {twoFaError && (
             <div className="px-3 py-2 bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-sm)] text-[var(--color-error)] text-xs mb-2">
@@ -286,7 +292,7 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
             <div className="flex flex-col gap-2">
               <Card variant="surface" padding="sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-[var(--color-success)] text-sm">✓</span>
+                  <Icon name="check" size={16} className="text-[var(--color-success)]" />
                   <span className="text-xs text-[var(--color-text)]">2FA is enabled</span>
                 </div>
               </Card>
@@ -405,8 +411,9 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
         </div>
 
         <div className="border-t border-[var(--color-border)] pt-4">
-          <h3 className="text-xs font-semibold text-[var(--color-text)] uppercase tracking-wider mb-2">
-            ✈️ Travel Mode
+          <h3 className="text-xs font-semibold text-[var(--color-text)] mb-2 flex items-center gap-1.5">
+            <Icon name="world" size={15} />
+            Travel mode
           </h3>
           {travelError && (
             <div className="px-3 py-2 bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-sm)] text-[var(--color-error)] text-xs mb-2">
@@ -432,16 +439,17 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
             </div>
           </Card>
           {travelMode && (
-            <div className="mt-2 px-3 py-2 bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-sm)] text-[var(--color-warning)] text-xs">
-              ⚠️ Only travel-safe folders will sync while travel mode is active. Disable when you
-              return.
+            <div className="mt-2 px-3 py-2 bg-[var(--color-warning-subtle)] border border-[var(--color-warning)] rounded-[var(--radius-sm)] text-[var(--color-warning)] text-xs flex items-start gap-1.5">
+              <Icon name="alert-triangle" size={15} className="shrink-0" />
+              <span>Only travel-safe folders will sync while travel mode is active. Disable when you return.</span>
             </div>
           )}
         </div>
 
         <div className="border-t border-[var(--color-border)] pt-4">
-          <h3 className="text-xs font-semibold text-[var(--color-text)] uppercase tracking-wider mb-2">
-            ✉️ Email Aliases
+          <h3 className="text-xs font-semibold text-[var(--color-text)] mb-2 flex items-center gap-1.5">
+            <Icon name="mail" size={15} />
+            Email aliases
           </h3>
           <div className="flex flex-col gap-2">
             <Select

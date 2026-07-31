@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Input, Select } from '@lockbox/design';
+import { Button, Icon, Input, Select } from '@lockbox/design';
 import type { CustomField } from '@lockbox/types';
 
 const FIELD_TYPE_OPTIONS = [
@@ -69,7 +69,7 @@ export default function CustomFieldsSection({
                       }
                       style={{ padding: '6px', minHeight: 'auto' }}
                     >
-                      {showCustomFields[idx] ? '👁️‍🗨️' : '👁️'}
+                      <Icon name={showCustomFields[idx] ? 'eye-off' : 'eye'} size={17} />
                     </Button>
                   )}
                   <Button
@@ -78,7 +78,7 @@ export default function CustomFieldsSection({
                     onClick={(e) => copyToClipboard(field.value, `cf-${idx}`, e.currentTarget)}
                     style={{ padding: '6px', minHeight: 'auto' }}
                   >
-                    {copiedField === `cf-${idx}` ? '✓' : '📋'}
+                    <Icon name={copiedField === `cf-${idx}` ? 'check' : 'copy'} size={17} />
                   </Button>
                 </div>
               </div>

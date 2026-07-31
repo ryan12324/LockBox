@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/brand/lockbox-logo-horizontal-v2.png" alt="Lockbox" width="420" />
+</p>
+
 # Lockbox
 
 Lockbox is a self-hosted, zero-knowledge password manager for technically comfortable users who want to run their own backend. Vault plaintext and encryption keys stay on the client; the Cloudflare backend stores ciphertext and synchronization metadata.
@@ -82,6 +86,10 @@ bun run deploy:web
 ```
 
 After deployment, configure the API's `CORS_ORIGINS` for the exact web origin and `EXTENSION_IDS` for any installed browser-extension IDs, then redeploy. The default configuration includes the default Pages URL, Vite development, and the Android WebView origin. See [DEPLOYING.md](DEPLOYING.md) for CI, extension, Android signing, CORS, and store-release instructions.
+
+On first run, give the extension the web-vault URL. The web deployment publishes
+versioned discovery metadata so the extension can locate and verify the Worker
+without asking the user for an API URL.
 
 ## Local development
 

@@ -24,6 +24,11 @@ import { createDb } from './db/index.js';
 import { sessions, vaultItems, twoFactorChallenges } from './db/schema.js';
 import { and, eq, isNotNull, lte } from 'drizzle-orm';
 import { purgeVaultItemStorage } from './services/vault-storage.js';
+import {
+  LOCKBOX_PRODUCT,
+  LOCKBOX_PROTOCOL_VERSION,
+  type LockboxHealthResponse,
+} from '@lockbox/types/discovery';
 
 type Bindings = {
   DB: D1Database;
@@ -76,7 +81,14 @@ app.route('/api/vault', documentRoutes);
 app.route('/api/auth/hardware-key', hardwareKeyRoutes);
 
 // Health check
-app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.get('/health', (c) =>
+  c.json<LockboxHealthResponse>({
+    product: LOCKBOX_PRODUCT,
+    protocolVersion: LOCKBOX_PROTOCOL_VERSION,
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+  })
+);
 
 export default {
   fetch: app.fetch,

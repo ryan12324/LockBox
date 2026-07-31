@@ -25,6 +25,7 @@ import {
   showUnlockPrompt,
 } from '../lib/webauthn-ui.js';
 import type { VaultItem, LoginItem, IdentityItem } from '@lockbox/types';
+import { iconifySvg } from '../lib/iconify.js';
 
 // Track injected overlays to avoid duplicates
 const injectedFields = new WeakSet<HTMLInputElement>();
@@ -257,7 +258,7 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
        align-items: flex-start;
        gap: 10px;
        padding: 12px 16px;
-       background: linear-gradient(135deg, #8B7355 0%, #6B5640 100%);
+       background: #5C4A3C;
        color: #fff;
        font-family: system-ui, -apple-system, sans-serif;
        font-size: 13px;
@@ -266,7 +267,7 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
        max-width: 340px;
      }
-     .icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+     .icon { display: flex; flex-shrink: 0; margin-top: 1px; }
      .text { flex: 1; min-width: 0; }
      .title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
      .desc { font-size: 12px; opacity: 0.85; }
@@ -305,7 +306,7 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
   const icon = document.createElement('span');
   icon.className = 'icon';
   icon.setAttribute('aria-hidden', 'true');
-  icon.textContent = '⚠️';
+  icon.innerHTML = iconifySvg('shield-check', { size: 18 });
 
   const text = document.createElement('div');
   text.className = 'text';
@@ -417,7 +418,7 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
        align-items: center;
        justify-content: space-between;
        padding: 10px 16px;
-       background: linear-gradient(135deg, #B5553A 0%, #8B3D2A 100%);
+       background: #98452F;
        color: #fff;
        font-family: system-ui, -apple-system, sans-serif;
        font-size: 13px;
@@ -431,7 +432,7 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
        flex: 1;
        min-width: 0;
      }
-     .icon { font-size: 18px; flex-shrink: 0; }
+     .icon { display: flex; flex-shrink: 0; }
      .text strong { display: block; margin-bottom: 2px; font-size: 14px; }
      .text span { opacity: 0.9; font-size: 12px; }
      .dismiss {
@@ -462,7 +463,7 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
   const icon = document.createElement('span');
   icon.className = 'icon';
   icon.setAttribute('aria-hidden', 'true');
-  icon.textContent = '⚠️';
+  icon.innerHTML = iconifySvg('alert-triangle', { size: 20 });
   const text = document.createElement('div');
   text.className = 'text';
   const title = document.createElement('strong');

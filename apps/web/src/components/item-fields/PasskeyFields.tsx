@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Input, Textarea } from '@lockbox/design';
+import { Button, Icon, Input, Textarea } from '@lockbox/design';
 
 export interface PasskeyFieldsProps {
   mode: 'view' | 'edit' | 'add';
@@ -63,7 +63,7 @@ export default function PasskeyFields({
                 onClick={(e) => copyToClipboard(rpId, 'rpId', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'rpId' ? '✓' : '📋'}
+                <Icon name={copiedField === 'rpId' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -88,7 +88,7 @@ export default function PasskeyFields({
                 onClick={(e) => copyToClipboard(passkeyUserName, 'userName', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'userName' ? '✓' : '📋'}
+                <Icon name={copiedField === 'userName' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -108,7 +108,7 @@ export default function PasskeyFields({
                 onClick={(e) => copyToClipboard(credentialId, 'credId', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'credId' ? '✓' : '📋'}
+                <Icon name={copiedField === 'credId' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -128,7 +128,7 @@ export default function PasskeyFields({
                 onClick={(e) => copyToClipboard(publicKey, 'pubKey', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'pubKey' ? '✓' : '📋'}
+                <Icon name={copiedField === 'pubKey' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { VaultItem, Folder } from '@lockbox/types';
-import { Button, Card } from '@lockbox/design';
+import { Button, Card, Icon } from '@lockbox/design';
 import ItemHistoryPanel from './ItemHistoryPanel.js';
 import AttachmentSection from './AttachmentSection.js';
 import ShareLinkModal from './ShareLinkModal.js';
@@ -42,7 +42,7 @@ function CollapsibleSection({
         }}
       >
         <span style={{ fontWeight: 600 }}>{title}</span>
-        <span>{open ? '▾' : '▸'}</span>
+        <Icon name={open ? 'chevron-down' : 'chevron-right'} size={18} />
       </Button>
       {open && <div style={{ marginTop: 12 }}>{children}</div>}
     </Card>
@@ -119,14 +119,7 @@ export default function ItemPanel({
       onClick={() => s.setFavorite(!s.favorite)}
       style={{ display: 'flex', alignItems: 'center', gap: 8 }}
     >
-      <span
-        style={{
-          color: s.favorite ? 'var(--color-primary)' : 'var(--color-text-secondary)',
-          fontSize: '1.1em',
-        }}
-      >
-        {s.favorite ? '★' : '☆'}
-      </span>
+      <Icon name="star" size={18} style={{ color: s.favorite ? 'var(--color-warning)' : undefined }} />
       <span
         style={{
           fontSize: 'var(--font-size-sm)',
@@ -140,15 +133,14 @@ export default function ItemPanel({
   );
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/30 z-40 transition-opacity" onClick={onClose} />
-      <div className="fixed inset-y-0 right-0 w-full sm:w-[450px] bg-[var(--color-surface)] shadow-[var(--shadow-lg)] border-l border-[var(--color-border)] z-50 flex flex-col transform transition-transform duration-300 ease-in-out translate-x-0">
+    <div className="item-panel-root">
+      <button type="button" className="item-panel__scrim" onClick={onClose} aria-label="Close item panel" />
+      <section className="item-panel" aria-label={s.currentMode === 'add' ? 'Add vault item' : s.name || 'Vault item'}>
         <ItemPanelHeader
           currentMode={s.currentMode}
           type={s.type}
           name={s.name}
           loading={s.loading}
-          typeIcon={s.typeIcon}
           onShare={() => s.setShowShareModal(true)}
           onHistory={() => s.setShowHistory(true)}
           onEdit={() => s.setCurrentMode('edit')}
@@ -156,7 +148,7 @@ export default function ItemPanel({
           onSave={s.handleSave}
           onClose={onClose}
         />
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="item-panel__body">
           {s.currentMode !== 'view' && (
             <Card variant="surface" padding="md">
               <CommonEditFields
@@ -228,7 +220,7 @@ export default function ItemPanel({
             </div>
           )}
         </div>
-      </div>
+      </section>
       {s.showHistory && item?.id && (
         <ItemHistoryPanel
           itemId={item.id}
@@ -246,6 +238,6 @@ export default function ItemPanel({
           onClose={() => s.setShowShareModal(false)}
         />
       )}
-    </>
+    </div>
   );
 }

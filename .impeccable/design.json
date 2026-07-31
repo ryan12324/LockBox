@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-31T21:40:59Z",
+  "title": "Design System: Lockbox",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Archive Paper",
+        "canonical": "oklch(0.965 0.008 80)",
+        "tonalRamp": ["oklch(0.15 0.008 80)", "oklch(0.25 0.008 80)", "oklch(0.37 0.008 80)", "oklch(0.49 0.008 80)", "oklch(0.61 0.008 80)", "oklch(0.73 0.008 80)", "oklch(0.85 0.008 80)", "oklch(0.95 0.008 80)"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ledger Ink",
+        "canonical": "oklch(0.25 0.018 55)",
+        "tonalRamp": ["oklch(0.15 0.018 55)", "oklch(0.25 0.018 55)", "oklch(0.37 0.018 55)", "oklch(0.49 0.018 55)", "oklch(0.61 0.018 55)", "oklch(0.73 0.018 55)", "oklch(0.85 0.018 55)", "oklch(0.95 0.018 55)"]
+      },
+      "umber": {
+        "role": "primary",
+        "displayName": "Ledger Umber",
+        "canonical": "oklch(0.42 0.055 55)",
+        "tonalRamp": ["oklch(0.15 0.055 55)", "oklch(0.25 0.055 55)", "oklch(0.37 0.055 55)", "oklch(0.49 0.055 55)", "oklch(0.61 0.055 55)", "oklch(0.73 0.055 55)", "oklch(0.85 0.055 55)", "oklch(0.95 0.055 55)"]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Consequential Red",
+        "canonical": "oklch(0.44 0.13 28)",
+        "tonalRamp": ["oklch(0.15 0.13 28)", "oklch(0.25 0.13 28)", "oklch(0.37 0.13 28)", "oklch(0.49 0.13 28)", "oklch(0.61 0.13 28)", "oklch(0.73 0.13 28)", "oklch(0.85 0.13 28)", "oklch(0.95 0.13 28)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Rare authentication and onboarding titles." },
+      "headline": { "displayName": "Headline", "purpose": "Page and primary pane titles." },
+      "title": { "displayName": "Title", "purpose": "Sections, items, and dialogs." },
+      "body": { "displayName": "Body", "purpose": "Controls, values, forms, and explanatory copy." },
+      "label": { "displayName": "Label", "purpose": "Fields, metadata, navigation, and statuses." }
+    },
+    "shadows": [
+      { "name": "resting-lift", "value": "0 1px 2px oklch(0.25 0.018 55 / 0.1)", "purpose": "Raised cards or floating controls only." },
+      { "name": "temporary-lift", "value": "0 6px 18px oklch(0.25 0.018 55 / 0.1)", "purpose": "Toasts and temporary menus." },
+      { "name": "dialog-lift", "value": "0 18px 48px oklch(0.2 0.018 55 / 0.16)", "purpose": "Blocking modal dialogs only." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "120ms", "purpose": "Hover, focus, and press feedback." },
+      { "name": "normal", "value": "200ms", "purpose": "Content entry and compact state transitions." },
+      { "name": "slow", "value": "320ms", "purpose": "Large pane transitions when motion adds spatial clarity." },
+      { "name": "ease-standard", "value": "cubic-bezier(0.2, 0, 0, 1)", "purpose": "Default state transition." },
+      { "name": "ease-enter", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Elements entering the viewport." }
+    ],
+    "breakpoints": [
+      { "name": "compact", "value": "0-599px" },
+      { "name": "medium", "value": "600-839px" },
+      { "name": "expanded", "value": "840px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single highest-priority action in a region.",
+      "html": "<button class=\"ds-button ds-button-primary\">Save item</button>",
+      "css": ".ds-button{min-height:44px;padding:0 16px;border:1px solid transparent;border-radius:var(--radius-md);font:500 1rem/1.25 var(--font-sans);cursor:pointer;transition:background-color 120ms var(--ease-standard),transform 120ms var(--ease-standard)}.ds-button-primary{color:var(--color-primary-fg);background:var(--color-primary)}.ds-button-primary:hover{background:var(--color-primary-hover)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-button:active{transform:translateY(1px)}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A supporting action with visible but quiet containment.",
+      "html": "<button class=\"ds-button ds-button-secondary\">Cancel</button>",
+      "css": ".ds-button{min-height:44px;padding:0 16px;border-radius:var(--radius-md);font:500 1rem/1.25 var(--font-sans);cursor:pointer;transition:background-color 120ms var(--ease-standard),border-color 120ms var(--ease-standard)}.ds-button-secondary{color:var(--color-text);background:var(--color-surface);border:1px solid var(--color-border)}.ds-button-secondary:hover{background:var(--color-bg-subtle);border-color:var(--color-border-strong)}.ds-button:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "A labeled, opaque field for vault data.",
+      "html": "<label class=\"ds-field\"><span>Username</span><input value=\"ryan@example.com\"></label>",
+      "css": ".ds-field{display:grid;gap:6px;color:var(--color-text-secondary);font:500 .875rem/1.25 var(--font-sans)}.ds-field input{min-height:44px;padding:9px 12px;color:var(--color-text);background:var(--color-surface-raised);border:1px solid var(--color-border);border-radius:var(--radius-md);font:400 1rem/1.5 var(--font-sans);outline:none}.ds-field input:hover{border-color:var(--color-border-strong)}.ds-field input:focus{border-color:var(--color-focus);box-shadow:0 0 0 3px color-mix(in oklch,var(--color-focus) 22%,transparent)}"
+    },
+    {
+      "name": "Vault Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A bounded surface for settings or exceptional grouped content.",
+      "html": "<section class=\"ds-card\"><strong>Autofill</strong><p>Ready on this device</p></section>",
+      "css": ".ds-card{padding:20px;color:var(--color-text);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);font-family:var(--font-sans)}.ds-card strong{font-size:1rem}.ds-card p{margin:6px 0 0;color:var(--color-text-secondary);font-size:.875rem}"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "description": "A compact text label for a non-color-only state.",
+      "html": "<span class=\"ds-badge\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0m6 0l2 2l4-4\"/></svg>Synced</span>",
+      "css": ".ds-badge{min-height:24px;padding:2px 8px;display:inline-flex;align-items:center;gap:4px;color:var(--color-success);background:var(--color-success-subtle);border-radius:9999px;font:500 .75rem/1.25 var(--font-sans)}.ds-badge svg{width:16px;height:16px}"
+    },
+    {
+      "name": "Labeled Navigation Item",
+      "kind": "nav",
+      "description": "An active destination with icon, text, and tonal selection.",
+      "html": "<a class=\"ds-nav-item ds-nav-item-active\" href=\"#\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M5 7a7 7 0 0 1 14 0v4a7 7 0 0 1-14 0zm4 8v4m6-4v4M8 19h8\"/></svg><span>Vault</span></a>",
+      "css": ".ds-nav-item{min-height:44px;padding:0 12px;display:flex;align-items:center;gap:10px;color:var(--color-text-secondary);border-radius:var(--radius-md);font:500 .875rem/1.25 var(--font-sans);text-decoration:none}.ds-nav-item svg{width:20px;height:20px}.ds-nav-item:hover{color:var(--color-text);background:var(--color-bg-subtle)}.ds-nav-item:focus-visible{outline:3px solid var(--color-focus);outline-offset:2px}.ds-nav-item-active{color:var(--color-primary);background:var(--color-bg-subtle);font-weight:600}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Ledger",
+    "overview": "Lockbox should feel like a well-kept personal ledger: calm enough to trust, structured enough to scan, and precise about every consequential action. Warm paper surfaces and dark ink establish a private, durable atmosphere; restrained umber marks the next action without turning security into spectacle. Density follows the task. The web vault is list-first, the extension is site-first, and Android is thumb-first. Layouts adapt by available window width rather than device name: compact windows use one focused pane and bottom navigation, medium windows may introduce a rail, and expanded windows use a side navigation plus a persistent list-detail workspace. Folding and unfolding must preserve selection, scroll, focus, and typed text; no important control, dialog, or reading column may straddle a hinge. The system explicitly rejects consumer-fintech gradients, glowing “secure” effects, glassmorphism, fear-based scores, ornamental card grids, and AI-first framing. Security confidence comes from legible state, honest copy, predictable behavior, and visible recovery consequences.",
+    "keyCharacteristics": [
+      "Warm, private, paper-like surfaces with one restrained accent.",
+      "List-first information architecture and explicit state labels.",
+      "Symmetric geometry, compact chrome, and 44px minimum controls.",
+      "Capability-based responsive behavior from cover display to unfolded dual pane.",
+      "Local Iconify Tabler icons used consistently and never fetched at runtime."
+    ],
+    "rules": [
+      { "name": "The One-Accent Rule", "body": "Umber is the only routine accent and occupies less than ten percent of a screen; semantic colors never become decoration.", "section": "colors" },
+      { "name": "The Labeled-State Rule", "body": "Color never carries security meaning alone. Pair every important state with an Iconify icon and concise text.", "section": "colors" },
+      { "name": "The Stable-Type Rule", "body": "Font weight, width, and letter spacing never animate. Security information must remain visually stable while it is being read.", "section": "typography" },
+      { "name": "The Flat-by-Default Rule", "body": "If a border and tonal step can communicate containment, a shadow is forbidden.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do make the primary task on each surface unmistakable: manage on web, fill on extension, unlock/sync/fill on Android.",
+      "Do use 44px minimum interactive targets, visible keyboard focus, semantic controls, and WCAG 2.2 AA contrast.",
+      "Do preserve scroll, focus, typed text, and selected vault item across resize, rotation, fold, and unfold.",
+      "Do use a single locally bundled Iconify Tabler set; label unfamiliar icons and keep security states visible in text.",
+      "Do explain irreversible, destructive, and cryptographic consequences before confirmation.",
+      "Do remove incomplete capabilities from normal navigation and describe only security flows that actually work."
+    ],
+    "donts": [
+      "Don't use consumer-fintech gradients, glowing ‘secure’ effects, glassmorphism, or decorative lock imagery that substitutes for evidence.",
+      "Don't use fear-based breach language, celebratory security scores, or gamification that encourages rushed changes.",
+      "Don't expose developer-console jargon in end-user errors.",
+      "Don't hide network activity, silently rotate keys, or present controls whose effect differs by platform without explanation.",
+      "Don't build large dashboards of vanity metrics, repetitive card grids, or AI-first framing that displaces essential vault tasks.",
+      "Don't place important content, dialogs, or actions across a fold or hinge."
+    ]
+  }
+}

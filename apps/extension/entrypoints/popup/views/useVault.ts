@@ -25,6 +25,7 @@ export function useVault() {
   const [allItems, setAllItems] = useState<VaultItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [siteItems, setSiteItems] = useState<VaultItem[]>([]);
+  const [siteHost, setSiteHost] = useState('Current site');
   const [sharedItems, setSharedItems] = useState<VaultItem[]>([]);
   const [sharedFolders, setSharedFolders] = useState<SFE[]>([]);
   const [hasKeyPair, setHasKeyPair] = useState(false);
@@ -59,6 +60,11 @@ export function useVault() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       const url = tabs[0]?.url;
       if (!url) return;
+      try {
+        setSiteHost(new URL(url).hostname.replace(/^www\./, ''));
+      } catch {
+        setSiteHost('Current site');
+      }
       sendMessage<{ items: VaultItem[] }>({ type: 'get-matches', url })
         .then(async ({ items }) => {
           try {
@@ -68,7 +74,9 @@ export function useVault() {
             let h = '';
             try {
               h = new URL(url).hostname;
-            } catch {}
+            } catch {
+              h = '';
+            }
             setSiteItems([...items, ...matchSharedByHostname(Object.values(sr || {}), h)]);
           } catch {
             setSiteItems(items);
@@ -182,6 +190,7 @@ export function useVault() {
     allItems,
     folders,
     siteItems,
+    siteHost,
     sharedItems,
     sharedFolders,
     hasKeyPair,

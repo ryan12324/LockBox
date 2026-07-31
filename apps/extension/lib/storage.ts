@@ -36,7 +36,21 @@ export async function getApiBaseUrl(): Promise<string> {
   return (result.apiBaseUrl as string) ?? '';
 }
 
-/** Set the API base URL. */
-export async function setApiBaseUrl(url: string): Promise<void> {
-  await chrome.storage.local.set({ apiBaseUrl: url });
+/** Get the verified web vault trust anchor from storage. */
+export async function getWebBaseUrl(): Promise<string> {
+  const result = await chrome.storage.local.get('webBaseUrl');
+  return (result.webBaseUrl as string) ?? '';
+}
+
+/** Store the verified web trust anchor and its discovered API atomically. */
+export async function setServerConnection(connection: {
+  webBaseUrl: string;
+  apiBaseUrl: string;
+}): Promise<void> {
+  await chrome.storage.local.set(connection);
+}
+
+/** Remove server routing so the setup flow can run again. */
+export async function clearServerConnection(): Promise<void> {
+  await chrome.storage.local.remove(['webBaseUrl', 'apiBaseUrl']);
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Input } from '@lockbox/design';
+import { Button, Icon, Input } from '@lockbox/design';
 
 export interface LoginFieldsProps {
   mode: 'view' | 'edit' | 'add';
@@ -60,7 +60,7 @@ export default function LoginFields({
                 onClick={(e) => copyToClipboard(username, 'user', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'user' ? '✓' : '📋'}
+                <Icon name={copiedField === 'user' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -81,7 +81,7 @@ export default function LoginFields({
                   onClick={() => setShowPassword(!showPassword)}
                   style={{ padding: '6px', minHeight: 'auto' }}
                 >
-                  {showPassword ? '👁️‍🗨️' : '👁️'}
+                  <Icon name={showPassword ? 'eye-off' : 'eye'} size={17} />
                 </Button>
                 <Button
                   variant="ghost"
@@ -89,7 +89,7 @@ export default function LoginFields({
                   onClick={(e) => copyToClipboard(password, 'pass', e.currentTarget)}
                   style={{ padding: '6px', minHeight: 'auto' }}
                 >
-                  {copiedField === 'pass' ? '✓' : '📋'}
+                  <Icon name={copiedField === 'pass' ? 'check' : 'copy'} size={17} />
                 </Button>
               </div>
             </div>
@@ -102,7 +102,8 @@ export default function LoginFields({
             onClick={onRotatePassword}
             style={{ width: '100%' }}
           >
-            🔄 Rotate Password
+            <Icon name="refresh" size={17} />
+            Rotate password
           </Button>
         )}
         {totpSecret && (
@@ -122,7 +123,7 @@ export default function LoginFields({
                   onClick={(e) => copyToClipboard(totpCode, 'totp', e.currentTarget)}
                   style={{ padding: '6px', minHeight: 'auto' }}
                 >
-                  {copiedField === 'totp' ? '✓' : '📋'}
+                  <Icon name={copiedField === 'totp' ? 'check' : 'copy'} size={17} />
                 </Button>
               </div>
             </div>
@@ -155,7 +156,7 @@ export default function LoginFields({
                       onClick={(e) => copyToClipboard(uri, `uri-${idx}`, e.currentTarget)}
                       style={{ padding: '6px', minHeight: 'auto' }}
                     >
-                      {copiedField === `uri-${idx}` ? '✓' : '📋'}
+                      <Icon name={copiedField === `uri-${idx}` ? 'check' : 'copy'} size={17} />
                     </Button>
                   </div>
                 ))}

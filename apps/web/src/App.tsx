@@ -1,8 +1,8 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth.js';
-import { AuraProvider } from './providers/AuraProvider.js';
 import { ToastProvider } from './providers/ToastProvider.js';
+import { startFoldableLayout } from './lib/foldable-layout.js';
 
 const Register = lazy(() => import('./pages/Register.js'));
 const Login = lazy(() => import('./pages/Login.js'));
@@ -50,9 +50,10 @@ export default function App() {
     };
   }, [updateActivity]);
 
+  useEffect(() => startFoldableLayout(), []);
+
   return (
-    <AuraProvider>
-      <ToastProvider>
+    <ToastProvider>
         <Suspense
           fallback={
             <div
@@ -89,7 +90,6 @@ export default function App() {
           <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />
           </Routes>
         </Suspense>
-      </ToastProvider>
-    </AuraProvider>
+    </ToastProvider>
   );
 }

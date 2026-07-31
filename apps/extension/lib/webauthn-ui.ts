@@ -2,13 +2,15 @@
  * WebAuthn consent UI overlays — Shadow DOM components injected into pages.
  *
  * All overlays follow the same pattern as the existing autofill dropdowns:
- * fixed-positioned, Shadow DOM for CSS isolation, indigo-600 primary,
- * dark card aesthetic, dismissible.
+ * fixed-positioned, Shadow DOM for CSS isolation, shared warm-neutral palette,
+ * checked-in Iconify icons, and dismissible interactions.
  *
  * SECURITY: These run in the content script (ISOLATED world). No private
  * keys or sensitive vault data flows through these — only display metadata
  * (rpName, userName, credentialId) for user consent decisions.
  */
+
+import { iconifySvg } from './iconify.js';
 
 // ─── Shared styles ──────────────────────────────────────────────────────────
 
@@ -48,7 +50,7 @@ const BASE_STYLES = `
   .info-icon {
     width: 36px; height: 36px; border-radius: 10px; background: rgba(139,115,85,0.15);
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    font-size: 16px;
+    color: #6B5640;
   }
   .info-label { font-size: 11px; color: #7A7168; text-transform: uppercase; letter-spacing: 0.5px; }
   .info-value {
@@ -105,7 +107,7 @@ const PICKER_STYLES = `
   .passkey-icon {
     width: 36px; height: 36px; border-radius: 10px; background: rgba(139,115,85,0.15);
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    font-size: 16px;
+    color: #6B5640;
   }
   .passkey-info { min-width: 0; flex: 1; }
   .passkey-name {
@@ -164,9 +166,9 @@ const TOAST_STYLES = `
 
 // ─── Key SVG icon (shared across overlays) ──────────────────────────────────
 
-const KEY_ICON_SVG = `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7A5 5 0 0 1 7 7h2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`;
-const SHIELD_ICON_SVG = `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
-const LOCK_ICON_SVG = `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+const KEY_ICON_SVG = iconifySvg('key', { size: 22 });
+const SHIELD_ICON_SVG = iconifySvg('shield-lock', { size: 22 });
+const LOCK_ICON_SVG = iconifySvg('lock', { size: 22 });
 
 // ─── Helper: create & mount shadow host ─────────────────────────────────────
 
@@ -231,7 +233,7 @@ export function showCreateConsent(params: CreateConsentParams): Promise<boolean>
         </div>
         <div class="modal-body">
           <div class="info-row">
-            <div class="info-icon">🌐</div>
+            <div class="info-icon">${iconifySvg('world', { size: 18 })}</div>
             <div>
               <div class="info-label">Website</div>
               <div class="info-value" data-rp-name></div>
@@ -239,7 +241,7 @@ export function showCreateConsent(params: CreateConsentParams): Promise<boolean>
             </div>
           </div>
           <div class="info-row">
-            <div class="info-icon">👤</div>
+            <div class="info-icon">${iconifySvg('user', { size: 18 })}</div>
             <div>
               <div class="info-label">Account</div>
               <div class="info-value" data-account-name></div>
@@ -333,7 +335,7 @@ export function showGetConsent(params: GetConsentParams): Promise<boolean> {
         </div>
         <div class="modal-body">
           <div class="info-row">
-            <div class="info-icon">👤</div>
+            <div class="info-icon">${iconifySvg('user', { size: 18 })}</div>
             <div>
               <div class="info-label">Account</div>
               <div class="info-value" data-account-name></div>
@@ -341,7 +343,7 @@ export function showGetConsent(params: GetConsentParams): Promise<boolean> {
             </div>
           </div>
           <div class="info-row">
-            <div class="info-icon">🌐</div>
+            <div class="info-icon">${iconifySvg('world', { size: 18 })}</div>
             <div>
               <div class="info-label">Website</div>
               <div class="info-value" data-rp-id></div>
@@ -454,7 +456,7 @@ export function showPasskeyPicker(
       item.type = 'button';
       item.className = 'passkey-item';
       item.innerHTML = `
-        <div class="passkey-icon">🔑</div>
+        <div class="passkey-icon">${iconifySvg('key', { size: 18 })}</div>
         <div class="passkey-info">
           <div class="passkey-name"></div>
           <div class="passkey-detail"></div>
@@ -589,7 +591,7 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
         </div>
         <div class="modal-body">
           <div class="info-row">
-            <div class="info-icon">🔑</div>
+            <div class="info-icon">${iconifySvg('key', { size: 18 })}</div>
             <div>
               <div class="info-label">Action required</div>
               <div class="info-value">Enter your master password to continue</div>
@@ -654,7 +656,7 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
           if (statusRow) {
             statusRow.classList.add('unlocked');
             const icon = document.createElement('span');
-            icon.textContent = '✓';
+            icon.innerHTML = iconifySvg('circle-check', { size: 18 });
             const message = document.createElement('span');
             message.textContent = 'Unlocked!';
             statusRow.replaceChildren(icon, message);

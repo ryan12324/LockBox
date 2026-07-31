@@ -541,10 +541,6 @@ export function useItemPanelState({
     }
   };
 
-  const typeIcon =
-    { login: '🔑', note: '📝', card: '💳', identity: '📛', passkey: '🗝️', document: '📄' }[type] ??
-    '📄';
-
   const clip = { copiedField, copyToClipboard };
 
   return {
@@ -583,7 +579,6 @@ export function useItemPanelState({
     setShowHistory,
     showShareModal,
     setShowShareModal,
-    typeIcon,
     handleSave,
     handleDelete,
     handleCreateFolder,

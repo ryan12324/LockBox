@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import { generatePassword, generatePassphrase, evaluateStrength } from '@lockbox/generator';
-import { Button, Input, Card, Badge } from '@lockbox/design';
+import { Button, Input, Card, Badge, Icon } from '@lockbox/design';
 
 type Tab = 'password' | 'passphrase';
 
 export default function Generator() {
+  const lengthId = React.useId();
+  const wordCountId = React.useId();
   const [tab, setTab] = useState<Tab>('password');
 
   const [length, setLength] = useState(20);
@@ -89,7 +91,7 @@ export default function Generator() {
             marginBottom: 20,
           }}
         >
-          Password Generator
+          Password generator
         </h1>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -99,18 +101,20 @@ export default function Generator() {
               gap: 6,
               padding: 4,
               background: 'var(--color-surface)',
-              borderRadius: 'var(--radius-full)',
-              boxShadow: 'var(--shadow-sm)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
             }}
           >
             {(['password', 'passphrase'] as Tab[]).map((t) => (
               <button
                 key={t}
+                type="button"
                 onClick={() => setTab(t)}
+                aria-pressed={tab === t}
                 style={{
                   flex: 1,
                   padding: '10px 16px',
-                  borderRadius: 'var(--radius-full)',
+                  borderRadius: 'var(--radius-sm)',
                   border: 'none',
                   background: tab === t ? 'var(--color-primary)' : 'transparent',
                   color: tab === t ? 'var(--color-primary-fg)' : 'var(--color-text-secondary)',
@@ -118,8 +122,7 @@ export default function Generator() {
                   fontSize: 'var(--font-size-sm)',
                   cursor: 'pointer',
                   textTransform: 'capitalize',
-                  transition: 'all 150ms ease',
-                  boxShadow: tab === t ? 'var(--shadow-md)' : 'none',
+                  transition: 'background 120ms ease, color 120ms ease',
                 }}
               >
                 {t}
@@ -127,18 +130,9 @@ export default function Generator() {
             ))}
           </div>
 
-          <Card variant="frost" padding="lg" style={{ textAlign: 'center' }}>
+          <Card variant="surface" padding="lg" style={{ textAlign: 'center' }}>
             <p
               data-testid="generated-password"
-              className={
-                generated && strength
-                  ? strength.score <= 1
-                    ? 'kinetic-insecure'
-                    : strength.score === 2
-                      ? 'kinetic-warning'
-                      : 'kinetic-secure'
-                  : ''
-              }
               style={{
                 fontFamily: 'var(--font-mono, monospace)',
                 fontSize: 24,
@@ -212,7 +206,8 @@ export default function Generator() {
                 onClick={copyToClipboard}
                 style={{ marginTop: 16 }}
               >
-                {copied ? '✓ Copied' : '📋 Copy'}
+                <Icon name={copied ? 'check' : 'copy'} size={17} />
+                {copied ? 'Copied' : 'Copy'}
               </Button>
             )}
           </Card>
@@ -233,6 +228,7 @@ export default function Generator() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
                   <label
+                    htmlFor={lengthId}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -245,15 +241,15 @@ export default function Generator() {
                     <span>Length</span>
                     <span style={{ fontFamily: 'var(--font-mono, monospace)' }}>{length}</span>
                   </label>
-                  {React.createElement('input', {
-                    type: 'range',
-                    min: 8,
-                    max: 128,
-                    value: length,
-                    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-                      setLength(Number(e.target.value)),
-                    style: { width: '100%' },
-                  })}
+                  <input
+                    id={lengthId}
+                    type="range"
+                    min={8}
+                    max={128}
+                    value={length}
+                    onChange={(event) => setLength(Number(event.target.value))}
+                    style={{ width: '100%' }}
+                  />
                 </div>
 
                 {[
@@ -288,6 +284,7 @@ export default function Generator() {
                       variant={value ? 'primary' : 'secondary'}
                       size="sm"
                       onClick={() => set(!value)}
+                      aria-pressed={value}
                       style={{ minWidth: 52 }}
                     >
                       {value ? 'On' : 'Off'}
@@ -299,6 +296,7 @@ export default function Generator() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
                   <label
+                    htmlFor={wordCountId}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -311,15 +309,15 @@ export default function Generator() {
                     <span>Word Count</span>
                     <span style={{ fontFamily: 'var(--font-mono, monospace)' }}>{wordCount}</span>
                   </label>
-                  {React.createElement('input', {
-                    type: 'range',
-                    min: 3,
-                    max: 10,
-                    value: wordCount,
-                    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-                      setWordCount(Number(e.target.value)),
-                    style: { width: '100%' },
-                  })}
+                  <input
+                    id={wordCountId}
+                    type="range"
+                    min={3}
+                    max={10}
+                    value={wordCount}
+                    onChange={(event) => setWordCount(Number(event.target.value))}
+                    style={{ width: '100%' }}
+                  />
                 </div>
 
                 <Input
@@ -356,6 +354,7 @@ export default function Generator() {
                       variant={value ? 'primary' : 'secondary'}
                       size="sm"
                       onClick={() => set(!value)}
+                      aria-pressed={value}
                       style={{ minWidth: 52 }}
                     >
                       {value ? 'On' : 'Off'}
@@ -367,7 +366,8 @@ export default function Generator() {
           </Card>
 
           <Button variant="primary" size="lg" onClick={generate} style={{ width: '100%' }}>
-            🎲 Generate
+            <Icon name="wand" size={19} />
+            Generate
           </Button>
         </div>
       </div>

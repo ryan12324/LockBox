@@ -9,7 +9,7 @@ import {
   createFolderKeyForMembers,
 } from '../lib/team-crypto.js';
 import { useToast } from '../providers/ToastProvider.js';
-import { Button, Input, Card, Badge, Select } from '@lockbox/design';
+import { Button, Input, Card, Badge, Icon, Select } from '@lockbox/design';
 
 interface Member {
   teamId: string;
@@ -698,7 +698,7 @@ export default function TeamDetail() {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 'var(--font-size-lg)' }}>🔒</span>
+                      <Icon name="lock" size={18} />
                       <span
                         style={{
                           fontSize: 'var(--font-size-sm)',

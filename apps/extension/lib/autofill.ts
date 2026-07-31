@@ -6,6 +6,7 @@
 
 import type { DetectedForm, DetectedIdentityForm, IdentityFieldType } from './form-detector.js';
 import type { IdentityItem } from '@lockbox/types';
+import { iconifySvg } from './iconify.js';
 /**
  * Simulate filling a single input field with SPA-compatible events.
  * This sequence is required for React/Vue/Angular to detect the value change.
@@ -84,7 +85,6 @@ export function createLockIconOverlay(field: HTMLInputElement, onClick: () => vo
     button {
       all: unset;
       cursor: pointer;
-      font-size: 15px;
       line-height: 1;
       opacity: 0.5;
       transition: opacity 0.15s;
@@ -94,6 +94,7 @@ export function createLockIconOverlay(field: HTMLInputElement, onClick: () => vo
       width: 100%;
       height: 100%;
     }
+    button svg { display: block; color: #6B5640; }
     button:hover { opacity: 1; }
     button:focus-visible { opacity: 1; outline: 2px solid #8B7355; outline-offset: 2px; border-radius: 4px; }
   `;
@@ -102,7 +103,7 @@ export function createLockIconOverlay(field: HTMLInputElement, onClick: () => vo
   btn.type = 'button';
   btn.title = 'Autofill with Lockbox';
   btn.setAttribute('aria-label', 'Autofill with Lockbox');
-  btn.textContent = '\uD83D\uDD10';
+  btn.innerHTML = iconifySvg('lock', { size: 16 });
 
   shadow.appendChild(style);
   shadow.appendChild(btn);
@@ -202,7 +203,7 @@ export function createSuggestionDropdown(
        .item-username { color: #7A7168; font-size: 12px; }
      </style>
     <div class="dropdown">
-      <div class="header">🔐 Lockbox</div>
+      <div class="header">${iconifySvg('shield-lock', { size: 14 })} Lockbox</div>
     </div>
   `;
 
@@ -419,10 +420,10 @@ export function createStatusDropdown(
 
   const shadow = host.attachShadow({ mode: 'open' });
 
-  const iconMap: Record<StatusDropdownType, string> = {
-    locked: '🔒',
-    'no-matches': '🔍',
-    error: '⚠️',
+  const iconMap: Record<StatusDropdownType, Parameters<typeof iconifySvg>[0]> = {
+    locked: 'lock',
+    'no-matches': 'search',
+    error: 'alert-triangle',
   };
 
   const titleMap: Record<StatusDropdownType, string> = {
@@ -504,13 +505,13 @@ export function createStatusDropdown(
 
   const headerEl = document.createElement('div');
   headerEl.className = 'header';
-  headerEl.textContent = '🔐 Lockbox';
+  headerEl.innerHTML = `${iconifySvg('shield-lock', { size: 14 })} Lockbox`;
   dropdown.appendChild(headerEl);
 
   const bodyEl = document.createElement('div');
   bodyEl.className = 'body';
   bodyEl.innerHTML = `
-    <span class="icon">${icon}</span>
+    <span class="icon">${iconifySvg(icon, { size: 20 })}</span>
     <div class="text">
       <div class="title">${title}</div>
       <div class="desc">${desc}</div>

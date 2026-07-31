@@ -2,11 +2,9 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.js';
 import { useHealthStore } from '../store/health.js';
-import { useAura } from '../providers/AuraProvider.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
-import { Card, Badge, Button, Aura } from '@lockbox/design';
-import HealthScore from '../components/HealthScore.js';
+import { Card, Badge, Button, Icon, type IconName } from '@lockbox/design';
 import IssueList from '../components/IssueList.js';
 import type { VaultItem } from '@lockbox/types';
 import { analyzeVaultHealth, analyzeItem, SecurityCopilot, LifecycleTracker } from '@lockbox/ai';
@@ -23,7 +21,6 @@ export default function Health() {
   const navigate = useNavigate();
   const { session, userKey } = useAuthStore();
   const { summary, reports, loading, setSummary, setReports, setLoading } = useHealthStore();
-  const aura = useAura();
   const [items, setItems] = useState<VaultItem[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [breachChecking, setBreachChecking] = useState(false);
@@ -37,8 +34,6 @@ export default function Health() {
 
   const [tfaData, setTfaData] = useState<Map<string, TFAData> | null>(null);
   const [tfaIssues, setTfaIssues] = useState<{ item: LoginItem; info: TFAData }[]>([]);
-  const [tfaScore, setTfaScore] = useState<number>(100);
-  const [tfaCapableCount, setTfaCapableCount] = useState(0);
 
   useEffect(() => {
     async function loadTFA() {
@@ -76,8 +71,6 @@ export default function Health() {
 
     const logins = items.filter((i) => i.type === 'login') as LoginItem[];
     const issues: { item: LoginItem; info: TFAData }[] = [];
-    let capable = 0;
-    let configured = 0;
 
     for (const login of logins) {
       if (!login.uris || login.uris.length === 0) continue;
@@ -106,38 +99,14 @@ export default function Health() {
       }
 
       if (info) {
-        capable++;
-        if (login.totp) {
-          configured++;
-        } else {
+        if (!login.totp) {
           issues.push({ item: login, info });
         }
       }
     }
 
-    setTfaCapableCount(capable);
-    setTfaScore(capable > 0 ? Math.round((configured / capable) * 100) : 100);
     setTfaIssues(issues);
   }, [tfaData, items]);
-
-  const finalScore = summary
-    ? Math.round(
-        ((summary.overallScore || 100) +
-          (tfaCapableCount > 0 ? tfaScore : summary.overallScore || 100)) /
-          2
-      )
-    : 100;
-
-  useEffect(() => {
-    if (!summary || loading || analyzing) return;
-    if (finalScore >= 80) {
-      aura.setState('idle');
-    } else if (finalScore >= 50) {
-      aura.setState('active');
-    } else {
-      aura.setState('thinking');
-    }
-  }, [finalScore, summary, loading, analyzing]);
 
   const loadAndAnalyzeVault = useCallback(async () => {
     if (!session || !userKey) return;
@@ -301,18 +270,7 @@ export default function Health() {
         style={{ background: 'var(--color-bg)', padding: 16 }}
         className="flex-1 flex flex-col items-center justify-center"
       >
-        <div style={{ position: 'relative', width: 120, height: 120, marginBottom: 24 }}>
-          <Aura state="thinking" position="center" />
-          <div
-            className="w-16 h-16 border-4 border-[var(--color-primary)] border-t-transparent rounded-[var(--radius-full)] animate-spin"
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-            }}
-          />
-        </div>
+        <Icon name="loader-2" size={32} className="vault-state__spinner" />
         <h2
           style={{
             fontSize: 'var(--font-size-xl)',
@@ -321,10 +279,10 @@ export default function Health() {
             marginBottom: 8,
           }}
         >
-          Analyzing Vault
+          Reviewing your vault
         </h2>
         <p style={{ color: 'var(--color-text-secondary)' }}>
-          Checking passwords for vulnerabilities...
+          Checking password quality and preparing local recommendations…
         </p>
       </div>
     );
@@ -349,7 +307,7 @@ export default function Health() {
               letterSpacing: '-0.025em',
             }}
           >
-            Security Health
+            Security review
           </h1>
           <div className="flex items-center" style={{ gap: 8 }}>
             <Button
@@ -359,10 +317,12 @@ export default function Health() {
               disabled={breachChecking || items.every((item) => item.type !== 'login')}
               title="Uses HIBP k-anonymity: only a five-character SHA-1 prefix leaves this device"
             >
-              {breachChecking ? 'Checking…' : 'Check Breaches'}
+              <Icon name="shield-check" size={18} />
+              {breachChecking ? 'Checking…' : 'Check breaches'}
             </Button>
             <Button variant="primary" size="sm" onClick={loadAndAnalyzeVault}>
-              Re-Analyze
+              <Icon name="refresh" size={18} />
+              Review again
             </Button>
           </div>
         </div>
@@ -398,7 +358,7 @@ export default function Health() {
                   boxShadow: 'var(--shadow-md)',
                 }}
               >
-                🛡️
+                <Icon name="shield-lock" size={30} />
               </div>
               <h2
                 style={{
@@ -408,127 +368,46 @@ export default function Health() {
                   marginBottom: 12,
                 }}
               >
-                Your Vault is Empty
+                Nothing to review yet
               </h2>
               <p style={{ color: 'var(--color-text-secondary)', maxWidth: 420, margin: '0 auto' }}>
-                Add some passwords to your vault to see your security score and get actionable
-                advice on how to improve it.
+                Add a login to receive local, item-specific recommendations. Lockbox does not
+                send vault contents for this review.
               </p>
             </div>
           </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Card
-              variant="frost"
-              padding="lg"
-              style={{
-                boxShadow: 'var(--shadow-xl)',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              <Aura
-                state={finalScore >= 80 ? 'idle' : finalScore >= 50 ? 'active' : 'thinking'}
-                position="center"
-                style={{ opacity: 0.15, width: 400, height: 400 }}
-              />
-              <div
-                style={{
-                  position: 'relative',
-                  zIndex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 16,
-                }}
-              >
-                <HealthScore
-                  score={finalScore}
-                  size={posture && posture.actions.length > 0 ? 140 : 180}
-                  label="Vault Score"
-                />
-                {posture && (
-                  <Badge
-                    variant={
-                      posture.trend === 'improving'
-                        ? 'success'
-                        : posture.trend === 'declining'
-                          ? 'error'
-                          : 'warning'
-                    }
-                  >
-                    {posture.trend === 'improving'
-                      ? '↗ Improving'
-                      : posture.trend === 'declining'
-                        ? '↘ Declining'
-                        : '→ Stable'}
-                  </Badge>
-                )}
-                {posture && posture.actions.length > 0 && (
-                  <div
-                    style={{
-                      width: '100%',
-                      maxWidth: 480,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 8,
-                    }}
-                  >
-                    <h3
-                      style={{
-                        color: 'var(--color-text-secondary)',
-                        fontSize: 'var(--font-size-xs)',
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: 4,
-                      }}
-                    >
-                      Top Actions
-                    </h3>
-                    {posture.actions.slice(0, 3).map((action, idx) => (
-                      <Card
-                        key={idx}
-                        variant="surface"
-                        padding="sm"
-                        style={{
-                          background:
-                            action.priority === 'critical' || action.priority === 'high'
-                              ? 'var(--color-error-subtle)'
-                              : action.priority === 'medium'
-                                ? 'var(--color-warning-subtle)'
-                                : 'var(--color-aura-dim)',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontWeight: 500,
-                            fontSize: 'var(--font-size-sm)',
-                            color:
-                              action.priority === 'critical' || action.priority === 'high'
-                                ? 'var(--color-error)'
-                                : action.priority === 'medium'
-                                  ? 'var(--color-warning)'
-                                  : 'var(--color-primary)',
-                          }}
-                        >
-                          {action.message}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 'var(--font-size-xs)',
-                            opacity: 0.7,
-                            display: 'block',
-                            marginTop: 4,
-                          }}
-                        >
-                          {action.affectedItems.length} items affected
-                        </span>
-                      </Card>
-                    ))}
-                  </div>
-                )}
+            <Card variant="surface" padding="lg">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: posture?.actions.length ? 20 : 0 }}>
+                <span style={{ width: 44, height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', color: 'var(--color-primary)', background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+                  <Icon name="shield-check" size={22} />
+                </span>
+                <div>
+                  <h2 style={{ margin: 0, color: 'var(--color-text)', fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>
+                    {summary.breached > 0
+                      ? 'Breach results need attention'
+                      : summary.weak + summary.reused + summary.old > 0
+                        ? 'Review the priorities below'
+                        : 'No current password issues found'}
+                  </h2>
+                  <p style={{ margin: '5px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                    Local analysis reviewed {summary.totalItems} {summary.totalItems === 1 ? 'login' : 'logins'}. Counts may overlap when one item has several issues.
+                  </p>
+                </div>
               </div>
+              {posture && posture.actions.length > 0 && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>Recommended next steps</h3>
+                  {posture.actions.slice(0, 3).map((action, index) => (
+                    <div key={index} style={{ padding: 12, display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr) auto', alignItems: 'center', gap: 9, background: action.priority === 'critical' || action.priority === 'high' ? 'var(--color-error-subtle)' : 'var(--color-bg-subtle)', borderRadius: 'var(--radius-md)' }}>
+                      <Icon name={action.priority === 'critical' || action.priority === 'high' ? 'alert-circle' : 'info-circle'} size={18} />
+                      <span style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>{action.message}</span>
+                      <Badge variant={action.priority === 'critical' || action.priority === 'high' ? 'error' : 'default'}>{action.affectedItems.length} {action.affectedItems.length === 1 ? 'item' : 'items'}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
 
             <div
@@ -538,23 +417,14 @@ export default function Health() {
                 gap: 16,
               }}
             >
-              {[
+              {([
                 {
                   key: 'weak',
                   label: 'Weak',
                   count: summary.weak,
                   iconBg: 'var(--color-error-subtle)',
                   iconColor: 'var(--color-error)',
-                  icon: (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                      />
-                    </svg>
-                  ),
+                  icon: 'alert-triangle',
                 },
                 {
                   key: 'reused',
@@ -562,16 +432,7 @@ export default function Health() {
                   count: summary.reused,
                   iconBg: 'var(--color-warning-subtle)',
                   iconColor: 'var(--color-warning)',
-                  icon: (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                      />
-                    </svg>
-                  ),
+                  icon: 'arrows-sort',
                 },
                 {
                   key: 'old',
@@ -579,16 +440,7 @@ export default function Health() {
                   count: summary.old,
                   iconBg: 'var(--color-warning-subtle)',
                   iconColor: 'var(--color-warning)',
-                  icon: (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                  ),
+                  icon: 'clock',
                 },
                 {
                   key: 'breached',
@@ -596,18 +448,16 @@ export default function Health() {
                   count: summary.breached,
                   iconBg: 'var(--color-error-subtle)',
                   iconColor: 'var(--color-error)',
-                  icon: (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                      />
-                    </svg>
-                  ),
+                  icon: 'lock',
                 },
-              ].map((cat) => (
+              ] satisfies Array<{
+                key: string;
+                label: string;
+                count: number;
+                iconBg: string;
+                iconColor: string;
+                icon: IconName;
+              }>).map((cat) => (
                 <Card
                   key={cat.key}
                   variant="surface"
@@ -637,15 +487,13 @@ export default function Health() {
                         boxShadow: 'var(--shadow-sm)',
                       }}
                     >
-                      {cat.icon}
+                      <Icon name={cat.icon} size={20} />
                     </div>
                     <h3
                       style={{
                         color: 'var(--color-text-secondary)',
                         fontSize: 'var(--font-size-sm)',
                         fontWeight: 500,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
                         marginBottom: 4,
                       }}
                     >
@@ -654,15 +502,9 @@ export default function Health() {
                   </div>
                   <div className="flex items-baseline" style={{ gap: 8 }}>
                     <span
-                      className={
-                        cat.count > 0
-                          ? cat.key === 'weak' || cat.key === 'breached'
-                            ? 'kinetic-insecure'
-                            : 'kinetic-warning'
-                          : 'kinetic-secure'
-                      }
                       style={{
                         fontSize: 'var(--font-size-2xl)',
+                        fontWeight: 650,
                         color: 'var(--color-text)',
                       }}
                     >
@@ -691,7 +533,7 @@ export default function Health() {
                     marginBottom: 16,
                   }}
                 >
-                  Due for Rotation
+                  Due for rotation
                 </h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {dueItems.map(({ schedule, item, category }) => {
@@ -722,11 +564,6 @@ export default function Health() {
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
                           <div className="flex items-center" style={{ gap: 12 }}>
                             <span
-                              className={
-                                schedule.urgency === 'overdue'
-                                  ? 'kinetic-insecure'
-                                  : 'kinetic-warning'
-                              }
                               style={{
                                 color: 'var(--color-text)',
                               }}
@@ -753,7 +590,7 @@ export default function Health() {
                           size="sm"
                           onClick={() => handleItemClick(item.id)}
                         >
-                          Rotate Now
+                          Rotate now
                         </Button>
                       </Card>
                     );
@@ -772,49 +609,11 @@ export default function Health() {
                       color: 'var(--color-text)',
                     }}
                   >
-                    Enable 2FA
+                    Enable two-factor authentication
                   </h2>
-                  <Badge variant="primary">{tfaIssues.length} Sites</Badge>
-                  <div style={{ marginLeft: 'auto' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '6px 14px',
-                        borderRadius: 'var(--radius-full)',
-                        background:
-                          tfaScore >= 80
-                            ? 'var(--color-success-subtle)'
-                            : tfaScore >= 50
-                              ? 'var(--color-warning-subtle)'
-                              : 'var(--color-error-subtle)',
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 'var(--font-size-lg)',
-                          fontWeight: 700,
-                          color:
-                            tfaScore >= 80
-                              ? 'var(--color-success)'
-                              : tfaScore >= 50
-                                ? 'var(--color-warning)'
-                                : 'var(--color-error)',
-                        }}
-                      >
-                        {tfaScore}%
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 'var(--font-size-xs)',
-                          color: 'var(--color-text-secondary)',
-                        }}
-                      >
-                        2FA Coverage
-                      </span>
-                    </div>
-                  </div>
+                  <Badge variant="primary">
+                    {tfaIssues.length} {tfaIssues.length === 1 ? 'site' : 'sites'}
+                  </Badge>
                 </div>
                 <div
                   style={{
@@ -879,13 +678,17 @@ export default function Health() {
                           size="sm"
                           onClick={() => handleItemClick(item.id)}
                         >
-                          Add TOTP Key
+                          Add TOTP key
                         </Button>
                         {info.documentation && (
-                          <a href={info.documentation} target="_blank" rel="noreferrer">
-                            <Button variant="secondary" size="sm" tabIndex={-1}>
-                              Docs ↗
-                            </Button>
+                          <a
+                            className="lb-button lb-button--secondary lb-button--sm"
+                            href={info.documentation}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Documentation
+                            <Icon name="external-link" size={16} />
                           </a>
                         )}
                       </div>
@@ -904,7 +707,7 @@ export default function Health() {
                   marginBottom: 16,
                 }}
               >
-                Action Items
+                Action items
               </h2>
               <IssueList reports={reports} items={items} onItemClick={handleItemClick} />
             </Card>

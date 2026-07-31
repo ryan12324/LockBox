@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Textarea } from '@lockbox/design';
+import { Button, Icon, Textarea } from '@lockbox/design';
 
 export interface DocumentFieldsProps {
   mode: 'view' | 'edit' | 'add';
@@ -160,7 +160,7 @@ export default function DocumentFields({
           aria-label={documentFile ? `Replace document with ${documentFile.name}` : 'Choose a document to upload'}
         >
           <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
-            <span className="text-2xl text-[var(--color-text-tertiary)]">📄</span>
+            <Icon name="file-description" size={26} className="text-[var(--color-text-tertiary)]" />
             <p className="text-sm font-medium text-[var(--color-text-secondary)]">
               {documentFile ? documentFile.name : 'Drag & drop a file here, or click to browse'}
             </p>

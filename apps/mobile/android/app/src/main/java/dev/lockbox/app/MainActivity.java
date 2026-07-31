@@ -9,6 +9,7 @@ import dev.lockbox.app.biometric.BiometricPlugin;
 import dev.lockbox.app.autofill.AutofillPlugin;
 import dev.lockbox.app.storage.StoragePlugin;
 import dev.lockbox.app.credentialprovider.CredentialManagerPlugin;
+import dev.lockbox.app.foldable.FoldableLayoutPlugin;
 
 public class MainActivity extends BridgeActivity {
     @Override
@@ -18,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AutofillPlugin.class);
         registerPlugin(StoragePlugin.class);
         registerPlugin(CredentialManagerPlugin.class);
+        registerPlugin(FoldableLayoutPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

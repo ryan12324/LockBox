@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
 import { createShareLink } from '../lib/team-crypto.js';
-import { Modal, Button, Input, Select } from '@lockbox/design';
+import { Modal, Button, Input, Select, Icon } from '@lockbox/design';
 import { useToast } from '../providers/ToastProvider.js';
 import type { VaultItem } from '@lockbox/types';
 
@@ -72,8 +72,8 @@ export default function ShareLinkModal({ item, isOpen, onClose }: ShareLinkModal
   }
 
   return (
-    <Modal open={isOpen} onClose={handleClose} title="Share Link" size="md">
-      <div className="space-y-6">
+    <Modal open={isOpen} onClose={handleClose} title="Create share link" size="md">
+      <div className="space-y-6 p-5">
         {!successUrl ? (
           <>
             <div>
@@ -91,10 +91,10 @@ export default function ShareLinkModal({ item, isOpen, onClose }: ShareLinkModal
                 value={String(expiresIn)}
                 onChange={(e) => setExpiresIn(Number(e.target.value))}
                 options={[
-                  { value: '3600', label: '1 Hour' },
-                  { value: '86400', label: '24 Hours' },
-                  { value: '604800', label: '7 Days' },
-                  { value: '2592000', label: '30 Days' },
+                  { value: '3600', label: '1 hour' },
+                  { value: '86400', label: '24 hours' },
+                  { value: '604800', label: '7 days' },
+                  { value: '2592000', label: '30 days' },
                 ]}
               />
 
@@ -103,9 +103,9 @@ export default function ShareLinkModal({ item, isOpen, onClose }: ShareLinkModal
                 value={String(maxViews)}
                 onChange={(e) => setMaxViews(Number(e.target.value))}
                 options={[
-                  { value: '1', label: '1 View (One-time)' },
-                  { value: '5', label: '5 Views' },
-                  { value: '10', label: '10 Views' },
+                  { value: '1', label: '1 view (one-time)' },
+                  { value: '5', label: '5 views' },
+                  { value: '10', label: '10 views' },
                   { value: '0', label: 'Unlimited' },
                 ]}
               />
@@ -116,24 +116,18 @@ export default function ShareLinkModal({ item, isOpen, onClose }: ShareLinkModal
                 Cancel
               </Button>
               <Button variant="primary" size="sm" onClick={handleCreate} loading={loading}>
-                Create Share Link
+                <Icon name="share" size={17} />
+                Create share link
               </Button>
             </div>
           </>
         ) : (
           <div className="space-y-6">
             <div className="flex flex-col items-center text-center space-y-3">
-              <div className="w-12 h-12 bg-[var(--color-success-subtle)] text-[var(--color-success)] rounded-[var(--radius-full)] flex items-center justify-center mb-2">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
+              <div className="w-12 h-12 bg-[var(--color-success-subtle)] text-[var(--color-success)] rounded-[var(--radius-md)] flex items-center justify-center mb-2">
+                <Icon name="circle-check" size={24} />
               </div>
-              <h3 className="text-lg font-medium text-[var(--color-text)]">Share Link Created</h3>
+              <h3 className="text-lg font-medium text-[var(--color-text)]">Share link created</h3>
               <p className="text-sm text-[var(--color-warning)] bg-[var(--color-warning-subtle)] px-3 py-2 rounded-[var(--radius-md)] border border-[var(--color-warning)]">
                 Save this link — it cannot be retrieved later. The encryption key is in the URL.
               </p>
@@ -149,7 +143,8 @@ export default function ShareLinkModal({ item, isOpen, onClose }: ShareLinkModal
               />
               <div className="mt-2 flex justify-end">
                 <Button variant="primary" size="sm" onClick={handleCopy}>
-                  {copied ? 'Copied!' : 'Copy'}
+                  <Icon name={copied ? 'check' : 'copy'} size={17} />
+                  {copied ? 'Copied' : 'Copy'}
                 </Button>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Card } from '@lockbox/design';
+import { Button, Card, Icon } from '@lockbox/design';
 import type { VaultItem, LoginItem } from '@lockbox/types';
 import { sendMessage, typeIcon } from './shared.js';
 
@@ -59,9 +59,10 @@ export function VersionHistoryView({ item, onBack }: { item: VaultItem; onBack: 
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-[var(--color-border)]">
         <Button variant="ghost" size="sm" onClick={onBack}>
-          ←
+          <Icon name="arrow-left" size={17} />
+          <span className="sr-only">Back</span>
         </Button>
-        <span className="text-lg">{typeIcon(item.type)}</span>
+        <Icon name={typeIcon(item.type)} size={18} />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-[var(--color-text)] truncate">{item.name}</div>
           <div className="text-[10px] text-[var(--color-text-tertiary)]">Version History</div>
@@ -79,7 +80,7 @@ export function VersionHistoryView({ item, onBack }: { item: VaultItem; onBack: 
           </div>
         ) : versions.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-6 text-center mt-6">
-            <div className="text-3xl mb-3">📜</div>
+            <Icon name="history" size={30} className="mb-3" />
             <p className="text-sm text-[var(--color-text-secondary)] mb-1">No version history</p>
             <p className="text-xs text-[var(--color-text-tertiary)]">
               Previous versions will appear here after edits.

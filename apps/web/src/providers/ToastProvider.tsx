@@ -47,20 +47,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={contextValue}>
       {children}
       {createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            bottom: 16,
-            right: 16,
-            zIndex: 9999,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-            pointerEvents: 'none',
-          }}
-        >
+        <div className="lb-toast-stack" aria-label="Notifications">
           {toasts.map((item) => (
-            <div key={item.id} style={{ pointerEvents: 'auto' }}>
+            <div key={item.id}>
               <Toast
                 message={item.message}
                 variant={item.variant}

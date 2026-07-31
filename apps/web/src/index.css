@@ -3,50 +3,56 @@
 @import '@lockbox/design/src/tokens/typography.css';
 @import '@lockbox/design/src/tokens/radii.css';
 @import '@lockbox/design/src/tokens/animations.css';
+@import '@lockbox/design/src/components.css';
+@import './app-shell.css';
+@import './vault.css';
+@import './item-panel.css';
+@import './auth.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--color-bg);
+  text-size-adjust: 100%;
+}
 
 body {
-  background-color: var(--color-bg);
+  min-height: 100vh;
+  margin: 0;
   color: var(--color-text);
+  background: var(--color-bg);
   font-family: var(--font-sans);
+  font-size: var(--font-size-base);
   line-height: var(--line-height-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  color: var(--color-primary-fg);
+  background: var(--color-primary);
 }
 
 :where(button, a, input, textarea, select, [role='button'], [tabindex]):focus-visible {
-  outline: 3px solid var(--color-primary) !important;
+  outline: 3px solid var(--color-focus) !important;
   outline-offset: 2px !important;
 }
 
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    radial-gradient(ellipse 80% 60% at 15% 10%, var(--color-aura-dim) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 40% at 85% 80%, var(--color-aura-dim) 0%, transparent 45%);
-  opacity: 0.6;
-  animation: aura-breathe 8s var(--ease-smooth) infinite;
-}
-
-.dark body::before {
-  opacity: 0.3;
-}
-
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  pointer-events: none;
-}
-
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -54,166 +60,15 @@ body::after {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: var(--radius-full);
-}
-
-::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-strong);
+  border: 2px solid transparent;
+  border-radius: var(--radius-full);
+  background-clip: padding-box;
 }
 
-/* ═══ Strategic Animations ═══ */
-
-/* Copy-to-clipboard feedback: elastic squish */
-@keyframes squish-bounce {
-  0% {
-    transform: scale(1);
-  }
-  30% {
-    transform: scale(0.92);
-  }
-  60% {
-    transform: scale(1.03);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-.squish {
-  animation: squish-bounce 300ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-/* Search typography: font-weight oscillation while searching */
-@keyframes type-search-pulse {
-  0%,
-  100% {
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-  50% {
-    font-weight: 300;
-    letter-spacing: 0.02em;
-  }
-}
-.type-searching {
-  animation: type-search-pulse 1.5s ease-in-out infinite;
-}
-
-/* Search typography: bold snap when match found */
-@keyframes type-found-snap {
-  0% {
-    font-weight: 400;
-  }
-  40% {
-    font-weight: 650;
-  }
-  100% {
-    font-weight: 400;
-  }
-}
-.type-found {
-  animation: type-found-snap 600ms ease-out forwards;
-}
-
-/* Page transition: fade in + slight upward movement */
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.fade-in {
-  animation: fade-in-up 250ms ease-out forwards;
-}
-
-/* Aura states */
-@keyframes aura-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.6;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.8;
-  }
-}
-.aura-idle {
-  animation: aura-breathe 4s ease-in-out infinite;
-}
-
-@keyframes aura-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.8;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-}
-.aura-active {
-  animation: aura-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes aura-think {
-  0% {
-    transform: scale(1) rotate(0deg);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.08) rotate(3deg);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 0.7;
-  }
-}
-.aura-thinking {
-  animation: aura-think 1.2s ease-in-out infinite;
-}
-
-/* Toast entrance */
-@keyframes toast-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.toast-enter {
-  animation: toast-slide-up 200ms ease-out forwards;
-}
-
-/* Respect reduced motion preference */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-
-  .squish,
-  .type-searching,
-  .type-found,
-  .fade-in,
-  .aura-idle,
-  .aura-active,
-  .aura-thinking,
-  .toast-enter {
-    animation: none !important;
-    transition: none !important;
-  }
-}
+/* Existing feedback hooks now use restrained, state-based motion. */
+.squish { transform: translateY(1px); }
+.type-searching,
+.type-found { font-weight: var(--font-weight-medium); }
+.fade-in,
+.toast-enter { animation: lb-fade-in var(--duration-normal) var(--ease-enter) both; }

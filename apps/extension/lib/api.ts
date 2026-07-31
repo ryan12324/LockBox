@@ -4,7 +4,12 @@
  */
 
 import { getApiBaseUrl } from './storage.js';
-import type { EncryptedVaultItem, Folder } from '@lockbox/types';
+import type { EncryptedVaultItem, Folder, KdfConfig } from '@lockbox/types';
+
+export interface KdfParamsResponse {
+  kdfConfig: KdfConfig;
+  salt: string;
+}
 
 export interface AuthenticatedLoginResponse {
   token: string;
@@ -45,6 +50,9 @@ async function request<T>(
 ): Promise<T> {
   const { token, ...fetchOptions } = options;
   const apiBase = await getApiBaseUrl();
+  if (!apiBase) {
+    throw new ApiError(0, 'No verified Lockbox server is configured. Connect your web vault first.');
+  }
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(fetchOptions.headers as Record<string, string>),
@@ -52,7 +60,24 @@ async function request<T>(
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${apiBase}${path}`, { ...fetchOptions, headers });
-  const data = await res.json().catch(() => ({}));
+  const contentType = res.headers.get('content-type')?.toLowerCase() ?? '';
+  if (!contentType.includes('application/json')) {
+    if (!res.ok) throw new ApiError(res.status, res.statusText || 'Request failed');
+    throw new ApiError(
+      502,
+      'The configured server did not return a Lockbox API response. Reconnect your web vault.',
+    );
+  }
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    throw new ApiError(
+      502,
+      'The Lockbox API returned malformed JSON. Try again or reconnect the web vault.',
+    );
+  }
 
   if (!res.ok) {
     throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
@@ -61,8 +86,68 @@ async function request<T>(
   return data as T;
 }
 
+function decodedBase64Length(value: unknown): number | null {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > 256 ||
+    value.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(value)
+  ) {
+    return null;
+  }
+  try {
+    return atob(value).length;
+  } catch {
+    return null;
+  }
+}
+
+function isValidKdfConfig(value: unknown): value is KdfConfig {
+  if (!value || typeof value !== 'object') return false;
+  const config = value as Record<string, unknown>;
+  if (!Number.isInteger(config.iterations)) return false;
+
+  if (config.type === 'argon2id') {
+    return (
+      (config.iterations as number) >= 1 &&
+      (config.iterations as number) <= 10 &&
+      Number.isInteger(config.memory) &&
+      (config.memory as number) >= 8_192 &&
+      (config.memory as number) <= 1_048_576 &&
+      Number.isInteger(config.parallelism) &&
+      (config.parallelism as number) >= 1 &&
+      (config.parallelism as number) <= 16
+    );
+  }
+
+  return (
+    config.type === 'pbkdf2' &&
+    (config.iterations as number) >= 100_000 &&
+    (config.iterations as number) <= 5_000_000
+  );
+}
+
+/** Validate login parameters before any value reaches the crypto decoder. */
+export function validateKdfParams(value: unknown): KdfParamsResponse {
+  if (!value || typeof value !== 'object') {
+    throw new ApiError(502, 'The Lockbox API returned invalid login parameters.');
+  }
+  const response = value as Record<string, unknown>;
+  if (decodedBase64Length(response.salt) !== 16 || !isValidKdfConfig(response.kdfConfig)) {
+    throw new ApiError(
+      502,
+      'The Lockbox API returned invalid login parameters. Reconnect the web vault or update the server.',
+    );
+  }
+  return response as unknown as KdfParamsResponse;
+}
+
 async function requestText(path: string, token: string): Promise<string> {
   const apiBase = await getApiBaseUrl();
+  if (!apiBase) {
+    throw new ApiError(0, 'No verified Lockbox server is configured. Connect your web vault first.');
+  }
   const res = await fetch(`${apiBase}${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -76,7 +161,9 @@ async function requestText(path: string, token: string): Promise<string> {
 export const api = {
   auth: {
     kdfParams: (email: string) =>
-      request(`/api/auth/kdf-params?email=${encodeURIComponent(email)}`),
+      request<unknown>(`/api/auth/kdf-params?email=${encodeURIComponent(email)}`).then(
+        validateKdfParams,
+      ),
     login: (body: { email: string; authHash: string }) =>
       request<LoginResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
     logout: (token: string) =>

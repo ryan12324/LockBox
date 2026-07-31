@@ -7,9 +7,9 @@ import { Command } from 'commander';
 import * as readline from 'node:readline';
 import type { VaultItemType } from '@lockbox/types';
 import { encryptString, toUtf8 } from '@lockbox/crypto';
-import { getSession, getApiUrl } from '../lib/session.js';
 import { createApi } from '../lib/api.js';
-import { getUserKey } from './unlock.js';
+import { unlockForCommand } from './unlock.js';
+import { prompt } from './login.js';
 
 function ask(question: string): Promise<string> {
   return new Promise((resolve) => {
@@ -27,7 +27,7 @@ function ask(question: string): Promise<string> {
 
 async function promptForLoginFields(): Promise<Record<string, unknown>> {
   const username = await ask('Username: ');
-  const password = await ask('Password: ');
+  const password = await prompt('Password: ', true);
   const uri = await ask('URI (optional): ');
   return {
     username,
@@ -43,10 +43,10 @@ async function promptForNoteFields(): Promise<Record<string, unknown>> {
 
 async function promptForCardFields(): Promise<Record<string, unknown>> {
   const cardholderName = await ask('Cardholder name: ');
-  const number = await ask('Card number: ');
+  const number = await prompt('Card number: ', true);
   const expMonth = await ask('Expiration month (MM): ');
   const expYear = await ask('Expiration year (YYYY): ');
-  const cvv = await ask('CVV: ');
+  const cvv = await prompt('CVV: ', true);
   const brand = await ask('Brand (optional): ');
   return { cardholderName, number, expMonth, expYear, cvv, brand: brand || undefined };
 }
@@ -72,28 +72,23 @@ export const createCommand = new Command('create')
     try {
       const opts = cmd.opts<{ type: VaultItemType; name: string }>();
       const parentOpts = cmd.parent?.opts<{ apiUrl?: string; json?: boolean }>() ?? {};
-      const session = getSession();
-      if (!session) {
-        console.error('Error: Not logged in. Run `lockbox login` first.');
-        process.exitCode = 1;
-        return;
-      }
-
-      const userKey = getUserKey();
-      if (!userKey) {
-        console.error('Error: Vault is locked. Run `lockbox unlock` first.');
-        process.exitCode = 1;
-        return;
-      }
-
-      const validTypes: VaultItemType[] = ['login', 'note', 'card', 'identity', 'passkey'];
+      const validTypes: VaultItemType[] = ['login', 'note', 'card', 'identity'];
       if (!validTypes.includes(opts.type)) {
+        if (opts.type === 'passkey') {
+          console.error(
+            'Error: Passkeys must be captured through the web vault or browser extension so the WebAuthn ceremony can run safely.'
+          );
+          process.exitCode = 1;
+          return;
+        }
         console.error(
           `Error: Invalid type "${opts.type}". Must be one of: ${validTypes.join(', ')}`
         );
         process.exitCode = 1;
         return;
       }
+
+      const { session, userKey } = await unlockForCommand(parentOpts.apiUrl);
 
       // Prompt for type-specific fields
       let fields: Record<string, unknown> = {};
@@ -130,8 +125,7 @@ export const createCommand = new Command('create')
       const aesKey = userKey.slice(0, 32);
       const encryptedData = await encryptString(JSON.stringify(itemData), aesKey, aad);
 
-      const apiUrl = getApiUrl(parentOpts.apiUrl);
-      const api = createApi(apiUrl);
+      const api = createApi(session.apiUrl);
       const result = await api.vault.createItem(
         {
           id,

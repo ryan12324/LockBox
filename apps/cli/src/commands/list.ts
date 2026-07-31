@@ -5,10 +5,16 @@
 
 import { Command } from 'commander';
 import type { VaultItemType, EncryptedVaultItem } from '@lockbox/types';
-import { getSession, getApiUrl } from '../lib/session.js';
+import { getApiUrl } from '../lib/session.js';
 import { createApi } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
-import { getUserKey } from './unlock.js';
+import { unlockForCommand } from './unlock.js';
+
+function truncate(value: string, width: number): string {
+  if (value.length <= width) return value;
+  if (width <= 1) return value.slice(0, width);
+  return `${value.slice(0, width - 1)}…`;
+}
 
 export const listCommand = new Command('list')
   .description('List vault items')
@@ -18,14 +24,8 @@ export const listCommand = new Command('list')
     try {
       const opts = cmd.opts<{ type?: VaultItemType; folder?: string }>();
       const parentOpts = cmd.parent?.opts<{ apiUrl?: string; json?: boolean }>() ?? {};
-      const session = getSession();
-      if (!session) {
-        console.error('Error: Not logged in. Run `lockbox login` first.');
-        process.exitCode = 1;
-        return;
-      }
-
       const apiUrl = getApiUrl(parentOpts.apiUrl);
+      const { session, userKey } = await unlockForCommand(parentOpts.apiUrl);
       const api = createApi(apiUrl);
       const params: Record<string, string> = {};
       if (opts.type) params['type'] = opts.type;
@@ -43,9 +43,6 @@ export const listCommand = new Command('list')
         }
       }
 
-      const userKey = getUserKey();
-
-      // Try to decrypt names if user key is available
       const displayItems: Array<{
         id: string;
         type: string;
@@ -54,19 +51,17 @@ export const listCommand = new Command('list')
       }> = [];
 
       for (const item of filteredItems) {
-        let name = '(encrypted)';
-        if (userKey) {
-          try {
-            const decrypted = await decryptVaultItem(
-              item.encryptedData,
-              userKey,
-              item.id,
-              item.revisionDate
-            );
-            name = (decrypted['name'] as string) ?? '(unnamed)';
-          } catch {
-            name = '(decryption failed)';
-          }
+        let name = '(decryption failed)';
+        try {
+          const decrypted = await decryptVaultItem(
+            item.encryptedData,
+            userKey,
+            item.id,
+            item.revisionDate
+          );
+          name = (decrypted['name'] as string) ?? '(unnamed)';
+        } catch {
+          // Preserve the row so one corrupt item does not hide the rest of the vault.
         }
         displayItems.push({
           id: item.id,
@@ -84,14 +79,26 @@ export const listCommand = new Command('list')
           return;
         }
 
-        // Format as table
-        console.log(`${'ID'.padEnd(38)} ${'TYPE'.padEnd(10)} ${'NAME'.padEnd(30)} FAV`);
-        console.log('-'.repeat(82));
-        for (const item of displayItems) {
-          const fav = item.favorite ? '*' : ' ';
-          console.log(
-            `${item.id.padEnd(38)} ${item.type.padEnd(10)} ${item.name.slice(0, 30).padEnd(30)} ${fav}`
-          );
+        const terminalWidth = process.stdout.columns ?? 100;
+        if (terminalWidth < 72) {
+          for (const [index, item] of displayItems.entries()) {
+            if (index > 0) console.log('');
+            console.log(`${item.name}${item.favorite ? '  *' : ''}`);
+            console.log(`  ${item.type}  ${item.id}`);
+          }
+        } else {
+          const idWidth = 36;
+          const typeWidth = 10;
+          const nameWidth = Math.max(12, terminalWidth - idWidth - typeWidth - 8);
+          const header = `${'ID'.padEnd(idWidth)}  ${'TYPE'.padEnd(typeWidth)}  ${'NAME'.padEnd(nameWidth)}  FAV`;
+          console.log(header);
+          console.log('-'.repeat(Math.min(terminalWidth, header.length)));
+          for (const item of displayItems) {
+            const fav = item.favorite ? '*' : '';
+            console.log(
+              `${truncate(item.id, idWidth).padEnd(idWidth)}  ${truncate(item.type, typeWidth).padEnd(typeWidth)}  ${truncate(item.name, nameWidth).padEnd(nameWidth)}  ${fav}`
+            );
+          }
         }
         console.log(`\n${displayItems.length} item(s)`);
       }

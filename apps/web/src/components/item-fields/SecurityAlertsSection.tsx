@@ -1,5 +1,5 @@
 import React from 'react';
-import { Badge, Button } from '@lockbox/design';
+import { Badge, Button, Icon } from '@lockbox/design';
 import type { SecurityAlert } from '@lockbox/ai';
 
 export interface SecurityAlertsSectionProps {
@@ -37,7 +37,10 @@ export default function SecurityAlertsSection({
                   : 'bg-[var(--color-aura-dim)] border-[var(--color-primary)] text-[var(--color-primary)]'
             }`}
           >
-            <div className="text-xl">{isCritical ? '🛡️' : isWarning ? '⚠️' : 'ℹ️'}</div>
+            <Icon
+              name={isCritical ? 'shield' : isWarning ? 'alert-triangle' : 'info-circle'}
+              size={20}
+            />
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start gap-2">
                 <div className="flex items-center gap-2">
@@ -68,7 +71,8 @@ export default function SecurityAlertsSection({
                       marginTop: '-8px',
                     }}
                   >
-                    ✕
+                    <Icon name="x" size={16} />
+                    <span className="sr-only">Dismiss alert</span>
                   </Button>
                 )}
               </div>

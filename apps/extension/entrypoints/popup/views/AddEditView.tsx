@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button, Input, Select, Textarea } from '@lockbox/design';
+import { Button, Icon, Input, Select, Textarea } from '@lockbox/design';
 import { generatePassword } from '@lockbox/generator';
 import type {
   VaultItem,
@@ -231,7 +231,8 @@ export function AddEditView({
                 onClick={() => setType(t)}
                 className="flex-1"
               >
-                {typeIcon(t)} {t.charAt(0).toUpperCase() + t.slice(1)}
+                <Icon name={typeIcon(t)} size={16} />
+                {t.charAt(0).toUpperCase() + t.slice(1)}
               </Button>
             ))}
           </div>
@@ -281,7 +282,8 @@ export function AddEditView({
                   className="flex-1"
                 />
                 <Button variant="primary" size="sm" onClick={handleCreateFolder}>
-                  ✓
+                  <Icon name="check" size={16} />
+                  <span className="sr-only">Create folder</span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -291,7 +293,8 @@ export function AddEditView({
                     setNewFolderName('');
                   }}
                 >
-                  ✕
+                  <Icon name="x" size={16} />
+                  <span className="sr-only">Cancel folder creation</span>
                 </Button>
               </div>
             )}
@@ -303,7 +306,8 @@ export function AddEditView({
               onChange={(e) => setFavorite(e.target.checked)}
               className="mb-1"
             />
-            ⭐
+            <Icon name="star" size={16} />
+            <span>Favorite</span>
           </label>
         </div>
 
@@ -349,7 +353,14 @@ export function AddEditView({
                     disabled={generatingAlias}
                     title="Generate email alias"
                   >
-                    {generatingAlias ? '...' : '✉️ Alias'}
+                    {generatingAlias ? (
+                      'Generating…'
+                    ) : (
+                      <>
+                        <Icon name="mail" size={16} />
+                        Alias
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>

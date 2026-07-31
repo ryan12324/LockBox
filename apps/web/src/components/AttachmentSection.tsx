@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { encryptFile, decryptFile } from '../lib/file-crypto.js';
 import { encryptString, decryptString } from '@lockbox/crypto';
-import { Button } from '@lockbox/design';
+import { Button, Icon } from '@lockbox/design';
 import { useToast } from '../providers/ToastProvider.js';
 
 interface Attachment {
@@ -297,7 +297,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
             onChange={(e) => handleUpload(e.target.files)}
           />
           <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
-            <span className="text-2xl text-[var(--color-text-tertiary)]">📄</span>
+            <Icon name="paperclip" size={26} className="text-[var(--color-text-tertiary)]" />
             <p className="text-sm font-medium text-[var(--color-text-secondary)]">
               Drag & drop files here, or click to browse
             </p>
@@ -327,7 +327,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       {/* File List */}
       {loading ? (
         <div className="text-center py-4 text-sm text-[var(--color-text-tertiary)] animate-pulse">
-          Loading attachments...
+          Loading attachments…
         </div>
       ) : attachments.length === 0 ? (
         mode === 'view' ? null : (
@@ -355,7 +355,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
                     />
                   ) : (
                     <div className="w-10 h-10 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-text-secondary)] rounded-[var(--radius-sm)] text-lg">
-                      {isImage ? '🖼️' : '📄'}
+                      <Icon name={isImage ? 'file' : 'file-description'} size={20} />
                     </div>
                   )}
                   <div className="truncate">

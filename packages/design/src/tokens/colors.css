@@ -1,113 +1,90 @@
-/* ──────────────────────────────────────────────
-   Aura & Architecture — Color Tokens
-   Base: Pantone 11-4201 Cloud Dancer (#F2EFEA)
-   Aesthetic: paper, clay, frosted glass, sea glass
-   ────────────────────────────────────────────── */
-
+/* Lockbox palette — warm paper, ink, and restrained umber. */
 :root {
-  /* Backgrounds */
-  --color-bg: #f2efea;
-  --color-bg-subtle: #eae6df;
-  --color-surface: #fdfcfa;
-  --color-surface-raised: #ffffff;
+  color-scheme: light;
 
-  /* Borders */
-  --color-border: #ddd6cc;
-  --color-border-strong: #c4baac;
+  --color-bg: oklch(0.965 0.008 80);
+  --color-bg-subtle: oklch(0.935 0.01 78);
+  --color-surface: oklch(0.985 0.005 80);
+  --color-surface-raised: oklch(0.997 0.003 80);
 
-  /* Text */
-  --color-text: #2c2825;
-  --color-text-secondary: #7a7168;
-  --color-text-tertiary: #a69e93;
+  --color-border: oklch(0.84 0.014 75);
+  --color-border-strong: oklch(0.69 0.02 68);
 
-  /* Primary — warm umber clay */
-  --color-primary: #8b7355;
-  --color-primary-hover: #7a6348;
-  --color-primary-active: #6b5640;
-  --color-primary-fg: #ffffff;
+  --color-text: oklch(0.25 0.018 55);
+  --color-text-secondary: oklch(0.43 0.02 55);
+  --color-text-tertiary: oklch(0.52 0.018 55);
 
-  /* Aura — the AI ghost's glow */
-  --color-aura: #c4a882;
-  --color-aura-dim: rgba(196, 168, 130, 0.15);
-  --color-aura-glow: rgba(196, 168, 130, 0.35);
+  --color-primary: oklch(0.42 0.055 55);
+  --color-primary-hover: oklch(0.36 0.052 55);
+  --color-primary-active: oklch(0.31 0.048 55);
+  --color-primary-fg: oklch(0.985 0.005 80);
+  --color-focus: oklch(0.5 0.07 55);
 
-  /* Semantic */
-  --color-error: #b5553a;
-  --color-error-subtle: rgba(181, 85, 58, 0.08);
-  --color-success: #5e8a5e;
-  --color-success-subtle: rgba(94, 138, 94, 0.08);
-  --color-warning: #b58e3a;
-  --color-warning-subtle: rgba(181, 142, 58, 0.08);
+  --color-error: oklch(0.44 0.13 28);
+  --color-error-subtle: oklch(0.94 0.025 30);
+  --color-success: oklch(0.4 0.09 145);
+  --color-success-subtle: oklch(0.94 0.025 145);
+  --color-warning: oklch(0.43 0.1 75);
+  --color-warning-subtle: oklch(0.94 0.03 80);
+  --color-info: oklch(0.43 0.1 250);
+  --color-info-subtle: oklch(0.94 0.025 250);
 
-  /* Frost (warm frosted glass) */
-  --color-frost: rgba(242, 239, 234, 0.75);
-  --color-frost-border: rgba(196, 186, 172, 0.4);
+  --shadow-sm: 0 1px 2px oklch(0.25 0.018 55 / 0.1);
+  --shadow-md: 0 6px 18px oklch(0.25 0.018 55 / 0.1);
+  --shadow-lg: 0 18px 48px oklch(0.2 0.018 55 / 0.16);
 
-  /* Shadows — Frosted Clay: deep soft shadows that make tiles hover 2-5mm */
-  --shadow-sm: 0 2px 8px rgba(44, 40, 37, 0.06), 0 1px 2px rgba(44, 40, 37, 0.04);
-  --shadow-md: 0 8px 24px rgba(44, 40, 37, 0.1), 0 4px 8px rgba(44, 40, 37, 0.06);
-  --shadow-lg: 0 20px 48px rgba(44, 40, 37, 0.14), 0 8px 16px rgba(44, 40, 37, 0.08);
-  --shadow-xl: 0 32px 64px rgba(44, 40, 37, 0.16), 0 16px 32px rgba(44, 40, 37, 0.1);
-  --shadow-depress: 0 1px 2px rgba(44, 40, 37, 0.1) inset, 0 2px 4px rgba(44, 40, 37, 0.06);
-  --shadow-aura: 0 0 60px rgba(196, 168, 130, 0.35), 0 0 120px rgba(196, 168, 130, 0.15);
+  /* Compatibility aliases while the v1 surfaces migrate to the new system. */
+  --color-aura: var(--color-primary);
+  --color-aura-dim: var(--color-bg-subtle);
+  --color-aura-glow: var(--color-bg-subtle);
+  --color-frost: var(--color-surface-raised);
+  --color-frost-border: var(--color-border);
+  --shadow-xl: var(--shadow-lg);
+  --shadow-depress: inset 0 1px 2px oklch(0.25 0.018 55 / 0.12);
+  --shadow-aura: none;
 
-  /* Contextual — Banking mode (solid charcoal) */
-  --color-ctx-banking-bg: #2c2825;
-  --color-ctx-banking-surface: #3a3634;
-  --color-ctx-banking-text: #ede8e1;
-  --color-ctx-banking-border: #4e4945;
+  --color-ctx-banking-bg: oklch(0.2 0.012 55);
+  --color-ctx-banking-surface: oklch(0.25 0.014 55);
+  --color-ctx-banking-text: oklch(0.94 0.008 80);
+  --color-ctx-banking-border: oklch(0.38 0.016 55);
 }
 
 .dark {
-  /* Backgrounds */
-  --color-bg: #1a1816;
-  --color-bg-subtle: #222020;
-  --color-surface: #2a2725;
-  --color-surface-raised: #332f2d;
+  color-scheme: dark;
 
-  /* Borders */
-  --color-border: #3a3634;
-  --color-border-strong: #4e4945;
+  --color-bg: oklch(0.17 0.01 55);
+  --color-bg-subtle: oklch(0.2 0.012 55);
+  --color-surface: oklch(0.22 0.013 55);
+  --color-surface-raised: oklch(0.25 0.014 55);
 
-  /* Text */
-  --color-text: #ede8e1;
-  --color-text-secondary: #a69e93;
-  --color-text-tertiary: #7a7168;
+  --color-border: oklch(0.34 0.016 55);
+  --color-border-strong: oklch(0.47 0.018 55);
 
-  /* Primary — golden clay on dark */
-  --color-primary: #c4a882;
-  --color-primary-hover: #d4b892;
-  --color-primary-active: #b49872;
-  --color-primary-fg: #1a1816;
+  --color-text: oklch(0.92 0.008 80);
+  --color-text-secondary: oklch(0.74 0.014 72);
+  --color-text-tertiary: oklch(0.64 0.014 65);
 
-  /* Aura */
-  --color-aura: #c4a882;
-  --color-aura-dim: rgba(196, 168, 130, 0.1);
-  --color-aura-glow: rgba(196, 168, 130, 0.25);
+  --color-primary: oklch(0.76 0.055 75);
+  --color-primary-hover: oklch(0.82 0.052 78);
+  --color-primary-active: oklch(0.7 0.05 72);
+  --color-primary-fg: oklch(0.2 0.012 55);
+  --color-focus: oklch(0.76 0.055 75);
 
-  /* Semantic */
-  --color-error: #d47a6a;
-  --color-error-subtle: rgba(212, 122, 106, 0.1);
-  --color-success: #8bab8b;
-  --color-success-subtle: rgba(139, 171, 139, 0.1);
-  --color-warning: #d4ab5b;
-  --color-warning-subtle: rgba(212, 171, 91, 0.1);
+  --color-error: oklch(0.72 0.12 28);
+  --color-error-subtle: oklch(0.27 0.045 28);
+  --color-success: oklch(0.72 0.085 145);
+  --color-success-subtle: oklch(0.27 0.035 145);
+  --color-warning: oklch(0.78 0.09 80);
+  --color-warning-subtle: oklch(0.28 0.035 80);
+  --color-info: oklch(0.75 0.085 250);
+  --color-info-subtle: oklch(0.27 0.035 250);
 
-  /* Frost */
-  --color-frost: rgba(26, 24, 22, 0.8);
-  --color-frost-border: rgba(58, 54, 52, 0.5);
+  --shadow-sm: 0 1px 2px oklch(0.05 0 0 / 0.28);
+  --shadow-md: 0 8px 20px oklch(0.05 0 0 / 0.3);
+  --shadow-lg: 0 20px 52px oklch(0.05 0 0 / 0.42);
 
-  /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.35), 0 8px 16px rgba(0, 0, 0, 0.25);
-  --shadow-xl: 0 32px 64px rgba(0, 0, 0, 0.4), 0 16px 32px rgba(0, 0, 0, 0.3);
-  --shadow-depress: 0 1px 3px rgba(0, 0, 0, 0.3) inset, 0 2px 6px rgba(0, 0, 0, 0.2);
-  --shadow-aura: 0 0 60px rgba(196, 168, 130, 0.25), 0 0 120px rgba(196, 168, 130, 0.1);
-
-  /* Contextual — Banking */
-  --color-ctx-banking-bg: #141210;
-  --color-ctx-banking-surface: #1e1b18;
-  --color-ctx-banking-text: #ede8e1;
-  --color-ctx-banking-border: #3a3634;
+  --color-ctx-banking-bg: oklch(0.13 0.008 55);
+  --color-ctx-banking-surface: oklch(0.18 0.01 55);
+  --color-ctx-banking-text: oklch(0.94 0.008 80);
+  --color-ctx-banking-border: oklch(0.31 0.014 55);
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Input } from '@lockbox/design';
+import { Button, Icon, Input } from '@lockbox/design';
 
 export interface IdentityFieldsProps {
   mode: 'view' | 'edit' | 'add';
@@ -100,7 +100,7 @@ export default function IdentityFields({
                 }
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'fullname' ? '✓' : '📋'}
+                <Icon name={copiedField === 'fullname' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -118,7 +118,7 @@ export default function IdentityFields({
                 onClick={(e) => copyToClipboard(email, 'email', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'email' ? '✓' : '📋'}
+                <Icon name={copiedField === 'email' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -136,7 +136,7 @@ export default function IdentityFields({
                 onClick={(e) => copyToClipboard(phone, 'phone', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'phone' ? '✓' : '📋'}
+                <Icon name={copiedField === 'phone' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -174,7 +174,7 @@ export default function IdentityFields({
                 }
                 style={{ padding: '6px', minHeight: 'auto', alignSelf: 'flex-start' }}
               >
-                {copiedField === 'address' ? '✓' : '📋'}
+                <Icon name={copiedField === 'address' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -192,7 +192,7 @@ export default function IdentityFields({
                 onClick={(e) => copyToClipboard(company, 'company', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'company' ? '✓' : '📋'}
+                <Icon name={copiedField === 'company' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -213,7 +213,7 @@ export default function IdentityFields({
                   onClick={() => setShowSsn(!showSsn)}
                   style={{ padding: '6px', minHeight: 'auto' }}
                 >
-                  {showSsn ? '👁️‍🗨️' : '👁️'}
+                  <Icon name={showSsn ? 'eye-off' : 'eye'} size={17} />
                 </Button>
                 <Button
                   variant="ghost"
@@ -221,7 +221,7 @@ export default function IdentityFields({
                   onClick={(e) => copyToClipboard(ssn, 'ssn', e.currentTarget)}
                   style={{ padding: '6px', minHeight: 'auto' }}
                 >
-                  {copiedField === 'ssn' ? '✓' : '📋'}
+                  <Icon name={copiedField === 'ssn' ? 'check' : 'copy'} size={17} />
                 </Button>
               </div>
             </div>
@@ -240,7 +240,7 @@ export default function IdentityFields({
                 onClick={(e) => copyToClipboard(passportNumber, 'passport', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'passport' ? '✓' : '📋'}
+                <Icon name={copiedField === 'passport' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>
@@ -258,7 +258,7 @@ export default function IdentityFields({
                 onClick={(e) => copyToClipboard(licenseNumber, 'license', e.currentTarget)}
                 style={{ padding: '6px', minHeight: 'auto' }}
               >
-                {copiedField === 'license' ? '✓' : '📋'}
+                <Icon name={copiedField === 'license' ? 'check' : 'copy'} size={17} />
               </Button>
             </div>
           </div>

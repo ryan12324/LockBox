@@ -5,10 +5,9 @@
 
 import { Command } from 'commander';
 import * as readline from 'node:readline';
-import { getSession, getApiUrl } from '../lib/session.js';
 import { createApi } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
-import { getUserKey } from './unlock.js';
+import { unlockForCommand } from './unlock.js';
 
 function askConfirmation(question: string): Promise<string> {
   return new Promise((resolve) => {
@@ -32,20 +31,6 @@ export const exportCommand = new Command('export')
     try {
       const opts = cmd.opts<{ format: string; yes: boolean }>();
       const parentOpts = cmd.parent?.opts<{ apiUrl?: string; json?: boolean }>() ?? {};
-      const session = getSession();
-      if (!session) {
-        console.error('Error: Not logged in. Run `lockbox login` first.');
-        process.exitCode = 1;
-        return;
-      }
-
-      const userKey = getUserKey();
-      if (!userKey) {
-        console.error('Error: Vault is locked. Run `lockbox unlock` first.');
-        process.exitCode = 1;
-        return;
-      }
-
       if (opts.format !== 'json') {
         console.error(`Error: Unsupported format "${opts.format}". Only "json" is supported.`);
         process.exitCode = 1;
@@ -64,8 +49,8 @@ export const exportCommand = new Command('export')
         }
       }
 
-      const apiUrl = getApiUrl(parentOpts.apiUrl);
-      const api = createApi(apiUrl);
+      const { session, userKey } = await unlockForCommand(parentOpts.apiUrl);
+      const api = createApi(session.apiUrl);
       const { items, folders } = await api.vault.list(session.token);
 
       const decryptedItems: Array<Record<string, unknown>> = [];

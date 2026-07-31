@@ -24,6 +24,16 @@ allprojects {
     }
 }
 
+// Capacitor 6 library modules rely on AGP's default build tools (35.0.0),
+// while this workspace ships 36.1.0. Apply the installed toolchain consistently.
+subprojects {
+    plugins.withId('com.android.library') {
+        android {
+            buildToolsVersion rootProject.ext.buildToolsVersion
+        }
+    }
+}
+
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
