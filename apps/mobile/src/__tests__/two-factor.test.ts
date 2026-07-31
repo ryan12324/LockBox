@@ -15,7 +15,6 @@ import {
   disable2FA,
   executeTwoFactorLogin,
   TwoFactorError,
-  type TwoFactorChallenge,
   type TwoFactorLoginState,
   type TwoFactorValidateResponse,
 } from '../auth/two-factor';

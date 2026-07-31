@@ -291,35 +291,60 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
        flex-shrink: 0;
      }
      .dismiss:hover { color: #fff; }
+     .dismiss:focus-visible, .link:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
    `;
 
   const badge = document.createElement('div');
   badge.className = 'badge';
+  badge.setAttribute('role', 'status');
+  badge.setAttribute('aria-live', 'polite');
 
   const siteLabel = siteName ?? 'This site';
   const methodsText = methods.length > 0 ? methods.join(', ') : '';
 
-  badge.innerHTML = `
-    <span class="icon">⚠️</span>
-    <div class="text">
-      <div class="title">${siteLabel} supports 2FA</div>
-      <div class="desc">Enable it for better security</div>
-      ${methodsText ? `<div class="methods">Methods: ${methodsText}</div>` : ''}
-    </div>
-  `;
+  const icon = document.createElement('span');
+  icon.className = 'icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = '⚠️';
+
+  const text = document.createElement('div');
+  text.className = 'text';
+  const title = document.createElement('div');
+  title.className = 'title';
+  title.textContent = `${siteLabel} supports 2FA`;
+  const description = document.createElement('div');
+  description.className = 'desc';
+  description.textContent = 'Enable it for better security';
+  text.append(title, description);
+  if (methodsText) {
+    const methodsEl = document.createElement('div');
+    methodsEl.className = 'methods';
+    methodsEl.textContent = `Methods: ${methodsText}`;
+    text.appendChild(methodsEl);
+  }
+  badge.append(icon, text);
 
   if (documentation) {
-    const link = document.createElement('a');
-    link.className = 'link';
-    link.textContent = '2FA setup guide →';
-    link.href = documentation;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    badge.querySelector('.text')?.appendChild(link);
+    try {
+      const guideUrl = new URL(documentation);
+      if (guideUrl.protocol === 'https:') {
+        const link = document.createElement('a');
+        link.className = 'link';
+        link.textContent = '2FA setup guide →';
+        link.href = guideUrl.href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        text.appendChild(link);
+      }
+    } catch {
+      // Ignore malformed or unsafe guide URLs from the remote directory.
+    }
   }
 
   const dismissBtn = document.createElement('button');
+  dismissBtn.type = 'button';
   dismissBtn.className = 'dismiss';
+  dismissBtn.setAttribute('aria-label', 'Dismiss two-factor authentication suggestion');
   dismissBtn.textContent = '✕';
   dismissBtn.addEventListener('click', () => host.remove());
   badge.appendChild(dismissBtn);
@@ -422,26 +447,36 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
        margin-left: 12px;
      }
      .dismiss:hover { background: rgba(255,255,255,0.3); }
+     .dismiss:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
    `;
 
   const banner = document.createElement('div');
   banner.className = 'banner';
+  banner.setAttribute('role', 'alert');
 
   const reasonText = message.reasons.length > 0 ? message.reasons[0] : 'Suspicious URL detected';
   const scorePercent = Math.round(message.score * 100);
 
-  banner.innerHTML = `
-    <div class="info">
-      <span class="icon">⚠️</span>
-      <div class="text">
-        <strong>Lockbox: Potential phishing site (${scorePercent}% risk)</strong>
-        <span>${reasonText}</span>
-      </div>
-    </div>
-  `;
+  const info = document.createElement('div');
+  info.className = 'info';
+  const icon = document.createElement('span');
+  icon.className = 'icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.textContent = '⚠️';
+  const text = document.createElement('div');
+  text.className = 'text';
+  const title = document.createElement('strong');
+  title.textContent = `Lockbox: Potential phishing site (${scorePercent}% risk)`;
+  const reason = document.createElement('span');
+  reason.textContent = reasonText;
+  text.append(title, reason);
+  info.append(icon, text);
+  banner.appendChild(info);
 
   const btn = document.createElement('button');
+  btn.type = 'button';
   btn.className = 'dismiss';
+  btn.setAttribute('aria-label', 'Dismiss phishing warning');
   btn.textContent = 'Dismiss';
   btn.addEventListener('click', () => host.remove());
   banner.appendChild(btn);
@@ -477,6 +512,15 @@ export default defineContentScript({
       async (event: MessageEvent) => {
         if (event.source !== window) return;
         if (!event.data || typeof event.data.type !== 'string') return;
+        if (
+          (event.data.type === 'lockbox-webauthn-create' ||
+            event.data.type === 'lockbox-webauthn-get') &&
+          (typeof event.data.requestId !== 'string' ||
+            event.data.requestId.length > 128 ||
+            event.data.origin !== window.location.origin)
+        ) {
+          return;
+        }
 
         if (event.data.type === 'lockbox-webauthn-create') {
           try {
@@ -521,6 +565,7 @@ export default defineContentScript({
             const result = await sendMessage<{
               credential?: object;
               error?: string;
+              errorName?: string;
               fallback?: boolean;
             }>({
               type: 'WEBAUTHN_CREATE',
@@ -568,6 +613,7 @@ export default defineContentScript({
             const result = await sendMessage<{
               credential?: object;
               error?: string;
+              errorName?: string;
               fallback?: boolean;
               selectPasskey?: boolean;
               needsConsent?: boolean;

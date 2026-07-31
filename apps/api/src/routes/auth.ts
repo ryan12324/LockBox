@@ -5,10 +5,10 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq, and, ne, sql } from 'drizzle-orm';
 
 import { createDb } from '../db/index.js';
-import { users, sessions, userTotpSettings } from '../db/schema.js';
+import { users, sessions, twoFactorChallenges, userTotpSettings } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 type Bindings = { DB: D1Database; AUTH_LIMITER: RateLimit };
@@ -21,6 +21,80 @@ export const authRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>
 // so PBKDF2 here is defense-in-depth for stored credentials.
 const PBKDF2_SERVER_ITERATIONS = 100_000;
 const HASH_LENGTH = 32;
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function isValidEmail(email: string): boolean {
+  return (
+    email.length <= 254 &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  );
+}
+
+function decodeBase64(value: unknown): Uint8Array | null {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 16_384) return null;
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0) return null;
+  try {
+    const binary = atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+    return bytes;
+  } catch {
+    return null;
+  }
+}
+
+function isValidAuthHash(value: unknown): value is string {
+  return decodeBase64(value)?.byteLength === 32;
+}
+
+function isValidSalt(value: unknown): value is string {
+  return decodeBase64(value)?.byteLength === 16;
+}
+
+function isValidEncryptedUserKey(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const parts = value.split('.');
+  if (parts.length !== 2) return false;
+  const iv = decodeBase64(parts[0]);
+  const ciphertext = decodeBase64(parts[1]);
+  return iv?.byteLength === 12 && Boolean(ciphertext && ciphertext.byteLength >= 16);
+}
+
+function isValidKdfConfig(value: unknown): value is {
+  type: 'argon2id' | 'pbkdf2';
+  iterations: number;
+  memory?: number;
+  parallelism?: number;
+} {
+  if (!value || typeof value !== 'object') return false;
+  const config = value as Record<string, unknown>;
+  if (!Number.isInteger(config.iterations)) return false;
+
+  if (config.type === 'argon2id') {
+    return (
+      (config.iterations as number) >= 1 &&
+      (config.iterations as number) <= 10 &&
+      Number.isInteger(config.memory) &&
+      (config.memory as number) >= 8_192 &&
+      (config.memory as number) <= 1_048_576 &&
+      Number.isInteger(config.parallelism) &&
+      (config.parallelism as number) >= 1 &&
+      (config.parallelism as number) <= 16
+    );
+  }
+
+  if (config.type === 'pbkdf2') {
+    return (
+      (config.iterations as number) >= 100_000 &&
+      (config.iterations as number) <= 5_000_000
+    );
+  }
+
+  return false;
+}
 
 /** Derive a deterministic 16-byte salt from an email address using SHA-256. */
 async function emailToArgonSalt(email: string): Promise<Uint8Array> {
@@ -86,16 +160,25 @@ authRoutes.get('/kdf-params', async (c) => {
     return c.json({ error: 'Missing email parameter' }, 400);
   }
 
+  const normalizedEmail = normalizeEmail(email);
+  if (!isValidEmail(normalizedEmail)) {
+    return c.json({ error: 'Invalid email parameter' }, 400);
+  }
+
   const db = createDb(c.env.DB);
-  const user = await db.select().from(users).where(eq(users.email, email)).get();
+  const user = await db
+    .select()
+    .from(users)
+    .where(sql`lower(${users.email}) = ${normalizedEmail}`)
+    .get();
 
   // Always return 200 — don't reveal whether email exists (timing-safe: same response shape)
   if (!user) {
     // Derive deterministic fake salt to prevent email enumeration
     // (same email always returns same fake salt — indistinguishable from real)
-    const fakeBytes = new TextEncoder().encode('lockbox-fake-salt:' + email.toLowerCase());
+    const fakeBytes = new TextEncoder().encode('lockbox-fake-salt:' + normalizedEmail);
     const fakeHash = await crypto.subtle.digest('SHA-256', fakeBytes);
-    const fakeArray = new Uint8Array(fakeHash);
+    const fakeArray = new Uint8Array(fakeHash).slice(0, 16);
     let binary = '';
     for (let i = 0; i < fakeArray.length; i++) binary += String.fromCharCode(fakeArray[i]);
 
@@ -125,47 +208,74 @@ authRoutes.post('/register', async (c) => {
   if (!email || !authHash || !encryptedUserKey || !kdfConfig || !salt) {
     return c.json({ error: 'Missing required fields' }, 400);
   }
-  if (typeof email !== 'string' || typeof authHash !== 'string') {
+  if (
+    typeof email !== 'string' ||
+    !isValidAuthHash(authHash) ||
+    !isValidEncryptedUserKey(encryptedUserKey) ||
+    !isValidKdfConfig(kdfConfig) ||
+    !isValidSalt(salt)
+  ) {
     return c.json({ error: 'Invalid field types' }, 400);
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  if (!isValidEmail(normalizedEmail)) {
+    return c.json({ error: 'Invalid email address' }, 400);
   }
 
   const db = createDb(c.env.DB);
   const now = new Date().toISOString();
 
   // Check for duplicate email
-  const existing = await db.select().from(users).where(eq(users.email, email)).get();
+  const existing = await db
+    .select()
+    .from(users)
+    .where(sql`lower(${users.email}) = ${normalizedEmail}`)
+    .get();
   if (existing) return c.json({ error: 'Email already registered' }, 409);
 
   // Double-hash the authHash on server side
-  const serverAuthHash = await hashAuthHash(authHash, email);
+  const serverAuthHash = await hashAuthHash(authHash, normalizedEmail);
 
   const userId = crypto.randomUUID();
   const token = generateToken();
   const sessionId = crypto.randomUUID();
 
-  await db.insert(users).values({
-    id: userId,
-    email,
-    authHash: serverAuthHash,
-    encryptedUserKey: encryptedUserKey as string,
-    kdfConfig: JSON.stringify(kdfConfig),
-    salt: salt as string,
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  await db.insert(sessions).values({
-    id: sessionId,
-    userId,
-    token,
-    expiresAt: sessionExpiry(),
-    createdAt: now,
-  });
+  // The first session is part of account creation. Commit both rows together so
+  // a transient D1 failure cannot leave an account that the registration caller
+  // believes was never created.
+  try {
+    await db.batch([
+      db.insert(users).values({
+        id: userId,
+        email: normalizedEmail,
+        authHash: serverAuthHash,
+        encryptedUserKey: encryptedUserKey as string,
+        kdfConfig: JSON.stringify(kdfConfig),
+        salt: salt as string,
+        createdAt: now,
+        updatedAt: now,
+      }),
+      db.insert(sessions).values({
+        id: sessionId,
+        userId,
+        token,
+        expiresAt: sessionExpiry(),
+        createdAt: now,
+      }),
+    ]);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/users_email_unique|UNIQUE constraint failed: users\.email/i.test(message)) {
+      return c.json({ error: 'Email already registered' }, 409);
+    }
+    throw error;
+  }
 
   return c.json(
     {
       token,
-      user: { id: userId, email, kdfConfig, salt },
+      user: { id: userId, email: normalizedEmail, kdfConfig, salt },
     },
     201,
   );
@@ -181,20 +291,30 @@ authRoutes.post('/login', async (c) => {
   if (!body) return c.json({ error: 'Invalid JSON' }, 400);
 
   const { email, authHash } = body as Record<string, unknown>;
-  if (!email || !authHash || typeof email !== 'string' || typeof authHash !== 'string') {
+  if (!email || typeof email !== 'string' || !isValidAuthHash(authHash)) {
+    return c.json({ error: 'Invalid credentials' }, 401);
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  if (!isValidEmail(normalizedEmail)) {
+    await hashAuthHash(authHash, normalizedEmail);
     return c.json({ error: 'Invalid credentials' }, 401);
   }
 
   const db = createDb(c.env.DB);
 
-  const user = await db.select().from(users).where(eq(users.email, email)).get();
+  const user = await db
+    .select()
+    .from(users)
+    .where(sql`lower(${users.email}) = ${normalizedEmail}`)
+    .get();
   if (!user) {
     // Constant-time: still hash even if user not found to prevent timing attacks
-    await hashAuthHash(authHash, email);
+    await hashAuthHash(authHash, normalizedEmail);
     return c.json({ error: 'Invalid credentials' }, 401);
   }
 
-  const serverHash = await hashAuthHash(authHash, email);
+  const serverHash = await hashAuthHash(authHash, normalizedEmail);
 
   // Constant-time comparison
   if (!timingSafeEqual(serverHash, user.authHash)) {
@@ -210,17 +330,32 @@ authRoutes.post('/login', async (c) => {
   if (totpSettings) {
     // User has 2FA enabled — return temp token instead of full session
     const tempToken = generateToken();
-    const tempSessionId = crypto.randomUUID();
+    const challengeId = crypto.randomUUID();
     const now = new Date().toISOString();
     const tempExpiry = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min
 
-    await db.insert(sessions).values({
-      id: tempSessionId,
-      userId: user.id,
-      token: tempToken,
-      expiresAt: tempExpiry,
-      createdAt: now,
-    });
+    // Keep one live password-only challenge per account. It is not a session
+    // and cannot pass authMiddleware until TOTP validation succeeds.
+    await db
+      .insert(twoFactorChallenges)
+      .values({
+        id: challengeId,
+        userId: user.id,
+        token: tempToken,
+        expiresAt: tempExpiry,
+        attempts: 0,
+        createdAt: now,
+      })
+      .onConflictDoUpdate({
+        target: twoFactorChallenges.userId,
+        set: {
+          id: challengeId,
+          token: tempToken,
+          expiresAt: tempExpiry,
+          attempts: 0,
+          createdAt: now,
+        },
+      });
 
     return c.json({ requires2FA: true, tempToken });
   }
@@ -301,6 +436,15 @@ authRoutes.post('/change-password', authMiddleware, async (c) => {
   if (!currentAuthHash || !newAuthHash || !newEncryptedUserKey || !newKdfConfig || !newSalt) {
     return c.json({ error: 'Missing required fields' }, 400);
   }
+  if (
+    !isValidAuthHash(currentAuthHash) ||
+    !isValidAuthHash(newAuthHash) ||
+    !isValidEncryptedUserKey(newEncryptedUserKey) ||
+    !isValidKdfConfig(newKdfConfig) ||
+    !isValidSalt(newSalt)
+  ) {
+    return c.json({ error: 'Invalid cryptographic account parameters' }, 400);
+  }
 
   const userId = c.get('userId');
   const db = createDb(c.env.DB);
@@ -309,32 +453,34 @@ authRoutes.post('/change-password', authMiddleware, async (c) => {
   if (!user) return c.json({ error: 'User not found' }, 404);
 
   // Verify current auth hash
-  const currentServerHash = await hashAuthHash(currentAuthHash as string, user.email);
+  const currentServerHash = await hashAuthHash(currentAuthHash, user.email);
   if (!timingSafeEqual(currentServerHash, user.authHash)) {
     return c.json({ error: 'Invalid current password' }, 401);
   }
 
   // Hash new auth hash
-  const newServerHash = await hashAuthHash(newAuthHash as string, user.email);
+  const newServerHash = await hashAuthHash(newAuthHash, user.email);
   const now = new Date().toISOString();
 
-  // Update user record
-  await db
-    .update(users)
-    .set({
-      authHash: newServerHash,
-      encryptedUserKey: newEncryptedUserKey as string,
-      kdfConfig: JSON.stringify(newKdfConfig),
-      salt: newSalt as string,
-      updatedAt: now,
-    })
-    .where(eq(users.id, userId));
-
-  // Invalidate all OTHER sessions (keep current)
+  // Update the account envelope and invalidate every other session as one
+  // transaction. Otherwise a partial failure could leave old sessions active
+  // after the master password was replaced.
   const currentToken = c.req.header('Authorization')!.slice(7);
-  await db
-    .delete(sessions)
-    .where(and(eq(sessions.userId, userId), ne(sessions.token, currentToken)));
+  await db.batch([
+    db
+      .update(users)
+      .set({
+        authHash: newServerHash,
+        encryptedUserKey: newEncryptedUserKey,
+        kdfConfig: JSON.stringify(newKdfConfig),
+        salt: newSalt as string,
+        updatedAt: now,
+      })
+      .where(eq(users.id, userId)),
+    db
+      .delete(sessions)
+      .where(and(eq(sessions.userId, userId), ne(sessions.token, currentToken))),
+  ]);
 
   return c.json({ success: true });
 });

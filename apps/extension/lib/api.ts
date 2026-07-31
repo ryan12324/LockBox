@@ -4,6 +4,30 @@
  */
 
 import { getApiBaseUrl } from './storage.js';
+import type { EncryptedVaultItem, Folder } from '@lockbox/types';
+
+export interface AuthenticatedLoginResponse {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    kdfConfig: {
+      algorithm: 'argon2id';
+      iterations: number;
+      memory: number;
+      parallelism: number;
+    };
+    salt: string;
+    encryptedUserKey: string;
+  };
+}
+
+export interface TwoFactorRequiredResponse {
+  requires2FA: true;
+  tempToken: string;
+}
+
+export type LoginResponse = AuthenticatedLoginResponse | TwoFactorRequiredResponse;
 
 export class ApiError extends Error {
   constructor(
@@ -37,12 +61,24 @@ async function request<T>(
   return data as T;
 }
 
+async function requestText(path: string, token: string): Promise<string> {
+  const apiBase = await getApiBaseUrl();
+  const res = await fetch(`${apiBase}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
+  }
+  return res.text();
+}
+
 export const api = {
   auth: {
     kdfParams: (email: string) =>
       request(`/api/auth/kdf-params?email=${encodeURIComponent(email)}`),
-    login: (body: object) =>
-      request('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
+    login: (body: { email: string; authHash: string }) =>
+      request<LoginResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
     logout: (token: string) =>
       request('/api/auth/logout', { method: 'POST', token }),
     me: (token: string) => request('/api/auth/me', { token }),
@@ -50,7 +86,7 @@ export const api = {
   vault: {
     list: (token: string, params?: Record<string, string>) => {
       const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-      return request(`/api/vault${qs}`, { token });
+      return request<{ items: EncryptedVaultItem[]; folders: Folder[] }>(`/api/vault${qs}`, { token });
     },
     createItem: (body: object, token: string) =>
       request('/api/vault/items', { method: 'POST', body: JSON.stringify(body), token }),
@@ -118,10 +154,10 @@ export const api = {
   sharing: {
     shareFolder: (folderId: string, body: { teamId: string; permissionLevel: string; memberKeys: Array<{ userId: string; encryptedFolderKey: string }> }, token: string) =>
       request<{ success: boolean; folderId: string; teamId: string }>(`/api/sharing/folders/${folderId}/share`, { method: 'POST', body: JSON.stringify(body), token }),
-    unshareFolder: (folderId: string, token: string) =>
-      request<{ success: boolean }>(`/api/sharing/folders/${folderId}/unshare`, { method: 'DELETE', token }),
+    unshareFolder: (folderId: string, teamId: string, token: string) =>
+      request<{ success: boolean }>(`/api/sharing/folders/${folderId}/unshare?teamId=${encodeURIComponent(teamId)}`, { method: 'DELETE', token }),
     getFolderKeys: (folderId: string, token: string) =>
-      request<{ keys: Array<{ folderId: string; userId: string; encryptedFolderKey: string; grantedBy: string; grantedAt: string }> }>(`/api/sharing/folders/${folderId}/keys`, { token }),
+      request<{ key: { folderId: string; userId: string; encryptedFolderKey: string; grantedBy: string; grantedAt: string } }>(`/api/sharing/folders/${folderId}/keys`, { token }),
     addFolderKey: (folderId: string, body: { targetUserId: string; encryptedFolderKey: string }, token: string) =>
       request<{ success: boolean }>(`/api/sharing/folders/${folderId}/keys`, { method: 'POST', body: JSON.stringify(body), token }),
     removeFolderKey: (folderId: string, targetUserId: string, token: string) =>
@@ -129,12 +165,12 @@ export const api = {
     listSharedFolders: (token: string) =>
       request<{ sharedFolders: Array<{ folderId: string; teamId: string; ownerUserId: string; permissionLevel: string; createdAt: string; folderName: string }> }>('/api/sharing/folders', { token }),
     listSharedFolderItems: (folderId: string, token: string) =>
-      request<{ items: Array<{ id: string; userId: string; type: string; encryptedData: string; folderId: string; tags: string | null; favorite: number; revisionDate: string; createdAt: string; deletedAt: string | null }> }>(`/api/sharing/folders/${folderId}/items`, { token }),
+      request<{ items: EncryptedVaultItem[] }>(`/api/sharing/folders/${folderId}/items`, { token }),
   },
 
   // ─── Share Links ─────────────────────────────────────────
   shareLinks: {
-    create: (body: { id: string; encryptedItem: string; tokenHash: string; expiresInSeconds: number; maxViews: number; itemName: string }, token: string) =>
+    create: (body: { id: string; encryptedItem: string; tokenHash: string; expiresAt: string; maxViews: number; itemName: string }, token: string) =>
       request<{ id: string; expiresAt: string; maxViews: number }>('/api/share-links', { method: 'POST', body: JSON.stringify(body), token }),
     redeem: (shareId: string, bearerToken: string) =>
       request<{ encryptedItem: string; viewCount: number; maxViews: number }>(`/api/share-links/${shareId}/redeem`, { token: bearerToken }),
@@ -147,9 +183,9 @@ export const api = {
   // ─── Attachments ───────────────────────────────────────────
   attachments: {
     list: (itemId: string, token: string) =>
-      request<{ attachments: Array<{ id: string; fileName: string; fileSize: number; mimeType: string; createdAt: string }> }>(`/api/vault/items/${itemId}/attachments`, { token }),
+      request<{ attachments: Array<{ id: string; itemId: string; encryptedName: string; encryptedMimeType: string; size: number; createdAt: string }> }>(`/api/vault/items/${itemId}/attachments`, { token }),
     download: (itemId: string, attachmentId: string, token: string) =>
-      request<{ encryptedData: string }>(`/api/vault/items/${itemId}/attachments/${attachmentId}`, { token }),
+      requestText(`/api/vault/items/${itemId}/attachments/${attachmentId}`, token),
   },
 
   // ─── Trash ──────────────────────────────────────────────────
@@ -162,32 +198,27 @@ export const api = {
       request<{ success: boolean }>(`/api/vault/items/${id}/permanent`, { method: 'DELETE', token }),
   },
 
-  // ─── Emergency Access ─────────────────────────────────────────
-  emergency: {
-    list: (token: string) =>
-      request<{ grantsAsGrantor: Array<{ id: string; granteeEmail: string; status: string; waitDays: number; createdAt: string }>; grantsAsGrantee: Array<{ id: string; grantorEmail: string; status: string; waitDays: number; createdAt: string }> }>('/api/emergency', { token }),
-    invite: (body: { email: string; waitDays: number }, token: string) =>
-      request<{ success: boolean; grant: { id: string; granteeEmail: string; status: string; waitDays: number } }>('/api/emergency', { method: 'POST', body: JSON.stringify(body), token }),
-    approve: (grantId: string, token: string) =>
-      request<{ success: boolean }>(`/api/emergency/${grantId}/approve`, { method: 'PUT', token }),
-    reject: (grantId: string, token: string) =>
-      request<{ success: boolean }>(`/api/emergency/${grantId}/reject`, { method: 'PUT', token }),
-    revoke: (grantId: string, token: string) =>
-      request<{ success: boolean }>(`/api/emergency/${grantId}/revoke`, { method: 'DELETE', token }),
-  },
-
   // ─── Travel Mode ──────────────────────────────────────────────
   travelMode: {
+    get: (token: string) =>
+      request<{ enabled: boolean }>('/api/settings/travel-mode', { token }),
     set: (body: { enabled: boolean }, token: string) =>
       request<{ success: boolean; enabled: boolean }>('/api/settings/travel-mode', { method: 'PUT', body: JSON.stringify(body), token }),
   },
 
   // ─── 2FA ──────────────────────────────────────────────────────
   twoFactor: {
+    status: (token: string) =>
+      request<{ enabled: boolean }>('/api/auth/2fa/status', { token }),
     setup: (token: string) =>
-      request<{ success: boolean; secret: string; otpauthUri: string; backupCodes: string[] }>('/api/auth/2fa/setup', { method: 'POST', token }),
+      request<{ secret: string; otpauthUri: string }>('/api/auth/2fa/setup', { method: 'POST', token }),
     verify: (body: { code: string }, token: string) =>
-      request<{ success: boolean }>('/api/auth/2fa/verify', { method: 'POST', body: JSON.stringify(body), token }),
+      request<{ enabled: true; backupCodes: string[] }>('/api/auth/2fa/verify', { method: 'POST', body: JSON.stringify(body), token }),
+    validate: (body: { tempToken: string; code: string }) =>
+      request<AuthenticatedLoginResponse>('/api/auth/2fa/validate', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
     disable: (body: { code: string }, token: string) =>
       request<{ success: boolean }>('/api/auth/2fa/disable', { method: 'POST', body: JSON.stringify(body), token }),
   },
@@ -202,7 +233,38 @@ export const api = {
 
   // ─── Email Aliases ──────────────────────────────────────────
   aliases: {
-    generate: (body: { provider?: string; apiKey?: string }, token: string) =>
-      request<{ alias: string }>('/api/aliases/generate', { method: 'POST', body: JSON.stringify(body), token }),
+    getConfig: (token: string) =>
+      request<{ provider: string; encryptedApiKey: string; baseUrl: string | null }>(
+        '/api/settings/alias',
+        { token },
+      ),
+    saveConfig: (
+      body: { provider: string; encryptedApiKey: string; baseUrl?: string },
+      token: string,
+    ) =>
+      request<{ success: boolean }>('/api/settings/alias', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+        token,
+      }),
+    deleteConfig: (token: string) =>
+      request<{ success: boolean }>('/api/settings/alias', { method: 'DELETE', token }),
+    list: (provider: string, apiKey: string, token: string, baseUrl?: string) => {
+      const headers: Record<string, string> = {
+        'X-Alias-Provider': provider,
+        'X-Alias-ApiKey': apiKey,
+      };
+      if (baseUrl) headers['X-Alias-BaseUrl'] = baseUrl;
+      return request<{ aliases: Array<{ email: string; enabled: boolean; id: string }> }>(
+        '/api/aliases',
+        { token, headers },
+      );
+    },
+    generate: (body: { provider: string; apiKey: string; baseUrl?: string }, token: string) =>
+      request<{ alias: { email: string } }>('/api/aliases/generate', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        token,
+      }),
   },
 };

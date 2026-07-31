@@ -20,7 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 WEB_DIR="$ROOT_DIR/apps/web"
 WRANGLER="bunx wrangler"
-PROJECT_NAME="lockbox-web"
+PROJECT_NAME="${LOCKBOX_PAGES_PROJECT:-lockbox-web}"
 
 # ── Colors ────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -56,7 +56,7 @@ ok "Authenticated with Cloudflare"
 if [ -z "${VITE_API_URL:-}" ]; then
   # Check for .env.local at repo root
   if [ -f "$ROOT_DIR/.env.local" ]; then
-    FOUND_URL=$(grep -oP '^VITE_API_URL=\K.+' "$ROOT_DIR/.env.local" 2>/dev/null || true)
+    FOUND_URL=$(sed -n 's/^VITE_API_URL=//p' "$ROOT_DIR/.env.local" | sed -n '1p')
     if [ -n "$FOUND_URL" ]; then
       export VITE_API_URL="$FOUND_URL"
       ok "Using API URL from .env.local: ${CYAN}${VITE_API_URL}${NC}"
@@ -89,7 +89,7 @@ ok "API URL: ${CYAN}${VITE_API_URL}${NC}"
 # ── 3. Install dependencies ──────────────────────────────────────────
 info "Installing dependencies..."
 cd "$ROOT_DIR"
-bun install
+bun install --frozen-lockfile
 ok "Dependencies installed"
 
 # ── 4. Build everything ──────────────────────────────────────────────
@@ -99,7 +99,19 @@ ok "Build complete"
 
 # ── 5. Ensure Pages project exists ────────────────────────────────
 info "Ensuring Pages project '$PROJECT_NAME' exists..."
-if ! $WRANGLER pages project list 2>/dev/null | grep -q "$PROJECT_NAME"; then
+PROJECT_EXISTS=$(
+  $WRANGLER pages project list --json \
+    | LOCKBOX_PAGES_PROJECT="$PROJECT_NAME" bun -e '
+      const parsed = JSON.parse(await Bun.stdin.text());
+      const projects = Array.isArray(parsed) ? parsed : (parsed.result ?? []);
+      if (projects.some((entry) =>
+        (entry.name ?? entry.project_name ?? entry["Project Name"]) === process.env.LOCKBOX_PAGES_PROJECT
+      )) {
+        console.log("yes");
+      }
+    '
+)
+if [ "$PROJECT_EXISTS" != "yes" ]; then
   info "Creating Pages project '$PROJECT_NAME'..."
   $WRANGLER pages project create "$PROJECT_NAME" --production-branch=main
   ok "Pages project created"
@@ -110,7 +122,7 @@ fi
 # ── 6. Deploy to Cloudflare Pages ────────────────────────────────
 info "Deploying to Cloudflare Pages..."
 cd "$WEB_DIR"
-if ! DEPLOY_OUTPUT=$($WRANGLER pages deploy --commit-dirty=true 2>&1); then
+if ! DEPLOY_OUTPUT=$($WRANGLER pages deploy dist --project-name "$PROJECT_NAME" --commit-dirty=true 2>&1); then
   echo "$DEPLOY_OUTPUT"
   fail "Pages deploy failed. See output above."
 fi
@@ -118,7 +130,9 @@ echo "$DEPLOY_OUTPUT"
 ok "Deployed to Cloudflare Pages"
 
 # ── 7. Print summary ────────────────────────────────────────────────
-PAGES_URL=$(echo "$DEPLOY_OUTPUT" | grep -oP 'https://[^\s]+\.pages\.dev' | head -1 || true)
+PAGES_URL=$(printf '%s\n' "$DEPLOY_OUTPUT" \
+  | sed -nE 's|.*(https://[^[:space:]]+\.pages\.dev).*|\1|p' \
+  | sed -n '1p')
 
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════╗${NC}"

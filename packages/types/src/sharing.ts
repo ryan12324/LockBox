@@ -20,7 +20,7 @@ export interface ShareLinkCreateRequest {
   id: string;
   encryptedItem: string;
   tokenHash: string;
-  expiresInSeconds: number;
+  expiresAt: string;
   maxViews: number;
   itemName: string;
 }

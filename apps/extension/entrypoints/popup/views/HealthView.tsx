@@ -15,6 +15,7 @@ export function HealthSummaryView({
   const [summary, setSummary] = useState<VaultHealthSummary | null>(null);
   const [reports, setReports] = useState<PasswordHealthReport[]>([]);
   const [loading, setLoading] = useState(true);
+  const [breachChecking, setBreachChecking] = useState(false);
   const [error, setError] = useState('');
 
   const analyze = useCallback(async () => {
@@ -30,8 +31,24 @@ export function HealthSummaryView({
         type: 'run-health-analysis',
       });
       if (result.success && result.summary && result.reports) {
-        setSummary(result.summary);
-        setReports(result.reports);
+        const breachStatus = await sendMessage<{
+          success: boolean;
+          breachedCount?: number;
+          breachedItemIds?: string[];
+        }>({ type: 'get-breach-status' });
+        const breachedItemIds = new Set(breachStatus.breachedItemIds ?? []);
+        setSummary({
+          ...result.summary,
+          breached: breachedItemIds.size,
+        });
+        setReports(
+          result.reports.map((report) =>
+            breachedItemIds.has(report.itemId) &&
+            !report.issues.some((issue) => issue.type === 'breached')
+              ? { ...report, issues: [...report.issues, { type: 'breached' as const }] }
+              : report
+          )
+        );
       } else {
         setError(result.error || 'Failed to analyze vault health');
       }
@@ -44,6 +61,31 @@ export function HealthSummaryView({
 
   useEffect(() => {
     analyze();
+  }, [analyze]);
+
+  const checkBreaches = useCallback(async () => {
+    setBreachChecking(true);
+    setError('');
+    try {
+      const result = await sendMessage<{
+        success: boolean;
+        failedCount?: number;
+        error?: string;
+      }>({
+        type: 'run-breach-check',
+      });
+      if (!result.success) throw new Error(result.error || 'Breach check failed');
+      await analyze();
+      if (result.failedCount) {
+        setError(
+          `${result.failedCount} password${result.failedCount === 1 ? '' : 's'} could not be checked. No safe verdict was inferred for those entries.`
+        );
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Breach check failed');
+    } finally {
+      setBreachChecking(false);
+    }
   }, [analyze]);
 
   const score = summary?.overallScore ?? 100;
@@ -71,9 +113,20 @@ export function HealthSummaryView({
           </Button>
           <span className="text-sm font-semibold text-[var(--color-text)]">Security Health</span>
         </div>
-        <Button variant="primary" size="sm" onClick={analyze} disabled={loading}>
-          {loading ? 'Analyzing...' : 'Analyze Now'}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={checkBreaches}
+            disabled={loading || breachChecking}
+            title="Uses HIBP k-anonymity: only a five-character SHA-1 prefix leaves this device"
+          >
+            {breachChecking ? 'Checking...' : 'Check Breaches'}
+          </Button>
+          <Button variant="primary" size="sm" onClick={analyze} disabled={loading}>
+            {loading ? 'Analyzing...' : 'Analyze Now'}
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-4">
@@ -82,6 +135,11 @@ export function HealthSummaryView({
             {error}
           </div>
         )}
+
+        <p className="text-[10px] text-[var(--color-text-tertiary)] m-0">
+          Breach checks are manual. Lockbox sends only the first five characters of each
+          password's SHA-1 hash to Have I Been Pwned.
+        </p>
 
         {loading && !summary ? (
           <div className="text-center text-[var(--color-text-tertiary)] text-sm mt-10">

@@ -6,10 +6,15 @@ import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { corsMiddleware, securityHeaders, requestSizeLimit } from '../middleware/security.js';
 
-const TEST_ENV = { CORS_ORIGINS: 'https://lockbox-web.pages.dev' };
+const TEST_ENV = {
+  CORS_ORIGINS: 'https://lockbox-web.pages.dev',
+  EXTENSION_IDS: 'abcdefghijklmnop,some-uuid',
+};
 
 function createTestApp() {
-  const app = new Hono<{ Bindings: { CORS_ORIGINS?: string } }>();
+  const app = new Hono<{
+    Bindings: { CORS_ORIGINS?: string; EXTENSION_IDS?: string };
+  }>();
   app.use('*', corsMiddleware);
   app.use('*', securityHeaders);
   app.use('*', requestSizeLimit(100)); // 100 bytes for testing
@@ -43,6 +48,15 @@ describe('CORS middleware', () => {
       headers: { Origin: 'moz-extension://some-uuid' },
     }, TEST_ENV);
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('moz-extension://some-uuid');
+  });
+
+  it('rejects extension origins when no IDs are configured', async () => {
+    const res = await app.request(
+      '/test',
+      { headers: { Origin: 'chrome-extension://abcdefghijklmnop' } },
+      { CORS_ORIGINS: 'https://lockbox-web.pages.dev' }
+    );
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
 
   it('blocks disallowed origins (no CORS headers)', async () => {
@@ -115,35 +129,30 @@ describe('Request size limit middleware', () => {
     }, TEST_ENV);
     expect(res.status).toBe(413);
   });
-});
 
-describe('Sync Hub — VaultSyncHub', () => {
-  it('exports VaultSyncHub class', async () => {
-    const { VaultSyncHub } = await import('../sync-hub.js');
-    expect(VaultSyncHub).toBeDefined();
-    expect(typeof VaultSyncHub).toBe('function');
+  it('rejects an oversized body when Content-Length is omitted', async () => {
+    const res = await app.request(
+      '/test',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: 'x'.repeat(101),
+      },
+      TEST_ENV
+    );
+    expect(res.status).toBe(413);
   });
 
-  it('VaultSyncHub has required DO methods', async () => {
-    const { VaultSyncHub } = await import('../sync-hub.js');
-    const proto = VaultSyncHub.prototype;
-    expect(typeof proto.fetch).toBe('function');
-    expect(typeof proto.webSocketMessage).toBe('function');
-    expect(typeof proto.webSocketClose).toBe('function');
-    expect(typeof proto.webSocketError).toBe('function');
-  });
-
-  it('VaultSyncHub.fetch rejects non-WebSocket requests', async () => {
-    const { VaultSyncHub } = await import('../sync-hub.js');
-    // Mock DurableObjectState
-    const mockState = {
-      acceptWebSocket: () => {},
-      getWebSockets: () => [],
-    } as unknown as DurableObjectState;
-
-    const hub = new VaultSyncHub(mockState, {});
-    const req = new Request('https://example.com/ws');
-    const res = await hub.fetch(req);
-    expect(res.status).toBe(426);
+  it('rejects malformed Content-Length values', async () => {
+    const res = await app.request(
+      '/test',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': 'not-a-number' },
+        body: '{}',
+      },
+      TEST_ENV
+    );
+    expect(res.status).toBe(400);
   });
 });

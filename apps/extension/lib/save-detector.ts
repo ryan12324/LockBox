@@ -193,15 +193,19 @@ export function injectSaveBanner(
 
   const buttonLabel = type === 'new' ? 'Save' : 'Update';
 
-  banner.innerHTML = `
-    <div class="info">
-      <span class="icon">🔐</span>
-      <span class="text">${message}</span>
-    </div>
-    <div class="actions"></div>
-  `;
+  const info = document.createElement('div');
+  info.className = 'info';
+  const icon = document.createElement('span');
+  icon.className = 'icon';
+  icon.textContent = '🔐';
+  const messageEl = document.createElement('span');
+  messageEl.className = 'text';
+  messageEl.textContent = message;
+  info.append(icon, messageEl);
 
-  const actionsEl = banner.querySelector('.actions');
+  const actionsEl = document.createElement('div');
+  actionsEl.className = 'actions';
+  banner.append(info, actionsEl);
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'btn btn-save';
@@ -219,8 +223,7 @@ export function injectSaveBanner(
     onDismiss();
   });
 
-  actionsEl?.appendChild(saveBtn);
-  actionsEl?.appendChild(dismissBtn);
+  actionsEl.append(saveBtn, dismissBtn);
 
   shadow.appendChild(style);
   shadow.appendChild(banner);

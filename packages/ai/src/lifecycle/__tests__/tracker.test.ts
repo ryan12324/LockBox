@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import type { LoginItem } from '@lockbox/types';
 import type { BreachCheckResult } from '@lockbox/types';
 import { LifecycleTracker, DEFAULT_ROTATION_INTERVALS } from '../tracker.js';
-import type { ItemCategory } from '../tracker.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -30,11 +29,6 @@ function makeItem(overrides: Partial<LoginItem> & { id: string }): LoginItem {
 /** Return an ISO string for `daysAgo` days before NOW. */
 function daysAgo(days: number): string {
   return new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
-}
-
-/** Return an ISO string for `daysAhead` days after NOW. */
-function daysFromNow(days: number): string {
-  return new Date(NOW.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
 }
 
 // ---------------------------------------------------------------------------

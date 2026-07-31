@@ -63,7 +63,8 @@ describe('Password Generator', () => {
         digits: true,
         symbols: false,
       });
-      expect(/[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password)).toBe(false);
+      const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      expect([...password].some((character) => symbols.includes(character))).toBe(false);
     });
 
     it('should throw error for invalid length', () => {

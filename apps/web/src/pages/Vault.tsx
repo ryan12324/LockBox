@@ -4,10 +4,11 @@ import { useSearchStore } from '../store/search.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
 import { copyWithFeedback } from '../lib/copy-utils.js';
+import { syncNativeAutofillIndex } from '../lib/native-autofill.js';
 import { useVaultFilterStore } from '../store/vault.js';
 import type {
   VaultItem,
-  Folder,
+  EncryptedVaultItem,
   PasskeyItem,
   LoginItem,
   SecureNoteItem,
@@ -17,18 +18,6 @@ import type {
 } from '@lockbox/types';
 import { Card, Badge, Button, Input, Select, Aura } from '@lockbox/design';
 import ItemPanel from '../components/ItemPanel.js';
-
-interface EncryptedItem {
-  id: string;
-  type: string;
-  encryptedData: string;
-  folderId: string | null;
-  tags: string | null;
-  favorite: number;
-  revisionDate: string;
-  createdAt: string;
-  deletedAt: string | null;
-}
 
 const typeLabels: Record<string, string> = {
   login: 'Login',
@@ -123,7 +112,7 @@ export default function Vault() {
     item: VaultItem | null;
   } | null>(null);
 
-  const [corruptItems, setCorruptItems] = useState<EncryptedItem[]>([]);
+  const [corruptItems, setCorruptItems] = useState<EncryptedVaultItem[]>([]);
 
   const loadVault = useCallback(async () => {
     if (!session || !userKey) {
@@ -131,14 +120,11 @@ export default function Vault() {
     }
     setLoading(true);
     try {
-      const res = (await api.vault.list(session.token)) as {
-        items: EncryptedItem[];
-        folders: Folder[];
-      };
+      const res = await api.vault.list(session.token);
       setFolders(res.folders);
 
       const decrypted: VaultItem[] = [];
-      const corrupt: EncryptedItem[] = [];
+      const corrupt: EncryptedVaultItem[] = [];
 
       await Promise.all(
         res.items
@@ -156,6 +142,9 @@ export default function Vault() {
       setItems(decrypted);
       setCorruptItems(corrupt);
       indexItems(decrypted).catch(console.error);
+      syncNativeAutofillIndex(decrypted).catch((error) =>
+        console.error('Failed to refresh Android autofill index:', error)
+      );
     } catch (err) {
       console.error('Failed to load vault:', err);
     } finally {

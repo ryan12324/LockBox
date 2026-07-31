@@ -80,34 +80,3 @@ export async function makeAuthHash(
 
   return toBase64(new Uint8Array(derivedBits));
 }
-
-/**
- * Generate a random recovery key for the emergency kit.
- * Returns a base32-encoded 256-bit (32-byte) random key.
- * Formatted in groups of 4 characters separated by dashes for readability.
- */
-export function generateRecoveryKey(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const base32Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-
-  // Encode bytes to base32
-  let bits = 0;
-  let value = 0;
-  let output = '';
-
-  for (let i = 0; i < bytes.length; i++) {
-    value = (value << 8) | bytes[i];
-    bits += 8;
-    while (bits >= 5) {
-      output += base32Chars[(value >>> (bits - 5)) & 31];
-      bits -= 5;
-    }
-  }
-
-  if (bits > 0) {
-    output += base32Chars[(value << (5 - bits)) & 31];
-  }
-
-  // Format in groups of 4 separated by dashes (e.g. ABCD-EFGH-...)
-  return output.match(/.{1,4}/g)?.join('-') ?? output;
-}

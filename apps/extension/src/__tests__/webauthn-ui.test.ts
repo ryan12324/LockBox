@@ -118,6 +118,7 @@ describe('showCreateConsent', () => {
     expect(shadow.innerHTML).toContain('Second');
 
     (shadow.querySelector('[data-action="confirm"]') as HTMLButtonElement).click();
+    expect(await first).toBe(false);
     expect(await second).toBe(true);
   });
 });
@@ -421,6 +422,7 @@ describe('showUnlockPrompt', () => {
 
     const shadow = hosts[0].shadowRoot!;
     (shadow.querySelector('[data-action="cancel"]') as HTMLButtonElement).click();
+    expect(await first).toBe(false);
     expect(await second).toBe(false);
   });
 });

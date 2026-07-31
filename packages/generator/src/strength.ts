@@ -1,4 +1,5 @@
-import { zxcvbn, ZxcvbnResult } from '@zxcvbn-ts/core';
+import { zxcvbn } from '@zxcvbn-ts/core';
+import type { ZxcvbnResult } from '@zxcvbn-ts/core';
 
 export interface StrengthResult {
   score: 0 | 1 | 2 | 3 | 4;

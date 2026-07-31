@@ -35,10 +35,10 @@ describe('generate command (via @lockbox/generator)', () => {
         digits: true,
       });
       // Symbols from the generator: !@#$%^&*()_+-=[]{}|;:,.<>?
-      const hasSymbols = /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password);
-      // With 50 chars, it's extremely unlikely to get no symbols by chance
-      // but we just check the option is accepted
+      const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+      const hasSymbols = [...password].some((character) => symbols.includes(character));
       expect(password.length).toBe(50);
+      expect(hasSymbols).toBe(false);
     });
 
     it('generates password without uppercase', () => {

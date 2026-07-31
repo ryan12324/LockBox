@@ -7,11 +7,13 @@
 
 import { registerPlugin } from '@capacitor/core';
 
-/** Credential data returned by autofill lookup */
-export interface AutofillCredential {
+/** Decrypted login fields sent to native code while the vault is unlocked. */
+export interface AutofillIndexCredential {
   id: string;
+  name: string;
   username: string;
-  uri: string;
+  password: string;
+  uris: string[];
 }
 
 /** Result from checking if autofill service is enabled */
@@ -19,9 +21,8 @@ export interface AutofillEnabledResult {
   enabled: boolean;
 }
 
-/** Result from listing saved credentials for a URI */
-export interface AutofillCredentialsResult {
-  credentials: AutofillCredential[];
+export interface AutofillIndexResult {
+  indexed: number;
 }
 
 /** Passkey metadata returned by autofill passkey lookup */
@@ -44,9 +45,8 @@ export interface AutofillPasskeysResult {
  * Methods:
  * - isEnabled: Checks if LockboxAutofillService is the active autofill provider
  * - requestEnable: Opens Android Settings to let user enable LockboxAutofillService
- * - getCredentialsForUri: Finds matching credentials for a given website URI
- * - saveCredential: Stores a new credential (encrypted blob) for autofill use
- * - removeCredential: Removes a credential from the autofill-accessible store
+ * - replaceCredentialIndex: Atomically rebuilds the biometric-gated local index
+ * - clearCredentialIndex: Clears account data on logout
  */
 export interface AutofillPlugin {
   /** Check if LockboxAutofillService is the active autofill provider */
@@ -55,14 +55,13 @@ export interface AutofillPlugin {
   /** Open Android Settings to enable LockboxAutofillService */
   requestEnable(): Promise<void>;
 
-  /** Find matching credentials for a website URI */
-  getCredentialsForUri(options: { uri: string }): Promise<AutofillCredentialsResult>;
+  /** Rebuild the native index. Native code encrypts every credential immediately. */
+  replaceCredentialIndex(options: {
+    credentials: AutofillIndexCredential[];
+  }): Promise<AutofillIndexResult>;
 
-  /** Store a credential for autofill use (encrypted blob only) */
-  saveCredential(options: { id: string; encryptedData: string; uri: string }): Promise<void>;
-
-  /** Remove a credential from the autofill-accessible store */
-  removeCredential(options: { id: string }): Promise<void>;
+  /** Remove every indexed credential, used when logging out. */
+  clearCredentialIndex(): Promise<void>;
 
   /** Find matching passkeys for a website URI (queries Room DB by rpId) */
   getPasskeysForUri(options: { uri: string }): Promise<AutofillPasskeysResult>;

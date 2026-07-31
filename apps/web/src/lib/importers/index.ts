@@ -82,6 +82,7 @@ function makeLoginItem(
     totp,
     tags: [],
     favorite: false,
+    customFields: notes ? [{ name: 'Notes', value: notes, type: 'text' }] : undefined,
     createdAt: now,
     updatedAt: now,
     revisionDate: now,

@@ -55,6 +55,7 @@ export function Button({
   size = 'md',
   loading = false,
   disabled,
+  type = 'button',
   style,
   children,
   onMouseEnter,
@@ -115,6 +116,7 @@ export function Button({
   return (
     <button
       {...rest}
+      type={type}
       disabled={isDisabled}
       style={{ ...baseStyle, ...style }}
       onMouseEnter={(e) => {

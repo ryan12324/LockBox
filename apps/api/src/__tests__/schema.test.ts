@@ -1,7 +1,19 @@
 import { describe, it, expect } from 'vitest';
-import { users, sessions, vaultItems, folders, aliasSettings } from '../db/schema';
+import {
+  users,
+  sessions,
+  twoFactorChallenges,
+  vaultItems,
+  vaultItemVersions,
+  folders,
+  aliasSettings,
+} from '../db/schema';
 
 describe('Database Schema', () => {
+  it('exports email alias settings', () => {
+    expect(aliasSettings).toBeDefined();
+  });
+
   describe('users table', () => {
     it('should export users table', () => {
       expect(users).toBeDefined();
@@ -39,6 +51,18 @@ describe('Database Schema', () => {
     });
   });
 
+  describe('two_factor_challenges table', () => {
+    it('keeps pre-authentication tokens separate from sessions', () => {
+      expect(twoFactorChallenges).toBeDefined();
+      expect(twoFactorChallenges.constructor.name).toBe('SQLiteTable');
+      expect(twoFactorChallenges.id).toBeDefined();
+      expect(twoFactorChallenges.userId).toBeDefined();
+      expect(twoFactorChallenges.token).toBeDefined();
+      expect(twoFactorChallenges.expiresAt).toBeDefined();
+      expect(twoFactorChallenges.attempts).toBeDefined();
+    });
+  });
+
   describe('folders table', () => {
     it('should export folders table', () => {
       expect(folders).toBeDefined();
@@ -69,6 +93,7 @@ describe('Database Schema', () => {
       expect(vaultItems.type).toBeDefined();
       expect(vaultItems.encryptedData).toBeDefined();
       expect(vaultItems.revisionDate).toBeDefined();
+      expect(vaultItems.serverModifiedAt).toBeDefined();
       expect(vaultItems.createdAt).toBeDefined();
     });
 
@@ -87,13 +112,26 @@ describe('Database Schema', () => {
     });
   });
 
+  describe('vault_item_versions table', () => {
+    it('snapshots ciphertext and authenticated metadata together', () => {
+      expect(vaultItemVersions).toBeDefined();
+      expect(vaultItemVersions.encryptedData).toBeDefined();
+      expect(vaultItemVersions.revisionDate).toBeDefined();
+      expect(vaultItemVersions.folderId).toBeDefined();
+      expect(vaultItemVersions.tags).toBeDefined();
+      expect(vaultItemVersions.favorite).toBeDefined();
+    });
+  });
+
   describe('Schema exports', () => {
     it('should export all tables from db module', async () => {
       const dbModule = await import('../db');
       expect(dbModule.users).toBeDefined();
       expect(dbModule.sessions).toBeDefined();
+      expect(dbModule.twoFactorChallenges).toBeDefined();
       expect(dbModule.folders).toBeDefined();
       expect(dbModule.vaultItems).toBeDefined();
+      expect(dbModule.vaultItemVersions).toBeDefined();
       expect(dbModule.aliasSettings).toBeDefined();
     });
 

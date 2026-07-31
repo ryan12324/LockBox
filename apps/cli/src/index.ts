@@ -14,7 +14,7 @@ const program = new Command();
 program
   .name('lockbox')
   .description('Lockbox CLI — manage your vault from the terminal')
-  .version('0.0.1')
+  .version('1.0.0')
   .option('--api-url <url>', 'API server URL', process.env['LOCKBOX_API_URL'])
   .option('--json', 'Output in JSON format');
 

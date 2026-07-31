@@ -1,24 +1,22 @@
-import React, { useEffect } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth.js';
-import Register from './pages/Register.js';
-import Login from './pages/Login.js';
-import Unlock from './pages/Unlock.js';
-import ShareView from './pages/ShareView.js';
-import Vault from './pages/Vault.js';
-import Trash from './pages/Trash.js';
-import Generator from './pages/Generator.js';
-import Settings from './pages/Settings.js';
-import ImportExport from './pages/ImportExport.js';
-import AISettings from './pages/AISettings.js';
-import Health from './pages/Health.js';
-import Chat from './pages/Chat.js';
-import AppLayout from './components/AppLayout.js';
-import Teams from './pages/Teams.js';
-import TeamDetail from './pages/TeamDetail.js';
-import EmergencyAccess from './pages/EmergencyAccess.js';
 import { AuraProvider } from './providers/AuraProvider.js';
 import { ToastProvider } from './providers/ToastProvider.js';
+
+const Register = lazy(() => import('./pages/Register.js'));
+const Login = lazy(() => import('./pages/Login.js'));
+const Unlock = lazy(() => import('./pages/Unlock.js'));
+const ShareView = lazy(() => import('./pages/ShareView.js'));
+const Vault = lazy(() => import('./pages/Vault.js'));
+const Trash = lazy(() => import('./pages/Trash.js'));
+const Generator = lazy(() => import('./pages/Generator.js'));
+const Settings = lazy(() => import('./pages/Settings.js'));
+const ImportExport = lazy(() => import('./pages/ImportExport.js'));
+const Health = lazy(() => import('./pages/Health.js'));
+const AppLayout = lazy(() => import('./components/AppLayout.js'));
+const Teams = lazy(() => import('./pages/Teams.js'));
+const TeamDetail = lazy(() => import('./pages/TeamDetail.js'));
 const AUTO_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -55,7 +53,17 @@ export default function App() {
   return (
     <AuraProvider>
       <ToastProvider>
-        <Routes>
+        <Suspense
+          fallback={
+            <div
+              role="status"
+              className="min-h-screen flex items-center justify-center text-sm text-[var(--color-text-secondary)]"
+            >
+              Loading Lockbox…
+            </div>
+          }
+        >
+          <Routes>
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/unlock" element={<Unlock />} />
@@ -73,16 +81,14 @@ export default function App() {
             <Route path="/generator" element={<Generator />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/import-export" element={<ImportExport />} />
-            <Route path="/settings/ai" element={<AISettings />} />
             <Route path="/health" element={<Health />} />
-            <Route path="/chat" element={<Chat />} />
             <Route path="/teams" element={<Teams />} />
             <Route path="/teams/:teamId" element={<TeamDetail />} />
-            <Route path="/emergency-access" element={<EmergencyAccess />} />
           </Route>
 
           <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </ToastProvider>
     </AuraProvider>
   );

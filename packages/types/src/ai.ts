@@ -3,7 +3,7 @@
  * Covers: LLM provider configuration, health reports, agent tool calls, breach checks.
  */
 
-import type { VaultItem, LoginItem, Folder } from './vault';
+import type { VaultItem } from './vault';
 
 // ---------------------------------------------------------------------------
 // Provider & Configuration
@@ -84,6 +84,7 @@ export interface BreachCheckResult {
   found: boolean;
   count: number; // Times seen in breaches
   checkedAt: string; // ISO 8601
+  error?: string; // Present when no verdict could be obtained
 }
 
 // ---------------------------------------------------------------------------

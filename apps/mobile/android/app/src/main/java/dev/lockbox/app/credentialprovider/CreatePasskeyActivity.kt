@@ -8,6 +8,9 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.annotation.RequiresApi
+import androidx.credentials.CreatePublicKeyCredentialRequest
+import androidx.credentials.CreatePublicKeyCredentialResponse
+import androidx.credentials.provider.PendingIntentHandler
 import dev.lockbox.app.storage.VaultDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +26,7 @@ import java.security.spec.ECGenParameterSpec
 import java.time.Instant
 
 /**
- * CreatePasskeyActivity — Phase 2 handler for passkey creation.
+ * Creates passkeys selected through Android's credential-provider UI.
  *
  * Launched via PendingIntent from LockboxCredentialProviderService when
  * the user selects "Save passkey to Lockbox" in the system credential picker.
@@ -48,9 +51,9 @@ class CreatePasskeyActivity : Activity() {
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEYSTORE_PREFIX = "lockbox_passkey_"
 
-        // WebAuthn authenticator flags for synced passkey registration
-        // UP=1 | UV=4 | BE=8 | BS=16 | AT=64 = 0x5D
-        private const val REGISTRATION_FLAGS: Byte = 0x5D.toByte()
+        // UP=1 | AT=64. The system picker supplies user presence, but this
+        // activity does not claim biometric verification or cloud backup.
+        private const val REGISTRATION_FLAGS: Byte = 0x41
 
         // AAGUID: 16 zero bytes (anonymous software authenticator)
         private val AAGUID = ByteArray(16)
@@ -59,19 +62,16 @@ class CreatePasskeyActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val request = intent.getParcelableExtra(
-            "android.service.credentials.extra.CREATE_CREDENTIAL_REQUEST",
-            android.service.credentials.CreateCredentialRequest::class.java
-        )
-
-        if (request == null) {
+        val providerRequest = PendingIntentHandler.retrieveProviderCreateCredentialRequest(intent)
+        val request = providerRequest?.callingRequest as? CreatePublicKeyCredentialRequest
+        if (providerRequest == null || request == null) {
             finishWithError("No create credential request")
             return
         }
 
         activityScope.launch {
             try {
-                handleCreateRequest(request)
+                handleCreateRequest(request, providerRequest.callingAppInfo)
             } catch (e: Exception) {
                 finishWithError("Create passkey failed: ${e.message}")
             }
@@ -79,23 +79,49 @@ class CreatePasskeyActivity : Activity() {
     }
 
     private suspend fun handleCreateRequest(
-        request: android.service.credentials.CreateCredentialRequest
+        request: CreatePublicKeyCredentialRequest,
+        callingAppInfo: androidx.credentials.provider.CallingAppInfo
     ) {
-        val requestJson = request.credentialData.getString(
-            "androidx.credentials.BUNDLE_KEY_REQUEST_JSON"
-        ) ?: throw IllegalArgumentException("Missing request JSON")
-
-        val json = JSONObject(requestJson)
+        val json = JSONObject(request.requestJson)
         val rpJson = json.getJSONObject("rp")
         val rpId = rpJson.getString("id")
+        require(isValidRpId(rpId)) { "Invalid relying-party ID" }
         val rpName = rpJson.optString("name", rpId)
 
         val userJson = json.getJSONObject("user")
         val userName = userJson.getString("name")
         val userDisplayName = userJson.optString("displayName", userName)
         val userId = userJson.getString("id") // base64url
+        decodeCanonicalBase64url(userId, 1, 64)
 
         val challengeB64 = json.getString("challenge") // base64url
+        decodeCanonicalBase64url(challengeB64, 16, 1024)
+
+        val supportedAlgorithm = json.getJSONArray("pubKeyCredParams").let { params ->
+            (0 until params.length()).any { index ->
+                val parameter = params.optJSONObject(index)
+                parameter?.optString("type") == "public-key" && parameter.optInt("alg") == -7
+            }
+        }
+        require(supportedAlgorithm) { "No supported public-key algorithm" }
+
+        val userVerification = json.optJSONObject("authenticatorSelection")
+            ?.optString("userVerification", "preferred")
+            ?: "preferred"
+        require(userVerification != "required") {
+            "This provider cannot satisfy required user verification"
+        }
+
+        val db = VaultDatabase.getInstance(applicationContext)
+        val excludedCredentials = json.optJSONArray("excludeCredentials")
+        if (excludedCredentials != null && excludedCredentials.length() > 0) {
+            val excludedIds = (0 until excludedCredentials.length()).mapNotNull { index ->
+                excludedCredentials.optJSONObject(index)?.optString("id")?.takeIf { it.isNotBlank() }
+            }.toSet()
+            require(db.passkeyMetadataDao().getByRpId(rpId).none { it.credentialId in excludedIds }) {
+                "A matching excluded credential already exists"
+            }
+        }
 
         // Generate a random credential ID (32 bytes)
         val credentialIdBytes = ByteArray(32)
@@ -114,15 +140,17 @@ class CreatePasskeyActivity : Activity() {
         val x = toUnsigned32Bytes(ecPoint.affineX)
         val y = toUnsigned32Bytes(ecPoint.affineY)
 
-        // Build clientDataJSON
+        val origin = request.origin?.takeIf { it.isNotBlank() }
+            ?: getCallingAppOrigin(callingAppInfo)
+
+        // Build clientDataJSON bound to the verified calling application.
         val clientDataJson = JSONObject().apply {
             put("type", "webauthn.create")
             put("challenge", challengeB64)
-            put("origin", "android:apk-key-hash:lockbox")
-            put("androidPackageName", packageName)
+            put("origin", origin)
+            put("androidPackageName", callingAppInfo.packageName)
         }.toString()
         val clientDataBytes = clientDataJson.toByteArray(Charsets.UTF_8)
-        val clientDataHash = MessageDigest.getInstance("SHA-256").digest(clientDataBytes)
 
         // Build COSE public key (77 bytes)
         val coseKey = buildCoseKey(x, y)
@@ -135,7 +163,6 @@ class CreatePasskeyActivity : Activity() {
         val attestationObject = buildAttestationObject(authData)
 
         // Store passkey metadata in Room DB
-        val db = VaultDatabase.getInstance(applicationContext)
         db.passkeyMetadataDao().insert(
             PasskeyMetadataEntity(
                 credentialId = credentialId,
@@ -160,24 +187,16 @@ class CreatePasskeyActivity : Activity() {
             })
         }
 
-        val responseData = android.os.Bundle().apply {
-            putString(
-                "androidx.credentials.BUNDLE_KEY_REGISTRATION_RESPONSE_JSON",
-                responseJson.toString()
-            )
-        }
-
-        val response = android.service.credentials.CreateCredentialResponse(responseData)
-
-        setResult(RESULT_OK, Intent().apply {
-            putExtra("android.service.credentials.extra.CREATE_CREDENTIAL_RESPONSE", response)
-        })
+        val response = CreatePublicKeyCredentialResponse(responseJson.toString())
+        val resultIntent = Intent()
+        PendingIntentHandler.setCreateCredentialResponse(resultIntent, response)
+        setResult(RESULT_OK, resultIntent)
         finish()
     }
 
     /**
-     * Generate an EC P-256 key pair in Android Keystore.
-     * Key requires user authentication (biometric/screen lock).
+     * Generate an EC P-256 key pair in Android Keystore. The system credential
+     * picker establishes user presence; this implementation does not claim UV.
      */
     private fun generateKeystoreKeyPair(alias: String) {
         val keyPairGenerator = KeyPairGenerator.getInstance(
@@ -191,7 +210,7 @@ class CreatePasskeyActivity : Activity() {
         )
             .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
             .setDigests(KeyProperties.DIGEST_SHA256)
-            .setUserAuthenticationRequired(false) // Service needs to sign without prompt
+            .setUserAuthenticationRequired(false)
             .build()
 
         keyPairGenerator.initialize(spec)

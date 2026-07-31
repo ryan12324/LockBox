@@ -16,9 +16,6 @@ export default function ShareView() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
-    document.documentElement.classList.add('dark');
-    document.body.classList.add('bg-gray-900');
-
     async function fetchSharedItem() {
       if (!shareId) {
         setError('Invalid share link format.');
@@ -53,6 +50,17 @@ export default function ShareView() {
 
     fetchSharedItem();
   }, [shareId]);
+
+  function safeExternalUrl(value: string): string | null {
+    try {
+      const candidate = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+      return candidate.protocol === 'https:' || candidate.protocol === 'http:'
+        ? candidate.href
+        : null;
+    } catch {
+      return null;
+    }
+  }
 
   async function copyToClipboard(text: string, field: string) {
     if (!text) return;
@@ -149,31 +157,34 @@ export default function ShareView() {
               URLs
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {loginItem.uris.filter(Boolean).map((uri: string, idx: number) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <a
-                    href={uri.startsWith('http') ? uri : `https://${uri}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      flex: 1,
-                      padding: '8px 12px',
-                      borderRadius: 'var(--radius-organic-lg)',
-                      background: 'var(--color-surface)',
-                      boxShadow: 'var(--shadow-sm)',
-                      color: 'var(--color-primary)',
-                      textDecoration: 'none',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      display: 'block',
-                      transition: 'box-shadow 0.15s',
-                    }}
-                  >
-                    {uri}
-                  </a>
-                </div>
-              ))}
+              {loginItem.uris.filter(Boolean).map((uri: string) => {
+                const href = safeExternalUrl(uri);
+                const style: React.CSSProperties = {
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius-organic-lg)',
+                  background: 'var(--color-surface)',
+                  boxShadow: 'var(--shadow-sm)',
+                  color: href ? 'var(--color-primary)' : 'var(--color-text-secondary)',
+                  textDecoration: 'none',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  display: 'block',
+                  transition: 'box-shadow 0.15s',
+                };
+                return (
+                  <div key={uri} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {href ? (
+                      <a href={href} target="_blank" rel="noopener noreferrer" style={style}>
+                        {uri}
+                      </a>
+                    ) : (
+                      <span style={style}>{uri}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

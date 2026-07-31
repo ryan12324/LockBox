@@ -10,8 +10,18 @@ import { createDb } from '../db/index.js';
 import { vaultItems, attachments } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_USER_QUOTA = 100 * 1024 * 1024; // 100MB
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB plaintext
+export const MAX_USER_QUOTA = 100 * 1024 * 1024; // 100MB plaintext
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Exact upper bound for base64(iv).base64(ciphertext+tag). */
+export function encryptedAttachmentSize(plaintextSize: number): number {
+  return 16 + 1 + 4 * Math.ceil((plaintextSize + 16) / 3);
+}
+
+/** Encrypted payload plus conservative multipart/form-data overhead. */
+export const MAX_ATTACHMENT_REQUEST_SIZE = encryptedAttachmentSize(MAX_FILE_SIZE) + 64 * 1024;
 
 type Bindings = { DB: D1Database; ATTACHMENTS: R2Bucket };
 type Variables = { userId: string };
@@ -39,19 +49,34 @@ attachmentRoutes.post('/items/:itemId/attachments', async (c) => {
   // Parse multipart body
   const body = await c.req.parseBody();
   const file = body['file'];
+  const attachmentId = body['attachmentId'];
+  const plaintextSizeValue = body['plaintextSize'];
   const encryptedName = body['encryptedName'];
   const encryptedMimeType = body['encryptedMimeType'];
 
   if (!file || !(file instanceof File)) {
     return c.json({ error: 'Missing file' }, 400);
   }
-  if (!encryptedName || !encryptedMimeType) {
+  if (typeof attachmentId !== 'string' || !UUID_PATTERN.test(attachmentId)) {
+    return c.json({ error: 'attachmentId must be a valid client-generated UUID' }, 400);
+  }
+  if (typeof encryptedName !== 'string' || typeof encryptedMimeType !== 'string') {
     return c.json({ error: 'Missing encryptedName or encryptedMimeType' }, 400);
   }
 
-  // Check file size limit (10MB)
-  if (file.size > MAX_FILE_SIZE) {
+  if (typeof plaintextSizeValue !== 'string' || !/^\d+$/.test(plaintextSizeValue)) {
+    return c.json({ error: 'plaintextSize must be a non-negative integer' }, 400);
+  }
+  const plaintextSize = Number(plaintextSizeValue);
+  if (!Number.isSafeInteger(plaintextSize) || plaintextSize > MAX_FILE_SIZE) {
     return c.json({ error: 'File too large. Maximum size is 10MB.' }, 413);
+  }
+
+  // The encrypted upload is base64 encoded, so it is larger than the 10MB
+  // plaintext limit. Bind its maximum size to the declared plaintext size to
+  // prevent clients under-reporting quota usage.
+  if (file.size !== encryptedAttachmentSize(plaintextSize)) {
+    return c.json({ error: 'Encrypted file size does not match plaintextSize' }, 400);
   }
 
   // Check user quota (100MB total)
@@ -61,27 +86,43 @@ attachmentRoutes.post('/items/:itemId/attachments', async (c) => {
     .where(eq(attachments.userId, userId));
 
   const totalUsed = userAttachments.reduce((sum, a) => sum + a.size, 0);
-  if (totalUsed + file.size > MAX_USER_QUOTA) {
+  if (totalUsed + plaintextSize > MAX_USER_QUOTA) {
     return c.json({ error: 'Storage quota exceeded. Maximum is 100MB.' }, 413);
   }
 
-  const attachmentId = crypto.randomUUID();
+  const existingAttachment = await db
+    .select({ id: attachments.id })
+    .from(attachments)
+    .where(eq(attachments.id, attachmentId))
+    .get();
+  if (existingAttachment) {
+    return c.json({ error: 'Attachment ID already exists' }, 409);
+  }
+
   const now = new Date().toISOString();
 
   // Store encrypted blob in R2
   const r2Key = `${userId}/${itemId}/${attachmentId}`;
-  await c.env.ATTACHMENTS.put(r2Key, file.stream());
+  // R2 requires a body with a known length. `File.stream()` can lose that
+  // length through multipart parsing in workerd/Miniflare.
+  await c.env.ATTACHMENTS.put(r2Key, await file.arrayBuffer());
 
-  // Store metadata in DB
-  await db.insert(attachments).values({
-    id: attachmentId,
-    itemId,
-    userId,
-    encryptedName: encryptedName as string,
-    encryptedMimeType: encryptedMimeType as string,
-    size: file.size,
-    createdAt: now,
-  });
+  // Store metadata in DB. Remove the R2 object if D1 rejects the insert so a
+  // failed request cannot leak quota as an orphaned object.
+  try {
+    await db.insert(attachments).values({
+      id: attachmentId,
+      itemId,
+      userId,
+      encryptedName,
+      encryptedMimeType,
+      size: plaintextSize,
+      createdAt: now,
+    });
+  } catch (error) {
+    await c.env.ATTACHMENTS.delete(r2Key);
+    throw error;
+  }
 
   return c.json(
     {
@@ -90,7 +131,7 @@ attachmentRoutes.post('/items/:itemId/attachments', async (c) => {
         itemId,
         encryptedName,
         encryptedMimeType,
-        size: file.size,
+        size: plaintextSize,
         createdAt: now,
       },
     },
@@ -118,7 +159,16 @@ attachmentRoutes.get('/items/:itemId/attachments', async (c) => {
     .from(attachments)
     .where(and(eq(attachments.itemId, itemId), eq(attachments.userId, userId)));
 
-  return c.json({ attachments: itemAttachments });
+  const userAttachments = await db
+    .select({ size: attachments.size })
+    .from(attachments)
+    .where(eq(attachments.userId, userId));
+  const used = userAttachments.reduce((sum, attachment) => sum + attachment.size, 0);
+
+  return c.json({
+    attachments: itemAttachments,
+    quota: { used, limit: MAX_USER_QUOTA },
+  });
 });
 
 // ─── GET /items/:itemId/attachments/:attachmentId ─────────────────────────────
@@ -159,7 +209,9 @@ attachmentRoutes.get('/items/:itemId/attachments/:attachmentId', async (c) => {
   return new Response(object.body, {
     headers: {
       'Content-Type': 'application/octet-stream',
-      'Content-Length': String(attachment.size),
+      // `attachments.size` is the plaintext quota size; the body is the
+      // larger base64-encoded ciphertext stored in R2.
+      'Content-Length': String(object.size),
     },
   });
 });

@@ -7,8 +7,8 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
   const [twoFaSetupData, setTwoFaSetupData] = useState<{
     secret: string;
     otpauthUri: string;
-    backupCodes: string[];
   } | null>(null);
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
   const [twoFaCode, setTwoFaCode] = useState('');
   const [twoFaLoading, setTwoFaLoading] = useState(false);
   const [twoFaError, setTwoFaError] = useState('');
@@ -20,15 +20,35 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
   const [travelLoading, setTravelLoading] = useState(false);
   const [travelError, setTravelError] = useState('');
   const [aliasProvider, setAliasProvider] = useState('simplelogin');
+  const [savedAliasProvider, setSavedAliasProvider] = useState('simplelogin');
   const [aliasApiKey, setAliasApiKey] = useState('');
+  const [aliasConfigured, setAliasConfigured] = useState(false);
   const [aliasTesting, setAliasTesting] = useState(false);
   const [aliasResult, setAliasResult] = useState<{ success: boolean; error?: string } | null>(null);
   const [lockTimeout, setLockTimeout] = useState(30);
   const [lockTimeoutSaving, setLockTimeoutSaving] = useState(false);
 
   useEffect(() => {
-    sendMessage<{ minutes: number }>({ type: 'get-lock-timeout' })
-      .then((res) => setLockTimeout(res.minutes))
+    Promise.all([
+      sendMessage<{ minutes: number }>({ type: 'get-lock-timeout' }),
+      sendMessage<{ success: boolean; enabled?: boolean }>({ type: 'get-2fa-status' }),
+      sendMessage<{ success: boolean; enabled?: boolean }>({ type: 'get-travel-mode' }),
+      sendMessage<{
+        success: boolean;
+        configured?: boolean;
+        provider?: string;
+      }>({ type: 'get-alias-config' }),
+    ])
+      .then(([timeout, twoFactor, travel, alias]) => {
+        setLockTimeout(timeout.minutes);
+        if (twoFactor.success) setTwoFaEnabled(Boolean(twoFactor.enabled));
+        if (travel.success) setTravelMode(Boolean(travel.enabled));
+        if (alias.success && alias.configured && alias.provider) {
+          setAliasConfigured(true);
+          setAliasProvider(alias.provider);
+          setSavedAliasProvider(alias.provider);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -53,14 +73,12 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
         success: boolean;
         secret?: string;
         otpauthUri?: string;
-        backupCodes?: string[];
         error?: string;
       }>({ type: 'setup-2fa' });
       if (res.success && res.otpauthUri) {
         setTwoFaSetupData({
           secret: res.secret!,
           otpauthUri: res.otpauthUri,
-          backupCodes: res.backupCodes ?? [],
         });
       } else {
         setTwoFaError(res.error ?? 'Failed to setup 2FA');
@@ -77,16 +95,22 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
     setTwoFaLoading(true);
     setTwoFaError('');
     try {
-      const res = await sendMessage<{ success: boolean; error?: string }>({
+      const res = await sendMessage<{
+        success: boolean;
+        backupCodes?: string[];
+        error?: string;
+      }>({
         type: 'verify-2fa',
         code: twoFaCode.trim(),
       });
       if (res.success) {
+        const codes = res.backupCodes ?? [];
+        setBackupCodes(codes);
         setTwoFaEnabled(true);
         setTwoFaSetupData(null);
         setTwoFaCode('');
         setTwoFaSuccess('2FA enabled successfully');
-        if (twoFaSetupData?.backupCodes.length) setShowBackupCodes(true);
+        setShowBackupCodes(codes.length > 0);
       } else {
         setTwoFaError(res.error ?? 'Invalid code');
       }
@@ -110,6 +134,8 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
         setTwoFaEnabled(false);
         setShowDisable(false);
         setDisableCode('');
+        setBackupCodes([]);
+        setShowBackupCodes(false);
         setTwoFaSuccess('2FA disabled');
       } else {
         setTwoFaError(res.error ?? 'Invalid code');
@@ -142,21 +168,57 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
   }
 
   async function handleAliasSave() {
+    if (!aliasApiKey.trim() && (!aliasConfigured || aliasProvider !== savedAliasProvider)) {
+      setAliasResult({ success: false, error: 'Enter an API key to save this provider' });
+      return;
+    }
     setAliasTesting(true);
     setAliasResult(null);
     try {
-      const res = await sendMessage<{ success: boolean; alias?: string; error?: string }>({
-        type: 'generate-alias',
+      const res = await sendMessage<{
+        success: boolean;
+        configured?: boolean;
+        provider?: string;
+        aliasCount?: number;
+        error?: string;
+      }>({
+        type: 'save-alias-config',
         provider: aliasProvider,
         apiKey: aliasApiKey,
       });
-      setAliasResult(
-        res.success
-          ? { success: true }
-          : { success: false, error: res.error ?? 'Connection failed' }
-      );
+      if (res.success) {
+        setAliasConfigured(true);
+        setSavedAliasProvider(res.provider ?? aliasProvider);
+        setAliasProvider(res.provider ?? aliasProvider);
+        setAliasApiKey('');
+        setAliasResult({ success: true });
+      } else {
+        setAliasResult({ success: false, error: res.error ?? 'Connection failed' });
+      }
     } catch {
       setAliasResult({ success: false, error: 'Test failed' });
+    } finally {
+      setAliasTesting(false);
+    }
+  }
+
+  async function handleAliasDelete() {
+    setAliasTesting(true);
+    setAliasResult(null);
+    try {
+      const res = await sendMessage<{ success: boolean; error?: string }>({
+        type: 'delete-alias-config',
+      });
+      if (!res.success) throw new Error(res.error ?? 'Failed to remove configuration');
+      setAliasConfigured(false);
+      setAliasProvider('simplelogin');
+      setSavedAliasProvider('simplelogin');
+      setAliasApiKey('');
+    } catch (err) {
+      setAliasResult({
+        success: false,
+        error: err instanceof Error ? err.message : 'Failed to remove configuration',
+      });
     } finally {
       setAliasTesting(false);
     }
@@ -272,15 +334,15 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
                   Disable 2FA
                 </Button>
               )}
-              {showBackupCodes && twoFaSetupData && (
+              {showBackupCodes && backupCodes.length > 0 && (
                 <Card variant="surface" padding="sm">
                   <div className="text-xs font-semibold text-[var(--color-text)] mb-2">
                     Backup Codes (save these securely)
                   </div>
                   <div className="grid grid-cols-2 gap-1">
-                    {twoFaSetupData.backupCodes.map((code, idx) => (
+                    {backupCodes.map((code) => (
                       <div
-                        key={idx}
+                        key={code}
                         className="font-mono text-xs text-[var(--color-primary)] bg-[var(--color-bg-subtle)] px-2 py-1 rounded-[var(--radius-sm)]"
                       >
                         {code}
@@ -396,16 +458,18 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
             />
             <Input
               type="password"
-              label="API Key"
+              label={aliasConfigured ? 'API Key (configured)' : 'API Key'}
               value={aliasApiKey}
               onChange={(e) => setAliasApiKey(e.target.value)}
-              placeholder="Enter API key"
+              placeholder={aliasConfigured ? 'Enter a new key to replace it' : 'Enter API key'}
             />
             {aliasResult && (
               <div
                 className={`p-2 rounded-[var(--radius-sm)] text-xs border ${aliasResult.success ? 'bg-[var(--color-success-subtle)] border-[var(--color-success)] text-[var(--color-success)]' : 'bg-[var(--color-error-subtle)] border-[var(--color-error)] text-[var(--color-error)]'}`}
               >
-                {aliasResult.success ? '✓ Connection successful' : `✕ ${aliasResult.error}`}
+                {aliasResult.success
+                  ? '✓ Connection successful and configuration saved'
+                  : `✕ ${aliasResult.error}`}
               </div>
             )}
             <Button
@@ -415,8 +479,23 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
               disabled={aliasTesting}
               style={{ width: '100%' }}
             >
-              {aliasTesting ? 'Testing...' : 'Test & Save'}
+              {aliasTesting
+                ? 'Testing...'
+                : aliasConfigured && !aliasApiKey
+                  ? 'Test Connection'
+                  : 'Test & Save'}
             </Button>
+            {aliasConfigured && (
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleAliasDelete}
+                disabled={aliasTesting}
+                style={{ width: '100%' }}
+              >
+                Remove Configuration
+              </Button>
+            )}
           </div>
         </div>
       </div>

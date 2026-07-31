@@ -10,8 +10,22 @@ import { createDb } from '../db/index.js';
 import { vaultItems } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 
-const MAX_DOC_SIZE = 50 * 1024 * 1024; // 50MB
-const MAX_DOC_QUOTA = 500 * 1024 * 1024; // 500MB
+export const MAX_DOC_SIZE = 50 * 1024 * 1024; // 50MB plaintext
+export const MAX_DOC_QUOTA = 500 * 1024 * 1024; // 500MB plaintext
+export const DOCUMENT_ENCRYPTION_OVERHEAD = 33; // magic + version + IV + GCM tag
+export const MAX_DOCUMENT_REQUEST_SIZE = MAX_DOC_SIZE + DOCUMENT_ENCRYPTION_OVERHEAD + 64 * 1024;
+
+function getPlaintextSize(object: R2Object): number {
+  const declared = object.customMetadata?.['plaintextSize'];
+  if (declared && /^\d+$/.test(declared)) {
+    const parsed = Number(declared);
+    if (Number.isSafeInteger(parsed) && parsed >= 0) return parsed;
+  }
+
+  // Legacy objects did not carry plaintext metadata. Conservatively count the
+  // stored bytes so they can never under-count quota.
+  return object.size;
+}
 
 type Bindings = { DB: D1Database; ATTACHMENTS: R2Bucket };
 type Variables = { userId: string };
@@ -40,14 +54,22 @@ documentRoutes.post('/items/:itemId/document', async (c) => {
   // Parse multipart body
   const body = await c.req.parseBody();
   const file = body['file'];
+  const plaintextSizeValue = body['plaintextSize'];
 
   if (!file || !(file instanceof File)) {
     return c.json({ error: 'Missing file' }, 400);
   }
 
-  // Check file size limit (50MB)
-  if (file.size > MAX_DOC_SIZE) {
+  if (typeof plaintextSizeValue !== 'string' || !/^\d+$/.test(plaintextSizeValue)) {
+    return c.json({ error: 'plaintextSize must be a non-negative integer' }, 400);
+  }
+  const plaintextSize = Number(plaintextSizeValue);
+  if (!Number.isSafeInteger(plaintextSize) || plaintextSize > MAX_DOC_SIZE) {
     return c.json({ error: 'File too large. Maximum size is 50MB.' }, 413);
+  }
+
+  if (file.size !== plaintextSize + DOCUMENT_ENCRYPTION_OVERHEAD) {
+    return c.json({ error: 'Encrypted file size does not match plaintextSize' }, 400);
   }
 
   // Check user quota (500MB total documents)
@@ -56,22 +78,25 @@ documentRoutes.post('/items/:itemId/document', async (c) => {
     .from(vaultItems)
     .where(and(eq(vaultItems.userId, userId), eq(vaultItems.type, 'document')));
 
-  let totalUsed = 0;
+  let totalUsedExcludingCurrent = 0;
   for (const doc of userDocs) {
     const r2Key = `docs/${userId}/${doc.id}`;
     const obj = await c.env.ATTACHMENTS.head(r2Key);
-    if (obj) totalUsed += obj.size;
+    if (obj && doc.id !== itemId) totalUsedExcludingCurrent += getPlaintextSize(obj);
   }
 
-  if (totalUsed + file.size > MAX_DOC_QUOTA) {
+  if (totalUsedExcludingCurrent + plaintextSize > MAX_DOC_QUOTA) {
     return c.json({ error: 'Document storage quota exceeded. Maximum is 500MB.' }, 413);
   }
 
   // Store in R2 at key docs/${userId}/${itemId}
   const r2Key = `docs/${userId}/${itemId}`;
-  await c.env.ATTACHMENTS.put(r2Key, file.stream());
+  // Preserve a known body length for R2 after multipart parsing.
+  await c.env.ATTACHMENTS.put(r2Key, await file.arrayBuffer(), {
+    customMetadata: { plaintextSize: String(plaintextSize) },
+  });
 
-  return c.json({ success: true, size: file.size });
+  return c.json({ success: true, size: plaintextSize });
 });
 
 // ─── GET /items/:itemId/document ─────────────────────────────────────────────
@@ -140,7 +165,7 @@ documentRoutes.get('/documents/quota', async (c) => {
   for (const doc of userDocs) {
     const r2Key = `docs/${userId}/${doc.id}`;
     const obj = await c.env.ATTACHMENTS.head(r2Key);
-    if (obj) used += obj.size;
+    if (obj) used += getPlaintextSize(obj);
   }
 
   return c.json({ used, limit: MAX_DOC_QUOTA });

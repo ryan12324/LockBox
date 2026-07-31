@@ -6,8 +6,6 @@
 
 import type { AIProvider, AIProviderConfig } from '@lockbox/types';
 
-const SETTINGS_STORAGE_KEY = 'lockbox:ai:providers';
-
 /**
  * In-memory store for decrypted provider configs.
  * Never persisted to disk in plaintext.

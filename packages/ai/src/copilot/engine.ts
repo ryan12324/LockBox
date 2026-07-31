@@ -127,13 +127,21 @@ export class SecurityCopilot {
    * 4. Determines trend from `previousScore` if provided
    */
   async evaluate(vault: LoginItem[], options: CopilotOptions = {}): Promise<SecurityPosture> {
-    const { ageThresholdDays = DEFAULT_AGE_THRESHOLD_DAYS, breachResults, previousScore } = options;
+    const {
+      ageThresholdDays = DEFAULT_AGE_THRESHOLD_DAYS,
+      criticalAgeDays = DEFAULT_CRITICAL_AGE_DAYS,
+      breachResults,
+      previousScore,
+    } = options;
 
     // 1. Aggregate health analysis
     const healthSummary = await analyzeVaultHealth(vault, { ageThresholdDays });
 
     // 2. Generate actions
-    const actions = this.generateActions(vault, healthSummary, breachResults);
+    const actions = this.generateActions(vault, healthSummary, breachResults, {
+      ageThresholdDays,
+      criticalAgeDays,
+    });
 
     // 3. Calculate score
     const score = this.calculateScore(healthSummary, actions);
@@ -156,16 +164,20 @@ export class SecurityCopilot {
    * 1. critical — breached passwords
    * 2. high     — reused passwords
    * 3. medium   — weak passwords (score < 3)
-   * 4. low      — old passwords (> ageThresholdDays)
+   * 4. low/high — old/critically old passwords
    * 5. medium   — items without TOTP on 2FA-capable domains
    */
   generateActions(
     vault: LoginItem[],
     healthSummary: VaultHealthSummary,
-    breachResults?: Map<string, BreachCheckResult>
+    breachResults?: Map<string, BreachCheckResult>,
+    options: Pick<CopilotOptions, 'ageThresholdDays' | 'criticalAgeDays'> = {}
   ): SecurityAction[] {
     const actions: SecurityAction[] = [];
-    const { ageThresholdDays = DEFAULT_AGE_THRESHOLD_DAYS } = {} as CopilotOptions;
+    const {
+      ageThresholdDays = DEFAULT_AGE_THRESHOLD_DAYS,
+      criticalAgeDays = DEFAULT_CRITICAL_AGE_DAYS,
+    } = options;
 
     // --- 1. Critical: Breached passwords ---
     if (breachResults) {
@@ -229,16 +241,20 @@ export class SecurityCopilot {
 
     // --- 4. Low: Old passwords ---
     const now = Date.now();
-    const thresholdMs = DEFAULT_AGE_THRESHOLD_DAYS * 24 * 60 * 60 * 1000;
+    const thresholdMs = ageThresholdDays * 24 * 60 * 60 * 1000;
+    const criticalThresholdMs = criticalAgeDays * 24 * 60 * 60 * 1000;
     for (const item of vault) {
       const ageMs = now - new Date(item.updatedAt).getTime();
       if (ageMs > thresholdMs) {
         const days = Math.floor(ageMs / (1000 * 60 * 60 * 24));
+        const isCriticalAge = ageMs > criticalThresholdMs;
         actions.push({
-          priority: 'low',
+          priority: isCriticalAge ? 'high' : 'low',
           type: 'rotate',
           affectedItems: [item.id],
-          message: `Password for ${item.name} hasn't been changed in ${days} days.`,
+          message: `Password for ${item.name} hasn't been changed in ${days} days.${
+            isCriticalAge ? ' Rotate it as soon as possible.' : ''
+          }`,
         });
       }
     }

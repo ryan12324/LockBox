@@ -61,9 +61,6 @@ describe('checkSiteAgainstEntries', () => {
   });
 
   it('matches deep subdomain to parent domain', () => {
-    const result = checkSiteAgainstEntries('api.app.github.com', MOCK_ENTRIES);
-    // Only checks one level up (app.github.com), not github.com
-    // This depends on implementation - let's check
     const result2 = checkSiteAgainstEntries('mail.google.com', MOCK_ENTRIES);
     expect(result2.supports2fa).toBe(true);
   });

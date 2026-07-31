@@ -58,7 +58,15 @@ interface VaultItemDao {
     /**
      * Update the sync status of a specific item.
      */
-    @Query("UPDATE vault_items SET syncStatus = :syncStatus WHERE id = :id")
+    @Query(
+        """UPDATE vault_items
+           SET syncStatus = :syncStatus,
+               baseRevisionDate = CASE
+                   WHEN :syncStatus = 'synced' THEN revisionDate
+                   ELSE baseRevisionDate
+               END
+           WHERE id = :id"""
+    )
     suspend fun updateSyncStatus(id: String, syncStatus: String)
 
     /**

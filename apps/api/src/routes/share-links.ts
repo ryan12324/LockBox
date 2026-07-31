@@ -4,7 +4,7 @@
  */
 
 import { Hono } from 'hono';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, gte, lt, or, sql } from 'drizzle-orm';
 import { createDb } from '../db/index.js';
 import { shareLinks } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -54,19 +54,50 @@ shareLinkRoutes.post('/', authMiddleware, async (c) => {
     );
   }
 
+  const expiryTime = Date.parse(expiresAt);
+  const canonicalExpiry = Number.isFinite(expiryTime) ? new Date(expiryTime).toISOString() : '';
+  const normalizedMaxViews = typeof maxViews === 'number' ? maxViews : 1;
+  const normalizedId = typeof id === 'string' ? id.toLowerCase() : '';
+  const normalizedTokenHash = typeof tokenHash === 'string' ? tokenHash.toLowerCase() : '';
+  if (
+    !/^[a-f0-9]{32}$/.test(normalizedId) ||
+    !/^[a-f0-9]{64}$/.test(normalizedTokenHash) ||
+    !encryptedItem.includes('.') ||
+    encryptedItem.length < 3 ||
+    encryptedItem.length > 900_000 ||
+    itemName.trim().length === 0 ||
+    itemName.length > 200 ||
+    canonicalExpiry !== expiresAt ||
+    expiryTime <= Date.now() ||
+    expiryTime > Date.now() + 30 * 24 * 60 * 60 * 1000 ||
+    !Number.isInteger(normalizedMaxViews) ||
+    normalizedMaxViews < 0 ||
+    normalizedMaxViews > 10_000
+  ) {
+    return c.json({ error: 'Invalid share link fields' }, 400);
+  }
+
   const db = createDb(c.env.DB);
 
-  await db.insert(shareLinks).values({
-    id,
-    userId,
-    encryptedItem,
-    tokenHash,
-    itemName,
-    maxViews: typeof maxViews === 'number' ? maxViews : 1,
-    expiresAt,
-  });
+  const inserted = await db
+    .insert(shareLinks)
+    .values({
+      id: normalizedId,
+      userId,
+      encryptedItem,
+      tokenHash: normalizedTokenHash,
+      itemName: itemName.trim(),
+      maxViews: normalizedMaxViews,
+      expiresAt,
+    })
+    .onConflictDoNothing()
+    .returning({ id: shareLinks.id });
+  if (inserted.length === 0) return c.json({ error: 'Share link already exists' }, 409);
 
-  return c.json({ id, itemName, expiresAt }, 201);
+  return c.json(
+    { id: normalizedId, itemName: itemName.trim(), expiresAt, maxViews: normalizedMaxViews },
+    201
+  );
 });
 
 // ─── GET /:id/redeem — Redeem share link (auth via Bearer token hash) ────────
@@ -79,10 +110,21 @@ shareLinkRoutes.get('/:id/redeem', async (c) => {
   }
 
   const token = authHeader.slice(7);
+  if (!/^[A-Za-z0-9+/]{22}==$/.test(token)) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
   const db = createDb(c.env.DB);
 
   // Decode base64 token back to raw bytes, then SHA-256 to match stored hash
-  const binary = atob(token);
+  let binary: string;
+  try {
+    binary = atob(token);
+  } catch {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
+  if (binary.length !== 16 || btoa(binary) !== token) {
+    return c.json({ error: 'Invalid token' }, 401);
+  }
   const tokenBytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) tokenBytes[i] = binary.charCodeAt(i);
   const hashBuffer = await crypto.subtle.digest('SHA-256', tokenBytes);
@@ -95,19 +137,28 @@ shareLinkRoutes.get('/:id/redeem', async (c) => {
   if (!timingSafeEqual(link.tokenHash, tokenHash)) return c.json({ error: 'Invalid token' }, 401);
 
   const now = new Date().toISOString();
-  if (link.expiresAt < now) return c.json({ error: 'Share link expired' }, 410);
-  if (link.viewCount >= link.maxViews) return c.json({ error: 'Maximum views reached' }, 410);
-
-  // Increment view count
-  await db
+  const redeemed = await db
     .update(shareLinks)
-    .set({ viewCount: link.viewCount + 1 })
-    .where(eq(shareLinks.id, linkId));
+    .set({ viewCount: sql`${shareLinks.viewCount} + 1` })
+    .where(
+      and(
+        eq(shareLinks.id, linkId),
+        gte(shareLinks.expiresAt, now),
+        or(eq(shareLinks.maxViews, 0), lt(shareLinks.viewCount, shareLinks.maxViews))
+      )
+    )
+    .returning({ viewCount: shareLinks.viewCount })
+    .get();
+
+  if (!redeemed) {
+    if (link.expiresAt < now) return c.json({ error: 'Share link expired' }, 410);
+    return c.json({ error: 'Maximum views reached' }, 410);
+  }
 
   return c.json({
     encryptedItem: link.encryptedItem,
     itemName: link.itemName,
-    viewCount: link.viewCount + 1,
+    viewCount: redeemed.viewCount,
     maxViews: link.maxViews,
   });
 });
@@ -128,6 +179,8 @@ shareLinkRoutes.get('/', authMiddleware, async (c) => {
       viewCount: l.viewCount,
       expiresAt: l.expiresAt,
       createdAt: l.createdAt,
+      isExpired: l.expiresAt < new Date().toISOString(),
+      isExhausted: l.maxViews !== 0 && l.viewCount >= l.maxViews,
     })),
   });
 });

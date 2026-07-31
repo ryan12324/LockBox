@@ -18,6 +18,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 API_DIR="$ROOT_DIR/apps/api"
 WRANGLER="bunx wrangler"
+LOCKBOX_CORS_ORIGINS="${LOCKBOX_CORS_ORIGINS:-https://lockbox-web.pages.dev,http://localhost:5173,https://localhost}"
+LOCKBOX_EXTENSION_IDS="${LOCKBOX_EXTENSION_IDS:-}"
+R2_BUCKET_NAME="lockbox-attachments"
 
 # ── Colors ────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -51,7 +54,7 @@ ok "Authenticated with Cloudflare"
 # ── 2. Install dependencies ──────────────────────────────────────────
 info "Installing dependencies..."
 cd "$ROOT_DIR"
-bun install
+bun install --frozen-lockfile
 ok "Dependencies installed"
 
 # ── 3. Build shared packages ─────────────────────────────────────────
@@ -63,39 +66,69 @@ ok "Packages built"
 info "Ensuring D1 database exists..."
 DB_NAME="lockbox-vault"
 
-# Check if database already exists
-if $WRANGLER d1 list 2>/dev/null | grep -q "$DB_NAME"; then
+find_database_id() {
+  $WRANGLER d1 list --json | LOCKBOX_DB_NAME="$DB_NAME" bun -e '
+    const parsed = JSON.parse(await Bun.stdin.text());
+    const databases = Array.isArray(parsed) ? parsed : (parsed.result ?? []);
+    const database = databases.find((entry) => entry.name === process.env.LOCKBOX_DB_NAME);
+    const id = database?.uuid ?? database?.id ?? database?.database_id;
+    if (id) console.log(id);
+  '
+}
+
+DB_ID=$(find_database_id)
+if [ -n "$DB_ID" ]; then
   ok "D1 database '$DB_NAME' already exists"
 else
   info "Creating D1 database '$DB_NAME'..."
   DB_OUTPUT=$($WRANGLER d1 create "$DB_NAME" 2>&1)
   echo "$DB_OUTPUT"
-
-  # Extract database ID and update wrangler.toml
-  DB_ID=$(echo "$DB_OUTPUT" | grep -oP 'database_id\s*=\s*"\K[^"]+' || true)
-  if [ -n "$DB_ID" ]; then
-    sed -i "s/placeholder-replace-at-deploy/$DB_ID/" "$API_DIR/wrangler.toml"
-    ok "D1 database created (ID: $DB_ID)"
-    ok "Updated wrangler.toml with database ID"
-  else
-    warn "Could not parse database ID — update apps/api/wrangler.toml manually"
-  fi
+  DB_ID=$(find_database_id)
 fi
 
-# ── 5. Apply migrations ──────────────────────────────────────────────
-info "Applying D1 migrations..."
+if [ -z "$DB_ID" ]; then
+  fail "Could not resolve the D1 database ID after creation"
+fi
+
+# Keep wrangler.toml aligned even when the database already existed. Writing via
+# a sibling temporary file works on both BSD/macOS and GNU/Linux sed.
+LOCKBOX_CONFIG_TMP=$(mktemp "${API_DIR}/wrangler.toml.XXXXXX")
+sed -E 's|(database_id[[:space:]]*=[[:space:]]*")[^"]*(")|\1'"$DB_ID"'\2|' \
+  "$API_DIR/wrangler.toml" > "$LOCKBOX_CONFIG_TMP"
+mv "$LOCKBOX_CONFIG_TMP" "$API_DIR/wrangler.toml"
+ok "Configured D1 database ID: $DB_ID"
+
+# ── 5. Create R2 bucket (idempotent) ─────────────────────────────────
+info "Ensuring R2 bucket exists..."
 cd "$API_DIR"
+if $WRANGLER r2 bucket info "$R2_BUCKET_NAME" --json >/dev/null 2>&1; then
+  ok "R2 bucket '$R2_BUCKET_NAME' already exists"
+else
+  info "Creating R2 bucket '$R2_BUCKET_NAME'..."
+  $WRANGLER r2 bucket create "$R2_BUCKET_NAME"
+  ok "R2 bucket created"
+fi
+
+# ── 6. Apply migrations ──────────────────────────────────────────────
+info "Applying D1 migrations..."
 $WRANGLER d1 migrations apply "$DB_NAME" --remote
 ok "Migrations applied"
 
-# ── 6. Deploy ────────────────────────────────────────────────────────
+# ── 7. Deploy ────────────────────────────────────────────────────────
 info "Deploying Worker..."
-DEPLOY_OUTPUT=$($WRANGLER deploy 2>&1)
+DEPLOY_OUTPUT=$(
+  $WRANGLER deploy \
+    --var "CORS_ORIGINS:${LOCKBOX_CORS_ORIGINS}" \
+    --var "EXTENSION_IDS:${LOCKBOX_EXTENSION_IDS}" \
+    2>&1
+)
 echo "$DEPLOY_OUTPUT"
 ok "Worker deployed"
 
-# ── 7. Print summary ─────────────────────────────────────────────────
-WORKER_URL=$(echo "$DEPLOY_OUTPUT" | grep -oP 'https://[^\s]+workers\.dev' || true)
+# ── 8. Print summary ─────────────────────────────────────────────────
+WORKER_URL=$(printf '%s\n' "$DEPLOY_OUTPUT" \
+  | sed -nE 's|.*(https://[^[:space:]]+\.workers\.dev).*|\1|p' \
+  | sed -n '1p')
 
 echo ""
 echo -e "${GREEN}╔═══════════════════════════════════════════╗${NC}"

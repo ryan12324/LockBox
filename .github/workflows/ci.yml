@@ -47,27 +47,88 @@ jobs:
       - name: Build
         run: bun run build
 
+      - name: Build Firefox extension
+        run: bun run build:firefox
+        working-directory: apps/extension
+
       # Upload build artifacts so they can be inspected on PRs
       - name: Upload Chrome extension
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: chrome-mv3-${{ github.sha }}
           path: apps/extension/.output/chrome-mv3/
+          if-no-files-found: error
           retention-days: 7
 
       - name: Upload Firefox extension
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: firefox-mv2-${{ github.sha }}
           path: apps/extension/.output/firefox-mv2/
+          if-no-files-found: error
           retention-days: 7
 
       - name: Upload web vault
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: web-dist-${{ github.sha }}
           path: apps/web/dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  android:
+    name: Android Release Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.10'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.1.0"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build web assets
+        run: bun run build
+        working-directory: apps/web
+
+      - name: Sync Capacitor
+        run: bun run build:android
+        working-directory: apps/mobile
+
+      - name: Compile debug APK and release bundle
+        run: ./gradlew :app:assembleDebug :app:bundleRelease :app:lintRelease --no-daemon
+        working-directory: apps/mobile/android
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-${{ github.sha }}
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload unsigned release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-unsigned-${{ github.sha }}
+          path: apps/mobile/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
           retention-days: 7

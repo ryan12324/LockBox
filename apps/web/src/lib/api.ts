@@ -2,6 +2,8 @@
  * API client — thin fetch wrapper with auth header injection.
  */
 
+import type { EncryptedVaultItem, Folder } from '@lockbox/types';
+
 const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 export class ApiError extends Error {
@@ -49,10 +51,45 @@ export const api = {
     changePassword: (body: object, token: string) =>
       request('/api/auth/change-password', { method: 'POST', body: JSON.stringify(body), token }),
   },
+  twoFactor: {
+    status: (token: string) =>
+      request<{ enabled: boolean }>('/api/auth/2fa/status', { token }),
+    setup: (token: string) =>
+      request<{ secret: string; otpauthUri: string }>('/api/auth/2fa/setup', {
+        method: 'POST',
+        token,
+      }),
+    verify: (code: string, token: string) =>
+      request<{ enabled: true; backupCodes: string[] }>('/api/auth/2fa/verify', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+        token,
+      }),
+    validate: (tempToken: string, code: string) =>
+      request<{
+        token: string;
+        user: {
+          id: string;
+          email: string;
+          kdfConfig: import('@lockbox/types').KdfConfig;
+          salt: string;
+          encryptedUserKey: string;
+        };
+      }>('/api/auth/2fa/validate', {
+        method: 'POST',
+        body: JSON.stringify({ tempToken, code }),
+      }),
+    disable: (code: string, token: string) =>
+      request<{ disabled: true }>('/api/auth/2fa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+        token,
+      }),
+  },
   vault: {
     list: (token: string, params?: Record<string, string>) => {
       const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-      return request<{ items: unknown[]; folders: Array<{ id: string; name: string; parentId?: string; createdAt: string }> }>(`/api/vault${qs}`, { token });
+      return request<{ items: EncryptedVaultItem[]; folders: Folder[] }>(`/api/vault${qs}`, { token });
     },
     createItem: (body: object, token: string) =>
       request('/api/vault/items', { method: 'POST', body: JSON.stringify(body), token }),
@@ -128,10 +165,10 @@ export const api = {
   sharing: {
     shareFolder: (folderId: string, body: { teamId: string; permissionLevel: string; memberKeys: Array<{ userId: string; encryptedFolderKey: string }> }, token: string) =>
       request<{ success: boolean; folderId: string; teamId: string }>(`/api/sharing/folders/${folderId}/share`, { method: 'POST', body: JSON.stringify(body), token }),
-    unshareFolder: (folderId: string, token: string) =>
-      request<{ success: boolean }>(`/api/sharing/folders/${folderId}/unshare`, { method: 'DELETE', token }),
+    unshareFolder: (folderId: string, teamId: string, token: string) =>
+      request<{ success: boolean }>(`/api/sharing/folders/${folderId}/unshare?teamId=${encodeURIComponent(teamId)}`, { method: 'DELETE', token }),
     getFolderKeys: (folderId: string, token: string) =>
-      request<{ keys: Array<{ folderId: string; userId: string; encryptedFolderKey: string; grantedBy: string; grantedAt: string }> }>(`/api/sharing/folders/${folderId}/keys`, { token }),
+      request<{ key: { folderId: string; userId: string; encryptedFolderKey: string; grantedBy: string; grantedAt: string } }>(`/api/sharing/folders/${folderId}/keys`, { token }),
     addFolderKey: (folderId: string, body: { targetUserId: string; encryptedFolderKey: string }, token: string) =>
       request<{ success: boolean }>(`/api/sharing/folders/${folderId}/keys`, { method: 'POST', body: JSON.stringify(body), token }),
     removeFolderKey: (folderId: string, targetUserId: string, token: string) =>
@@ -139,7 +176,7 @@ export const api = {
     listSharedFolders: (token: string) =>
       request<{ sharedFolders: Array<{ folderId: string; teamId: string; ownerUserId: string; permissionLevel: string; createdAt: string; folderName: string }> }>('/api/sharing/folders', { token }),
     listSharedFolderItems: (folderId: string, token: string) =>
-      request<{ items: Array<{ id: string; userId: string; type: string; encryptedData: string; folderId: string; tags: string | null; favorite: number; revisionDate: string; createdAt: string; deletedAt: string | null }> }>(`/api/sharing/folders/${folderId}/items`, { token }),
+      request<{ items: EncryptedVaultItem[] }>(`/api/sharing/folders/${folderId}/items`, { token }),
   },
 
   // ─── Share Links ─────────────────────────────────────────
@@ -173,54 +210,39 @@ export const api = {
       return request<{ aliases: Array<{ email: string; enabled: boolean; id: string }> }>('/api/aliases', { token, headers });
     },
   },
-  emergency: {
-    createGrant: (body: { granteeEmail: string; waitPeriodDays: number; waitPeriod?: number; encryptedUserKey: string }, token: string) =>
-      request<{ id: string }>('/api/emergency/grants', { method: 'POST', body: JSON.stringify(body), token }),
-    listGrants: (token: string) =>
-      request<{ grants: import('@lockbox/types').EmergencyAccessGrant[] }>('/api/emergency/grants', { token }),
-    listRequests: (token: string) =>
-      request<{ requests: import('@lockbox/types').EmergencyAccessRequest[] }>('/api/emergency/requests', { token }),
-    confirmGrant: (id: string, token: string) =>
-      request<{ success: boolean }>(`/api/emergency/grants/${id}/confirm`, { method: 'POST', token }),
-    revokeGrant: (id: string, token: string) =>
-      request<{ success: boolean }>(`/api/emergency/grants/${id}`, { method: 'DELETE', token }),
-    requestAccess: (grantId: string, token: string) =>
-      request<{ success: boolean }>('/api/emergency/requests', { method: 'POST', body: JSON.stringify({ grantId }), token }),
-    rejectRequest: (id: string, token: string) =>
-      request<{ success: boolean }>(`/api/emergency/grants/${id}/reject`, { method: 'POST', token }),
-    approveRequest: (id: string, token: string) =>
-      request<{ success: boolean }>(`/api/emergency/grants/${id}/approve`, { method: 'POST', token }),
-    getAccess: (id: string, token: string) =>
-      request<{ encryptedVault: string }>(`/api/emergency/grants/${id}/access`, { token }),
-  },
-
   // ─── Documents ────────────────────────────────────────────
   documents: {
-    upload: (itemId: string, file: ArrayBuffer, contentType: string, token: string) =>
-      request<{ success: boolean; size: number }>(`/api/vault/items/${itemId}/document`, {
+    upload: async (itemId: string, file: Blob, plaintextSize: number, token: string) => {
+      const body = new FormData();
+      body.append('file', file, 'document.lockbox');
+      body.append('plaintextSize', String(plaintextSize));
+      const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/document`, {
         method: 'POST',
-        body: JSON.stringify({ file: Array.from(new Uint8Array(file)), contentType }),
-        token,
-      }),
-    download: (itemId: string, token: string) =>
-      request<ArrayBuffer>(`/api/vault/items/${itemId}/document`, { token }),
+        headers: { Authorization: `Bearer ${token}` },
+        body,
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        size?: number;
+        error?: string;
+      };
+      if (!res.ok) throw new ApiError(res.status, data.error ?? res.statusText);
+      return data as { success: boolean; size: number };
+    },
+    download: async (itemId: string, token: string) => {
+      const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/document`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new ApiError(res.status, data.error ?? res.statusText);
+      }
+      return res.arrayBuffer();
+    },
     delete: (itemId: string, token: string) =>
       request<{ success: boolean }>(`/api/vault/items/${itemId}/document`, { method: 'DELETE', token }),
     quota: (token: string) =>
       request<{ used: number; limit: number }>('/api/vault/documents/quota', { token }),
   },
 
-  // ─── Hardware Keys ────────────────────────────────────────
-  hardwareKey: {
-    setup: (data: { keyType: string; publicKey: string; wrappedMasterKey: string; attestation?: string }, token: string) =>
-      request<{ id: string }>('/api/auth/hardware-key/setup', { method: 'POST', body: JSON.stringify(data), token }),
-    list: (token: string) =>
-      request<{ keys: Array<{ id: string; keyType: string; createdAt: string }> }>('/api/auth/hardware-key', { token }),
-    challenge: (keyId: string, token: string) =>
-      request<{ challenge: string; keyId: string; expiresAt: string }>(`/api/auth/hardware-key/challenge`, { method: 'POST', body: JSON.stringify({ keyId }), token }),
-    verify: (data: { keyId: string; challenge: string; signature: string }) =>
-      request<{ token: string; wrappedMasterKey: string }>('/api/auth/hardware-key/verify', { method: 'POST', body: JSON.stringify(data) }),
-    delete: (id: string, token: string) =>
-      request<{ success: boolean }>(`/api/auth/hardware-key/${id}`, { method: 'DELETE', token }),
-  },
 };

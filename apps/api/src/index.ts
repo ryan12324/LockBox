@@ -7,47 +7,61 @@ import { Hono } from 'hono';
 import { authRoutes } from './routes/auth.js';
 import { vaultRoutes } from './routes/vault.js';
 import { syncRoutes } from './routes/sync.js';
-import { wsRoutes } from './routes/ws.js';
 import { aiRoutes } from './routes/ai.js';
 import { keypairRoutes } from './routes/keypair.js';
 import { teamRoutes } from './routes/teams.js';
 import { sharingRoutes } from './routes/sharing.js';
 import { shareLinkRoutes } from './routes/share-links.js';
 import { twofaRoutes } from './routes/twofa.js';
-import { attachmentRoutes } from './routes/attachments.js';
+import { attachmentRoutes, MAX_ATTACHMENT_REQUEST_SIZE } from './routes/attachments.js';
 import { aliasRoutes } from './routes/aliases.js';
 import { emergencyRoutes } from './routes/emergency.js';
 import { settingsRoutes } from './routes/settings.js';
-import { documentRoutes } from './routes/documents.js';
+import { documentRoutes, MAX_DOCUMENT_REQUEST_SIZE } from './routes/documents.js';
 import { hardwareKeyRoutes } from './routes/hardware-key.js';
 import { corsMiddleware, securityHeaders, requestSizeLimit } from './middleware/security.js';
-import { VaultSyncHub } from './sync-hub.js';
 import { createDb } from './db/index.js';
-import { vaultItems, emergencyAccessGrants, emergencyAccessRequests } from './db/schema.js';
+import { sessions, vaultItems, twoFactorChallenges } from './db/schema.js';
 import { and, eq, isNotNull, lte } from 'drizzle-orm';
-
-export { VaultSyncHub };
+import { purgeVaultItemStorage } from './services/vault-storage.js';
 
 type Bindings = {
   DB: D1Database;
-  SYNC_HUB: DurableObjectNamespace;
   AUTH_LIMITER: RateLimit;
   CORS_ORIGINS?: string;
+  EXTENSION_IDS?: string;
   ATTACHMENTS: R2Bucket;
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+export const app = new Hono<{ Bindings: Bindings }>();
 
 // Global middleware
 app.use('*', corsMiddleware);
 app.use('*', securityHeaders);
-app.use('*', requestSizeLimit());
+app.use(
+  '*',
+  requestSizeLimit((request) => {
+    const url = new URL(request.url);
+    if (
+      request.method === 'POST' &&
+      /^\/api\/vault\/items\/[^/]+\/attachments$/.test(url.pathname)
+    ) {
+      return MAX_ATTACHMENT_REQUEST_SIZE;
+    }
+    if (
+      request.method === 'POST' &&
+      /^\/api\/vault\/items\/[^/]+\/document$/.test(url.pathname)
+    ) {
+      return MAX_DOCUMENT_REQUEST_SIZE;
+    }
+    return 1_048_576;
+  })
+);
 
 // Routes
 app.route('/api/auth', authRoutes);
 app.route('/api/vault', vaultRoutes);
 app.route('/api/sync', syncRoutes);
-app.route('/api/sync', wsRoutes);
 app.route('/api/ai', aiRoutes);
 app.route('/api/auth/keypair', keypairRoutes);
 app.route('/api/teams', teamRoutes);
@@ -66,32 +80,43 @@ app.get('/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOStri
 
 export default {
   fetch: app.fetch,
-  scheduled: async (event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) => {
+  scheduled: async (event: ScheduledEvent, env: Bindings, _ctx: ExecutionContext) => {
     const db = createDb(env.DB);
 
     // Delete vault items that were soft-deleted more than 30 days ago
     const cutoffDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    await db
-      .delete(vaultItems)
+    const expiredItems = await db
+      .select({ id: vaultItems.id, userId: vaultItems.userId })
+      .from(vaultItems)
       .where(and(isNotNull(vaultItems.deletedAt), lte(vaultItems.deletedAt, cutoffDate)));
 
-    // Auto-approve emergency access requests past wait period
-    const waitingGrants = await db.select().from(emergencyAccessGrants)
-      .where(eq(emergencyAccessGrants.status, 'waiting'));
-
-    for (const grant of waitingGrants) {
-      const request = await db.select().from(emergencyAccessRequests)
-        .where(eq(emergencyAccessRequests.grantId, grant.id))
-        .get();
-      if (request && new Date(request.expiresAt) <= new Date()) {
-        await db.update(emergencyAccessGrants)
-          .set({ status: 'approved', updatedAt: new Date().toISOString() })
-          .where(eq(emergencyAccessGrants.id, grant.id));
-        await db.update(emergencyAccessRequests)
-          .set({ approvedAt: new Date().toISOString() })
-          .where(eq(emergencyAccessRequests.id, request.id));
+    for (const item of expiredItems) {
+      try {
+        await purgeVaultItemStorage(env, item.userId, item.id);
+        await db
+          .delete(vaultItems)
+          .where(
+            and(
+              eq(vaultItems.id, item.id),
+              eq(vaultItems.userId, item.userId),
+              isNotNull(vaultItems.deletedAt),
+              lte(vaultItems.deletedAt, cutoffDate)
+            )
+          );
+      } catch (error) {
+        console.error(`Failed to purge expired vault item ${item.id}`, error);
       }
     }
+
+    const now = new Date().toISOString();
+
+    // Remove expired bearer sessions and abandoned password-only challenges so
+    // inactive accounts cannot grow D1 indefinitely.
+    await db.delete(sessions).where(lte(sessions.expiresAt, now));
+    await db
+      .delete(twoFactorChallenges)
+      .where(lte(twoFactorChallenges.expiresAt, now));
+
   },
 };

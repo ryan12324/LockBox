@@ -4,7 +4,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { attachmentRoutes } from '../routes/attachments.js';
+import {
+  attachmentRoutes,
+  encryptedAttachmentSize,
+  MAX_FILE_SIZE,
+  MAX_USER_QUOTA,
+} from '../routes/attachments.js';
 
 describe('Attachments API — auth enforcement', () => {
   const app = new Hono();
@@ -55,10 +60,14 @@ describe('Attachments API — route existence', () => {
 });
 
 describe('Attachments API — size limits', () => {
-  it('MAX_FILE_SIZE is 10MB', async () => {
-    // Verify the constant value via module import
-    const mod = await import('../routes/attachments.js');
-    // Route exists and is a Hono instance
-    expect(mod.attachmentRoutes).toBeDefined();
+  it('enforces the documented plaintext limits', () => {
+    expect(MAX_FILE_SIZE).toBe(10 * 1024 * 1024);
+    expect(MAX_USER_QUOTA).toBe(100 * 1024 * 1024);
+  });
+
+  it('accounts for IV, GCM tag, separator, and base64 expansion', () => {
+    expect(encryptedAttachmentSize(0)).toBe(41);
+    expect(encryptedAttachmentSize(1)).toBe(41);
+    expect(encryptedAttachmentSize(MAX_FILE_SIZE)).toBeGreaterThan(MAX_FILE_SIZE);
   });
 });

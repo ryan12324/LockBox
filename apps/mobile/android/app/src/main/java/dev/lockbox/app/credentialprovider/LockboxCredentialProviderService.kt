@@ -2,6 +2,7 @@ package dev.lockbox.app.credentialprovider
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.CancellationSignal
 import android.os.OutcomeReceiver
@@ -14,16 +15,13 @@ import android.service.credentials.CreateEntry
 import android.service.credentials.CredentialEntry
 import android.service.credentials.CredentialProviderService
 import androidx.annotation.RequiresApi
-import androidx.credentials.exceptions.ClearCredentialException
-import androidx.credentials.exceptions.CreateCredentialException
-import androidx.credentials.exceptions.GetCredentialException
 import dev.lockbox.app.storage.VaultDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.security.KeyStore
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * LockboxCredentialProviderService — Android 14+ Credential Provider integration.
@@ -47,9 +45,10 @@ class LockboxCredentialProviderService : CredentialProviderService() {
 
     companion object {
         private const val PUBLIC_KEY_TYPE = "public-key"
+        private val nextRequestCode = AtomicInteger(1000)
     }
 
-    override fun onBeginGetCredentialRequest(
+    override fun onBeginGetCredential(
         request: BeginGetCredentialRequest,
         cancellationSignal: CancellationSignal,
         callback: OutcomeReceiver<BeginGetCredentialResponse, android.credentials.GetCredentialException>
@@ -58,23 +57,17 @@ class LockboxCredentialProviderService : CredentialProviderService() {
             try {
                 val db = VaultDatabase.getInstance(applicationContext)
                 val responseBuilder = BeginGetCredentialResponse.Builder()
-                var entryCount = 0
-
                 for (option in request.beginGetCredentialOptions) {
                     if (option.type != PUBLIC_KEY_TYPE) continue
 
                     val rpId = extractRpId(option.candidateQueryData)
-                    val passkeys = if (rpId != null) {
-                        db.passkeyMetadataDao().getByRpId(rpId)
-                    } else {
-                        db.passkeyMetadataDao().getAll()
-                    }
+                    // Do not enumerate account metadata when the caller did not
+                    // provide a valid relying-party ID.
+                    if (rpId == null) continue
+                    val passkeys = db.passkeyMetadataDao().getByRpId(rpId)
 
                     for (passkey in passkeys) {
-                        val pendingIntent = buildGetPendingIntent(
-                            passkey.credentialId,
-                            entryCount
-                        )
+                        val pendingIntent = buildGetPendingIntent(passkey.credentialId)
                         val slice = PasskeySliceHelper.buildCredentialSlice(
                             applicationContext,
                             passkey.userName,
@@ -84,7 +77,6 @@ class LockboxCredentialProviderService : CredentialProviderService() {
                         responseBuilder.addCredentialEntry(
                             CredentialEntry(option, slice)
                         )
-                        entryCount++
                     }
                 }
 
@@ -100,7 +92,7 @@ class LockboxCredentialProviderService : CredentialProviderService() {
         }
     }
 
-    override fun onBeginCreateCredentialRequest(
+    override fun onBeginCreateCredential(
         request: BeginCreateCredentialRequest,
         cancellationSignal: CancellationSignal,
         callback: OutcomeReceiver<BeginCreateCredentialResponse, android.credentials.CreateCredentialException>
@@ -109,9 +101,7 @@ class LockboxCredentialProviderService : CredentialProviderService() {
             try {
                 val responseBuilder = BeginCreateCredentialResponse.Builder()
 
-                for (option in request.beginCreateCredentialOptions) {
-                    if (option.type != PUBLIC_KEY_TYPE) continue
-
+                if (request.type == PUBLIC_KEY_TYPE) {
                     val pendingIntent = buildCreatePendingIntent()
                     val slice = PasskeySliceHelper.buildCreateSlice(
                         applicationContext,
@@ -133,59 +123,52 @@ class LockboxCredentialProviderService : CredentialProviderService() {
         }
     }
 
-    override fun onClearCredentialStateRequest(
+    override fun onClearCredentialState(
         request: ClearCredentialStateRequest,
         cancellationSignal: CancellationSignal,
-        callback: OutcomeReceiver<Void?, android.credentials.ClearCredentialException>
+        callback: OutcomeReceiver<Void?, android.credentials.ClearCredentialStateException>
     ) {
-        serviceScope.launch {
-            try {
-                val db = VaultDatabase.getInstance(applicationContext)
-                val allPasskeys = db.passkeyMetadataDao().getAll()
-
-                // Delete private keys from Android Keystore
-                val keyStore = KeyStore.getInstance("AndroidKeyStore")
-                keyStore.load(null)
-                for (passkey in allPasskeys) {
-                    if (keyStore.containsAlias(passkey.keystoreAlias)) {
-                        keyStore.deleteEntry(passkey.keystoreAlias)
-                    }
-                }
-
-                // Clear passkey metadata from Room
-                db.passkeyMetadataDao().deleteAll()
-
-                callback.onResult(null)
-            } catch (e: Exception) {
-                callback.onError(
-                    android.credentials.ClearCredentialException(
-                        android.credentials.ClearCredentialException.TYPE_UNKNOWN,
-                        e.message
-                    )
-                )
-            }
-        }
+        // This callback clears provider sign-in/session state. Lockbox does not
+        // cache any provider session, so there is nothing to clear. Stored
+        // passkeys must only be removed through the explicit delete operation.
+        callback.onResult(null)
     }
 
-    private fun buildGetPendingIntent(credentialId: String, requestCode: Int): PendingIntent {
+    private fun buildGetPendingIntent(credentialId: String): PendingIntent {
+        val requestCode = nextRequestCode.incrementAndGet()
         val intent = Intent(applicationContext, GetPasskeyActivity::class.java).apply {
             putExtra(GetPasskeyActivity.EXTRA_CREDENTIAL_ID, credentialId)
+            data = Uri.Builder()
+                .scheme("lockbox")
+                .authority("credential")
+                .appendPath("get")
+                .appendPath(credentialId)
+                .appendPath(requestCode.toString())
+                .build()
         }
         return PendingIntent.getActivity(
             applicationContext,
             requestCode,
             intent,
-            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_CANCEL_CURRENT
         )
     }
 
     private fun buildCreatePendingIntent(): PendingIntent {
-        val intent = Intent(applicationContext, CreatePasskeyActivity::class.java)
+        val requestCode = nextRequestCode.incrementAndGet()
+        val intent = Intent(applicationContext, CreatePasskeyActivity::class.java).apply {
+            data = Uri.Builder()
+                .scheme("lockbox")
+                .authority("credential")
+                .appendPath("create")
+                .appendPath(requestCode.toString())
+                .build()
+        }
         return PendingIntent.getActivity(
             applicationContext,
-            1000,
+            requestCode,
             intent,
-            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_CANCEL_CURRENT
         )
     }
 
@@ -199,7 +182,7 @@ class LockboxCredentialProviderService : CredentialProviderService() {
                 "androidx.credentials.BUNDLE_KEY_REQUEST_JSON"
             ) ?: return null
             val json = JSONObject(requestJson)
-            json.optString("rpId", null)
+            json.optString("rpId").takeIf(::isValidRpId)
         } catch (e: Exception) {
             null
         }

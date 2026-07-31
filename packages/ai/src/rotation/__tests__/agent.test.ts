@@ -12,9 +12,6 @@ vi.mock('@lockbox/generator', () => ({
 
 import { generatePassword } from '@lockbox/generator';
 import { createRotationAgent } from '../agent.js';
-import { googleAdapter } from '../adapters/google.js';
-import { githubAdapter } from '../adapters/github.js';
-import { amazonAdapter } from '../adapters/amazon.js';
 import { genericAdapter } from '../adapters/generic.js';
 
 const mockGeneratePassword = vi.mocked(generatePassword);

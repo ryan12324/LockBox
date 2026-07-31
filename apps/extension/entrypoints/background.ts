@@ -9,7 +9,17 @@
  * - Never persist decrypted data to any storage
  */
 
-import { deriveKey, decryptUserKey, makeAuthHash, fromBase64 } from '@lockbox/crypto';
+import {
+  deriveKey,
+  decryptUserKey,
+  makeAuthHash,
+  encryptString,
+  decryptString,
+  decrypt,
+  toUtf8,
+  toBase64,
+  fromBase64,
+} from '@lockbox/crypto';
 import { totp as generateTOTP, parseOtpAuthUri } from '@lockbox/totp';
 import { checkBatch } from '@lockbox/crypto';
 import { analyzeVaultHealth, analyzeItem } from '@lockbox/ai';
@@ -24,6 +34,7 @@ import {
 import type { SearchResult, SecurityAlert } from '@lockbox/ai';
 import type { VaultItem, LoginItem, PasskeyItem, KdfConfig, Folder } from '@lockbox/types';
 import { api } from '../lib/api.js';
+import type { AuthenticatedLoginResponse } from '../lib/api.js';
 import { checkSite as checkTwoFaSite } from '../lib/twofa-directory.js';
 import {
   base64urlEncode,
@@ -38,6 +49,8 @@ import {
   buildAttestationObject,
   buildClientDataJSON,
   findMatchingPasskeys,
+  isValidBase64url,
+  resolveWebAuthnCaller,
 } from '../lib/webauthn.js';
 import type {
   StoredPasskey,
@@ -50,24 +63,25 @@ import {
   setSessionToken,
   clearSession,
   setStoredEmail,
-  getApiBaseUrl,
-  getStoredEmail,
 } from '../lib/storage.js';
-import {
-  listHardwareKeys,
-  removeHardwareKey,
-  registerHardwareKey,
-  authenticateWithHardwareKey,
-  requestHardwareKeyChallenge,
-  unwrapMasterKey,
-} from '../lib/hardware-key.js';
-import { generateSyncQR, processSyncQR } from '../lib/qr-sync.js';
-import { initWebAuthnProxy } from '../lib/webauthn-proxy.js';
+import { urlMatchesUri } from '../lib/form-detector.js';
+
+const ALIAS_API_KEY_AAD = toUtf8('lockbox:alias-api-key:v1');
+
+async function decryptAliasApiKey(encryptedApiKey: string, key: Uint8Array): Promise<string> {
+  try {
+    return await decryptString(encryptedApiKey, key.slice(0, 32), ALIAS_API_KEY_AAD);
+  } catch {
+    return decryptString(encryptedApiKey, key.slice(0, 32));
+  }
+}
 
 // ─── In-memory state (cleared on lock) ────────────────────────────────────────
 
 let masterKey: Uint8Array | null = null;
 let userKey: Uint8Array | null = null;
+let pendingTwoFactorToken: string | null = null;
+let pendingTwoFactorEmail: string | null = null;
 let vaultItems: Map<string, VaultItem> = new Map();
 let lastSyncTimestamp: string | null = null;
 let folders: Folder[] = [];
@@ -84,9 +98,14 @@ let sharedFoldersList: Array<{
   folderName: string;
 }> = [];
 let hasKeyPairFlag = false;
-let cachedBreachStatus: { breachedCount: number; results: Map<string, any> } = {
+let cachedBreachStatus: {
+  breachedCount: number;
+  breachedItemIds: string[];
+  failedCount: number;
+} = {
   breachedCount: 0,
-  results: new Map(),
+  breachedItemIds: [],
+  failedCount: 0,
 };
 const phishingDetector = new PhishingDetector();
 let searchEngine: SemanticSearch | null = null;
@@ -127,39 +146,50 @@ async function encryptVaultItem(
 // ─── Vault loading ────────────────────────────────────────────────────────────
 
 async function loadVault(token: string): Promise<void> {
-  try {
-    const res = (await api.vault.list(token)) as {
-      items: Array<{
-        id: string;
-        type: string;
-        encryptedData: string;
-        revisionDate: string;
-        deletedAt: string | null;
-      }>;
-      folders: Folder[];
-    };
+  const res = (await api.vault.list(token)) as {
+    items: Array<{
+      id: string;
+      type: string;
+      encryptedData: string;
+      revisionDate: string;
+      deletedAt: string | null;
+    }>;
+    folders: Folder[];
+  };
 
-    vaultItems.clear();
-    folders = res.folders ?? [];
-    for (const item of res.items) {
-      if (item.deletedAt) continue;
-      const decrypted = await decryptVaultItem(item.encryptedData, item.id, item.revisionDate);
-      if (decrypted) {
-        vaultItems.set(item.id, decrypted);
-      }
+  // Build the next snapshot separately. Never replace a valid in-memory vault
+  // with a partial or empty one when a row is corrupt or the wrong key is used.
+  const nextItems = new Map<string, VaultItem>();
+  const failedItemIds: string[] = [];
+  for (const item of res.items) {
+    if (item.deletedAt) continue;
+    const decrypted = await decryptVaultItem(item.encryptedData, item.id, item.revisionDate);
+    if (decrypted) {
+      nextItems.set(item.id, decrypted);
+    } else {
+      failedItemIds.push(item.id);
     }
-    lastSyncTimestamp = new Date().toISOString();
-    searchEngine = null; // Reset search index when vault is reloaded
-  } catch (err) {
-    console.error('[Lockbox] Failed to load vault:', err);
   }
+
+  if (failedItemIds.length > 0) {
+    throw new Error(
+      `Could not decrypt ${failedItemIds.length} vault item${failedItemIds.length === 1 ? '' : 's'}. ` +
+        'The vault was left locked to prevent incomplete data from being used.'
+    );
+  }
+
+  vaultItems.clear();
+  for (const [id, item] of nextItems) vaultItems.set(id, item);
+  folders = res.folders ?? [];
+  lastSyncTimestamp = new Date().toISOString();
+  searchEngine = null; // Reset search index when vault is reloaded
 }
 
 // ─── URL matching ─────────────────────────────────────────────────────────────
 
 function getMatchingItems(url: string): VaultItem[] {
   try {
-    const pageHost = new URL(url).hostname.replace(/^www\./, '');
+    new URL(url);
     const matches: VaultItem[] = [];
 
     // Search personal vault items
@@ -167,18 +197,9 @@ function getMatchingItems(url: string): VaultItem[] {
       if (item.type !== 'login') continue;
       const login = item as LoginItem;
       for (const uri of login.uris ?? []) {
-        try {
-          const itemHost = new URL(uri).hostname.replace(/^www\./, '');
-          if (
-            pageHost === itemHost ||
-            pageHost.endsWith(`.${itemHost}`) ||
-            itemHost.endsWith(`.${pageHost}`)
-          ) {
-            matches.push(item);
-            break;
-          }
-        } catch {
-          // Not a valid URL, skip
+        if (urlMatchesUri(url, uri)) {
+          matches.push(item);
+          break;
         }
       }
     }
@@ -189,18 +210,9 @@ function getMatchingItems(url: string): VaultItem[] {
         if (item.type !== 'login') continue;
         const login = item as LoginItem;
         for (const uri of login.uris ?? []) {
-          try {
-            const itemHost = new URL(uri).hostname.replace(/^www\./, '');
-            if (
-              pageHost === itemHost ||
-              pageHost.endsWith(`.${itemHost}`) ||
-              itemHost.endsWith(`.${pageHost}`)
-            ) {
-              matches.push(item);
-              break;
-            }
-          } catch {
-            // Not a valid URL, skip
+          if (urlMatchesUri(url, uri)) {
+            matches.push(item);
+            break;
           }
         }
       }
@@ -216,7 +228,6 @@ function getMatchingItems(url: string): VaultItem[] {
 
 const LOCK_ALARM = 'lockbox-auto-lock';
 const SYNC_ALARM = 'lockbox-sync';
-const BREACH_ALARM = 'lockbox-breach-check';
 const COPILOT_ALARM = 'lockbox-copilot';
 const DEFAULT_LOCK_TIMEOUT = 30; // minutes
 const LOCK_TIMEOUT_KEY = 'lockTimeoutMinutes';
@@ -236,11 +247,14 @@ async function scheduleAutoLock(): Promise<void> {
 
 function schedulePeriodSync() {
   chrome.alarms.create(SYNC_ALARM, { periodInMinutes: 5 });
-  chrome.alarms.create(BREACH_ALARM, { periodInMinutes: 24 * 60 });
   chrome.alarms.create(COPILOT_ALARM, { periodInMinutes: 24 * 60 });
 }
-async function runBreachCheck(): Promise<{ breachedCount: number; results: Map<string, any> }> {
-  if (!userKey) return { breachedCount: 0, results: new Map() };
+async function runBreachCheck(): Promise<{
+  breachedCount: number;
+  breachedItemIds: string[];
+  failedCount: number;
+}> {
+  if (!userKey) throw new Error('Vault is locked');
   const loginItems: Array<{ id: string; password: string }> = [];
   for (const item of vaultItems.values()) {
     if (item.type === 'login') {
@@ -250,22 +264,27 @@ async function runBreachCheck(): Promise<{ breachedCount: number; results: Map<s
       }
     }
   }
-  if (loginItems.length === 0) return { breachedCount: 0, results: new Map() };
-  const results = await checkBatch(loginItems);
-  let breachedCount = 0;
-  for (const [, result] of results) {
-    if (result.found) breachedCount++;
+  if (loginItems.length === 0) {
+    cachedBreachStatus = { breachedCount: 0, breachedItemIds: [], failedCount: 0 };
+    return cachedBreachStatus;
   }
-  cachedBreachStatus = { breachedCount, results };
+  const results = await checkBatch(loginItems);
+  const breachedItemIds = Array.from(results.entries())
+    .filter(([, result]) => result.found)
+    .map(([itemId]) => itemId);
+  const failedCount = Array.from(results.values()).filter((result) => result.error).length;
+  cachedBreachStatus = { breachedCount: breachedItemIds.length, breachedItemIds, failedCount };
   return cachedBreachStatus;
 }
 function lock() {
   masterKey = null;
   userKey = null;
+  pendingTwoFactorToken = null;
+  pendingTwoFactorEmail = null;
   vaultItems.clear();
   folders = [];
   lastSyncTimestamp = null;
-  cachedBreachStatus = { breachedCount: 0, results: new Map() };
+  cachedBreachStatus = { breachedCount: 0, breachedItemIds: [], failedCount: 0 };
   searchEngine = null;
   userId = null;
   privateKey = null;
@@ -275,7 +294,37 @@ function lock() {
   sharedFoldersList = [];
   hasKeyPairFlag = false;
   chrome.alarms.clear(LOCK_ALARM);
-  chrome.alarms.clear(BREACH_ALARM);
+}
+
+async function completeLogin(
+  loginResponse: AuthenticatedLoginResponse,
+  email: string
+): Promise<void> {
+  if (!masterKey) throw new Error('Login expired. Enter your master password again.');
+
+  try {
+    userKey = await decryptUserKey(loginResponse.user.encryptedUserKey, masterKey);
+    userId = loginResponse.user.id;
+
+    // Prove the key can decrypt the complete server snapshot before persisting
+    // the authenticated session or reporting unlock success.
+    await loadVault(loginResponse.token);
+    await setSessionToken(loginResponse.token);
+    await setStoredEmail(email);
+    pendingTwoFactorToken = null;
+    pendingTwoFactorEmail = null;
+
+    await scheduleAutoLock();
+    schedulePeriodSync();
+
+    loadTeamData(loginResponse.token).catch((err) =>
+      console.error('[Lockbox] Failed to load team data:', err)
+    );
+  } catch (error) {
+    lock();
+    await clearSession();
+    throw error;
+  }
 }
 
 // ─── Team data loading ─────────────────────────────────────────────────────────
@@ -298,7 +347,7 @@ async function loadTeamData(token: string): Promise<void> {
     for (const sf of sharedFoldersList) {
       try {
         const keysRes = await api.sharing.getFolderKeys(sf.folderId, token);
-        const myKey = keysRes.keys.find((k) => k.userId === userId);
+        const myKey = keysRes.key.userId === userId ? keysRes.key : null;
         if (!myKey || !privateKey) continue;
 
         const folderKey = await unwrapFolderKey(myKey.encryptedFolderKey, privateKey);
@@ -331,6 +380,8 @@ async function loadTeamData(token: string): Promise<void> {
 
 type Message =
   | { type: 'unlock'; email: string; password: string }
+  | { type: 'validate-login-2fa'; code: string }
+  | { type: 'cancel-login-2fa' }
   | { type: 'lock' }
   | { type: 'get-matches'; url: string }
   | { type: 'get-vault' }
@@ -362,7 +413,10 @@ type Message =
   | { type: 'get-attachments'; itemId: string }
   | { type: 'download-attachment'; itemId: string; attachmentId: string }
   | { type: 'check-2fa'; domain: string }
-  | { type: 'generate-alias'; provider?: string; apiKey?: string }
+  | { type: 'get-alias-config' }
+  | { type: 'save-alias-config'; provider?: string; apiKey?: string }
+  | { type: 'delete-alias-config' }
+  | { type: 'generate-alias' }
   | {
       type: 'WEBAUTHN_CREATE';
       requestId: string;
@@ -380,23 +434,14 @@ type Message =
   | { type: 'get-trash' }
   | { type: 'restore-item'; id: string }
   | { type: 'permanent-delete'; id: string }
-  | { type: 'get-emergency-access' }
-  | { type: 'invite-emergency'; email: string; waitDays: number }
-  | { type: 'approve-emergency'; grantId: string }
-  | { type: 'reject-emergency'; grantId: string }
-  | { type: 'revoke-emergency'; grantId: string }
   | { type: 'set-travel-mode'; enabled: boolean }
+  | { type: 'get-travel-mode' }
   | { type: 'get-versions'; itemId: string }
   | { type: 'restore-version'; itemId: string; versionId: string }
   | { type: 'setup-2fa' }
+  | { type: 'get-2fa-status' }
   | { type: 'verify-2fa'; code: string }
   | { type: 'disable-2fa'; code: string }
-  | { type: 'hw-key-unlock' }
-  | { type: 'list-hardware-keys' }
-  | { type: 'register-hardware-key' }
-  | { type: 'remove-hardware-key'; keyId: string }
-  | { type: 'generate-sync-qr' }
-  | { type: 'process-sync-qr'; qrData: string }
   | { type: 'open-popup' }
   | { type: 'get-lock-timeout' }
   | { type: 'set-lock-timeout'; minutes: number };
@@ -413,7 +458,7 @@ async function signPasskeyAssertion(
   for (const item of vaultItems.values()) {
     if (item.type !== 'passkey') continue;
     const pk = item as PasskeyItem & { privateKey?: string };
-    if (pk.credentialId === credentialId) {
+    if (pk.credentialId === credentialId && pk.rpId === rpId) {
       matchedItem = pk;
       break;
     }
@@ -424,7 +469,6 @@ async function signPasskeyAssertion(
   const privKeyBytes = base64urlDecode(matchedItem.privateKey);
   const privKey = await importPrivateKey(privKeyBytes);
   const newCounter = matchedItem.counter + 1;
-  matchedItem.counter = newCounter;
 
   const rpIdHash = await hashRpId(rpId);
   const authData = createAuthenticatorData(rpIdHash, newCounter);
@@ -435,32 +479,37 @@ async function signPasskeyAssertion(
   const signatureRaw = await signChallenge(privKey, authData, clientDataHash);
   const signature = p1363ToDer(signatureRaw);
 
-  // Update vault counter
+  // Persist the updated sign counter before returning the assertion. A local-only
+  // increment can regress after a service-worker restart and look like a cloned key.
   const token = await getSessionToken();
-  if (token) {
-    const now = new Date().toISOString();
-    matchedItem.updatedAt = now;
-    matchedItem.revisionDate = now;
-    const encryptedData = await encryptVaultItem(
-      matchedItem as unknown as VaultItem,
-      matchedItem.id,
-      now
-    );
-    if (encryptedData) {
-      api.vault
-        .updateItem(
-          matchedItem.id,
-          {
-            encryptedData,
-            tags: matchedItem.tags ?? [],
-            favorite: matchedItem.favorite ?? false,
-            revisionDate: now,
-          },
-          token
-        )
-        .catch(() => {});
-    }
-  }
+  if (!token) return { fallback: true };
+
+  const now = new Date().toISOString();
+  const updatedItem = {
+    ...matchedItem,
+    counter: newCounter,
+    updatedAt: now,
+    revisionDate: now,
+  };
+  const encryptedData = await encryptVaultItem(
+    updatedItem as unknown as VaultItem,
+    updatedItem.id,
+    now
+  );
+  if (!encryptedData) return { fallback: true };
+
+  await api.vault.updateItem(
+    updatedItem.id,
+    {
+      encryptedData,
+      tags: updatedItem.tags ?? [],
+      favorite: updatedItem.favorite ?? false,
+      revisionDate: now,
+      expectedRevisionDate: matchedItem.revisionDate,
+    },
+    token
+  );
+  vaultItems.set(updatedItem.id, updatedItem as unknown as VaultItem);
 
   return {
     credential: {
@@ -478,11 +527,13 @@ async function signPasskeyAssertion(
   };
 }
 
-async function handleMessage(message: Message): Promise<unknown> {
+async function handleMessage(message: Message, senderUrl?: string): Promise<unknown> {
   switch (message.type) {
     case 'unlock': {
       const { email, password } = message;
       try {
+        pendingTwoFactorToken = null;
+        pendingTwoFactorEmail = null;
         // 1. Get KDF params
         const kdfRes = (await api.auth.kdfParams(email)) as { kdfConfig: KdfConfig; salt: string };
         const salt = fromBase64(kdfRes.salt);
@@ -494,36 +545,15 @@ async function handleMessage(message: Message): Promise<unknown> {
         const authHash = await makeAuthHash(masterKey, password);
 
         // 4. Login
-        const loginRes = (await api.auth.login({ email, authHash })) as {
-          token: string;
-          user: {
-            id: string;
-            email: string;
-            kdfConfig: KdfConfig;
-            salt: string;
-            encryptedUserKey: string;
-          };
-        };
+        const loginRes = await api.auth.login({ email, authHash });
 
-        // 5. Decrypt user key
-        userKey = await decryptUserKey(loginRes.user.encryptedUserKey, masterKey);
+        if ('requires2FA' in loginRes) {
+          pendingTwoFactorToken = loginRes.tempToken;
+          pendingTwoFactorEmail = email;
+          return { success: false, requires2FA: true };
+        }
 
-        // 6. Store session token
-        await setSessionToken(loginRes.token);
-        await setStoredEmail(email);
-
-        userId = loginRes.user.id;
-        // 7. Load vault
-        await loadVault(loginRes.token);
-
-        // 8. Schedule auto-lock (user-configured, default 30 min)
-        await scheduleAutoLock();
-        schedulePeriodSync();
-
-        // 9. Load team data (non-blocking on unlock)
-        loadTeamData(loginRes.token).catch((err) =>
-          console.error('[Lockbox] Failed to load team data:', err)
-        );
+        await completeLogin(loginRes, email);
 
         return { success: true };
       } catch (err) {
@@ -531,6 +561,37 @@ async function handleMessage(message: Message): Promise<unknown> {
         userKey = null;
         return { success: false, error: err instanceof Error ? err.message : 'Login failed' };
       }
+    }
+
+    case 'validate-login-2fa': {
+      if (!pendingTwoFactorToken || !pendingTwoFactorEmail || !masterKey) {
+        lock();
+        return {
+          success: false,
+          error: 'Login expired. Enter your master password again.',
+        };
+      }
+
+      try {
+        const loginRes = await api.twoFactor.validate({
+          tempToken: pendingTwoFactorToken,
+          code: message.code,
+        });
+        await completeLogin(loginRes, pendingTwoFactorEmail);
+        return { success: true };
+      } catch (err) {
+        return {
+          success: false,
+          requires2FA: true,
+          error: err instanceof Error ? err.message : 'Two-factor verification failed',
+        };
+      }
+    }
+
+    case 'cancel-login-2fa': {
+      lock();
+      await clearSession();
+      return { success: true };
     }
 
     case 'lock': {
@@ -677,6 +738,7 @@ async function handleMessage(message: Message): Promise<unknown> {
             tags: vaultItem.tags ?? [],
             favorite: vaultItem.favorite ?? false,
             revisionDate: now,
+            expectedRevisionDate: existing.revisionDate,
           },
           token
         );
@@ -752,6 +814,31 @@ async function handleMessage(message: Message): Promise<unknown> {
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
+        for (const item of vaultItems.values()) {
+          if (item.folderId !== message.id) continue;
+          const now = new Date().toISOString();
+          const movedItem = {
+            ...item,
+            folderId: undefined,
+            updatedAt: now,
+            revisionDate: now,
+          } as VaultItem;
+          const encryptedData = await encryptVaultItem(movedItem, movedItem.id, now);
+          if (!encryptedData) throw new Error(`Failed to encrypt item ${movedItem.id}`);
+          await api.vault.updateItem(
+            movedItem.id,
+            {
+              encryptedData,
+              folderId: null,
+              tags: movedItem.tags ?? [],
+              favorite: movedItem.favorite ?? false,
+              revisionDate: now,
+              expectedRevisionDate: item.revisionDate,
+            },
+            token
+          );
+          vaultItems.set(movedItem.id, movedItem);
+        }
         await api.vault.deleteFolder(message.id, token);
         folders = folders.filter((f) => f.id !== message.id);
         return { success: true };
@@ -867,28 +954,18 @@ async function handleMessage(message: Message): Promise<unknown> {
       if (!userKey) return { result: 'new' as const };
       const { url, username, password } = message;
       try {
-        const pageHost = new URL(url).hostname.replace(/^www\./, '');
+        new URL(url);
         for (const item of vaultItems.values()) {
           if (item.type !== 'login') continue;
           const login = item as LoginItem;
           for (const uri of login.uris ?? []) {
-            try {
-              const itemHost = new URL(uri).hostname.replace(/^www\./, '');
-              if (
-                pageHost === itemHost ||
-                pageHost.endsWith(`.${itemHost}`) ||
-                itemHost.endsWith(`.${pageHost}`)
-              ) {
-                // Found a matching URI
-                if (login.username === username && login.password === password) {
-                  return { result: 'match' as const };
-                }
-                if (login.username === username && login.password !== password) {
-                  return { result: 'update' as const, itemId: login.id };
-                }
+            if (urlMatchesUri(url, uri)) {
+              if (login.username === username && login.password === password) {
+                return { result: 'match' as const };
               }
-            } catch {
-              // Invalid URI, skip
+              if (login.username === username && login.password !== password) {
+                return { result: 'update' as const, itemId: login.id };
+              }
             }
           }
         }
@@ -898,22 +975,13 @@ async function handleMessage(message: Message): Promise<unknown> {
             if (item.type !== 'login') continue;
             const login = item as LoginItem;
             for (const uri of login.uris ?? []) {
-              try {
-                const itemHost = new URL(uri).hostname.replace(/^www\./, '');
-                if (
-                  pageHost === itemHost ||
-                  pageHost.endsWith(`.${itemHost}`) ||
-                  itemHost.endsWith(`.${pageHost}`)
-                ) {
-                  if (login.username === username && login.password === password) {
-                    return { result: 'match' as const };
-                  }
-                  if (login.username === username && login.password !== password) {
-                    return { result: 'update' as const, itemId: login.id };
-                  }
+              if (urlMatchesUri(url, uri)) {
+                if (login.username === username && login.password === password) {
+                  return { result: 'match' as const };
                 }
-              } catch {
-                // Invalid URI, skip
+                if (login.username === username && login.password !== password) {
+                  return { result: 'update' as const, itemId: login.id };
+                }
               }
             }
           }
@@ -999,6 +1067,7 @@ async function handleMessage(message: Message): Promise<unknown> {
             tags: updatedItem.tags ?? [],
             favorite: updatedItem.favorite ?? false,
             revisionDate: now,
+            expectedRevisionDate: existing.revisionDate,
           },
           token
         );
@@ -1020,7 +1089,23 @@ async function handleMessage(message: Message): Promise<unknown> {
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
         const res = await api.attachments.list(message.itemId, token);
-        return { success: true, attachments: res.attachments };
+        const attachments = await Promise.all(
+          res.attachments.map(async (attachment) => {
+            const aad = toUtf8(`${message.itemId}:${attachment.id}`);
+            const [fileName, mimeType] = await Promise.all([
+              decryptString(attachment.encryptedName, userKey!.slice(0, 32), aad),
+              decryptString(attachment.encryptedMimeType, userKey!.slice(0, 32), aad),
+            ]);
+            return {
+              id: attachment.id,
+              fileName,
+              fileSize: attachment.size,
+              mimeType,
+              createdAt: attachment.createdAt,
+            };
+          })
+        );
+        return { success: true, attachments };
       } catch (err) {
         return {
           success: false,
@@ -1034,8 +1119,20 @@ async function handleMessage(message: Message): Promise<unknown> {
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
-        const res = await api.attachments.download(message.itemId, message.attachmentId, token);
-        return { success: true, encryptedData: res.encryptedData };
+        const encryptedData = await api.attachments.download(
+          message.itemId,
+          message.attachmentId,
+          token
+        );
+        const dotIndex = encryptedData.indexOf('.');
+        if (dotIndex === -1) throw new Error('Invalid encrypted attachment format');
+        const plaintext = await decrypt(
+          fromBase64(encryptedData.slice(dotIndex + 1)),
+          userKey.slice(0, 32),
+          fromBase64(encryptedData.slice(0, dotIndex)),
+          toUtf8(`${message.itemId}:${message.attachmentId}`)
+        );
+        return { success: true, encryptedData: toBase64(plaintext) };
       } catch (err) {
         return {
           success: false,
@@ -1057,16 +1154,105 @@ async function handleMessage(message: Message): Promise<unknown> {
 
     // ─── Email Alias ─────────────────────────────────────────────────
 
+    case 'get-alias-config': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const config = await api.aliases.getConfig(token);
+        return {
+          success: true,
+          configured: true,
+          provider: config.provider,
+        };
+      } catch (err) {
+        if ((err as { status?: number }).status === 404) {
+          return { success: true, configured: false };
+        }
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to load alias configuration',
+        };
+      }
+    }
+
+    case 'save-alias-config': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        let provider: string;
+        let apiKey: string;
+        let baseUrl: string | undefined;
+        const enteredKey = message.apiKey?.trim();
+
+        if (enteredKey) {
+          provider = message.provider ?? '';
+          apiKey = enteredKey;
+          try {
+            const existingConfig = await api.aliases.getConfig(token);
+            if (existingConfig.provider === provider) {
+              baseUrl = existingConfig.baseUrl ?? undefined;
+            }
+          } catch (err) {
+            if ((err as { status?: number }).status !== 404) throw err;
+          }
+        } else {
+          const config = await api.aliases.getConfig(token);
+          provider = config.provider;
+          apiKey = await decryptAliasApiKey(config.encryptedApiKey, userKey);
+          baseUrl = config.baseUrl ?? undefined;
+        }
+
+        const result = await api.aliases.list(provider, apiKey, token, baseUrl);
+        if (enteredKey) {
+          const encryptedApiKey = await encryptString(
+            apiKey,
+            userKey.slice(0, 32),
+            ALIAS_API_KEY_AAD,
+          );
+          await api.aliases.saveConfig({ provider, encryptedApiKey, baseUrl }, token);
+        }
+        return { success: true, configured: true, provider, aliasCount: result.aliases.length };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to save alias configuration',
+        };
+      }
+    }
+
+    case 'delete-alias-config': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        await api.aliases.deleteConfig(token);
+        return { success: true };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to remove alias configuration',
+        };
+      }
+    }
+
     case 'generate-alias': {
       if (!userKey) return { success: false, error: 'Vault is locked' };
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
+        const config = await api.aliases.getConfig(token);
+        const apiKey = await decryptAliasApiKey(config.encryptedApiKey, userKey);
         const res = await api.aliases.generate(
-          { provider: message.provider, apiKey: message.apiKey },
-          token
+          {
+            provider: config.provider,
+            apiKey,
+            baseUrl: config.baseUrl ?? undefined,
+          },
+          token,
         );
-        return { success: true, alias: res.alias };
+        return { success: true, alias: res.alias.email };
       } catch (err) {
         return {
           success: false,
@@ -1082,8 +1268,42 @@ async function handleMessage(message: Message): Promise<unknown> {
       const token = await getSessionToken();
       if (!token) return { fallback: true };
       try {
-        const { options: createOpts, origin } = message;
-        const rpId = createOpts.rp.id ?? new URL(origin).hostname;
+        const { options: createOpts } = message;
+        const caller = resolveWebAuthnCaller(senderUrl, message.origin, createOpts.rp.id);
+        if (!caller) return { fallback: true };
+        const { origin, rpId } = caller;
+        if (
+          !isValidBase64url(createOpts.challenge, 16, 1024) ||
+          !isValidBase64url(createOpts.user.id, 1, 64) ||
+          !createOpts.pubKeyCredParams.some((param) => param.type === 'public-key' && param.alg === -7) ||
+          createOpts.authenticatorSelection?.userVerification === 'required' ||
+          createOpts.authenticatorSelection?.authenticatorAttachment === 'cross-platform'
+        ) {
+          return { fallback: true };
+        }
+
+        const excludedIds = new Set(
+          (createOpts.excludeCredentials ?? [])
+            .filter(
+              (credential) =>
+                credential.type === 'public-key' &&
+                isValidBase64url(credential.id, 1, 1024)
+            )
+            .map((credential) => credential.id)
+        );
+        const alreadyRegistered = Array.from(vaultItems.values()).some(
+          (item) => {
+            if (item.type !== 'passkey') return false;
+            const passkey = item as PasskeyItem;
+            return passkey.rpId === rpId && excludedIds.has(passkey.credentialId);
+          }
+        );
+        if (alreadyRegistered) {
+          return {
+            error: 'A passkey is already registered for this account.',
+            errorName: 'InvalidStateError',
+          };
+        }
 
         // Generate ECDSA P-256 key pair
         const { publicKeySPKI, privateKeyPKCS8, publicKeyCOSE } = await generatePasskeyKeyPair();
@@ -1094,7 +1314,7 @@ async function handleMessage(message: Message): Promise<unknown> {
 
         // Build authenticator data with attested credential data
         const rpIdHash = await hashRpId(rpId);
-        const counter = 1;
+        const counter = 0;
         const authData = createAuthenticatorData(rpIdHash, counter, credId, publicKeyCOSE);
 
         // Build attestation object (fmt="none")
@@ -1178,8 +1398,21 @@ async function handleMessage(message: Message): Promise<unknown> {
     case 'WEBAUTHN_GET': {
       if (!userKey) return { fallback: true };
       try {
-        const { options: getOpts, origin } = message;
-        const rpId = getOpts.rpId ?? new URL(origin).hostname;
+        const { options: getOpts } = message;
+        const caller = resolveWebAuthnCaller(senderUrl, message.origin, getOpts.rpId);
+        if (!caller) return { fallback: true };
+        const { origin, rpId } = caller;
+        if (
+          !isValidBase64url(getOpts.challenge, 16, 1024) ||
+          getOpts.userVerification === 'required' ||
+          (getOpts.allowCredentials ?? []).some(
+            (credential) =>
+              credential.type !== 'public-key' ||
+              !isValidBase64url(credential.id, 1, 1024)
+          )
+        ) {
+          return { fallback: true };
+        }
 
         // Find matching passkeys in the vault
         const allPasskeys: StoredPasskey[] = [];
@@ -1243,8 +1476,20 @@ async function handleMessage(message: Message): Promise<unknown> {
     case 'WEBAUTHN_GET_SELECTED': {
       if (!userKey) return { fallback: true };
       try {
-        const { credentialId, rpId, challenge, origin } = message;
-        return signPasskeyAssertion(credentialId, rpId, challenge, origin);
+        const caller = resolveWebAuthnCaller(senderUrl, message.origin, message.rpId);
+        if (
+          !caller ||
+          !isValidBase64url(message.credentialId, 1, 1024) ||
+          !isValidBase64url(message.challenge, 16, 1024)
+        ) {
+          return { fallback: true };
+        }
+        return signPasskeyAssertion(
+          message.credentialId,
+          caller.rpId,
+          message.challenge,
+          caller.origin
+        );
       } catch (err) {
         console.error('[Lockbox] WebAuthn get-selected failed:', err);
         return { fallback: true };
@@ -1305,75 +1550,22 @@ async function handleMessage(message: Message): Promise<unknown> {
       }
     }
 
-    // ─── Emergency Access ────────────────────────────────────────────────
+    // ─── Travel Mode ─────────────────────────────────────────────────────
 
-    case 'get-emergency-access': {
+    case 'get-travel-mode': {
       if (!userKey) return { success: false, error: 'Vault is locked' };
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
-        const res = await api.emergency.list(token);
-        return { success: true, ...res };
+        const res = await api.travelMode.get(token);
+        return { success: true, enabled: res.enabled };
       } catch (err) {
         return {
           success: false,
-          error: err instanceof Error ? err.message : 'Failed to get emergency access',
+          error: err instanceof Error ? err.message : 'Failed to load travel mode',
         };
       }
     }
-
-    case 'invite-emergency': {
-      if (!userKey) return { success: false, error: 'Vault is locked' };
-      const token = await getSessionToken();
-      if (!token) return { success: false, error: 'Not authenticated' };
-      try {
-        const res = await api.emergency.invite(
-          { email: message.email, waitDays: message.waitDays },
-          token
-        );
-        return { success: true, grant: res.grant };
-      } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to invite' };
-      }
-    }
-
-    case 'approve-emergency': {
-      if (!userKey) return { success: false, error: 'Vault is locked' };
-      const token = await getSessionToken();
-      if (!token) return { success: false, error: 'Not authenticated' };
-      try {
-        await api.emergency.approve(message.grantId, token);
-        return { success: true };
-      } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to approve' };
-      }
-    }
-
-    case 'reject-emergency': {
-      if (!userKey) return { success: false, error: 'Vault is locked' };
-      const token = await getSessionToken();
-      if (!token) return { success: false, error: 'Not authenticated' };
-      try {
-        await api.emergency.reject(message.grantId, token);
-        return { success: true };
-      } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to reject' };
-      }
-    }
-
-    case 'revoke-emergency': {
-      if (!userKey) return { success: false, error: 'Vault is locked' };
-      const token = await getSessionToken();
-      if (!token) return { success: false, error: 'Not authenticated' };
-      try {
-        await api.emergency.revoke(message.grantId, token);
-        return { success: true };
-      } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'Failed to revoke' };
-      }
-    }
-
-    // ─── Travel Mode ─────────────────────────────────────────────────────
 
     case 'set-travel-mode': {
       if (!userKey) return { success: false, error: 'Vault is locked' };
@@ -1428,6 +1620,7 @@ async function handleMessage(message: Message): Promise<unknown> {
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
         await api.versions.restore(message.itemId, message.versionId, token);
+        await loadVault(token);
         return { success: true };
       } catch (err) {
         return {
@@ -1439,6 +1632,21 @@ async function handleMessage(message: Message): Promise<unknown> {
 
     // ─── 2FA Setup ───────────────────────────────────────────────────────
 
+    case 'get-2fa-status': {
+      if (!userKey) return { success: false, error: 'Vault is locked' };
+      const token = await getSessionToken();
+      if (!token) return { success: false, error: 'Not authenticated' };
+      try {
+        const res = await api.twoFactor.status(token);
+        return { success: true, enabled: res.enabled };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : 'Failed to load 2FA status',
+        };
+      }
+    }
+
     case 'setup-2fa': {
       if (!userKey) return { success: false, error: 'Vault is locked' };
       const token = await getSessionToken();
@@ -1449,7 +1657,6 @@ async function handleMessage(message: Message): Promise<unknown> {
           success: true,
           secret: res.secret,
           otpauthUri: res.otpauthUri,
-          backupCodes: res.backupCodes,
         };
       } catch (err) {
         return {
@@ -1464,8 +1671,8 @@ async function handleMessage(message: Message): Promise<unknown> {
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
-        await api.twoFactor.verify({ code: message.code }, token);
-        return { success: true };
+        const res = await api.twoFactor.verify({ code: message.code }, token);
+        return { success: true, backupCodes: res.backupCodes };
       } catch (err) {
         return {
           success: false,
@@ -1489,129 +1696,6 @@ async function handleMessage(message: Message): Promise<unknown> {
       }
     }
 
-    // ─── Hardware Keys ────────────────────────────────────────────────
-
-    case 'list-hardware-keys': {
-      if (!userKey) return { success: false, error: 'Vault is locked' };
-      const token = await getSessionToken();
-      if (!token) return { success: false, error: 'Not authenticated' };
-      try {
-        const apiUrl = await getApiBaseUrl();
-        const keys = await listHardwareKeys(apiUrl, token);
-        return { success: true, keys };
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : 'Failed to list hardware keys',
-        };
-      }
-    }
-
-    case 'remove-hardware-key': {
-      if (!userKey) return { success: false, error: 'Vault is locked' };
-      const token = await getSessionToken();
-      if (!token) return { success: false, error: 'Not authenticated' };
-      try {
-        const apiUrl = await getApiBaseUrl();
-        await removeHardwareKey(apiUrl, token, message.keyId);
-        return { success: true };
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : 'Failed to remove hardware key',
-        };
-      }
-    }
-
-    case 'register-hardware-key': {
-      if (!userKey || !masterKey || !userId) return { success: false, error: 'Vault is locked' };
-      const token = await getSessionToken();
-      if (!token) return { success: false, error: 'Not authenticated' };
-      try {
-        const email = await getStoredEmail();
-        if (!email) return { success: false, error: 'No stored email' };
-        const result = await registerHardwareKey({ userId, email, masterKey });
-        // Save the key server-side
-        const apiUrl = await getApiBaseUrl();
-        await api.auth.me(token); // Verify session is valid
-        return { success: true, keyId: result.keyId };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Registration failed';
-        // WebAuthn may not be available in service worker context
-        if (msg.includes('WebAuthn') || msg.includes('credentials')) {
-          return {
-            success: false,
-            error:
-              'Hardware key registration requires browser interaction. Please use the web vault.',
-          };
-        }
-        return { success: false, error: msg };
-      }
-    }
-
-    case 'hw-key-unlock': {
-      try {
-        const email = await getStoredEmail();
-        if (!email)
-          return { success: false, error: 'No stored email — log in with password first' };
-        const apiUrl = await getApiBaseUrl();
-        // Get KDF params and derive keys to find stored key IDs
-        const kdfRes = (await api.auth.kdfParams(email)) as { kdfConfig: KdfConfig; salt: string };
-        // List keys requires auth — attempt to use stored credentials
-        // For HW key unlock, we need the key ID from local storage
-        const stored = await chrome.storage.local.get('hwKeyId');
-        const keyId = stored.hwKeyId as string | undefined;
-        if (!keyId) return { success: false, error: 'No hardware key registered for this device' };
-        const challenge = await requestHardwareKeyChallenge(apiUrl, keyId);
-        const authResult = await authenticateWithHardwareKey({
-          apiUrl,
-          keyId,
-          challenge: challenge.challenge,
-        });
-        // Unwrap master key and establish session
-        await setSessionToken(authResult.token);
-        const salt = fromBase64(kdfRes.salt);
-        masterKey = await deriveKey('', salt, kdfRes.kdfConfig); // placeholder — real key comes from HW unwrap
-        return { success: true };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Hardware key unlock failed';
-        if (msg.includes('WebAuthn') || msg.includes('credentials')) {
-          return { success: false, error: 'Hardware key unlock requires browser interaction' };
-        }
-        return { success: false, error: msg };
-      }
-    }
-
-    // ─── QR Device Sync ─────────────────────────────────────────────────
-
-    case 'generate-sync-qr': {
-      if (!userKey) return { success: false, error: 'Vault is locked' };
-      const token = await getSessionToken();
-      if (!token) return { success: false, error: 'Not authenticated' };
-      try {
-        const result = await generateSyncQR({ sessionToken: token, userKey });
-        return { success: true, qrData: result.qrData, expiresAt: result.expiresAt };
-      } catch (err) {
-        return {
-          success: false,
-          error: err instanceof Error ? err.message : 'Failed to generate sync QR',
-        };
-      }
-    }
-
-    case 'process-sync-qr': {
-      try {
-        const result = await processSyncQR({ qrData: message.qrData });
-        if (!result) return { success: false, error: 'Invalid or expired QR data' };
-        // Establish session from synced data
-        await setSessionToken(result.sessionToken);
-        userKey = result.userKey;
-        return { success: true };
-      } catch (err) {
-        return { success: false, error: err instanceof Error ? err.message : 'QR sync failed' };
-      }
-    }
-
     default:
       return { error: 'Unknown message type' };
   }
@@ -1620,96 +1704,8 @@ async function handleMessage(message: Message): Promise<unknown> {
 // ─── WXT background export ────────────────────────────────────────────────────
 
 export default defineBackground(() => {
-  initWebAuthnProxy({
-    isUnlocked: () => userKey !== null,
-    getPasskeys: () => {
-      const passkeys: Array<{
-        id: string;
-        credentialId: string;
-        rpId: string;
-        rpName: string;
-        userId: string;
-        userName: string;
-        publicKey: string;
-        counter: number;
-        privateKey?: string;
-        createdAt: string;
-        updatedAt: string;
-        revisionDate: string;
-      }> = [];
-      for (const item of vaultItems.values()) {
-        if (item.type !== 'passkey') continue;
-        const pk = item as PasskeyItem & { privateKey?: string };
-        passkeys.push({
-          id: pk.id,
-          credentialId: pk.credentialId,
-          rpId: pk.rpId,
-          rpName: pk.rpName,
-          userId: pk.userId,
-          userName: pk.userName,
-          publicKey: pk.publicKey,
-          counter: pk.counter,
-          privateKey: pk.privateKey,
-          createdAt: pk.createdAt,
-          updatedAt: pk.updatedAt ?? pk.createdAt,
-          revisionDate: pk.revisionDate ?? pk.createdAt,
-        });
-      }
-      return passkeys;
-    },
-    persistCounter: (credentialId: string, newCounter: number, updatedAt: string) => {
-      for (const item of vaultItems.values()) {
-        if (item.type !== 'passkey') continue;
-        const pk = item as PasskeyItem & { privateKey?: string };
-        if (pk.credentialId === credentialId) {
-          pk.counter = newCounter;
-          (pk as PasskeyItem & { updatedAt: string }).updatedAt = updatedAt;
-          (pk as PasskeyItem & { revisionDate: string }).revisionDate = updatedAt;
-          getSessionToken().then((token) => {
-            if (!token) return;
-            encryptVaultItem(pk as unknown as VaultItem, pk.id, updatedAt).then((encrypted) => {
-              if (!encrypted) return;
-              api.vault
-                .updateItem(
-                  pk.id,
-                  {
-                    encryptedData: encrypted,
-                    tags: pk.tags ?? [],
-                    favorite: pk.favorite ?? false,
-                    revisionDate: updatedAt,
-                  },
-                  token
-                )
-                .catch(() => {});
-            });
-          });
-          break;
-        }
-      }
-    },
-    savePasskeyItem: async (passkeyData) => {
-      const token = await getSessionToken();
-      if (!token || !userKey) return;
-      const vaultItem = passkeyData as unknown as VaultItem;
-      const encrypted = await encryptVaultItem(vaultItem, passkeyData.id, passkeyData.revisionDate);
-      if (!encrypted) return;
-      await api.vault.createItem(
-        {
-          id: passkeyData.id,
-          type: 'passkey' as const,
-          encryptedData: encrypted,
-          tags: ['passkey'],
-          favorite: false,
-          revisionDate: passkeyData.revisionDate,
-        },
-        token
-      );
-      vaultItems.set(passkeyData.id, vaultItem);
-    },
-  });
-
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    handleMessage(message as Message)
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    handleMessage(message as Message, sender.url)
       .then(sendResponse)
       .catch((err) => sendResponse({ error: err.message }));
     return true; // Keep message channel open for async response
@@ -1744,8 +1740,6 @@ export default defineBackground(() => {
       if (token && userKey) {
         await loadVault(token);
       }
-    } else if (alarm.name === BREACH_ALARM) {
-      await runBreachCheck();
     } else if (alarm.name === COPILOT_ALARM) {
       if (userKey) {
         try {

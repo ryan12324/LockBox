@@ -4,8 +4,12 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import dev.lockbox.app.credentialprovider.PasskeyMetadataDao
 import dev.lockbox.app.credentialprovider.PasskeyMetadataEntity
+import dev.lockbox.app.autofill.AutofillCredentialDao
+import dev.lockbox.app.autofill.AutofillCredentialEntity
 
 /**
  * VaultDatabase — Room database for encrypted vault item storage.
@@ -17,17 +21,93 @@ import dev.lockbox.app.credentialprovider.PasskeyMetadataEntity
  * The encryption/decryption happens in the TypeScript layer using the user key.
  */
 @Database(
-    entities = [VaultItemEntity::class, PasskeyMetadataEntity::class],
-    version = 3,
+    entities = [VaultItemEntity::class, PasskeyMetadataEntity::class, AutofillCredentialEntity::class],
+    version = 5,
     exportSchema = true
 )
 abstract class VaultDatabase : RoomDatabase() {
 
     abstract fun vaultItemDao(): VaultItemDao
     abstract fun passkeyMetadataDao(): PasskeyMetadataDao
+    abstract fun autofillCredentialDao(): AutofillCredentialDao
 
     companion object {
         private const val DATABASE_NAME = "lockbox_vault.db"
+
+        /** Remove the obsolete standalone IV column; encryptedData already contains it. */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS vault_items_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        encryptedData TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        revisionDate TEXT NOT NULL,
+                        syncStatus TEXT NOT NULL,
+                        folderId TEXT,
+                        tags TEXT,
+                        favorite INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO vault_items_new (
+                        id, encryptedData, type, revisionDate, syncStatus, folderId, tags, favorite
+                    )
+                    SELECT id, encryptedData, type, revisionDate, syncStatus, folderId, tags, favorite
+                    FROM vault_items
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE vault_items")
+                db.execSQL("ALTER TABLE vault_items_new RENAME TO vault_items")
+            }
+        }
+
+        /** Add local metadata for Android's passkey credential provider. */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS passkey_metadata (
+                        credentialId TEXT NOT NULL PRIMARY KEY,
+                        rpId TEXT NOT NULL,
+                        rpName TEXT NOT NULL,
+                        userName TEXT NOT NULL,
+                        userDisplayName TEXT NOT NULL,
+                        userId TEXT NOT NULL,
+                        keystoreAlias TEXT NOT NULL,
+                        createdAt TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        /** Add the biometric-gated, device-local login index used by AutofillService. */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS autofill_credentials (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        domainHashes TEXT NOT NULL,
+                        encryptedData TEXT NOT NULL,
+                        updatedAt TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
+        /** Track the server revision that an offline edit was based on. */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE vault_items ADD COLUMN baseRevisionDate TEXT")
+                db.execSQL("UPDATE vault_items SET baseRevisionDate = revisionDate")
+            }
+        }
 
         @Volatile
         private var instance: VaultDatabase? = null
@@ -54,7 +134,7 @@ abstract class VaultDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .enableMultiInstanceInvalidation()
-                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
         }
     }

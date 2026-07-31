@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { hardwareKeyRoutes } from '../routes/hardware-key.js';
+import { HARDWARE_KEY_UNAVAILABLE, hardwareKeyRoutes } from '../routes/hardware-key.js';
 import { hardwareKeys } from '../db/schema.js';
 
 describe('Hardware Key API — auth enforcement', () => {
@@ -53,8 +53,7 @@ describe('Hardware Key API — route existence', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    // Challenge doesn't require auth, so it should return 400 (missing keyId), not 404
-    expect(res.status).not.toBe(404);
+    expect(res.status).toBe(501);
   });
 
   it('POST /api/auth/hardware-key/verify — route exists (not 404)', async () => {
@@ -63,64 +62,43 @@ describe('Hardware Key API — route existence', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    // Verify doesn't require auth, so it should return 400, not 404
-    expect(res.status).not.toBe(404);
+    expect(res.status).toBe(501);
   });
 });
 
-describe('Hardware Key API — challenge endpoint', () => {
+describe('Hardware Key API — unsafe authentication disabled for v1', () => {
   const app = new Hono();
   app.route('/api/auth/hardware-key', hardwareKeyRoutes);
 
-  it('POST /challenge — returns 400 for missing keyId', async () => {
+  it('POST /challenge — never issues challenges', async () => {
     const res = await app.request('/api/auth/hardware-key/challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(501);
     const data = (await res.json()) as { error: string };
-    expect(data.error).toContain('keyId');
+    expect(data.error).toBe(HARDWARE_KEY_UNAVAILABLE);
   });
 
-  it('POST /challenge — returns 400 for invalid JSON', async () => {
+  it('POST /challenge — does not parse attacker-controlled payloads', async () => {
     const res = await app.request('/api/auth/hardware-key/challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: 'not-json',
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(501);
   });
-});
 
-describe('Hardware Key API — verify endpoint', () => {
-  const app = new Hono();
-  app.route('/api/auth/hardware-key', hardwareKeyRoutes);
-
-  it('POST /verify — returns 400 for missing fields', async () => {
+  it('POST /verify — never exchanges assertions for sessions', async () => {
     const res = await app.request('/api/auth/hardware-key/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyId: 'test' }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(501);
     const data = (await res.json()) as { error: string };
-    expect(data.error).toBeDefined();
-  });
-
-  it('POST /verify — returns 401 for invalid challengeId', async () => {
-    const res = await app.request('/api/auth/hardware-key/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        keyId: 'test-key',
-        challengeId: 'nonexistent-challenge',
-        signature: 'test-sig',
-      }),
-    });
-    expect(res.status).toBe(401);
-    const data = (await res.json()) as { error: string };
-    expect(data.error).toContain('Invalid or expired challenge');
+    expect(data.error).toBe(HARDWARE_KEY_UNAVAILABLE);
   });
 });
 

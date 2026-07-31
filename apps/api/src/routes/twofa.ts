@@ -7,7 +7,13 @@ import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
 
 import { createDb } from '../db/index.js';
-import { users, sessions, userTotpSettings, backupCodes } from '../db/schema.js';
+import {
+  users,
+  sessions,
+  twoFactorChallenges,
+  userTotpSettings,
+  backupCodes,
+} from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { totp } from '@lockbox/totp';
 import { base32Encode, base32Decode } from '@lockbox/totp';
@@ -26,14 +32,6 @@ async function sha256(input: string): Promise<string> {
     .join('');
 }
 
-/** Generate a cryptographically random session token (base64, 32 bytes). */
-function generateToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
-}
-
 /** Verify a TOTP code against a secret with ±1 time-step tolerance. */
 async function verifyTotpCode(secretBytes: Uint8Array, code: string): Promise<boolean> {
   const now = Date.now();
@@ -44,6 +42,35 @@ async function verifyTotpCode(secretBytes: Uint8Array, code: string): Promise<bo
   ]);
   return codes.includes(code);
 }
+
+/** Generate a random 256-bit bearer token. */
+function generateToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function isTotpCode(value: unknown): value is string {
+  return typeof value === 'string' && /^\d{6}$/.test(value);
+}
+
+function isLoginVerificationCode(value: unknown): value is string {
+  return typeof value === 'string' && (/^\d{6}$/.test(value) || /^[a-fA-F0-9]{16}$/.test(value));
+}
+
+// ─── GET /status ─────────────────────────────────────────────────────────────
+
+twofaRoutes.get('/status', authMiddleware, async (c) => {
+  const userId = c.get('userId');
+  const db = createDb(c.env.DB);
+  const settings = await db
+    .select({ enabled: userTotpSettings.enabled })
+    .from(userTotpSettings)
+    .where(eq(userTotpSettings.userId, userId))
+    .get();
+  return c.json({ enabled: settings?.enabled === 1 });
+});
 
 // ─── POST /setup ──────────────────────────────────────────────────────────────
 
@@ -75,17 +102,21 @@ twofaRoutes.post('/setup', authMiddleware, async (c) => {
   // Build otpauth URI
   const otpauthUri = `otpauth://totp/Lockbox:${encodeURIComponent(user.email)}?secret=${base32Secret}&issuer=Lockbox`;
 
-  // Delete any existing pending setup
-  await db.delete(userTotpSettings).where(eq(userTotpSettings.userId, userId));
-
-  // Store the secret
+  // Store or replace the pending secret atomically. The server must retain this
+  // secret to verify login codes; it never grants access to vault ciphertext.
   const now = new Date().toISOString();
-  await db.insert(userTotpSettings).values({
-    userId,
-    encryptedTotpSecret: base32Secret,
-    enabled: 0,
-    createdAt: now,
-  });
+  await db
+    .insert(userTotpSettings)
+    .values({
+      userId,
+      encryptedTotpSecret: base32Secret,
+      enabled: 0,
+      createdAt: now,
+    })
+    .onConflictDoUpdate({
+      target: userTotpSettings.userId,
+      set: { encryptedTotpSecret: base32Secret, enabled: 0, createdAt: now },
+    });
 
   return c.json({ secret: base32Secret, otpauthUri });
 });
@@ -100,8 +131,8 @@ twofaRoutes.post('/verify', authMiddleware, async (c) => {
   if (!body) return c.json({ error: 'Invalid JSON' }, 400);
 
   const { code } = body as Record<string, unknown>;
-  if (!code || typeof code !== 'string') {
-    return c.json({ error: 'Missing code' }, 400);
+  if (!isTotpCode(code)) {
+    return c.json({ error: 'Code must contain 6 digits' }, 400);
   }
 
   // Look up TOTP settings
@@ -127,9 +158,6 @@ twofaRoutes.post('/verify', authMiddleware, async (c) => {
     return c.json({ error: 'Invalid code' }, 401);
   }
 
-  // Enable 2FA
-  await db.update(userTotpSettings).set({ enabled: 1 }).where(eq(userTotpSettings.userId, userId));
-
   // Generate 8 backup codes
   const plainCodes: string[] = [];
   for (let i = 0; i < 8; i++) {
@@ -140,21 +168,27 @@ twofaRoutes.post('/verify', authMiddleware, async (c) => {
     plainCodes.push(hex);
   }
 
-  // Delete any existing backup codes for this user
-  await db.delete(backupCodes).where(eq(backupCodes.userId, userId));
-
-  // Store SHA-256 hashes of backup codes
+  // Prepare all hashes before mutating account state.
   const now = new Date().toISOString();
-  for (const plainCode of plainCodes) {
-    const hash = await sha256(plainCode);
-    await db.insert(backupCodes).values({
+  const backupCodeRows = await Promise.all(
+    plainCodes.map(async (plainCode) => ({
       id: crypto.randomUUID(),
       userId,
-      codeHash: hash,
+      codeHash: await sha256(plainCode),
       used: 0,
       createdAt: now,
-    });
-  }
+    })),
+  );
+
+  // Enabling 2FA and replacing its recovery codes is one account transition.
+  await db.batch([
+    db.delete(backupCodes).where(eq(backupCodes.userId, userId)),
+    db.insert(backupCodes).values(backupCodeRows),
+    db
+      .update(userTotpSettings)
+      .set({ enabled: 1 })
+      .where(and(eq(userTotpSettings.userId, userId), eq(userTotpSettings.enabled, 0))),
+  ]);
 
   return c.json({ enabled: true, backupCodes: plainCodes });
 });
@@ -169,8 +203,8 @@ twofaRoutes.post('/disable', authMiddleware, async (c) => {
   if (!body) return c.json({ error: 'Invalid JSON' }, 400);
 
   const { code } = body as Record<string, unknown>;
-  if (!code || typeof code !== 'string') {
-    return c.json({ error: 'Missing code' }, 400);
+  if (!isTotpCode(code)) {
+    return c.json({ error: 'Code must contain 6 digits' }, 400);
   }
 
   // Look up TOTP settings
@@ -192,9 +226,11 @@ twofaRoutes.post('/disable', authMiddleware, async (c) => {
     return c.json({ error: 'Invalid code' }, 401);
   }
 
-  // Delete TOTP settings and backup codes
-  await db.delete(userTotpSettings).where(eq(userTotpSettings.userId, userId));
-  await db.delete(backupCodes).where(eq(backupCodes.userId, userId));
+  // Remove the factor and its recovery codes atomically.
+  await db.batch([
+    db.delete(userTotpSettings).where(eq(userTotpSettings.userId, userId)),
+    db.delete(backupCodes).where(eq(backupCodes.userId, userId)),
+  ]);
 
   return c.json({ disabled: true });
 });
@@ -212,27 +248,31 @@ twofaRoutes.post('/validate', async (c) => {
   if (!body) return c.json({ error: 'Invalid JSON' }, 400);
 
   const { tempToken, code } = body as Record<string, unknown>;
-  if (!tempToken || !code || typeof tempToken !== 'string' || typeof code !== 'string') {
-    return c.json({ error: 'Missing tempToken or code' }, 400);
+  if (!tempToken || typeof tempToken !== 'string' || !isLoginVerificationCode(code)) {
+    return c.json({ error: 'A valid tempToken and verification code are required' }, 400);
   }
 
   const db = createDb(c.env.DB);
 
-  // Look up session by tempToken
+  // Look up the dedicated pre-auth challenge. It is intentionally never stored
+  // in the sessions table, so it cannot authorize any other API route.
   const now = new Date().toISOString();
-  const session = await db.select().from(sessions).where(eq(sessions.token, tempToken)).get();
+  const challenge = await db
+    .select()
+    .from(twoFactorChallenges)
+    .where(eq(twoFactorChallenges.token, tempToken))
+    .get();
 
-  if (!session) {
+  if (!challenge) {
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 
-  // Check if session is expired
-  if (session.expiresAt <= now) {
-    await db.delete(sessions).where(eq(sessions.id, session.id));
+  if (challenge.expiresAt <= now) {
+    await db.delete(twoFactorChallenges).where(eq(twoFactorChallenges.id, challenge.id));
     return c.json({ error: 'Invalid or expired token' }, 401);
   }
 
-  const userId = session.userId;
+  const userId = challenge.userId;
 
   // Get TOTP settings
   const settings = await db
@@ -247,11 +287,11 @@ twofaRoutes.post('/validate', async (c) => {
 
   // Try TOTP verification first
   const secretBytes = base32Decode(settings.encryptedTotpSecret);
-  let valid = await verifyTotpCode(secretBytes, code);
+  let valid = /^\d{6}$/.test(code) && (await verifyTotpCode(secretBytes, code));
 
   // If TOTP fails, try backup code
   if (!valid) {
-    const codeHash = await sha256(code);
+    const codeHash = await sha256(code.toLowerCase());
     const backupCode = await db
       .select()
       .from(backupCodes)
@@ -265,19 +305,50 @@ twofaRoutes.post('/validate', async (c) => {
       .get();
 
     if (backupCode) {
-      // Mark backup code as used
-      await db.update(backupCodes).set({ used: 1 }).where(eq(backupCodes.id, backupCode.id));
-      valid = true;
+      // Consume the code atomically so concurrent validation cannot reuse it.
+      const consumedCode = await db
+        .update(backupCodes)
+        .set({ used: 1 })
+        .where(and(eq(backupCodes.id, backupCode.id), eq(backupCodes.used, 0)))
+        .returning({ id: backupCodes.id })
+        .get();
+      valid = Boolean(consumedCode);
     }
   }
 
   if (!valid) {
+    const attempts = challenge.attempts + 1;
+    if (attempts >= 5) {
+      await db.delete(twoFactorChallenges).where(eq(twoFactorChallenges.id, challenge.id));
+    } else {
+      await db
+        .update(twoFactorChallenges)
+        .set({ attempts })
+        .where(eq(twoFactorChallenges.id, challenge.id));
+    }
     return c.json({ error: 'Invalid code' }, 401);
   }
 
-  // Extend session expiry to full 24 hours
+  // Consume the challenge before issuing a real session. Only one concurrent
+  // validation can delete-and-return it successfully.
+  const consumedChallenge = await db
+    .delete(twoFactorChallenges)
+    .where(eq(twoFactorChallenges.id, challenge.id))
+    .returning({ id: twoFactorChallenges.id })
+    .get();
+  if (!consumedChallenge) {
+    return c.json({ error: 'Invalid or expired token' }, 401);
+  }
+
+  const sessionToken = generateToken();
   const fullExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  await db.update(sessions).set({ expiresAt: fullExpiry }).where(eq(sessions.id, session.id));
+  await db.insert(sessions).values({
+    id: crypto.randomUUID(),
+    userId,
+    token: sessionToken,
+    expiresAt: fullExpiry,
+    createdAt: now,
+  });
 
   // Get user info for full login response
   const user = await db.select().from(users).where(eq(users.id, userId)).get();
@@ -286,7 +357,7 @@ twofaRoutes.post('/validate', async (c) => {
   }
 
   return c.json({
-    token: tempToken,
+    token: sessionToken,
     user: {
       id: user.id,
       email: user.email,

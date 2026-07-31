@@ -130,11 +130,13 @@ export interface CustomField {
 export interface EncryptedVaultItem {
   id: string;
   type: VaultItemType;
-  encryptedData: string; // Base64-encoded AES-256-GCM ciphertext
+  encryptedData: string; // base64(iv).base64(AES-256-GCM ciphertext)
   revisionDate: string; // ISO 8601 — used for delta sync and AAD binding
-  folderId?: string;
+  folderId: string | null;
   tags: string[];
   favorite: boolean;
+  createdAt: string;
+  deletedAt: string | null;
 }
 
 /**
@@ -165,5 +167,8 @@ export interface VaultItemVersion {
   itemId: string;
   encryptedData: string;
   revisionDate: string;
+  folderId: string | null;
+  tags: string[];
+  favorite: boolean;
   createdAt: string;
 }

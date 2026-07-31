@@ -2,9 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.js';
 import { api } from '../lib/api.js';
-import { encryptString, decryptString } from '@lockbox/crypto';
+import {
+  deriveKey,
+  encryptString,
+  decryptString,
+  encryptUserKey,
+  makeAuthHash,
+  toBase64,
+  toUtf8,
+} from '@lockbox/crypto';
 import { QRCodeSVG } from 'qrcode.react';
 import { Button, Input, Select, Card } from '@lockbox/design';
+import {
+  getNativeAutofillStatus,
+  openNativeAutofillSettings,
+} from '../lib/native-autofill.js';
 
 type Theme = 'system' | 'light' | 'dark';
 type AutoLockMinutes = 1 | 5 | 15 | 30 | 60;
@@ -22,6 +34,18 @@ const DEFAULT_SETTINGS: Settings = {
   clipboardSeconds: 30,
 };
 
+const ALIAS_API_KEY_AAD = toUtf8('lockbox:alias-api-key:v1');
+
+async function decryptAliasApiKey(encryptedApiKey: string, userKey: Uint8Array): Promise<string> {
+  try {
+    return await decryptString(encryptedApiKey, userKey.slice(0, 32), ALIAS_API_KEY_AAD);
+  } catch {
+    // Pre-v1 builds stored this value without AAD. Accept it once so users can
+    // test or replace an existing configuration during the upgrade.
+    return decryptString(encryptedApiKey, userKey.slice(0, 32));
+  }
+}
+
 function loadSettings(): Settings {
   try {
     const stored = localStorage.getItem('lockbox-settings');
@@ -37,8 +61,15 @@ function saveSettings(settings: Settings) {
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { session } = useAuthStore();
+  const { session, userKey, masterKey, setSession, setKeys } = useAuthStore();
   const [settings, setSettings] = useState<Settings>(loadSettings);
+
+  const [currentMasterPassword, setCurrentMasterPassword] = useState('');
+  const [newMasterPassword, setNewMasterPassword] = useState('');
+  const [confirmMasterPassword, setConfirmMasterPassword] = useState('');
+  const [passwordChanging, setPasswordChanging] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
 
   const [is2FAEnabled, setIs2FAEnabled] = useState<boolean | null>(null);
   const [twoFaSetup, setTwoFaSetup] = useState<{ secret: string; otpauthUri: string } | null>(null);
@@ -48,7 +79,6 @@ export default function Settings() {
   const [twoFaLoading, setTwoFaLoading] = useState(false);
 
   type AliasProvider = 'simplelogin' | 'anonaddy';
-  const { userKey } = useAuthStore();
   const [aliasProvider, setAliasProvider] = useState<AliasProvider>('simplelogin');
   const [aliasApiKey, setAliasApiKey] = useState('');
   const [aliasBaseUrl, setAliasBaseUrl] = useState('');
@@ -63,34 +93,38 @@ export default function Settings() {
     Array<{ id: string; name: string; travelSafe: boolean }>
   >([]);
   const [showTravelConfirm, setShowTravelConfirm] = useState(false);
+  const [nativeAutofill, setNativeAutofill] = useState<{
+    supported: boolean;
+    enabled: boolean;
+  }>({ supported: false, enabled: false });
+  const [nativeAutofillLoading, setNativeAutofillLoading] = useState(false);
+  const [nativeAutofillError, setNativeAutofillError] = useState('');
 
-  const [hwKeys, setHwKeys] = useState<Array<{ id: string; keyType: string; createdAt: string }>>(
-    []
-  );
-  const [hwKeyLoading, setHwKeyLoading] = useState(false);
-  const [hwKeyError, setHwKeyError] = useState('');
-  const [hwKeySuccess, setHwKeySuccess] = useState('');
-
-  const [showQrSync, setShowQrSync] = useState(false);
-  const [qrPayload, setQrPayload] = useState<string | null>(null);
-  const [qrCountdown, setQrCountdown] = useState(0);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = () => {
+      getNativeAutofillStatus()
+        .then((status) => {
+          if (mounted) setNativeAutofill(status);
+        })
+        .catch(() => {});
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => {
+      mounted = false;
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
 
   useEffect(() => {
     async function check2FA() {
       if (!session) return;
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/auth/2fa/verify`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.token}`,
-          },
-          body: JSON.stringify({ code: '000000' }),
-        });
-        if (res.status === 409) setIs2FAEnabled(true);
-        else setIs2FAEnabled(false);
+        const result = await api.twoFactor.status(session.token);
+        setIs2FAEnabled(result.enabled);
       } catch {
-        setIs2FAEnabled(false);
+        setIs2FAEnabled(null);
       }
     }
     check2FA();
@@ -144,23 +178,6 @@ export default function Settings() {
       .catch(() => {});
   }, [session]);
 
-  useEffect(() => {
-    if (!session) return;
-    api.hardwareKey
-      .list(session.token)
-      .then((res) => setHwKeys(res.keys))
-      .catch(() => {});
-  }, [session]);
-
-  useEffect(() => {
-    if (qrCountdown <= 0) {
-      if (showQrSync) setQrPayload(null);
-      return;
-    }
-    const timer = setTimeout(() => setQrCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [qrCountdown, showQrSync]);
-
   async function handleTravelToggle(enabled: boolean) {
     if (!session) return;
     setTravelLoading(true);
@@ -174,6 +191,20 @@ export default function Settings() {
     }
   }
 
+  async function handleOpenAutofillSettings() {
+    setNativeAutofillLoading(true);
+    setNativeAutofillError('');
+    try {
+      await openNativeAutofillSettings();
+    } catch (error) {
+      setNativeAutofillError(
+        error instanceof Error ? error.message : 'Could not open Android autofill settings'
+      );
+    } finally {
+      setNativeAutofillLoading(false);
+    }
+  }
+
   async function handleFolderTravel(folderId: string, travelSafe: boolean) {
     if (!session) return;
     try {
@@ -184,75 +215,69 @@ export default function Settings() {
     }
   }
 
-  async function handleRegisterHardwareKey() {
-    if (!session || !userKey) return;
-    setHwKeyLoading(true);
-    setHwKeyError('');
-    setHwKeySuccess('');
+  async function handleChangeMasterPassword(event: React.FormEvent) {
+    event.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!session || !userKey || !masterKey) {
+      setPasswordError('Unlock your vault before changing the master password');
+      return;
+    }
+    if (!currentMasterPassword) {
+      setPasswordError('Enter your current master password');
+      return;
+    }
+    if (newMasterPassword.length < 12) {
+      setPasswordError('The new master password must contain at least 12 characters');
+      return;
+    }
+    if (newMasterPassword !== confirmMasterPassword) {
+      setPasswordError('New master passwords do not match');
+      return;
+    }
+    if (newMasterPassword === currentMasterPassword) {
+      setPasswordError('Choose a different master password');
+      return;
+    }
+
+    setPasswordChanging(true);
     try {
-      const challengeBytes = crypto.getRandomValues(new Uint8Array(32));
-      const credential = (await navigator.credentials.create({
-        publicKey: {
-          challenge: challengeBytes,
-          rp: { name: 'Lockbox', id: window.location.hostname },
-          user: {
-            id: new Uint8Array(16),
-            name: session.email,
-            displayName: session.email,
-          },
-          pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
-          authenticatorSelection: { authenticatorAttachment: 'cross-platform' },
-        },
-      })) as PublicKeyCredential | null;
-      if (!credential) throw new Error('No credential created');
-      const response = credential.response as AuthenticatorAttestationResponse;
-      const pubKeyBytes = new Uint8Array(response.getPublicKey?.() || new ArrayBuffer(0));
-      const pubKeyB64 = btoa(String.fromCharCode(...pubKeyBytes));
-      const wrappedKeyB64 = btoa(String.fromCharCode(...userKey.slice(0, 32)));
-      const result = await api.hardwareKey.setup(
+      const newSalt = crypto.getRandomValues(new Uint8Array(16));
+      const newMasterKey = await deriveKey(newMasterPassword, newSalt, session.kdfConfig);
+      const [currentAuthHash, newEncryptedUserKey, newAuthHash] = await Promise.all([
+        makeAuthHash(masterKey, currentMasterPassword),
+        encryptUserKey(userKey, newMasterKey),
+        makeAuthHash(newMasterKey, newMasterPassword),
+      ]);
+      const newSaltB64 = toBase64(newSalt);
+
+      await api.auth.changePassword(
         {
-          keyType: 'fido2',
-          publicKey: pubKeyB64,
-          wrappedMasterKey: wrappedKeyB64,
+          currentAuthHash,
+          newAuthHash,
+          newEncryptedUserKey,
+          newKdfConfig: session.kdfConfig,
+          newSalt: newSaltB64,
         },
         session.token
       );
-      setHwKeys((prev) => [
-        ...prev,
-        { id: result.id, keyType: 'fido2', createdAt: new Date().toISOString() },
-      ]);
-      setHwKeySuccess('Hardware key registered successfully');
+
+      setSession({
+        ...session,
+        encryptedUserKey: newEncryptedUserKey,
+        salt: newSaltB64,
+      });
+      setKeys(newMasterKey, userKey);
+      setCurrentMasterPassword('');
+      setNewMasterPassword('');
+      setConfirmMasterPassword('');
+      setPasswordSuccess('Master password changed. Other signed-in sessions were revoked.');
     } catch (err) {
-      setHwKeyError(err instanceof Error ? err.message : 'Failed to register key');
+      setPasswordError(err instanceof Error ? err.message : 'Failed to change master password');
     } finally {
-      setHwKeyLoading(false);
+      setPasswordChanging(false);
     }
-  }
-
-  async function handleRevokeHardwareKey(id: string) {
-    if (!session) return;
-    try {
-      await api.hardwareKey.delete(id, session.token);
-      setHwKeys((prev) => prev.filter((k) => k.id !== id));
-      setHwKeySuccess('Hardware key revoked');
-    } catch (err) {
-      setHwKeyError(err instanceof Error ? err.message : 'Failed to revoke key');
-    }
-  }
-
-  function handleGenerateQrSync() {
-    const expiresAt = new Date(Date.now() + 30 * 1000).toISOString();
-    const ephemeralKey = crypto.getRandomValues(new Uint8Array(32));
-    const nonce = crypto.getRandomValues(new Uint8Array(12));
-    const payload = JSON.stringify({
-      ephemeralPublicKey: btoa(String.fromCharCode(...ephemeralKey)),
-      encryptedSessionKey: btoa(String.fromCharCode(...new Uint8Array(32))),
-      nonce: btoa(String.fromCharCode(...nonce)),
-      expiresAt,
-    });
-    setQrPayload(payload);
-    setQrCountdown(30);
-    setShowQrSync(true);
   }
 
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
@@ -264,13 +289,8 @@ export default function Settings() {
     setTwoFaLoading(true);
     setTwoFaError('');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/auth/2fa/setup`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to setup 2FA');
-      setTwoFaSetup({ secret: data.secret, otpauthUri: data.otpauthUri });
+      const data = await api.twoFactor.setup(session.token);
+      setTwoFaSetup(data);
     } catch (err) {
       setTwoFaError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -284,16 +304,7 @@ export default function Settings() {
     setTwoFaLoading(true);
     setTwoFaError('');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/auth/2fa/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.token}`,
-        },
-        body: JSON.stringify({ code: verifyCode }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to verify 2FA');
+      const data = await api.twoFactor.verify(verifyCode, session.token);
       setBackupCodes(data.backupCodes);
       setIs2FAEnabled(true);
       setTwoFaSetup(null);
@@ -312,16 +323,7 @@ export default function Settings() {
     setTwoFaLoading(true);
     setTwoFaError('');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/auth/2fa/disable`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.token}`,
-        },
-        body: JSON.stringify({ code }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to disable 2FA');
+      await api.twoFactor.disable(code, session.token);
       setIs2FAEnabled(false);
       setBackupCodes(null);
     } catch (err) {
@@ -350,7 +352,11 @@ export default function Settings() {
     setAliasError('');
     setAliasSuccess('');
     try {
-      const encryptedApiKey = await encryptString(aliasApiKey, userKey.slice(0, 32));
+      const encryptedApiKey = await encryptString(
+        aliasApiKey.trim(),
+        userKey.slice(0, 32),
+        ALIAS_API_KEY_AAD
+      );
       await api.aliases.saveConfig(
         {
           provider: aliasProvider,
@@ -381,7 +387,7 @@ export default function Settings() {
       let plainKey = aliasApiKey;
       if (!plainKey && aliasConfigured) {
         const config = await api.aliases.getConfig(session.token);
-        plainKey = await decryptString(config.encryptedApiKey, userKey.slice(0, 32));
+        plainKey = await decryptAliasApiKey(config.encryptedApiKey, userKey);
       }
       if (!plainKey) {
         setAliasError('Enter an API key to test');
@@ -692,27 +698,6 @@ export default function Settings() {
           </Card>
 
           <Card variant="surface" padding="lg">
-            <h2 style={sectionHeading}>AI & Intelligence</h2>
-            <p style={descStyle}>
-              Configure AI-powered features: password health, breach monitoring, smart autofill, and
-              chat assistant.
-            </p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/settings/ai')}
-              style={{
-                width: '100%',
-                justifyContent: 'flex-start',
-                padding: '8px 0',
-                color: 'var(--color-primary)',
-              }}
-            >
-              Configure AI Features →
-            </Button>
-          </Card>
-
-          <Card variant="surface" padding="lg">
             <h2 style={sectionHeading}>Email Aliases</h2>
             <p style={descStyle}>
               Generate unique email aliases for each login using SimpleLogin or AnonAddy. API keys
@@ -876,6 +861,87 @@ export default function Settings() {
                   { value: '60', label: '60 seconds' },
                 ]}
               />
+              <div
+                style={{
+                  borderTop: '1px solid var(--color-border)',
+                  paddingTop: 16,
+                  marginTop: 4,
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: 'var(--font-size-base)',
+                    fontWeight: 600,
+                    color: 'var(--color-text)',
+                    marginBottom: 6,
+                  }}
+                >
+                  Change master password
+                </h3>
+                <p style={{ ...descStyle, marginBottom: 14 }}>
+                  This re-wraps your vault key and revokes every other signed-in session. It does
+                  not create a recovery method—if you lose the new password, the vault cannot be
+                  recovered.
+                </p>
+                <form
+                  onSubmit={handleChangeMasterPassword}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+                >
+                  <Input
+                    name="currentMasterPassword"
+                    type="password"
+                    autoComplete="current-password"
+                    label="Current master password"
+                    value={currentMasterPassword}
+                    onChange={(event) => setCurrentMasterPassword(event.target.value)}
+                    required
+                  />
+                  <Input
+                    name="newMasterPassword"
+                    type="password"
+                    autoComplete="new-password"
+                    label="New master password"
+                    value={newMasterPassword}
+                    onChange={(event) => setNewMasterPassword(event.target.value)}
+                    minLength={12}
+                    required
+                  />
+                  <Input
+                    name="confirmMasterPassword"
+                    type="password"
+                    autoComplete="new-password"
+                    label="Confirm new master password"
+                    value={confirmMasterPassword}
+                    onChange={(event) => setConfirmMasterPassword(event.target.value)}
+                    minLength={12}
+                    required
+                  />
+                  {passwordError && (
+                    <p
+                      role="alert"
+                      style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-error)' }}
+                    >
+                      {passwordError}
+                    </p>
+                  )}
+                  {passwordSuccess && (
+                    <p
+                      role="status"
+                      style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-success)' }}
+                    >
+                      {passwordSuccess}
+                    </p>
+                  )}
+                  <Button
+                    type="submit"
+                    variant="secondary"
+                    size="sm"
+                    disabled={passwordChanging}
+                  >
+                    {passwordChanging ? 'Changing password...' : 'Change master password'}
+                  </Button>
+                </form>
+              </div>
             </div>
           </Card>
 
@@ -955,6 +1021,8 @@ export default function Settings() {
               </div>
               <Button
                 variant="ghost"
+                aria-label={`${travelEnabled ? 'Disable' : 'Enable'} travel mode`}
+                aria-pressed={travelEnabled}
                 onClick={() => {
                   if (!travelEnabled) {
                     setShowTravelConfirm(true);
@@ -1062,6 +1130,8 @@ export default function Settings() {
                       <Button
                         variant="ghost"
                         onClick={() => handleFolderTravel(f.id, !f.travelSafe)}
+                        aria-label={`${f.travelSafe ? 'Exclude' : 'Include'} ${f.name} in travel mode`}
+                        aria-pressed={f.travelSafe}
                         style={{
                           position: 'relative',
                           width: 40,
@@ -1097,208 +1167,48 @@ export default function Settings() {
             )}
           </Card>
 
-          <Card variant="surface" padding="lg">
-            <h2 style={{ ...sectionHeading, marginBottom: 8 }}>🔐 Hardware Security Keys</h2>
-            <p
-              style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-text-secondary)',
-                marginBottom: 16,
-              }}
-            >
-              Register a FIDO2 hardware key (e.g. YubiKey) for passwordless vault unlock. The master
-              key is wrapped with the hardware key's public key.
-            </p>
-
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleRegisterHardwareKey}
-              disabled={hwKeyLoading}
-              style={{ marginBottom: 16 }}
-            >
-              {hwKeyLoading ? 'Registering...' : 'Register Hardware Key'}
-            </Button>
-
-            {hwKeyError && (
-              <p
-                style={{
-                  fontSize: 'var(--font-size-sm)',
-                  color: 'var(--color-error)',
-                  marginBottom: 12,
-                }}
-              >
-                {hwKeyError}
+          {nativeAutofill.supported && (
+            <Card variant="surface" padding="lg">
+              <h2 style={{ ...sectionHeading, marginBottom: 8 }}>Android Autofill</h2>
+              <p style={{ ...descStyle, marginBottom: 16 }}>
+                Let Android offer your Lockbox logins in apps and browsers. Credentials stay in a
+                biometric-protected local index and are cleared when you sign out.
               </p>
-            )}
-            {hwKeySuccess && (
               <p
+                role="status"
                 style={{
+                  margin: '0 0 12px',
                   fontSize: 'var(--font-size-sm)',
-                  color: 'var(--color-success)',
-                  marginBottom: 12,
+                  color: nativeAutofill.enabled
+                    ? 'var(--color-success)'
+                    : 'var(--color-text-secondary)',
                 }}
               >
-                {hwKeySuccess}
+                {nativeAutofill.enabled ? 'Enabled on this device' : 'Not enabled on this device'}
               </p>
-            )}
-
-            {hwKeys.length > 0 && (
-              <div>
-                <h3
-                  style={{
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 500,
-                    color: 'var(--color-text-secondary)',
-                    marginBottom: 10,
-                  }}
-                >
-                  Registered Keys
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {hwKeys.map((key) => (
-                    <div
-                      key={key.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: 14,
-                        background: 'var(--color-bg-subtle)',
-                        borderRadius: 'var(--radius-md)',
-                      }}
-                    >
-                      <div>
-                        <span style={valueStyle}>🔑 {key.keyType.toUpperCase()}</span>
-                        <p
-                          style={{
-                            fontSize: 'var(--font-size-sm)',
-                            color: 'var(--color-text-tertiary)',
-                            marginTop: 2,
-                            margin: 0,
-                            marginBlockStart: 2,
-                          }}
-                        >
-                          Added {new Date(key.createdAt).toLocaleDateString()} • ID:{' '}
-                          {key.id.slice(0, 8)}…
-                        </p>
-                      </div>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleRevokeHardwareKey(key.id)}
-                      >
-                        Revoke
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <Card variant="surface" padding="lg">
-            <h2 style={{ ...sectionHeading, marginBottom: 8 }}>📱 Device Sync</h2>
-            <p
-              style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-text-secondary)',
-                marginBottom: 16,
-              }}
-            >
-              Add a new device by scanning a QR code. Uses ECDH key exchange to securely transfer
-              your session key. QR codes expire after 30 seconds.
-            </p>
-
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleGenerateQrSync}
-              disabled={showQrSync && qrCountdown > 0}
-            >
-              {showQrSync && qrCountdown > 0 ? `QR Active (${qrCountdown}s)` : 'Add Device'}
-            </Button>
-
-            {showQrSync && qrPayload && qrCountdown > 0 && (
-              <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <Card
-                  variant="frost"
-                  padding="lg"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    alignSelf: 'center',
-                    background: 'white',
-                  }}
-                >
-                  <QRCodeSVG value={qrPayload} size={180} />
-                </Card>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div
-                    style={{
-                      flex: 1,
-                      background: 'var(--color-surface)',
-                      borderRadius: 'var(--radius-full)',
-                      height: 8,
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        background: 'var(--color-primary)',
-                        height: 8,
-                        borderRadius: 'var(--radius-full)',
-                        transition: 'width 1s linear',
-                        width: `${(qrCountdown / 30) * 100}%`,
-                      }}
-                    />
-                  </div>
-                  <span
-                    style={{
-                      fontSize: 'var(--font-size-sm)',
-                      color: 'var(--color-text-tertiary)',
-                      fontFamily: 'var(--font-mono, monospace)',
-                      width: 32,
-                      textAlign: 'right',
-                    }}
-                  >
-                    {qrCountdown}s
-                  </span>
-                </div>
-                <p
-                  style={{
-                    fontSize: 'var(--font-size-sm)',
-                    color: 'var(--color-text-tertiary)',
-                    margin: 0,
-                  }}
-                >
-                  Open Lockbox on your new device and select "Scan QR Code" to pair.
-                </p>
-              </div>
-            )}
-
-            {showQrSync && qrCountdown <= 0 && (
-              <div
-                style={{
-                  marginTop: 16,
-                  padding: 16,
-                  background: 'var(--color-warning-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                }}
+              <Button
+                type="button"
+                variant={nativeAutofill.enabled ? 'secondary' : 'primary'}
+                size="sm"
+                loading={nativeAutofillLoading}
+                onClick={handleOpenAutofillSettings}
               >
+                {nativeAutofill.enabled ? 'Open autofill settings' : 'Enable Android autofill'}
+              </Button>
+              {nativeAutofillError && (
                 <p
+                  role="alert"
                   style={{
+                    margin: '12px 0 0',
                     fontSize: 'var(--font-size-sm)',
-                    color: 'var(--color-warning)',
-                    margin: 0,
+                    color: 'var(--color-error)',
                   }}
                 >
-                  QR code expired. Click "Add Device" to generate a new one.
+                  {nativeAutofillError}
                 </p>
-              </div>
-            )}
-          </Card>
+              )}
+            </Card>
+          )}
 
           <Card variant="surface" padding="lg">
             <h2 style={sectionHeading}>About</h2>
@@ -1311,7 +1221,7 @@ export default function Settings() {
                 color: 'var(--color-text-tertiary)',
               }}
             >
-              <p style={{ margin: 0 }}>Lockbox v0.0.1 — Self-Hosted Password Manager</p>
+              <p style={{ margin: 0 }}>Lockbox v1.0.0 — Self-Hosted Password Manager</p>
               <p style={{ margin: 0 }}>Zero-knowledge E2E encryption · Cloudflare Workers</p>
               <p style={{ margin: 0 }}>AES-256-GCM · Argon2id · HKDF-SHA-256</p>
             </div>

@@ -16,7 +16,7 @@
  */
 
 import type { AgentEvent, AgentToolCall, AgentToolResult } from '@lockbox/types';
-import type { LLMProvider, Message, ToolCallRequest } from '../providers/types.js';
+import type { LLMProvider, Message } from '../providers/types.js';
 import { ToolExecutor } from './executor.js';
 import type { AgentContext } from './executor.js';
 import { SafetyGate } from './safety.js';

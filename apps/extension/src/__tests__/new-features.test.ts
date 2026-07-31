@@ -4,19 +4,29 @@
  * Tests for new extension features:
  * - Attachment support (message types, API methods)
  * - 2FA detection (message types, badge injection)
- * - Email alias generation (message types)
+ * - Email alias configuration and generation (message types)
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 
 // ─── New message type validation ──────────────────────────────────────────────
 
-type NewMessageType = 'get-attachments' | 'download-attachment' | 'check-2fa' | 'generate-alias';
+type NewMessageType =
+  | 'get-attachments'
+  | 'download-attachment'
+  | 'check-2fa'
+  | 'get-alias-config'
+  | 'save-alias-config'
+  | 'delete-alias-config'
+  | 'generate-alias';
 
 const NEW_MESSAGE_TYPES: NewMessageType[] = [
   'get-attachments',
   'download-attachment',
   'check-2fa',
+  'get-alias-config',
+  'save-alias-config',
+  'delete-alias-config',
   'generate-alias',
 ];
 
@@ -25,11 +35,14 @@ describe('new background message types', () => {
     expect(NEW_MESSAGE_TYPES).toContain('get-attachments');
     expect(NEW_MESSAGE_TYPES).toContain('download-attachment');
     expect(NEW_MESSAGE_TYPES).toContain('check-2fa');
+    expect(NEW_MESSAGE_TYPES).toContain('get-alias-config');
+    expect(NEW_MESSAGE_TYPES).toContain('save-alias-config');
+    expect(NEW_MESSAGE_TYPES).toContain('delete-alias-config');
     expect(NEW_MESSAGE_TYPES).toContain('generate-alias');
   });
 
-  it('has 4 new message types', () => {
-    expect(NEW_MESSAGE_TYPES).toHaveLength(4);
+  it('has 7 new message types', () => {
+    expect(NEW_MESSAGE_TYPES).toHaveLength(7);
   });
 });
 
@@ -122,18 +135,18 @@ describe('2FA check message shapes', () => {
 // ─── Email alias message shapes ──────────────────────────────────────────────
 
 describe('email alias message shapes', () => {
-  it('generate-alias message with no provider', () => {
+  it('generates aliases from the saved configuration', () => {
     const msg = { type: 'generate-alias' as const };
     expect(msg.type).toBe('generate-alias');
   });
 
-  it('generate-alias message with provider and apiKey', () => {
+  it('saves provider credentials through the background context', () => {
     const msg = {
-      type: 'generate-alias' as const,
+      type: 'save-alias-config' as const,
       provider: 'simplelogin',
       apiKey: 'sk-test-123',
     };
-    expect(msg.type).toBe('generate-alias');
+    expect(msg.type).toBe('save-alias-config');
     expect(msg.provider).toBe('simplelogin');
     expect(msg.apiKey).toBe('sk-test-123');
   });
@@ -300,11 +313,14 @@ describe('all extension message types', () => {
     'get-attachments',
     'download-attachment',
     'check-2fa',
+    'get-alias-config',
+    'save-alias-config',
+    'delete-alias-config',
     'generate-alias',
   ];
 
-  it('has 33 total message types', () => {
-    expect(ALL_MESSAGE_TYPES).toHaveLength(33);
+  it('has 36 total message types', () => {
+    expect(ALL_MESSAGE_TYPES).toHaveLength(36);
   });
 
   it('includes all new attachment message types', () => {
@@ -316,7 +332,10 @@ describe('all extension message types', () => {
     expect(ALL_MESSAGE_TYPES).toContain('check-2fa');
   });
 
-  it('includes alias generation message type', () => {
+  it('includes alias configuration and generation message types', () => {
+    expect(ALL_MESSAGE_TYPES).toContain('get-alias-config');
+    expect(ALL_MESSAGE_TYPES).toContain('save-alias-config');
+    expect(ALL_MESSAGE_TYPES).toContain('delete-alias-config');
     expect(ALL_MESSAGE_TYPES).toContain('generate-alias');
   });
 });

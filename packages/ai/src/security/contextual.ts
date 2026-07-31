@@ -38,7 +38,9 @@ export class ContextualAlertEngine {
           /^www\./,
           ''
         );
-      } catch {}
+      } catch {
+        // Invalid URLs cannot be matched against breach domains.
+      }
       const breach = this.breachData.breachedDomains.get(domain);
       if (breach) {
         alerts.push({

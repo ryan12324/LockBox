@@ -165,9 +165,10 @@ describe('checkBatch', () => {
       { id: 'ok', password: 'password' },
     ]);
 
-    // Failed item should be recorded as not found
+    // Failed item carries an explicit unknown verdict rather than false safety.
     expect(results.get('fail')?.found).toBe(false);
     expect(results.get('fail')?.count).toBe(0);
+    expect(results.get('fail')?.error).toBe('Network failure');
     // Successful item should still work
     expect(results.get('ok')?.found).toBe(true);
     expect(results.get('ok')?.count).toBe(42);

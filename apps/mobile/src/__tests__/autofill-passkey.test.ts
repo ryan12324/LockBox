@@ -4,9 +4,8 @@ const mockPlugin = vi.hoisted(() => ({
   _pluginName: 'Autofill',
   isEnabled: vi.fn().mockResolvedValue({ enabled: true }),
   requestEnable: vi.fn().mockResolvedValue(undefined),
-  getCredentialsForUri: vi.fn().mockResolvedValue({ credentials: [] }),
-  saveCredential: vi.fn().mockResolvedValue(undefined),
-  removeCredential: vi.fn().mockResolvedValue(undefined),
+  replaceCredentialIndex: vi.fn().mockResolvedValue({ indexed: 0 }),
+  clearCredentialIndex: vi.fn().mockResolvedValue(undefined),
   getPasskeysForUri: vi.fn().mockResolvedValue({
     passkeys: [
       {
@@ -136,23 +135,19 @@ describe('Autofill passkey integration', () => {
       expect(Array.isArray(result.passkeys)).toBe(true);
     });
 
-    it('passkey entries have distinct labels from credentials', async () => {
-      const credResult = await Autofill.getCredentialsForUri({
-        uri: 'https://example.com',
+    it('passkey lookup remains separate from password index writes', async () => {
+      const indexResult = await Autofill.replaceCredentialIndex({
+        credentials: [],
       });
       const passkeyResult = await Autofill.getPasskeysForUri({
         uri: 'https://example.com',
       });
 
+      expect(indexResult).toEqual({ indexed: 0 });
       for (const pk of passkeyResult.passkeys) {
         expect(pk).toHaveProperty('userName');
         expect(pk).toHaveProperty('rpName');
         expect(pk).not.toHaveProperty('username');
-      }
-
-      for (const cred of credResult.credentials) {
-        expect(cred).toHaveProperty('username');
-        expect(cred).not.toHaveProperty('rpName');
       }
     });
   });
@@ -171,26 +166,14 @@ describe('Autofill passkey integration', () => {
       expect(typeof result.enabled).toBe('boolean');
     });
 
-    it('getCredentialsForUri still returns credentials', async () => {
-      const result = await Autofill.getCredentialsForUri({
-        uri: 'https://example.com',
+    it('replaceCredentialIndex resolves', async () => {
+      await expect(Autofill.replaceCredentialIndex({ credentials: [] })).resolves.toEqual({
+        indexed: 0,
       });
-      expect(result).toHaveProperty('credentials');
-      expect(Array.isArray(result.credentials)).toBe(true);
     });
 
-    it('saveCredential still resolves', async () => {
-      await expect(
-        Autofill.saveCredential({
-          id: 'item-1',
-          encryptedData: 'blob',
-          uri: 'https://example.com',
-        })
-      ).resolves.toBeUndefined();
-    });
-
-    it('removeCredential still resolves', async () => {
-      await expect(Autofill.removeCredential({ id: 'item-1' })).resolves.toBeUndefined();
+    it('clearCredentialIndex resolves', async () => {
+      await expect(Autofill.clearCredentialIndex()).resolves.toBeUndefined();
     });
   });
 });

@@ -74,16 +74,20 @@ export function createApi(apiUrl: string) {
           folders: Folder[];
         }>(apiUrl, `/api/vault${qs}`, { token });
       },
-      getItem: (id: string, token: string) =>
-        request<EncryptedVaultItem>(apiUrl, `/api/vault/items/${id}`, {
+      getItem: async (id: string, token: string) => {
+        const response = await request<{ item: EncryptedVaultItem }>(apiUrl, `/api/vault/items/${id}`, {
           token,
-        }),
-      createItem: (body: object, token: string) =>
-        request<{ id: string }>(apiUrl, '/api/vault/items', {
+        });
+        return response.item;
+      },
+      createItem: async (body: object, token: string) => {
+        const response = await request<{ item: EncryptedVaultItem }>(apiUrl, '/api/vault/items', {
           method: 'POST',
           body: JSON.stringify(body),
           token,
-        }),
+        });
+        return response.item;
+      },
       deleteItem: (id: string, token: string) =>
         request<{ success: boolean }>(apiUrl, `/api/vault/items/${id}`, {
           method: 'DELETE',

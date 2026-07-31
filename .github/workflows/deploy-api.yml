@@ -45,6 +45,17 @@ jobs:
       - name: Build packages
         run: bun run build
 
+      - name: Configure D1 binding
+        working-directory: apps/api
+        env:
+          LOCKBOX_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+        run: |
+          if [ -z "$LOCKBOX_D1_DATABASE_ID" ]; then
+            echo "Set the CLOUDFLARE_D1_DATABASE_ID repository variable before deploying."
+            exit 1
+          fi
+          sed -i -E 's|(database_id[[:space:]]*=[[:space:]]*")[^"]*(")|\1'"$LOCKBOX_D1_DATABASE_ID"'\2|' wrangler.toml
+
       - name: Apply D1 migrations
         run: bunx wrangler d1 migrations apply lockbox-vault --remote
         working-directory: apps/api
@@ -52,9 +63,26 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Deploy Worker
-        run: bunx wrangler deploy
+      - name: Ensure R2 bucket exists
+        run: |
+          if ! bunx wrangler r2 bucket info lockbox-attachments --json >/dev/null 2>&1; then
+            bunx wrangler r2 bucket create lockbox-attachments
+          fi
         working-directory: apps/api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy Worker
+        run: |
+          cors_origins="${LOCKBOX_CORS_ORIGINS:-https://lockbox-web.pages.dev,http://localhost:5173,https://localhost}"
+          extension_ids="${LOCKBOX_EXTENSION_IDS:-}"
+          bunx wrangler deploy \
+            --var "CORS_ORIGINS:$cors_origins" \
+            --var "EXTENSION_IDS:$extension_ids"
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LOCKBOX_CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+          LOCKBOX_EXTENSION_IDS: ${{ vars.EXTENSION_IDS }}

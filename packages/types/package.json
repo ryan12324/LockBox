@@ -1,6 +1,6 @@
 {
   "name": "@lockbox/types",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "description": "Shared TypeScript types",
   "main": "src/index.ts",

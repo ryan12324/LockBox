@@ -5,13 +5,11 @@ import {
   generateUserKey,
   encryptUserKey,
   makeAuthHash,
-  generateRecoveryKey,
   toBase64,
 } from '@lockbox/crypto';
 import { evaluateStrength } from '@lockbox/generator';
 import { Button, Input, Card, Aura } from '@lockbox/design';
 import { api } from '../lib/api.js';
-import { generateEmergencyKitPDF } from '../lib/emergency-kit.js';
 import { useAuthStore } from '../store/auth.js';
 import { useToast } from '../providers/ToastProvider.js';
 import type { KdfConfig } from '@lockbox/types';
@@ -41,8 +39,8 @@ export default function Register() {
       toast('Passwords do not match', 'error');
       return;
     }
-    if (password.length < 8) {
-      toast('Password must be at least 8 characters', 'error');
+    if (password.length < 12) {
+      toast('Password must be at least 12 characters', 'error');
       return;
     }
 
@@ -64,10 +62,7 @@ export default function Register() {
       // 5. Make auth hash
       const authHash = await makeAuthHash(masterKey, password);
 
-      // 6. Generate recovery key
-      const recoveryKey = generateRecoveryKey();
-
-      // 7. Register
+      // 6. Register
       const res = (await api.auth.register({
         email,
         authHash,
@@ -76,10 +71,7 @@ export default function Register() {
         salt: saltB64,
       })) as { token: string; user: { id: string; email: string } };
 
-      // 8. Generate emergency kit PDF
-      generateEmergencyKitPDF(email, recoveryKey);
-
-      // 9. Store session + keys
+      // 7. Store session + keys
       setSession({
         token: res.token,
         userId: res.user.id,
@@ -161,6 +153,7 @@ export default function Register() {
                 onChange={(e) => setPassword(e.target.value)}
                 label="Master Password"
                 placeholder="Strong master password"
+                minLength={12}
               />
               {strength && (
                 <div style={{ marginTop: 10 }}>
@@ -192,6 +185,7 @@ export default function Register() {
               onChange={(e) => setConfirm(e.target.value)}
               label="Confirm Password"
               placeholder="Confirm master password"
+              minLength={12}
             />
 
             <div
@@ -204,8 +198,8 @@ export default function Register() {
                 lineHeight: 1.5,
               }}
             >
-              ⚠️ Your master password cannot be recovered. An emergency kit PDF will be downloaded —
-              store it safely.
+              ⚠️ Your master password cannot be recovered in v1. Store it securely; losing it
+              means losing access to this vault.
             </div>
 
             <Button

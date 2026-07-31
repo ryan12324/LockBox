@@ -1,6 +1,6 @@
 {
   "name": "@lockbox/web",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "description": "React web vault",
   "scripts": {
@@ -16,27 +16,26 @@
     "@lockbox/generator": "*",
     "@lockbox/totp": "*",
     "@lockbox/types": "*",
-    "jspdf": "^4.2.0",
     "qrcode.react": "^4.2.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-router-dom": "^7.13.1",
-    "zustand": "^5.0.11"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.2.1",
-    "@testing-library/jest-dom": "^6.9.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/jest-dom": "^6.10.0",
     "@testing-library/react": "^16.3.2",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "@vitejs/plugin-react": "^5.1.4",
-    "eslint": "^9.0.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^9.39.5",
     "jsdom": "^28.1.0",
-    "tailwindcss": "^4.2.1",
-    "typescript": "^5.3.0",
-    "vite": "^7.3.1",
-    "vitest": "^4.0.18"
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
   }
 }

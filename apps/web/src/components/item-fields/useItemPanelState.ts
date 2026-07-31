@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/auth.js';
 import { api } from '../../lib/api.js';
 import { encryptVaultItem } from '../../lib/crypto.js';
+import { decryptDocument, encryptDocument } from '../../lib/document-crypto.js';
 import { copyWithFeedback } from '../../lib/copy-utils.js';
-import { decryptString } from '@lockbox/crypto';
+import { decryptString, toUtf8 } from '@lockbox/crypto';
 import { useToast } from '../../providers/ToastProvider.js';
 import type {
   VaultItem,
@@ -19,8 +20,18 @@ import type {
 } from '@lockbox/types';
 import { totp, getRemainingSeconds, base32Decode, parseOtpAuthUri } from '@lockbox/totp';
 import { generatePassword } from '@lockbox/generator';
-import { SecurityAlertEngine } from '@lockbox/ai';
+import { SecurityAlertEngine, suggestTags } from '@lockbox/ai';
 import type { SecurityAlert } from '@lockbox/ai';
+
+const ALIAS_API_KEY_AAD = toUtf8('lockbox:alias-api-key:v1');
+
+async function decryptAliasApiKey(encryptedApiKey: string, userKey: Uint8Array): Promise<string> {
+  try {
+    return await decryptString(encryptedApiKey, userKey.slice(0, 32), ALIAS_API_KEY_AAD);
+  } catch {
+    return decryptString(encryptedApiKey, userKey.slice(0, 32));
+  }
+}
 
 interface UseItemPanelStateArgs {
   mode: 'view' | 'edit' | 'add';
@@ -106,6 +117,7 @@ export function useItemPanelState({
     used: number;
     limit: number;
   } | null>(null);
+  const [downloadingDocument, setDownloadingDocument] = useState(false);
 
   const [customFields, setCustomFields] = useState<CustomField[]>(item?.customFields || []);
   const [showPassword, setShowPassword] = useState(false);
@@ -219,17 +231,32 @@ export function useItemPanelState({
 
   useEffect(() => {
     if (currentMode !== 'view') {
-      import('@lockbox/ai')
-        .then((ai: any) => {
-          if (typeof ai.suggestTags === 'function')
-            Promise.resolve(ai.suggestTags({ name, uris, type })).then((r) =>
-              setSuggestedTags(r || [])
-            );
-          else setSuggestedTags(['personal', 'work', 'finance', 'shopping']);
-        })
-        .catch(() => setSuggestedTags(['personal', 'work', 'finance', 'shopping']));
+      const candidate = {
+        ...(item ?? {}),
+        id: item?.id ?? 'tag-preview',
+        type,
+        name,
+        uris,
+        tags,
+        favorite,
+        createdAt: item?.createdAt ?? new Date().toISOString(),
+        updatedAt: item?.updatedAt ?? new Date().toISOString(),
+        revisionDate: item?.revisionDate ?? new Date().toISOString(),
+      } as VaultItem;
+      setSuggestedTags(suggestTags(candidate));
     }
-  }, [currentMode, name, uris, type]);
+  }, [currentMode, name, uris, type, item, tags, favorite]);
+
+  useEffect(() => {
+    if (!session || type !== 'document') {
+      setDocumentQuota(null);
+      return;
+    }
+    api.documents
+      .quota(session.token)
+      .then(setDocumentQuota)
+      .catch(() => setDocumentQuota(null));
+  }, [session, type]);
 
   useEffect(() => {
     if (currentMode === 'view' && type === 'login' && uris.length > 0 && uris[0]) {
@@ -257,7 +284,7 @@ export function useItemPanelState({
     if (!session || !userKey) return;
     try {
       const cfg = await api.aliases.getConfig(session.token);
-      const key = await decryptString(cfg.encryptedApiKey, userKey.slice(0, 32));
+      const key = await decryptAliasApiKey(cfg.encryptedApiKey, userKey);
       const r = await api.aliases.generate(
         { provider: cfg.provider, apiKey: key, baseUrl: cfg.baseUrl || undefined },
         session.token
@@ -289,10 +316,37 @@ export function useItemPanelState({
   };
 
   const handleFileDrop = (f: File) => {
+    if (f.size > 50 * 1024 * 1024) {
+      toast('Documents must be 50MB or smaller', 'error');
+      return;
+    }
     setDocumentFile(f);
     setMimeType(f.type || 'application/octet-stream');
     setFileSize(f.size);
   };
+
+  async function handleDownloadDocument() {
+    if (!session || !userKey || !item?.id || type !== 'document') return;
+    setDownloadingDocument(true);
+    try {
+      const encrypted = await api.documents.download(item.id, session.token);
+      const plaintext = await decryptDocument(encrypted, userKey, item.id);
+      const blob = new Blob([plaintext], { type: mimeType || 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = name.trim() || 'lockbox-document';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast('Document decrypted and downloaded', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Document download failed', 'error');
+    } finally {
+      setDownloadingDocument(false);
+    }
+  }
 
   async function handleCreateFolder() {
     if (!session || !newFolderName.trim()) return;
@@ -399,13 +453,23 @@ export function useItemPanelState({
     if (type === 'card' && !number.trim()) return toast('Card number is required', 'error');
     if (type === 'card' && (!expMonth || !expYear.trim()))
       return toast('Expiration date is required', 'error');
+    if (type === 'document' && currentMode === 'add' && !documentFile)
+      return toast('Choose a document to upload', 'error');
+    if (
+      type === 'document' &&
+      documentFile &&
+      documentQuota &&
+      documentQuota.used - (documentItem?.size ?? 0) + documentFile.size > documentQuota.limit
+    ) {
+      return toast('Document storage quota exceeded', 'error');
+    }
     setLoading(true);
     try {
       const now = new Date().toISOString();
       const isAdd = currentMode === 'add';
       const itemId = isAdd ? crypto.randomUUID() : item!.id;
       const enc = await encryptVaultItem(buildVaultItem(itemId, now), userKey, itemId, now);
-      if (isAdd)
+      if (isAdd) {
         await api.vault.createItem(
           {
             id: itemId,
@@ -418,7 +482,7 @@ export function useItemPanelState({
           },
           session.token
         );
-      else
+      } else {
         await api.vault.updateItem(
           itemId,
           {
@@ -427,9 +491,34 @@ export function useItemPanelState({
             tags,
             favorite,
             revisionDate: now,
+            expectedRevisionDate: item!.revisionDate,
           },
           session.token
         );
+      }
+
+      if (type === 'document' && documentFile) {
+        try {
+          const encryptedDocument = await encryptDocument(
+            await documentFile.arrayBuffer(),
+            userKey,
+            itemId
+          );
+          await api.documents.upload(
+            itemId,
+            encryptedDocument,
+            documentFile.size,
+            session.token
+          );
+        } catch (uploadError) {
+          // A newly created document row without its file is not useful.
+          // Existing R2 object replacements are atomic and remain retryable.
+          if (isAdd) {
+            await api.vault.permanentDelete(itemId, session.token).catch(() => undefined);
+          }
+          throw uploadError;
+        }
+      }
       onSave();
     } catch (err) {
       console.error('Failed to save item:', err);
@@ -601,6 +690,8 @@ export function useItemPanelState({
       setIsDragging,
       documentFile,
       documentQuota,
+      downloading: downloadingDocument,
+      onDownload: handleDownloadDocument,
       onBrowse: () => fileInputRef.current?.click(),
       onFileDrop: handleFileDrop,
     },

@@ -2,7 +2,6 @@
  * Auth middleware — verifies Bearer session tokens from D1.
  */
 
-import type { Context, Next } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { eq, and, gt } from 'drizzle-orm';
 import { createDb } from '../db/index.js';

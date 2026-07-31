@@ -6,26 +6,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-
-// ─── URL matching logic (extracted from background.ts) ────────────────────────
-
-/**
- * Mirrors the getMatchingItems URL matching logic from background.ts.
- * Tests the hostname matching algorithm in isolation.
- */
-function hostnameMatches(pageUrl: string, itemUri: string): boolean {
-  try {
-    const pageHost = new URL(pageUrl).hostname.replace(/^www\./, '');
-    const itemHost = new URL(itemUri).hostname.replace(/^www\./, '');
-    return (
-      pageHost === itemHost ||
-      pageHost.endsWith(`.${itemHost}`) ||
-      itemHost.endsWith(`.${pageHost}`)
-    );
-  } catch {
-    return false;
-  }
-}
+import { urlMatchesUri as hostnameMatches } from '../../lib/form-detector.js';
 
 describe('background URL matching logic', () => {
   it('matches exact hostname', () => {
@@ -42,6 +23,19 @@ describe('background URL matching logic', () => {
 
   it('matches subdomain to parent', () => {
     expect(hostnameMatches('https://app.example.com', 'https://example.com')).toBe(true);
+  });
+
+  it('does not broaden a subdomain credential to its parent', () => {
+    expect(hostnameMatches('https://example.com', 'https://app.example.com')).toBe(false);
+  });
+
+  it('does not cross a private suffix boundary', () => {
+    expect(hostnameMatches('https://alice.github.io', 'https://github.io')).toBe(false);
+  });
+
+  it('does not offer credentials on insecure non-loopback pages', () => {
+    expect(hostnameMatches('http://example.com', 'https://example.com')).toBe(false);
+    expect(hostnameMatches('http://localhost', 'http://localhost')).toBe(true);
   });
 
   it('does not match different domains', () => {
@@ -67,6 +61,8 @@ describe('background URL matching logic', () => {
 
 type MessageType =
   | 'unlock'
+  | 'validate-login-2fa'
+  | 'cancel-login-2fa'
   | 'lock'
   | 'get-matches'
   | 'get-vault'
@@ -88,6 +84,8 @@ type MessageType =
 
 const VALID_MESSAGE_TYPES: MessageType[] = [
   'unlock',
+  'validate-login-2fa',
+  'cancel-login-2fa',
   'lock',
   'get-matches',
   'get-vault',
@@ -111,6 +109,8 @@ const VALID_MESSAGE_TYPES: MessageType[] = [
 describe('background message types', () => {
   it('defines all expected message types', () => {
     expect(VALID_MESSAGE_TYPES).toContain('unlock');
+    expect(VALID_MESSAGE_TYPES).toContain('validate-login-2fa');
+    expect(VALID_MESSAGE_TYPES).toContain('cancel-login-2fa');
     expect(VALID_MESSAGE_TYPES).toContain('lock');
     expect(VALID_MESSAGE_TYPES).toContain('get-matches');
     expect(VALID_MESSAGE_TYPES).toContain('get-vault');
@@ -131,8 +131,8 @@ describe('background message types', () => {
     expect(VALID_MESSAGE_TYPES).toContain('update-credentials');
   });
 
-  it('has 19 message types total', () => {
-    expect(VALID_MESSAGE_TYPES).toHaveLength(19);
+  it('has 21 message types total', () => {
+    expect(VALID_MESSAGE_TYPES).toHaveLength(21);
   });
 });
 

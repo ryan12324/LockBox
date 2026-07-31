@@ -8,13 +8,8 @@ export type ViewState =
   | { view: 'add' }
   | { view: 'edit'; item: VaultItem }
   | { view: 'health'; filterBreached?: boolean }
-  | { view: 'ai-settings' }
-  | { view: 'chat' }
-  | { view: 'hw-keys' }
-  | { view: 'qr-sync' }
   | { view: 'trash' }
   | { view: 'settings' }
-  | { view: 'emergency' }
   | { view: 'history'; item: VaultItem };
 
 export async function sendMessage<T>(message: object): Promise<T> {

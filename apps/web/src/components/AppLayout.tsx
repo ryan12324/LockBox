@@ -5,12 +5,14 @@ import { useAuthStore } from '../store/auth.js';
 import { useVaultFilterStore } from '../store/vault.js';
 import { useAura } from '../providers/AuraProvider.js';
 import { api } from '../lib/api.js';
-import type { Folder } from '@lockbox/types';
+import { decryptVaultItem, encryptVaultItem } from '../lib/crypto.js';
+import { clearNativeAutofillIndex } from '../lib/native-autofill.js';
+import type { Folder, VaultItem } from '@lockbox/types';
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { session, lock, logout } = useAuthStore();
+  const { session, userKey, lock, logout } = useAuthStore();
 
   const {
     selectedFolder,
@@ -48,6 +50,7 @@ export default function AppLayout() {
 
   async function handleLogout() {
     if (session) await api.auth.logout(session.token).catch(() => {});
+    await clearNativeAutofillIndex().catch(() => {});
     logout();
     navigate('/login');
   }
@@ -89,8 +92,45 @@ export default function AppLayout() {
   }
 
   async function handleDeleteFolder(id: string) {
-    if (!session) return;
+    if (!session || !userKey) return;
     try {
+      const vault = (await api.vault.list(session.token)) as {
+        items: Array<{
+          id: string;
+          encryptedData: string;
+          revisionDate: string;
+          folderId: string | null;
+        }>;
+        folders: Folder[];
+      };
+      for (const encryptedItem of vault.items.filter((item) => item.folderId === id)) {
+        const item = await decryptVaultItem(
+          encryptedItem.encryptedData,
+          userKey,
+          encryptedItem.id,
+          encryptedItem.revisionDate
+        );
+        const now = new Date().toISOString();
+        const movedItem = {
+          ...item,
+          folderId: undefined,
+          updatedAt: now,
+          revisionDate: now,
+        } as VaultItem;
+        const encryptedData = await encryptVaultItem(movedItem, userKey, encryptedItem.id, now);
+        await api.vault.updateItem(
+          encryptedItem.id,
+          {
+            encryptedData,
+            folderId: null,
+            tags: movedItem.tags ?? [],
+            favorite: movedItem.favorite ?? false,
+            revisionDate: now,
+            expectedRevisionDate: encryptedItem.revisionDate,
+          },
+          session.token
+        );
+      }
       await api.vault.deleteFolder(id, session.token);
       setDeletingFolderId(null);
       if (selectedFolder === id) setSelectedFolder(null);
@@ -128,10 +168,8 @@ export default function AppLayout() {
       return 'Vault';
     }
     if (location.pathname === '/trash') return 'Trash';
-    if (location.pathname === '/chat') return 'Assistant';
     if (location.pathname === '/health') return 'Security';
     if (location.pathname.startsWith('/teams')) return 'Teams';
-    if (location.pathname === '/emergency-access') return 'Emergency Access';
     if (location.pathname === '/generator') return 'Generator';
     if (location.pathname.startsWith('/settings')) return 'Settings';
     return 'Lockbox';
@@ -268,16 +306,6 @@ export default function AppLayout() {
             <Button
               variant="ghost"
               size="sm"
-              title="Assistant"
-              onClick={() => navigate('/chat')}
-              style={getRailStyle(isNavActive('/chat'))}
-            >
-              ✨
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
               title="Security"
               onClick={() => navigate('/health')}
               style={getRailStyle(isNavActive('/health'))}
@@ -293,16 +321,6 @@ export default function AppLayout() {
               style={getRailStyle(location.pathname.startsWith('/teams'))}
             >
               👥
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              title="Emergency Access"
-              onClick={() => navigate('/emergency-access')}
-              style={getRailStyle(isNavActive('/emergency-access'))}
-            >
-              🆘
             </Button>
 
             {/* Divider */}
@@ -544,7 +562,7 @@ export default function AppLayout() {
               ) : deletingFolderId === folder.id ? (
                 <div key={folder.id} className="px-2 py-2">
                   <p className="text-xs text-[var(--color-text-secondary)] mb-2">
-                    Delete &quot;{folder.name}&quot;? Items will be moved to root.
+                    Delete &quot;{folder.name}&quot;? Items will be securely moved to root.
                   </p>
                   <div className="flex gap-2">
                     <Button

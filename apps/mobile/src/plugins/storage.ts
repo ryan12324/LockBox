@@ -20,10 +20,12 @@ export interface StoredVaultItem {
   id: string;
   encryptedData: string;
   type: string;
-  folderId?: string;
+  folderId?: string | null;
   tags: string[];
   favorite: boolean;
   revisionDate: string;
+  /** Server revision this local mutation was based on. */
+  baseRevisionDate?: string | null;
   syncStatus: SyncStatus;
 }
 
@@ -60,10 +62,11 @@ export interface StoragePlugin {
     id: string;
     encryptedData: string;
     type: string;
-    folderId?: string;
+    folderId?: string | null;
     tags?: string[];
     favorite?: boolean;
     revisionDate: string;
+    baseRevisionDate?: string | null;
     syncStatus: SyncStatus;
   }): Promise<void>;
 
@@ -90,10 +93,11 @@ export interface StoragePlugin {
     id: string;
     encryptedData: string;
     type: string;
-    folderId?: string;
+    folderId?: string | null;
     tags?: string[];
     favorite?: boolean;
     revisionDate: string;
+    baseRevisionDate?: string | null;
     syncStatus: SyncStatus;
   }> }): Promise<void>;
 

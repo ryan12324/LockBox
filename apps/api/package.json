@@ -1,6 +1,6 @@
 {
   "name": "@lockbox/api",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "description": "Cloudflare Workers backend",
   "main": "src/index.ts",
@@ -12,16 +12,18 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260305.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "drizzle-kit": "^0.31.9",
-    "eslint": "^9.0.0",
-    "typescript": "^5.3.0",
-    "vitest": "^4.0.18"
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9.39.5",
+    "miniflare": "5.20260730.0-alpha",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.1",
-    "hono": "^4.12.2"
+    "@lockbox/types": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.33"
   }
 }

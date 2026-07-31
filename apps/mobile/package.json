@@ -1,15 +1,15 @@
 {
   "name": "@lockbox/mobile",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "description": "Capacitor Android app for lockbox password manager",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
     "build": "tsc",
-    "build:android": "tsc && npx cap sync android",
-    "dev:android": "tsc --watch & npx cap run android",
-    "sync": "npx cap sync",
+    "build:android": "tsc && bunx cap sync android",
+    "dev:android": "tsc --watch & bunx cap run android",
+    "sync": "bunx cap sync",
     "test": "vitest run",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"

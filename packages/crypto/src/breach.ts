@@ -105,13 +105,15 @@ export async function checkBatch(
     try {
       const result = await checkPassword(password);
       results.set(id, result);
-    } catch {
-      // Graceful failure — mark as not found with zero count
+    } catch (error) {
+      // Preserve an explicit unknown state. A failed network request must never
+      // be presented to the user as evidence that a password was not breached.
       results.set(id, {
         hashPrefix: '',
         found: false,
         count: 0,
         checkedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : 'Breach check failed',
       });
     }
   }

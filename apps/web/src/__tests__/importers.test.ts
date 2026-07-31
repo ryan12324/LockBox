@@ -10,7 +10,6 @@ import {
   parseBitwarden,
   parseChrome,
   parseFirefox,
-  parseOnePassword,
   parseLastPass,
   parseKeePass,
   parseImport,

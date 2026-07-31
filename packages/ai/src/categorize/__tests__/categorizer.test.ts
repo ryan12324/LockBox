@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { suggestTags, suggestFolder, detectDuplicates } from '../categorizer.js';
-import type { VaultItem, LoginItem, Folder, SecureNoteItem, CardItem } from '@lockbox/types';
+import type { LoginItem, Folder, SecureNoteItem } from '@lockbox/types';
 
 function makeLogin(overrides: Partial<LoginItem>): LoginItem {
   return {

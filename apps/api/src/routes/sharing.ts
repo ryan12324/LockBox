@@ -8,11 +8,47 @@ import { eq, and } from 'drizzle-orm';
 import { createDb } from '../db/index.js';
 import { sharedFolders, sharedFolderKeys, teamMembers, folders, vaultItems } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { serializeVaultItem } from '../services/vault-serialization.js';
 
 type Bindings = { DB: D1Database };
 type Variables = { userId: string };
 
 export const sharingRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+const FOLDER_PERMISSIONS = new Set(['read_only', 'read_write']);
+
+function isValidWrappedFolderKey(value: string): boolean {
+  if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0) return false;
+  try {
+    return atob(value).length === 256;
+  } catch {
+    return false;
+  }
+}
+
+async function hasLiveFolderAccess(
+  db: ReturnType<typeof createDb>,
+  folderId: string,
+  userId: string
+): Promise<boolean> {
+  const ownedFolder = await db
+    .select({ id: folders.id })
+    .from(folders)
+    .where(and(eq(folders.id, folderId), eq(folders.userId, userId)))
+    .get();
+  if (ownedFolder) return true;
+
+  const membership = await db
+    .select({ teamId: teamMembers.teamId })
+    .from(sharedFolders)
+    .innerJoin(
+      teamMembers,
+      and(eq(teamMembers.teamId, sharedFolders.teamId), eq(teamMembers.userId, userId))
+    )
+    .where(eq(sharedFolders.folderId, folderId))
+    .get();
+  return Boolean(membership);
+}
 
 sharingRoutes.use('*', authMiddleware);
 
@@ -24,9 +60,35 @@ sharingRoutes.post('/folders/:folderId/share', async (c) => {
   const body = await c.req.json().catch(() => null);
   if (!body) return c.json({ error: 'Invalid JSON' }, 400);
 
-  const { teamId, permissionLevel } = body as Record<string, unknown>;
+  const { teamId, permissionLevel, memberKeys } = body as Record<string, unknown>;
   if (!teamId || typeof teamId !== 'string') {
     return c.json({ error: 'Missing required field: teamId' }, 400);
+  }
+  const requestedPermission = permissionLevel ?? 'read_write';
+  if (typeof requestedPermission !== 'string' || !FOLDER_PERMISSIONS.has(requestedPermission)) {
+    return c.json({ error: 'permissionLevel must be read_only or read_write' }, 400);
+  }
+  if (!Array.isArray(memberKeys) || memberKeys.length === 0 || memberKeys.length > 500) {
+    return c.json({ error: 'memberKeys must contain between 1 and 500 entries' }, 400);
+  }
+  const normalizedKeys: Array<{ userId: string; encryptedFolderKey: string }> = [];
+  const seenUserIds = new Set<string>();
+  for (const entry of memberKeys) {
+    if (
+      !entry ||
+      typeof entry !== 'object' ||
+      typeof (entry as Record<string, unknown>).userId !== 'string' ||
+      typeof (entry as Record<string, unknown>).encryptedFolderKey !== 'string'
+    ) {
+      return c.json({ error: 'Each member key must include userId and encryptedFolderKey' }, 400);
+    }
+    const key = entry as { userId: string; encryptedFolderKey: string };
+    if (!key.userId || !isValidWrappedFolderKey(key.encryptedFolderKey)) {
+      return c.json({ error: 'Invalid member key' }, 400);
+    }
+    if (seenUserIds.has(key.userId)) return c.json({ error: 'Duplicate member key' }, 400);
+    seenUserIds.add(key.userId);
+    normalizedKeys.push(key);
   }
 
   const db = createDb(c.env.DB);
@@ -49,6 +111,18 @@ sharingRoutes.post('/folders/:folderId/share', async (c) => {
 
   if (!membership) return c.json({ error: 'Not a member of this team' }, 403);
 
+  const teamMemberships = await db
+    .select({ userId: teamMembers.userId })
+    .from(teamMembers)
+    .where(eq(teamMembers.teamId, teamId));
+  const teamUserIds = new Set(teamMemberships.map((member) => member.userId));
+  if (
+    normalizedKeys.some((key) => !teamUserIds.has(key.userId)) ||
+    !normalizedKeys.some((key) => key.userId === userId)
+  ) {
+    return c.json({ error: 'Member keys must cover valid team members and include the owner' }, 400);
+  }
+
   // Check not already shared
   const existing = await db
     .select()
@@ -58,12 +132,90 @@ sharingRoutes.post('/folders/:folderId/share', async (c) => {
 
   if (existing) return c.json({ error: 'Folder already shared with this team' }, 409);
 
+  const previousKeys: Array<{
+    userId: string;
+    encryptedFolderKey: string;
+    grantedBy: string;
+  } | null> = [];
+  for (const memberKey of normalizedKeys) {
+    const previous = await db
+      .select({
+        userId: sharedFolderKeys.userId,
+        encryptedFolderKey: sharedFolderKeys.encryptedFolderKey,
+        grantedBy: sharedFolderKeys.grantedBy,
+      })
+      .from(sharedFolderKeys)
+      .where(
+        and(
+          eq(sharedFolderKeys.folderId, folderId),
+          eq(sharedFolderKeys.userId, memberKey.userId)
+        )
+      )
+      .get();
+    previousKeys.push(previous ?? null);
+  }
+
   await db.insert(sharedFolders).values({
     folderId,
     teamId,
     ownerUserId: userId,
-    permissionLevel: typeof permissionLevel === 'string' ? permissionLevel : 'read_write',
+    permissionLevel: requestedPermission,
   });
+
+  try {
+    for (const [index, memberKey] of normalizedKeys.entries()) {
+      const existingKey = previousKeys[index];
+      if (existingKey) {
+        await db
+          .update(sharedFolderKeys)
+          .set({ encryptedFolderKey: memberKey.encryptedFolderKey, grantedBy: userId })
+          .where(
+            and(
+              eq(sharedFolderKeys.folderId, folderId),
+              eq(sharedFolderKeys.userId, memberKey.userId)
+            )
+          );
+      } else {
+        await db.insert(sharedFolderKeys).values({
+          folderId,
+          userId: memberKey.userId,
+          encryptedFolderKey: memberKey.encryptedFolderKey,
+          grantedBy: userId,
+        });
+      }
+    }
+  } catch (error) {
+    for (const [index, memberKey] of normalizedKeys.entries()) {
+      const previous = previousKeys[index];
+      if (previous) {
+        await db
+          .update(sharedFolderKeys)
+          .set({
+            encryptedFolderKey: previous.encryptedFolderKey,
+            grantedBy: previous.grantedBy,
+          })
+          .where(
+            and(
+              eq(sharedFolderKeys.folderId, folderId),
+              eq(sharedFolderKeys.userId, memberKey.userId)
+            )
+          );
+      } else {
+        await db
+          .delete(sharedFolderKeys)
+          .where(
+            and(
+              eq(sharedFolderKeys.folderId, folderId),
+              eq(sharedFolderKeys.userId, memberKey.userId)
+            )
+          );
+      }
+    }
+    await db
+      .delete(sharedFolders)
+      .where(and(eq(sharedFolders.folderId, folderId), eq(sharedFolders.teamId, teamId)));
+    throw error;
+  }
 
   return c.json({ success: true, folderId, teamId }, 201);
 });
@@ -73,9 +225,7 @@ sharingRoutes.post('/folders/:folderId/share', async (c) => {
 sharingRoutes.delete('/folders/:folderId/unshare', async (c) => {
   const userId = c.get('userId');
   const folderId = c.req.param('folderId');
-  const body = await c.req.json().catch(() => null);
-
-  const teamId = (body as Record<string, unknown> | null)?.teamId;
+  const teamId = c.req.query('teamId');
   if (!teamId || typeof teamId !== 'string') {
     return c.json({ error: 'Missing required field: teamId' }, 400);
   }
@@ -93,11 +243,33 @@ sharingRoutes.delete('/folders/:folderId/unshare', async (c) => {
   if (share.ownerUserId !== userId)
     return c.json({ error: 'Only the folder owner can unshare' }, 403);
 
-  // Remove all folder keys for this folder
-  await db.delete(sharedFolderKeys).where(eq(sharedFolderKeys.folderId, folderId));
   await db
     .delete(sharedFolders)
     .where(and(eq(sharedFolders.folderId, folderId), eq(sharedFolders.teamId, teamId)));
+
+  // Revoke keys only for users who no longer belong to any team with access.
+  const keys = await db.select().from(sharedFolderKeys).where(eq(sharedFolderKeys.folderId, folderId));
+  for (const key of keys) {
+    const remainingAccess = await db
+      .select({ teamId: sharedFolders.teamId })
+      .from(sharedFolders)
+      .innerJoin(
+        teamMembers,
+        and(
+          eq(teamMembers.teamId, sharedFolders.teamId),
+          eq(teamMembers.userId, key.userId)
+        )
+      )
+      .where(eq(sharedFolders.folderId, folderId))
+      .get();
+    if (!remainingAccess && key.userId !== share.ownerUserId) {
+      await db
+        .delete(sharedFolderKeys)
+        .where(
+          and(eq(sharedFolderKeys.folderId, folderId), eq(sharedFolderKeys.userId, key.userId))
+        );
+    }
+  }
 
   return c.json({ success: true });
 });
@@ -109,7 +281,10 @@ sharingRoutes.get('/folders/:folderId/keys', async (c) => {
   const folderId = c.req.param('folderId');
   const db = createDb(c.env.DB);
 
-  // Must be either the folder owner or have a key
+  if (!(await hasLiveFolderAccess(db, folderId, userId))) {
+    return c.json({ error: 'No access to this shared folder' }, 403);
+  }
+
   const key = await db
     .select()
     .from(sharedFolderKeys)
@@ -118,12 +293,7 @@ sharingRoutes.get('/folders/:folderId/keys', async (c) => {
 
   if (!key) return c.json({ error: 'No key found for this folder' }, 404);
 
-  return c.json({
-    folderId: key.folderId,
-    encryptedFolderKey: key.encryptedFolderKey,
-    grantedBy: key.grantedBy,
-    grantedAt: key.grantedAt,
-  });
+  return c.json({ key });
 });
 
 // ─── POST /folders/:folderId/keys — Add member key ───────────────────────────
@@ -143,8 +313,15 @@ sharingRoutes.post('/folders/:folderId/keys', async (c) => {
   ) {
     return c.json({ error: 'Missing required fields: targetUserId, encryptedFolderKey' }, 400);
   }
+  if (!isValidWrappedFolderKey(encryptedFolderKey)) {
+    return c.json({ error: 'Invalid encryptedFolderKey' }, 400);
+  }
 
   const db = createDb(c.env.DB);
+
+  if (!(await hasLiveFolderAccess(db, folderId, userId))) {
+    return c.json({ error: 'No permission to grant keys for this folder' }, 403);
+  }
 
   // Verify the granter has a key for this folder (can only grant if you have access)
   const granterKey = await db
@@ -269,7 +446,10 @@ sharingRoutes.get('/folders/:folderId/items', async (c) => {
   const folderId = c.req.param('folderId');
   const db = createDb(c.env.DB);
 
-  // Verify user has access (has a key for this folder)
+  if (!(await hasLiveFolderAccess(db, folderId, userId))) {
+    return c.json({ error: 'No access to this shared folder' }, 403);
+  }
+
   const key = await db
     .select()
     .from(sharedFolderKeys)
@@ -278,15 +458,9 @@ sharingRoutes.get('/folders/:folderId/items', async (c) => {
 
   if (!key) return c.json({ error: 'No access to this shared folder' }, 403);
 
-  const items = await db
-    .select()
-    .from(vaultItems)
-    .where(and(eq(vaultItems.folderId, folderId), eq(vaultItems.deletedAt, '')));
-
-  // If no deletedAt filter works (null check), get all and filter
   const allItems = await db.select().from(vaultItems).where(eq(vaultItems.folderId, folderId));
 
   const activeItems = allItems.filter((i) => !i.deletedAt);
 
-  return c.json({ items: activeItems });
+  return c.json({ items: activeItems.map(serializeVaultItem) });
 });

@@ -12,7 +12,7 @@ import {
   rsaEncrypt,
   rsaDecrypt,
 } from '../rsa.js';
-import { toBase64, fromBase64, toUtf8 } from '../utils.js';
+import { fromBase64, toUtf8 } from '../utils.js';
 
 describe('rsa', () => {
   describe('generateRsaKeyPair', () => {

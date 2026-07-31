@@ -25,6 +25,7 @@ concurrency:
 # │                                                                   │
 # │  Chrome Web Store:                                                │
 # │    CHROME_EXTENSION_ID    — from chrome.google.com/webstore       │
+# │    CHROME_PUBLISHER_ID    — Chrome Web Store publisher ID         │
 # │    CHROME_CLIENT_ID       — from Google Cloud Console OAuth       │
 # │    CHROME_CLIENT_SECRET   — from Google Cloud Console OAuth       │
 # │    CHROME_REFRESH_TOKEN   — OAuth refresh token                   │
@@ -32,7 +33,7 @@ concurrency:
 # │  Firefox AMO:                                                     │
 # │    FIREFOX_JWT_ISSUER     — from addons.mozilla.org/developers    │
 # │    FIREFOX_JWT_SECRET     — from addons.mozilla.org/developers    │
-# │    FIREFOX_EXTENSION_ID   — e.g. lockbox@lockbox.dev              │
+# │  Manifest ID: lockbox-password-manager@ryan12324.github.io        │
 # └───────────────────────────────────────────────────────────────────┘
 
 jobs:
@@ -68,6 +69,9 @@ jobs:
           cd apps/extension/.output/firefox-mv2
           zip -r ../../../../firefox-extension.zip .
 
+      - name: Package reviewable source for Firefox
+        run: git archive --format=zip --output=firefox-source.zip HEAD
+
       - name: Upload Chrome artifact
         uses: actions/upload-artifact@v4
         with:
@@ -79,6 +83,12 @@ jobs:
         with:
           name: firefox-extension
           path: firefox-extension.zip
+
+      - name: Upload Firefox source artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-source
+          path: firefox-source.zip
 
   chrome:
     name: Publish to Chrome Web Store
@@ -97,18 +107,15 @@ jobs:
 
       - name: Upload to Chrome Web Store
         run: |
-          npx chrome-webstore-upload-cli upload \
+          npx --yes chrome-webstore-upload-cli@4.0.1 \
             --source chrome-extension.zip \
-            --extension-id "$CHROME_EXTENSION_ID" \
-            --client-id "$CHROME_CLIENT_ID" \
-            --client-secret "$CHROME_CLIENT_SECRET" \
-            --refresh-token "$CHROME_REFRESH_TOKEN" \
-            --auto-publish
+            --extension-id "$EXTENSION_ID"
         env:
-          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
-          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
-          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
-          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
 
   firefox:
     name: Publish to Firefox AMO
@@ -125,17 +132,21 @@ jobs:
         with:
           name: firefox-extension
 
+      - name: Download reviewable source
+        uses: actions/download-artifact@v4
+        with:
+          name: firefox-source
+
       - name: Upload to Firefox AMO
         run: |
           mkdir -p source
           unzip firefox-extension.zip -d source/
-          npx web-ext sign \
+          npx --yes web-ext@10.5.0 sign \
             --source-dir source \
+            --upload-source-code firefox-source.zip \
             --channel listed \
             --api-key "$FIREFOX_JWT_ISSUER" \
-            --api-secret "$FIREFOX_JWT_SECRET" \
-            --id "$FIREFOX_EXTENSION_ID"
+            --api-secret "$FIREFOX_JWT_SECRET"
         env:
           FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
           FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}
-          FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}

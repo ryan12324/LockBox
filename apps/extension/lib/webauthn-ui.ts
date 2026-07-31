@@ -72,6 +72,10 @@ const BASE_STYLES = `
     border: 1px solid #DDD6CC;
   }
   .btn-secondary:hover { background: #DDD6CC; color: #2C2825; }
+  .btn:focus-visible, .cancel-btn:focus-visible, .toast-action:focus-visible,
+  .toast-dismiss:focus-visible, .passkey-item:focus-visible {
+    outline: 2px solid #8B7355; outline-offset: 2px;
+  }
   .security-badge {
     display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
     border-radius: 10px; font-size: 10px; font-weight: 600;
@@ -79,6 +83,10 @@ const BASE_STYLES = `
   }
   .badge-secure { background: rgba(94,138,94,0.1); color: #5E8A5E; }
   .badge-warning { background: rgba(181,142,58,0.1); color: #B58E3A; }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay, .modal { animation: none; }
+    .btn { transition: none; }
+  }
 `;
 
 // ─── Passkey picker styles (for multi-match assertion) ──────────────────────
@@ -89,6 +97,8 @@ const PICKER_STYLES = `
     padding: 12px 20px; cursor: pointer;
     border-bottom: 1px solid #DDD6CC;
     display: flex; align-items: center; gap: 12px; transition: background 0.1s;
+    width: 100%; background: transparent; border-left: 0; border-right: 0;
+    border-top: 0; font: inherit; text-align: left;
   }
   .passkey-item:last-child { border-bottom: none; }
   .passkey-item:hover { background: rgba(196,168,130,0.1); }
@@ -149,25 +159,22 @@ const TOAST_STYLES = `
     cursor: pointer; font-size: 16px; padding: 0; line-height: 1; flex-shrink: 0;
   }
   .toast-dismiss:hover { color: #2C2825; }
+  @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 `;
 
 // ─── Key SVG icon (shared across overlays) ──────────────────────────────────
 
-const KEY_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7A5 5 0 0 1 7 7h2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`;
-const SHIELD_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
-const LOCK_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
-
-// ─── Helper: sanitize for display ───────────────────────────────────────────
-
-function esc(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
+const KEY_ICON_SVG = `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7h2a5 5 0 0 1 0 10h-2m-6 0H7A5 5 0 0 1 7 7h2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`;
+const SHIELD_ICON_SVG = `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`;
+const LOCK_ICON_SVG = `<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
 
 // ─── Helper: create & mount shadow host ─────────────────────────────────────
 
+const activeHostCleanups = new Map<string, () => void>();
+
 function createHost(id: string): { host: HTMLDivElement; shadow: ShadowRoot } {
+  activeHostCleanups.get(id)?.();
+  activeHostCleanups.delete(id);
   document.getElementById(id)?.remove();
 
   const host = document.createElement('div');
@@ -176,6 +183,14 @@ function createHost(id: string): { host: HTMLDivElement; shadow: ShadowRoot } {
   const shadow = host.attachShadow({ mode: 'open' });
   document.documentElement.appendChild(host);
   return { host, shadow };
+}
+
+function registerHostCleanup(id: string, cleanup: () => void): void {
+  activeHostCleanups.set(id, cleanup);
+}
+
+function unregisterHostCleanup(id: string, cleanup: () => void): void {
+  if (activeHostCleanups.get(id) === cleanup) activeHostCleanups.delete(id);
 }
 
 // ─── Passkey Create Consent ─────────────────────────────────────────────────
@@ -204,11 +219,11 @@ export function showCreateConsent(params: CreateConsentParams): Promise<boolean>
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.innerHTML = `
-      <div class="modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lockbox-create-title">
         <div class="modal-header">
           ${SHIELD_ICON_SVG}
           <div>
-            <div class="modal-title">Create a passkey</div>
+            <div class="modal-title" id="lockbox-create-title">Create a passkey</div>
             <div class="modal-subtitle">
               <span class="security-badge badge-secure">End-to-end encrypted</span>
             </div>
@@ -219,27 +234,40 @@ export function showCreateConsent(params: CreateConsentParams): Promise<boolean>
             <div class="info-icon">🌐</div>
             <div>
               <div class="info-label">Website</div>
-              <div class="info-value">${esc(params.rpName)}</div>
-              <div class="info-label" style="margin-top:2px">${esc(params.rpId)}</div>
+              <div class="info-value" data-rp-name></div>
+              <div class="info-label" style="margin-top:2px" data-rp-id></div>
             </div>
           </div>
           <div class="info-row">
             <div class="info-icon">👤</div>
             <div>
               <div class="info-label">Account</div>
-              <div class="info-value">${esc(params.userDisplayName || params.userName)}</div>
-              ${params.userDisplayName && params.userName !== params.userDisplayName ? `<div class="info-label" style="margin-top:2px">${esc(params.userName)}</div>` : ''}
+              <div class="info-value" data-account-name></div>
+              <div class="info-label" style="margin-top:2px" data-account-secondary hidden></div>
             </div>
           </div>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-secondary" data-action="cancel">Cancel</button>
-          <button class="btn btn-primary" data-action="confirm">Save passkey</button>
+          <button type="button" class="btn btn-secondary" data-action="cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" data-action="confirm">Save passkey</button>
         </div>
       </div>
     `;
 
+    (overlay.querySelector('[data-rp-name]') as HTMLElement).textContent = params.rpName;
+    (overlay.querySelector('[data-rp-id]') as HTMLElement).textContent = params.rpId;
+    (overlay.querySelector('[data-account-name]') as HTMLElement).textContent =
+      params.userDisplayName || params.userName;
+    const accountSecondary = overlay.querySelector('[data-account-secondary]') as HTMLElement;
+    if (params.userDisplayName && params.userName !== params.userDisplayName) {
+      accountSecondary.hidden = false;
+      accountSecondary.textContent = params.userName;
+    }
+
+    const replacementCleanup = () => cleanup(false);
     function cleanup(result: boolean): void {
+      unregisterHostCleanup('lockbox-webauthn-create-consent', replacementCleanup);
+      document.removeEventListener('keydown', keyHandler);
       host.remove();
       resolve(result);
     }
@@ -261,6 +289,7 @@ export function showCreateConsent(params: CreateConsentParams): Promise<boolean>
       }
     };
     document.addEventListener('keydown', keyHandler);
+    registerHostCleanup('lockbox-webauthn-create-consent', replacementCleanup);
 
     shadow.appendChild(overlay);
     (shadow.querySelector('[data-action="confirm"]') as HTMLButtonElement)?.focus();
@@ -294,12 +323,12 @@ export function showGetConsent(params: GetConsentParams): Promise<boolean> {
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.innerHTML = `
-      <div class="modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lockbox-get-title">
         <div class="modal-header">
           ${KEY_ICON_SVG}
           <div>
-            <div class="modal-title">Sign in with passkey</div>
-            <div class="modal-subtitle">${esc(params.rpName)}</div>
+            <div class="modal-title" id="lockbox-get-title">Sign in with passkey</div>
+            <div class="modal-subtitle" data-rp-name></div>
           </div>
         </div>
         <div class="modal-body">
@@ -307,26 +336,39 @@ export function showGetConsent(params: GetConsentParams): Promise<boolean> {
             <div class="info-icon">👤</div>
             <div>
               <div class="info-label">Account</div>
-              <div class="info-value">${esc(params.userDisplayName || params.userName)}</div>
-              ${params.userDisplayName && params.userName !== params.userDisplayName ? `<div class="info-label" style="margin-top:2px">${esc(params.userName)}</div>` : ''}
+              <div class="info-value" data-account-name></div>
+              <div class="info-label" style="margin-top:2px" data-account-secondary hidden></div>
             </div>
           </div>
           <div class="info-row">
             <div class="info-icon">🌐</div>
             <div>
               <div class="info-label">Website</div>
-              <div class="info-value">${esc(params.rpId)}</div>
+              <div class="info-value" data-rp-id></div>
             </div>
           </div>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-secondary" data-action="cancel">Cancel</button>
-          <button class="btn btn-primary" data-action="confirm">Sign in</button>
+          <button type="button" class="btn btn-secondary" data-action="cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" data-action="confirm">Sign in</button>
         </div>
       </div>
     `;
 
+    (overlay.querySelector('[data-rp-name]') as HTMLElement).textContent = params.rpName;
+    (overlay.querySelector('[data-rp-id]') as HTMLElement).textContent = params.rpId;
+    (overlay.querySelector('[data-account-name]') as HTMLElement).textContent =
+      params.userDisplayName || params.userName;
+    const accountSecondary = overlay.querySelector('[data-account-secondary]') as HTMLElement;
+    if (params.userDisplayName && params.userName !== params.userDisplayName) {
+      accountSecondary.hidden = false;
+      accountSecondary.textContent = params.userName;
+    }
+
+    const replacementCleanup = () => cleanup(false);
     function cleanup(result: boolean): void {
+      unregisterHostCleanup('lockbox-webauthn-get-consent', replacementCleanup);
+      document.removeEventListener('keydown', keyHandler);
       host.remove();
       resolve(result);
     }
@@ -348,6 +390,7 @@ export function showGetConsent(params: GetConsentParams): Promise<boolean> {
       }
     };
     document.addEventListener('keydown', keyHandler);
+    registerHostCleanup('lockbox-webauthn-get-consent', replacementCleanup);
 
     shadow.appendChild(overlay);
     (shadow.querySelector('[data-action="confirm"]') as HTMLButtonElement)?.focus();
@@ -382,35 +425,44 @@ export function showPasskeyPicker(
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.innerHTML = `
-      <div class="modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lockbox-picker-title">
         <div class="modal-header">
           ${KEY_ICON_SVG}
           <div>
-            <div class="modal-title">Choose a passkey</div>
-            <div class="modal-subtitle">Sign in to ${esc(passkeys[0]?.rpName || 'this site')}</div>
+            <div class="modal-title" id="lockbox-picker-title">Choose a passkey</div>
+            <div class="modal-subtitle">Sign in to <span data-rp-name></span></div>
           </div>
         </div>
         <div class="passkey-list"></div>
-        <button class="cancel-btn">Cancel</button>
+        <button type="button" class="cancel-btn">Cancel</button>
       </div>
     `;
+    (overlay.querySelector('[data-rp-name]') as HTMLElement).textContent =
+      passkeys[0]?.rpName || 'this site';
 
+    const replacementCleanup = () => cleanup(null);
     function cleanup(result: { credentialId: string } | null): void {
+      unregisterHostCleanup('lockbox-webauthn-picker', replacementCleanup);
+      document.removeEventListener('keydown', keyHandler);
       host.remove();
       resolve(result);
     }
 
     const listEl = overlay.querySelector('.passkey-list')!;
     for (const pk of passkeys) {
-      const item = document.createElement('div');
+      const item = document.createElement('button');
+      item.type = 'button';
       item.className = 'passkey-item';
       item.innerHTML = `
         <div class="passkey-icon">🔑</div>
         <div class="passkey-info">
-          <div class="passkey-name">${esc(pk.userDisplayName || pk.userName)}</div>
-          <div class="passkey-detail">${esc(pk.userName)}</div>
+          <div class="passkey-name"></div>
+          <div class="passkey-detail"></div>
         </div>
       `;
+      (item.querySelector('.passkey-name') as HTMLElement).textContent =
+        pk.userDisplayName || pk.userName;
+      (item.querySelector('.passkey-detail') as HTMLElement).textContent = pk.userName;
       item.addEventListener('click', () => cleanup({ credentialId: pk.credentialId }));
       listEl.appendChild(item);
     }
@@ -427,8 +479,10 @@ export function showPasskeyPicker(
       }
     };
     document.addEventListener('keydown', keyHandler);
+    registerHostCleanup('lockbox-webauthn-picker', replacementCleanup);
 
     shadow.appendChild(overlay);
+    (shadow.querySelector('.passkey-item, .cancel-btn') as HTMLButtonElement)?.focus();
   });
 }
 
@@ -453,14 +507,16 @@ export function showVaultLockedToast(onOpenLockbox?: () => void): void {
 
   const toast = document.createElement('div');
   toast.className = 'toast';
+  toast.setAttribute('role', 'status');
+  toast.setAttribute('aria-live', 'polite');
   toast.innerHTML = `
     <span class="toast-icon">${LOCK_ICON_SVG.replace('width="24"', 'width="20"').replace('height="24"', 'height="20"').replace('stroke="currentColor"', 'stroke="#fbbf24"')}</span>
     <div class="toast-text">
       <div class="toast-title">Lockbox is locked</div>
       <div class="toast-desc">Unlock to use passkeys on this site</div>
-      <button class="toast-action">Open Lockbox</button>
+      <button type="button" class="toast-action">Open Lockbox</button>
     </div>
-    <button class="toast-dismiss">\u00d7</button>
+    <button type="button" class="toast-dismiss" aria-label="Dismiss Lockbox notification">\u00d7</button>
   `;
 
   toast.querySelector('.toast-action')!.addEventListener('click', () => {
@@ -523,11 +579,11 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
     overlay.innerHTML = `
-      <div class="modal">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lockbox-unlock-title">
         <div class="modal-header">
           ${LOCK_ICON_SVG}
           <div>
-            <div class="modal-title">Lockbox is locked</div>
+            <div class="modal-title" id="lockbox-unlock-title">Lockbox is locked</div>
             <div class="modal-subtitle">Unlock to use passkeys on this site</div>
           </div>
         </div>
@@ -539,14 +595,14 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
               <div class="info-value">Enter your master password to continue</div>
             </div>
           </div>
-          <div class="status-row" data-status>
+          <div class="status-row" data-status role="status" aria-live="polite">
             <div class="spinner"></div>
             <span>Waiting for unlock…</span>
           </div>
         </div>
         <div class="modal-actions">
-          <button class="btn btn-secondary" data-action="cancel">Cancel</button>
-          <button class="btn btn-primary" data-action="open">Open Lockbox</button>
+          <button type="button" class="btn btn-secondary" data-action="cancel">Cancel</button>
+          <button type="button" class="btn btn-primary" data-action="open">Open Lockbox</button>
         </div>
       </div>
     `;
@@ -555,9 +611,12 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
     let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
     let resolved = false;
 
+    const replacementCleanup = () => cleanup(false);
     function cleanup(result: boolean): void {
       if (resolved) return;
       resolved = true;
+      unregisterHostCleanup('lockbox-webauthn-unlock-prompt', replacementCleanup);
+      document.removeEventListener('keydown', keyHandler);
       if (pollTimer) clearInterval(pollTimer);
       if (timeoutTimer) clearTimeout(timeoutTimer);
       host.remove();
@@ -581,6 +640,7 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
       }
     };
     document.addEventListener('keydown', keyHandler);
+    registerHostCleanup('lockbox-webauthn-unlock-prompt', replacementCleanup);
 
     shadow.appendChild(overlay);
     (shadow.querySelector('[data-action="open"]') as HTMLButtonElement)?.focus();
@@ -593,7 +653,11 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
           const statusRow = shadow.querySelector('[data-status]');
           if (statusRow) {
             statusRow.classList.add('unlocked');
-            statusRow.innerHTML = `<span>✓</span><span>Unlocked!</span>`;
+            const icon = document.createElement('span');
+            icon.textContent = '✓';
+            const message = document.createElement('span');
+            message.textContent = 'Unlocked!';
+            statusRow.replaceChildren(icon, message);
           }
           setTimeout(() => cleanup(true), 300);
         }

@@ -1,13 +1,28 @@
 {
   "name": "lockbox",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Cloudflare self-hosted password manager",
   "packageManager": "bun@1.3.10",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
+  "overrides": {
+    "@xmldom/xmldom": "0.8.13",
+    "brace-expansion": "5.0.9",
+    "defu": "6.1.7",
+    "esbuild": "0.25.12",
+    "flatted": "3.4.4",
+    "js-yaml": "5.2.2",
+    "picomatch": "2.3.2",
+    "postcss": "8.5.25",
+    "tar": "7.5.22",
+    "undici": "7.28.0",
+    "uuid": "11.1.1",
+    "vite": "7.3.6"
+  },
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
@@ -17,12 +32,16 @@
     "deploy:web": "./scripts/deploy-web.sh"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "eslint": "^8.56.0",
-    "prettier": "^3.0.0",
-    "turbo": "^2.0.0",
-    "typescript": "^5.3.0",
-    "vitest": "^4.0.0"
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.1",
+    "prettier": "^3.9.6",
+    "turbo": "^2.10.8",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "wrangler": "4.118.0"
+  },
+  "patchedDependencies": {
+    "@capacitor/cli@6.2.1": "patches/@capacitor%2Fcli@6.2.1.patch"
   }
 }

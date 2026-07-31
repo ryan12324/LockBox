@@ -1,6 +1,5 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
-import { radii } from '../tokens/radii.js';
 
 const radiusDemos = [
   { name: '--radius-sm', css: 'var(--radius-sm)', label: 'Small (10px)' },

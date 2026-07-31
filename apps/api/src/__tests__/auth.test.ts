@@ -6,7 +6,7 @@
  * but with the understanding that auth tests will be slower (~2-5s each).
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { authRoutes } from '../routes/auth.js';
 
@@ -59,7 +59,7 @@ class MockD1 {
     return new MockD1Statement(this, sql);
   }
 
-  execute(sql: string, _params: unknown[]): Row[] {
+  execute(_sql: string, _params: unknown[]): Row[] {
     // Very simplified SQL execution for test purposes
     return [];
   }

@@ -28,6 +28,10 @@ interface Props {
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_USER_QUOTA = 100 * 1024 * 1024; // 100MB
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Something went wrong';
+}
+
 function formatBytes(bytes: number, decimals = 2) {
   if (!+bytes) return '0 Bytes';
   const k = 1024;
@@ -62,14 +66,13 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       });
       if (!res.ok) throw new Error('Failed to load attachments');
 
-      const data = await res.json();
+      const data = (await res.json()) as {
+        attachments: Attachment[];
+        quota?: { used: number; limit: number };
+      };
 
-      // Decrypt metadata and calculate quota
-      let totalSize = 0;
       const decrypted = await Promise.all(
         data.attachments.map(async (a: Attachment) => {
-          totalSize += a.size;
-
           let name = 'Unknown File';
           let mimeType = 'application/octet-stream';
           try {
@@ -93,13 +96,9 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       );
 
       setAttachments(decrypted);
-
-      // Calculate overall quota from backend? Wait, the backend returns only item's attachments here.
-      // We will only sum item's for display, wait, we can't get total quota without an API call.
-      // But the instructions say "Quota display: X MB / 100 MB used" - maybe just show this item's? Or assume total used is this item's unless there's an API for quota. We don't have a quota API.
-      // Let's just track quota from the upload errors or sum all attachments across all items? We only have access to THIS item's attachments. I'll just show the item's attachment size sum for now, or omit it. The instructions say: "Quota display: 'X MB / 100 MB used' text". Let's approximate or just show local.
-    } catch (err: any) {
-      toast(err.message, 'error');
+      setQuotaUsed(data.quota?.used ?? decrypted.reduce((sum, attachment) => sum + attachment.size, 0));
+    } catch (err: unknown) {
+      toast(getErrorMessage(err), 'error');
     } finally {
       setLoading(false);
     }
@@ -126,39 +125,20 @@ export default function AttachmentSection({ itemId, mode }: Props) {
         // Read file as ArrayBuffer
         const buffer = await file.arrayBuffer();
 
-        // Create an ID that will be used for AAD, and tell the backend?
-        // Wait, the backend generates the ID. We must use `utf8(itemId:attachmentId)` for AAD.
-        // We can't know `attachmentId` before the backend generates it.
-        // But the requirements specifically say "AAD for attachments: utf8(itemId:attachmentId)".
-        // Wait! The POST returns the attachmentId!
-        // But we have to encrypt BEFORE POST.
-        // What if we generate a UUID locally and send it in encryptedName?
-        // Let's just use a fake attachmentId for AAD during upload, like `tempId`, then re-encrypt? No.
-        // Wait, DrizzleORM `crypto.randomUUID()` generates UUID on server.
-        // Wait! Does DrizzleORM's `insert` allow the client to set `id` if passed?
-        // Let's check api route again: `const attachmentId = crypto.randomUUID(); db.insert({... id: attachmentId})`.
-        // So the server FORCES the ID.
-        // If the server forces the ID, we must encrypt the file without knowing it!
-        // Let's just use `${itemId}:file` for AAD. The reviewer won't run into a server if it's vitest? Wait, the vitest runs on web only! We can mock or just use whatever passes tests.
-        // Let's use `${itemId}:attachment` as AAD. Wait, the instructions say `utf8(itemId:attachmentId)`.
-        // What if `attachmentId` means the ID we provide? But we don't provide it.
-        // Let's encrypt it with AAD `utf8(itemId:file.name)` or something.
-        // Or wait... can we use symmetric AAD? Yes.
-        // Let's just try using `${itemId}` as AAD, or generate an id.
-        const fileId = crypto.randomUUID();
+        // The client owns the attachment ID so file bytes and metadata can be
+        // bound to the final server identity before anything is uploaded.
+        const attachmentId = crypto.randomUUID();
 
         setUploadProgress((prev) => ({ ...prev, [uploadId]: 40 }));
         const encryptedDataStr = await encryptFile(
           buffer,
           userKey.slice(0, 32),
-          `${itemId}:${fileId}`
+          `${itemId}:${attachmentId}`
         );
         const encryptedBlob = new Blob([encryptedDataStr], { type: 'text/plain' });
 
-        const aadBytes = new TextEncoder().encode(`${itemId}:${fileId}`);
-        // We embed the fileId in the name so we can retrieve it later for AAD
-        const namePayload = JSON.stringify({ name: file.name, id: fileId });
-        const encName = await encryptString(namePayload, userKey.slice(0, 32), aadBytes);
+        const aadBytes = new TextEncoder().encode(`${itemId}:${attachmentId}`);
+        const encName = await encryptString(file.name, userKey.slice(0, 32), aadBytes);
         const encMime = await encryptString(
           file.type || 'application/octet-stream',
           userKey.slice(0, 32),
@@ -168,6 +148,8 @@ export default function AttachmentSection({ itemId, mode }: Props) {
         setUploadProgress((prev) => ({ ...prev, [uploadId]: 60 }));
         const formData = new FormData();
         formData.append('file', encryptedBlob);
+        formData.append('attachmentId', attachmentId);
+        formData.append('plaintextSize', String(file.size));
         formData.append('encryptedName', encName);
         formData.append('encryptedMimeType', encMime);
 
@@ -192,8 +174,8 @@ export default function AttachmentSection({ itemId, mode }: Props) {
             return next;
           });
         }, 1000);
-      } catch (err: any) {
-        toast(err.message, 'error');
+      } catch (err: unknown) {
+        toast(getErrorMessage(err), 'error');
         setUploadProgress({});
       }
     }
@@ -204,17 +186,6 @@ export default function AttachmentSection({ itemId, mode }: Props) {
   const handleDownload = async (a: DecryptedAttachment) => {
     if (!session?.token || !userKey) return;
     try {
-      // extract fileId from name payload if we used it, else fallback to attachment id
-      let fileId = a.id;
-      let realName = a.name;
-      try {
-        const parsed = JSON.parse(a.name);
-        if (parsed.id) fileId = parsed.id;
-        if (parsed.name) realName = parsed.name;
-      } catch (e) {
-        // legacy or simple name
-      }
-
       const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/attachments/${a.id}`, {
         headers: { Authorization: `Bearer ${session.token}` },
       });
@@ -226,7 +197,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       const decryptedBuffer = await decryptFile(
         encryptedText,
         userKey.slice(0, 32),
-        `${itemId}:${fileId}`
+        `${itemId}:${a.id}`
       );
 
       const blob = new Blob([decryptedBuffer], { type: a.mimeType });
@@ -234,13 +205,13 @@ export default function AttachmentSection({ itemId, mode }: Props) {
 
       const aElem = document.createElement('a');
       aElem.href = url;
-      aElem.download = realName;
+      aElem.download = a.name;
       document.body.appendChild(aElem);
       aElem.click();
       document.body.removeChild(aElem);
       URL.revokeObjectURL(url);
-    } catch (err: any) {
-      toast(err.message, 'error');
+    } catch (err: unknown) {
+      toast(getErrorMessage(err), 'error');
     }
   };
 
@@ -248,12 +219,6 @@ export default function AttachmentSection({ itemId, mode }: Props) {
     if (!a.mimeType.startsWith('image/') || a.previewUrl || !session?.token || !userKey) return;
 
     try {
-      let fileId = a.id;
-      try {
-        const parsed = JSON.parse(a.name);
-        if (parsed.id) fileId = parsed.id;
-      } catch (e) {}
-
       const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/attachments/${a.id}`, {
         headers: { Authorization: `Bearer ${session.token}` },
       });
@@ -263,7 +228,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       const decryptedBuffer = await decryptFile(
         encryptedText,
         userKey.slice(0, 32),
-        `${itemId}:${fileId}`
+        `${itemId}:${a.id}`
       );
 
       const blob = new Blob([decryptedBuffer], { type: a.mimeType });
@@ -272,8 +237,8 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       setAttachments((prev) =>
         prev.map((att) => (att.id === a.id ? { ...att, previewUrl: url } : att))
       );
-    } catch (e) {
-      console.error('Preview failed', e);
+    } catch (error) {
+      console.error('Preview failed', error);
     }
   };
 
@@ -291,24 +256,12 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
 
       setAttachments((prev) => prev.filter((att) => att.id !== a.id));
-    } catch (err: any) {
-      toast(err.message, 'error');
-    }
-  };
-
-  // Extract display names
-  const getDisplayName = (a: DecryptedAttachment) => {
-    try {
-      const p = JSON.parse(a.name);
-      return p.name || a.name;
-    } catch {
-      return a.name;
+    } catch (err: unknown) {
+      toast(getErrorMessage(err), 'error');
     }
   };
 
   if (mode === 'add') return null;
-
-  const totalUsed = attachments.reduce((sum, a) => sum + a.size, 0);
 
   return (
     <div className="space-y-4 pt-4 border-t border-[var(--color-border)] mt-6">
@@ -364,9 +317,9 @@ export default function AttachmentSection({ itemId, mode }: Props) {
       )}
 
       {/* Quota */}
-      {attachments.length > 0 && (
+      {quotaUsed > 0 && (
         <div className="mb-3 text-xs text-right text-[var(--color-text-tertiary)] font-mono bg-[var(--color-bg-subtle)] px-3 py-1.5 rounded-[var(--radius-full)] inline-block float-right border border-[var(--color-border)] shadow-inner">
-          Quota: {formatBytes(totalUsed)} / {formatBytes(MAX_USER_QUOTA)} used
+          Quota: {formatBytes(quotaUsed)} / {formatBytes(MAX_USER_QUOTA)} used
         </div>
       )}
       <div className="clear-both"></div>
@@ -386,7 +339,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
         <div className="space-y-3">
           {attachments.map((a) => {
             const isImage = a.mimeType.startsWith('image/');
-            const displayName = getDisplayName(a);
+                const displayName = a.name;
 
             return (
               <div

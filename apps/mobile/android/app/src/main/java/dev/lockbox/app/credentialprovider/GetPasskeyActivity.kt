@@ -6,6 +6,11 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Base64
 import androidx.annotation.RequiresApi
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.GetPublicKeyCredentialOption
+import androidx.credentials.PublicKeyCredential
+import androidx.credentials.provider.PendingIntentHandler
+import androidx.credentials.provider.ProviderGetCredentialRequest
 import dev.lockbox.app.storage.VaultDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +23,7 @@ import java.security.MessageDigest
 import java.security.Signature
 
 /**
- * GetPasskeyActivity — Phase 2 handler for passkey authentication.
+ * Returns passkey assertions selected through Android's credential-provider UI.
  *
  * Launched via PendingIntent from LockboxCredentialProviderService when
  * the user selects a passkey in the system credential picker.
@@ -41,9 +46,9 @@ class GetPasskeyActivity : Activity() {
         const val EXTRA_CREDENTIAL_ID = "credential_id"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
 
-        // WebAuthn authenticator flags for synced passkey assertion
-        // UP=1 | UV=4 | BE=8 | BS=16 = 0x1D
-        private const val ASSERTION_FLAGS: Byte = 0x1D.toByte()
+        // The system picker supplies user presence. Do not claim biometric user
+        // verification or backup eligibility when neither occurred.
+        private const val ASSERTION_FLAGS: Byte = 0x01
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,11 +60,7 @@ class GetPasskeyActivity : Activity() {
             return
         }
 
-        val request = intent.getParcelableExtra(
-            "android.service.credentials.extra.GET_CREDENTIAL_REQUEST",
-            android.service.credentials.GetCredentialRequest::class.java
-        )
-
+        val request = PendingIntentHandler.retrieveProviderGetCredentialRequest(intent)
         if (request == null) {
             finishWithError("No get credential request")
             return
@@ -76,23 +77,43 @@ class GetPasskeyActivity : Activity() {
 
     private suspend fun handleGetRequest(
         credentialId: String,
-        request: android.service.credentials.GetCredentialRequest
+        request: ProviderGetCredentialRequest
     ) {
         // Look up passkey metadata
         val db = VaultDatabase.getInstance(applicationContext)
         val metadata = db.passkeyMetadataDao().getByCredentialId(credentialId)
             ?: throw IllegalStateException("Passkey not found: $credentialId")
 
-        // Extract challenge from request
-        val challengeB64 = extractChallenge(request)
-            ?: throw IllegalArgumentException("Missing challenge in request")
+        val option = request.credentialOptions
+            .filterIsInstance<GetPublicKeyCredentialOption>()
+            .firstOrNull()
+            ?: throw IllegalArgumentException("Missing public-key credential option")
+        val requestJson = JSONObject(option.requestJson)
+        val challengeB64 = requestJson.getString("challenge")
+        decodeCanonicalBase64url(challengeB64, 16, 1024)
+        val requestedRpId = requestJson.optString("rpId", metadata.rpId)
+        require(isValidRpId(requestedRpId)) { "Invalid relying-party ID" }
+        require(requestedRpId == metadata.rpId) { "Passkey does not match the requested RP ID" }
+        require(requestJson.optString("userVerification", "preferred") != "required") {
+            "This provider cannot satisfy required user verification"
+        }
+        val allowedCredentials = requestJson.optJSONArray("allowCredentials")
+        if (allowedCredentials != null && allowedCredentials.length() > 0) {
+            val isAllowed = (0 until allowedCredentials.length()).any { index ->
+                val allowed = allowedCredentials.optJSONObject(index)
+                allowed?.optString("type") == "public-key" &&
+                    allowed.optString("id") == credentialId
+            }
+            require(isAllowed) { "Passkey is not allowed by this request" }
+        }
+        val origin = getCallingAppOrigin(request.callingAppInfo)
 
         // Build clientDataJSON
         val clientDataJson = JSONObject().apply {
             put("type", "webauthn.get")
             put("challenge", challengeB64)
-            put("origin", "android:apk-key-hash:lockbox")
-            put("androidPackageName", packageName)
+            put("origin", origin)
+            put("androidPackageName", request.callingAppInfo.packageName)
         }.toString()
         val clientDataBytes = clientDataJson.toByteArray(Charsets.UTF_8)
         val clientDataHash = MessageDigest.getInstance("SHA-256").digest(clientDataBytes)
@@ -119,18 +140,11 @@ class GetPasskeyActivity : Activity() {
             })
         }
 
-        val responseData = android.os.Bundle().apply {
-            putString(
-                "androidx.credentials.BUNDLE_KEY_AUTHENTICATION_RESPONSE_JSON",
-                responseJson.toString()
-            )
-        }
-
-        val response = android.service.credentials.GetCredentialResponse(responseData)
-
-        setResult(RESULT_OK, Intent().apply {
-            putExtra("android.service.credentials.extra.GET_CREDENTIAL_RESPONSE", response)
-        })
+        val credential = PublicKeyCredential(responseJson.toString())
+        val response = GetCredentialResponse(credential)
+        val resultIntent = Intent()
+        PendingIntentHandler.setGetCredentialResponse(resultIntent, response)
+        setResult(RESULT_OK, resultIntent)
         finish()
     }
 
@@ -162,25 +176,6 @@ class GetPasskeyActivity : Activity() {
         signature.initSign(privateKey as java.security.PrivateKey)
         signature.update(data)
         return signature.sign()
-    }
-
-    /**
-     * Extract challenge from the get credential request bundle.
-     */
-    private fun extractChallenge(
-        request: android.service.credentials.GetCredentialRequest
-    ): String? {
-        for (option in request.getCredentialOptions) {
-            val requestJson = option.credentialData.getString(
-                "androidx.credentials.BUNDLE_KEY_REQUEST_JSON"
-            ) ?: continue
-            return try {
-                JSONObject(requestJson).getString("challenge")
-            } catch (e: Exception) {
-                null
-            }
-        }
-        return null
     }
 
     /** Base64url encode without padding */

@@ -19,7 +19,7 @@ import {
   decodeShareSecret,
 } from '../sharing.js';
 import { generateRsaKeyPair, importPublicKey } from '../rsa.js';
-import { toUtf8, toHex, fromUtf8 } from '../utils.js';
+import { toHex } from '../utils.js';
 
 describe('sharing', () => {
   describe('generateFolderKey', () => {

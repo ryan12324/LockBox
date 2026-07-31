@@ -30,8 +30,6 @@ export interface SchedulerOptions {
 
 const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DEFAULT_MAX_NOTIFICATIONS = 1;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------

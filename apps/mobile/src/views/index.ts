@@ -85,11 +85,6 @@ export {
 export type { EmailAliasProvider, AliasConfig, GeneratedAlias } from './email-aliases.js';
 
 export {
-  parseOtpAuthUri,
-} from './qr-totp.js';
-export type { OtpAuthParams } from './qr-totp.js';
-
-export {
   MAX_FILE_SIZE,
   MAX_TOTAL_QUOTA,
   formatFileSize,
@@ -102,20 +97,6 @@ export {
   validateQuota,
 } from './attachments.js';
 export type { AttachmentListItem, ValidationResult } from './attachments.js';
-
-export {
-  getStatusBadge,
-  getStatusDescription,
-  formatWaitPeriod,
-  calculateTimeRemaining,
-  toGrantListItem,
-  processGrantList,
-  getGrantorActions,
-  getGranteeActions,
-  validateWaitPeriod,
-  getAvailableWaitPeriods,
-} from './emergency-access.js';
-export type { EmergencyGrant, EmergencyAccessAction, GrantListItem } from './emergency-access.js';
 
 export {
   getTravelModeWarning,

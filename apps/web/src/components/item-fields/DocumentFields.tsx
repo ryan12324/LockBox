@@ -11,6 +11,8 @@ export interface DocumentFieldsProps {
   setIsDragging: (v: boolean) => void;
   documentFile: File | null;
   documentQuota: { used: number; limit: number } | null;
+  downloading: boolean;
+  onDownload: () => void;
   onBrowse: () => void;
   onFileDrop: (file: File) => void;
 }
@@ -25,6 +27,8 @@ export default function DocumentFields({
   setIsDragging,
   documentFile,
   documentQuota,
+  downloading,
+  onDownload,
   onBrowse,
   onFileDrop,
 }: DocumentFieldsProps) {
@@ -61,6 +65,17 @@ export default function DocumentFields({
             </div>
           </div>
         </div>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          loading={downloading}
+          disabled={fileSize <= 0}
+          onClick={onDownload}
+          style={{ width: '100%' }}
+        >
+          Download and decrypt
+        </Button>
         {mimeType && mimeType.startsWith('image/') && (
           <div>
             <span className="block text-xs font-semibold text-[var(--color-text-tertiary)] uppercase mb-1">
@@ -123,7 +138,8 @@ export default function DocumentFields({
         <span className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">
           Upload Document
         </span>
-        <div
+        <button
+          type="button"
           className={`relative w-full p-6 rounded-[var(--radius-lg)] border-2 border-dashed transition-all duration-200 text-center cursor-pointer overflow-hidden ${
             isDragging
               ? 'border-[var(--color-primary)] bg-[var(--color-aura-dim)]'
@@ -141,6 +157,7 @@ export default function DocumentFields({
             if (f) onFileDrop(f);
           }}
           onClick={onBrowse}
+          aria-label={documentFile ? `Replace document with ${documentFile.name}` : 'Choose a document to upload'}
         >
           <div className="flex flex-col items-center justify-center space-y-2 pointer-events-none">
             <span className="text-2xl text-[var(--color-text-tertiary)]">📄</span>
@@ -150,10 +167,10 @@ export default function DocumentFields({
             <p className="text-xs text-[var(--color-text-tertiary)]">
               {documentFile
                 ? `${(documentFile.size / 1024).toFixed(1)} KB • ${documentFile.type || 'unknown type'}`
-                : 'Max 10MB. Encrypted before upload.'}
+                : 'Max 50MB. Encrypted on this device before upload.'}
             </p>
           </div>
-        </div>
+        </button>
       </div>
       {mimeType && mode === 'edit' && (
         <div className="grid grid-cols-2 gap-4">

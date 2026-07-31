@@ -4,7 +4,6 @@ import { useAuthStore } from '../store/auth.js';
 import { useTeamsStore } from '../store/teams.js';
 import { api } from '../lib/api.js';
 import {
-  createKeyPair,
   unlockPrivateKey,
   loadPublicKey,
   createFolderKeyForMembers,
@@ -50,7 +49,7 @@ export default function TeamDetail() {
   const navigate = useNavigate();
   const { teamId } = useParams<{ teamId: string }>();
   const { session, userKey } = useAuthStore();
-  const { hasKeyPair, setHasKeyPair, privateKey, setPrivateKey } = useTeamsStore();
+  const { hasKeyPair, privateKey, setPrivateKey } = useTeamsStore();
 
   const [teamName, setTeamName] = useState('');
   const [members, setMembers] = useState<Member[]>([]);
@@ -230,9 +229,9 @@ export default function TeamDetail() {
   }
 
   async function handleUnshareFolder(folderId: string) {
-    if (!session) return;
+    if (!session || !teamId) return;
     try {
-      await api.sharing.unshareFolder(folderId, session.token);
+      await api.sharing.unshareFolder(folderId, teamId, session.token);
       showMessage('Folder unshared.', 'success');
       await loadTeamDetail();
     } catch {

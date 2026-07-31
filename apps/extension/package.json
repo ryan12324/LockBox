@@ -1,6 +1,6 @@
 {
   "name": "@lockbox/extension",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "private": true,
   "description": "Browser extension",
   "main": "src/index.ts",
@@ -9,20 +9,20 @@
     "dev": "wxt",
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
-    "test": "vitest run",
+    "test": "wxt prepare && vitest run",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "wxt prepare && tsc --noEmit"
   },
   "devDependencies": {
-    "@types/chrome": "^0.1.37",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "eslint": "^9.0.0",
+    "@types/chrome": "^0.1.43",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^9.39.5",
     "jsdom": "^28.1.0",
-    "typescript": "^5.3.0",
-    "vitest": "^4.0.18"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
   },
   "dependencies": {
     "@lockbox/crypto": "*",
@@ -30,12 +30,13 @@
     "@lockbox/generator": "*",
     "@lockbox/totp": "*",
     "@lockbox/types": "*",
-    "@tailwindcss/vite": "^4.2.1",
-    "@wxt-dev/module-react": "^1.1.5",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "tailwindcss": "^4.2.1",
-    "wxt": "^0.20.18",
-    "zustand": "^5.0.11"
+    "@tailwindcss/vite": "^4.3.3",
+    "@wxt-dev/module-react": "^1.2.2",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3",
+    "tldts": "7.0.23",
+    "wxt": "^0.21.3",
+    "zustand": "^5.0.14"
   }
 }

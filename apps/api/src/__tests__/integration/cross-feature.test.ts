@@ -168,18 +168,14 @@ describe('Cross-feature: Full vault lifecycle with item types', () => {
 describe('Cross-feature: Authentication flows', () => {
   const app = createFullApp();
 
-  it('hardware key challenge → verify full flow (no auth required)', async () => {
-    // Step 1: Request challenge (no auth required, returns 400 for missing keyId)
+  it('hardware key challenge and verify are disabled without issuing a session', async () => {
     const challengeRes = await app.request('/api/auth/hardware-key/challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyId: 'test-hw-key' }),
     });
-    // Challenge route doesn't require auth — returns 400/500 depending on missing DB
-    expect(challengeRes.status).not.toBe(404);
-    expect(challengeRes.status).not.toBe(401);
+    expect(challengeRes.status).toBe(501);
 
-    // Step 2: Verify (no auth required, returns 400 for missing fields)
     const verifyRes = await app.request('/api/auth/hardware-key/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -189,8 +185,7 @@ describe('Cross-feature: Authentication flows', () => {
         signature: 'fake-sig',
       }),
     });
-    // Returns 401 (invalid challenge) — not 404
-    expect(verifyRes.status).not.toBe(404);
+    expect(verifyRes.status).toBe(501);
   });
 
   it('2FA validate endpoint accessible without auth (returns 400 for missing body)', async () => {
@@ -235,24 +230,22 @@ describe('Cross-feature: Authentication flows', () => {
     expect(res2.status).toBe(400);
   });
 
-  it('login → 2FA validate flow: auth route + 2FA validate are both reachable', async () => {
-    // Login route reachable
+  it('login and 2FA validation routes both reject malformed requests', async () => {
     const loginRes = await app.request('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'test@example.com', authHash: 'hash' }),
+      body: JSON.stringify({}),
+    }, {
+      AUTH_LIMITER: { limit: async () => ({ success: true }) },
     });
-    expect(loginRes.status).not.toBe(404);
+    expect(loginRes.status).toBe(401);
 
-    // 2FA validate reachable (no auth needed)
     const validateRes = await app.request('/api/auth/2fa/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tempToken: 'temp-123', code: '123456' }),
+      body: JSON.stringify({}),
     });
-    expect(validateRes.status).not.toBe(404);
-    // Should be 400 or 401 depending on token lookup, not 404
-    expect(validateRes.status).not.toBe(404);
+    expect(validateRes.status).toBe(400);
   });
 });
 
@@ -618,17 +611,14 @@ describe('Cross-feature: Hardware key management', () => {
     expect(deleteRes.status).toBe(401);
   });
 
-  it('HW key challenge + verify do NOT require auth in combined app', async () => {
-    // Challenge doesn't need auth
+  it('HW key challenge + verify are unavailable in v1', async () => {
     const challengeRes = await app.request('/api/auth/hardware-key/challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyId: 'yubikey-1' }),
     });
-    expect(challengeRes.status).not.toBe(401);
-    expect(challengeRes.status).not.toBe(404);
+    expect(challengeRes.status).toBe(501);
 
-    // Verify doesn't need auth
     const verifyRes = await app.request('/api/auth/hardware-key/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -638,27 +628,27 @@ describe('Cross-feature: Hardware key management', () => {
         signature: 'sig-data',
       }),
     });
-    expect(verifyRes.status).not.toBe(404);
+    expect(verifyRes.status).toBe(501);
   });
 
-  it('challenge returns 400 for missing keyId', async () => {
+  it('challenge stays disabled for malformed requests', async () => {
     const res = await app.request('/api/auth/hardware-key/challenge', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(501);
     const json = (await res.json()) as { error?: string };
-    expect(json.error).toContain('keyId');
+    expect(json.error).toContain('not available in v1');
   });
 
-  it('verify returns 400 for incomplete fields', async () => {
+  it('verify stays disabled for incomplete assertions', async () => {
     const res = await app.request('/api/auth/hardware-key/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyId: 'test' }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(501);
     const json = (await res.json()) as { error?: string };
     expect(json.error).toBeDefined();
   });
@@ -723,8 +713,10 @@ describe('Cross-feature: Full app route registration integrity', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
+    }, {
+      AUTH_LIMITER: { limit: async () => ({ success: true }) },
     });
-    expect(registerRes.status).not.toBe(404);
+    expect(registerRes.status).toBe(400);
 
     // 2FA routes
     const twofaRes = await app.request('/api/auth/2fa/setup', { method: 'POST' });

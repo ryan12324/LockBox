@@ -28,9 +28,9 @@ export interface SyncVaultItem {
   type: string;
   encryptedData: string;
   revisionDate: string;
-  folderId?: string;
-  tags: string[];
-  favorite: boolean;
+  folderId?: string | null;
+  tags: string[] | string | null;
+  favorite: boolean | number;
 }
 
 /** Folder from server */
@@ -53,24 +53,26 @@ export interface SyncSharedFolder {
 
 /** Push payload for pending changes */
 export interface PushPayload {
-  created: Array<{
-    id: string;
-    type: string;
-    encryptedData: string;
-    folderId?: string;
+  changes: Array<{
+    operation: 'create' | 'update' | 'delete';
+    itemId: string;
+    type?: string;
+    encryptedData?: string;
+    folderId?: string | null;
     tags?: string[];
     favorite?: boolean;
     revisionDate?: string;
+    expectedRevisionDate?: string;
   }>;
-  updated: Array<{
-    id: string;
-    encryptedData: string;
-    folderId?: string;
-    tags?: string[];
-    favorite?: boolean;
-    revisionDate?: string;
+}
+
+export interface PushResponse {
+  results: Array<{
+    itemId: string;
+    status: 'ok' | 'conflict';
+    serverRevisionDate: string;
   }>;
-  deleted: string[];
+  serverTimestamp: string;
 }
 
 /** Sync result returned to the caller */
@@ -84,43 +86,57 @@ export interface SyncResult {
 
 /**
  * Build a push payload from locally pending items.
- * Groups items by their syncStatus into created, updated, and deleted arrays.
+ * Converts local sync states to the API's ordered `changes` contract.
  */
 export function buildPushPayload(pendingItems: StoredVaultItem[]): PushPayload {
-  const created: PushPayload['created'] = [];
-  const updated: PushPayload['updated'] = [];
-  const deleted: string[] = [];
+  const changes: PushPayload['changes'] = [];
 
   for (const item of pendingItems) {
     switch (item.syncStatus) {
       case 'pending_create':
-        created.push({
-          id: item.id,
+        changes.push({
+          operation: 'create',
+          itemId: item.id,
           type: item.type,
           encryptedData: item.encryptedData,
-          folderId: item.folderId,
-          tags: item.tags.length > 0 ? item.tags : undefined,
-          favorite: item.favorite ? true : undefined,
+          folderId: item.folderId ?? null,
+          tags: item.tags,
+          favorite: item.favorite,
           revisionDate: item.revisionDate,
         });
         break;
       case 'pending_update':
-        updated.push({
-          id: item.id,
+        changes.push({
+          operation: 'update',
+          itemId: item.id,
           encryptedData: item.encryptedData,
-          folderId: item.folderId,
-          tags: item.tags.length > 0 ? item.tags : undefined,
-          favorite: item.favorite ? true : undefined,
+          folderId: item.folderId ?? null,
+          tags: item.tags,
+          favorite: item.favorite,
           revisionDate: item.revisionDate,
+          expectedRevisionDate: item.baseRevisionDate ?? undefined,
         });
         break;
       case 'pending_delete':
-        deleted.push(item.id);
+        changes.push({ operation: 'delete', itemId: item.id });
         break;
     }
   }
 
-  return { created, updated, deleted };
+  return { changes };
+}
+
+function normalizeTags(tags: SyncVaultItem['tags']): string[] {
+  if (Array.isArray(tags)) return tags.filter((tag): tag is string => typeof tag === 'string');
+  if (typeof tags !== 'string') return [];
+  try {
+    const parsed: unknown = JSON.parse(tags);
+    return Array.isArray(parsed)
+      ? parsed.filter((tag): tag is string => typeof tag === 'string')
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -145,9 +161,10 @@ export async function mergeSyncResponse(
       encryptedData: item.encryptedData,
       type: item.type,
       folderId: item.folderId,
-      tags: item.tags,
-      favorite: item.favorite,
+      tags: normalizeTags(item.tags),
+      favorite: item.favorite === true || item.favorite === 1,
       revisionDate: item.revisionDate,
+      baseRevisionDate: item.revisionDate,
       syncStatus: 'synced' as SyncStatus,
     }));
     await storage.batchUpsert({ items });
@@ -177,9 +194,10 @@ export async function mergeSyncResponse(
         encryptedData: serverItem.encryptedData,
         type: serverItem.type,
         folderId: serverItem.folderId,
-        tags: serverItem.tags,
-        favorite: serverItem.favorite,
+        tags: normalizeTags(serverItem.tags),
+        favorite: serverItem.favorite === true || serverItem.favorite === 1,
         revisionDate: serverItem.revisionDate,
+        baseRevisionDate: serverItem.revisionDate,
         syncStatus: 'synced' as SyncStatus,
       })),
     });
@@ -204,8 +222,10 @@ export async function mergeSyncResponse(
 export async function markPushedAsSynced(
   storage: StoragePlugin,
   pendingItems: StoredVaultItem[],
+  successfulItemIds = new Set(pendingItems.map((item) => item.id)),
 ): Promise<void> {
   for (const item of pendingItems) {
+    if (!successfulItemIds.has(item.id)) continue;
     if (item.syncStatus === 'pending_delete') {
       // Actually delete locally after server confirms
       await storage.deleteItem({ id: item.id });
@@ -230,7 +250,7 @@ export async function markPushedAsSynced(
  */
 export async function performSync(
   storage: StoragePlugin,
-  pushFn: (payload: PushPayload) => Promise<void>,
+  pushFn: (payload: PushPayload) => Promise<PushResponse>,
   pullFn: (since?: string) => Promise<SyncResponse>,
 ): Promise<SyncResult> {
   // Step 1: Get pending local changes
@@ -238,13 +258,20 @@ export async function performSync(
   const pendingItems = pendingResult.items;
 
   let pushed = 0;
+  let pushConflicts = 0;
 
   // Step 2: Push pending changes (if any)
   if (pendingItems.length > 0) {
     const payload = buildPushPayload(pendingItems);
-    await pushFn(payload);
-    await markPushedAsSynced(storage, pendingItems);
-    pushed = pendingItems.length;
+    const pushResponse = await pushFn(payload);
+    const successfulItemIds = new Set(
+      pushResponse.results
+        .filter((result) => result.status === 'ok')
+        .map((result) => result.itemId)
+    );
+    await markPushedAsSynced(storage, pendingItems, successfulItemIds);
+    pushed = successfulItemIds.size;
+    pushConflicts = pushResponse.results.filter((result) => result.status === 'conflict').length;
   }
 
   // Step 3: Pull server changes
@@ -258,7 +285,7 @@ export async function performSync(
   return {
     pushed,
     pulled,
-    conflicts,
+    conflicts: conflicts + pushConflicts,
     sharedItemsPulled: (response.sharedItems ?? []).length,
     timestamp: response.serverTimestamp,
   };

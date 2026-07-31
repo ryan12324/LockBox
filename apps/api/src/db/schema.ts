@@ -24,6 +24,21 @@ export const sessions = sqliteTable('sessions', {
   createdAt: text('created_at').notNull(),
 });
 
+// Short-lived, pre-authentication challenges used only to complete account 2FA.
+// These are deliberately separate from sessions so authMiddleware can never
+// treat a password-only login as an authenticated vault session.
+export const twoFactorChallenges = sqliteTable('two_factor_challenges', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .unique()
+    .references(() => users.id),
+  token: text('token').notNull().unique(),
+  expiresAt: text('expires_at').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+});
+
 export const folders = sqliteTable('folders', {
   id: text('id').primaryKey(),
   userId: text('user_id')
@@ -46,6 +61,9 @@ export const vaultItems = sqliteTable('vault_items', {
   tags: text('tags'), // JSON array of strings
   favorite: integer('favorite').default(0), // 0 or 1
   revisionDate: text('revision_date').notNull(),
+  // Server-owned sync cursor. revisionDate is client-owned because it is part
+  // of the ciphertext AAD and may legitimately move backwards on restore.
+  serverModifiedAt: text('server_modified_at'),
   createdAt: text('created_at').notNull(),
   deletedAt: text('deleted_at'), // null = active, set = soft-deleted
 });
@@ -64,7 +82,7 @@ export const userTotpSettings = sqliteTable('user_totp_settings', {
 export const backupCodes = sqliteTable('backup_codes', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id),
-  codeHash: text('code_hash').notNull(), // bcrypt hash of backup code
+  codeHash: text('code_hash').notNull(), // SHA-256 digest of high-entropy backup code
   used: integer('used').notNull().default(0), // 0 = unused, 1 = used
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
@@ -165,6 +183,9 @@ export const vaultItemVersions = sqliteTable('vault_item_versions', {
   userId: text('user_id').notNull(),
   encryptedData: text('encrypted_data').notNull(),
   revisionDate: text('revision_date').notNull(),
+  folderId: text('folder_id'),
+  tags: text('tags'),
+  favorite: integer('favorite').default(0),
   createdAt: text('created_at').notNull(),
 });
 

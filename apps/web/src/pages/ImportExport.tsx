@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.js';
-import { encryptVaultItem } from '../lib/crypto.js';
+import { decryptVaultItem, encryptVaultItem } from '../lib/crypto.js';
 import { api } from '../lib/api.js';
 import {
   parseImport,
@@ -10,7 +10,7 @@ import {
   parseCSV,
   type ImportFormat,
 } from '../lib/importers/index.js';
-import { Button, Card, Badge, Select } from '@lockbox/design';
+import { Button, Card, Select } from '@lockbox/design';
 import { useToast } from '../providers/ToastProvider.js';
 import type { VaultItem } from '@lockbox/types';
 
@@ -150,34 +150,26 @@ export default function ImportExport() {
   }
 
   async function handleExport() {
+    if (!session || !userKey) {
+      toast('Unlock your vault before exporting', 'error');
+      return;
+    }
     setExportLoading(true);
     try {
-      const data = (await api.vault.list(session!.token)) as {
-        items: Array<{
-          id: string;
-          type: string;
-          encryptedData: string;
-          folderId?: string;
-          tags?: string;
-          favorite?: number;
-          revisionDate: string;
-        }>;
-      };
-      const csvContent = exportToBitwardenCSV(
-        data.items.map((item) => ({
-          id: item.id,
-          type: item.type as 'login' | 'note' | 'card',
-          name: `Item ${item.id.slice(0, 8)}`,
-          tags: [],
-          favorite: Boolean(item.favorite),
-          createdAt: item.revisionDate,
-          updatedAt: item.revisionDate,
-          revisionDate: item.revisionDate,
-          username: '',
-          password: '',
-          uris: [],
-        }))
+      const data = await api.vault.list(session.token);
+      const decryptedItems = await Promise.all(
+        data.items
+          .filter((item) => !item.deletedAt)
+          .map((item) =>
+            decryptVaultItem(
+              item.encryptedData,
+              userKey,
+              item.id,
+              item.revisionDate
+            )
+          )
       );
+      const csvContent = exportToBitwardenCSV(decryptedItems);
 
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);

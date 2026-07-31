@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth.js';
 import { useHealthStore } from '../store/health.js';
@@ -10,25 +10,13 @@ import HealthScore from '../components/HealthScore.js';
 import IssueList from '../components/IssueList.js';
 import type { VaultItem } from '@lockbox/types';
 import { analyzeVaultHealth, analyzeItem, SecurityCopilot, LifecycleTracker } from '@lockbox/ai';
+import { checkBatch } from '@lockbox/crypto';
 import type { SecurityPosture, RotationSchedule, LoginItem } from '@lockbox/types';
-import type { ItemCategory } from '@lockbox/ai';
 
 interface TFAData {
   domain: string;
   tfa: string[];
   documentation?: string;
-}
-
-interface EncryptedItem {
-  id: string;
-  type: string;
-  encryptedData: string;
-  folderId: string | null;
-  tags: string | null;
-  favorite: number;
-  revisionDate: string;
-  createdAt: string;
-  deletedAt: string | null;
 }
 
 export default function Health() {
@@ -38,6 +26,10 @@ export default function Health() {
   const aura = useAura();
   const [items, setItems] = useState<VaultItem[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [breachChecking, setBreachChecking] = useState(false);
+  const [breachMessage, setBreachMessage] = useState<string | null>(null);
+  const breachedItemIds = useRef(new Set<string>());
+  const baseHealthScore = useRef(100);
   const [posture, setPosture] = useState<SecurityPosture | null>(null);
   const [dueItems, setDueItems] = useState<
     { schedule: RotationSchedule; item: VaultItem; category: string }[]
@@ -153,7 +145,7 @@ export default function Health() {
     setLoading(true);
     setAnalyzing(true);
     try {
-      const res = (await api.vault.list(session.token)) as { items: EncryptedItem[] };
+      const res = await api.vault.list(session.token);
       const decrypted: VaultItem[] = [];
 
       await Promise.all(
@@ -180,8 +172,23 @@ export default function Health() {
           const reportsResult = await Promise.all(
             logins.map((login) => analyzeItem(login, logins))
           );
-          setSummary(summaryResult);
-          setReports(reportsResult);
+          const knownBreaches = breachedItemIds.current;
+          baseHealthScore.current = summaryResult.overallScore;
+          setSummary({
+            ...summaryResult,
+            breached: knownBreaches.size,
+            overallScore:
+              knownBreaches.size > 0
+                ? Math.min(summaryResult.overallScore, 49)
+                : summaryResult.overallScore,
+          });
+          setReports(
+            reportsResult.map((report) =>
+              knownBreaches.has(report.itemId)
+                ? { ...report, issues: [...report.issues, { type: 'breached' as const }] }
+                : report
+            )
+          );
 
           const copilot = new SecurityCopilot();
           const postureResult = await copilot.evaluate(logins);
@@ -234,6 +241,60 @@ export default function Health() {
     loadAndAnalyzeVault();
   }, [loadAndAnalyzeVault]);
 
+  const checkBreaches = async () => {
+    const logins = items.filter((item): item is LoginItem => item.type === 'login');
+    if (logins.length === 0) return;
+
+    setBreachChecking(true);
+    setBreachMessage(null);
+    try {
+      const results = await checkBatch(
+        logins.map((item) => ({ id: item.id, password: item.password }))
+      );
+      const nextBreaches = new Set(breachedItemIds.current);
+      let failedCount = 0;
+      for (const [itemId, result] of results) {
+        if (result.error) {
+          failedCount++;
+          continue;
+        }
+        if (result.found) nextBreaches.add(itemId);
+        else nextBreaches.delete(itemId);
+      }
+      breachedItemIds.current = nextBreaches;
+      if (summary) {
+        setSummary({
+          ...summary,
+          breached: nextBreaches.size,
+          overallScore:
+            nextBreaches.size > 0
+              ? Math.min(baseHealthScore.current, 49)
+              : baseHealthScore.current,
+        });
+      }
+      setReports(
+        reports.map((report) => {
+          const withoutBreach = report.issues.filter((issue) => issue.type !== 'breached');
+          return {
+            ...report,
+            issues: nextBreaches.has(report.itemId)
+              ? [...withoutBreach, { type: 'breached' as const }]
+              : withoutBreach,
+          };
+        })
+      );
+      setBreachMessage(
+        failedCount > 0
+          ? `${failedCount} password${failedCount === 1 ? '' : 's'} could not be checked; no safe verdict was inferred for those entries.`
+          : `Checked ${logins.length} password${logins.length === 1 ? '' : 's'} using HIBP k-anonymity.`
+      );
+    } catch (error) {
+      setBreachMessage(error instanceof Error ? error.message : 'Breach check failed');
+    } finally {
+      setBreachChecking(false);
+    }
+  };
+
   if (loading || analyzing) {
     return (
       <div
@@ -269,7 +330,7 @@ export default function Health() {
     );
   }
 
-  const handleItemClick = (itemId: string) => {
+  const handleItemClick = (_itemId: string) => {
     navigate('/vault');
   };
 
@@ -290,10 +351,34 @@ export default function Health() {
           >
             Security Health
           </h1>
-          <Button variant="primary" size="sm" onClick={loadAndAnalyzeVault}>
-            Re-Analyze
-          </Button>
+          <div className="flex items-center" style={{ gap: 8 }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={checkBreaches}
+              disabled={breachChecking || items.every((item) => item.type !== 'login')}
+              title="Uses HIBP k-anonymity: only a five-character SHA-1 prefix leaves this device"
+            >
+              {breachChecking ? 'Checking…' : 'Check Breaches'}
+            </Button>
+            <Button variant="primary" size="sm" onClick={loadAndAnalyzeVault}>
+              Re-Analyze
+            </Button>
+          </div>
         </div>
+
+        <p style={{ margin: 0, color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}>
+          Breach checks are manual. Only the first five characters of each password's SHA-1 hash
+          are sent to Have I Been Pwned.
+        </p>
+        {breachMessage && (
+          <p
+            role="status"
+            style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)' }}
+          >
+            {breachMessage}
+          </p>
+        )}
 
         {!summary || summary.totalItems === 0 ? (
           <Card variant="frost" padding="lg" style={{ boxShadow: 'var(--shadow-xl)' }}>

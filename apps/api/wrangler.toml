@@ -4,7 +4,8 @@ compatibility_date = "2026-01-01"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-CORS_ORIGINS = "https://lockbox-web.pages.dev"
+CORS_ORIGINS = "https://lockbox-web.pages.dev,http://localhost:5173,https://localhost"
+EXTENSION_IDS = ""
 
 [[d1_databases]]
 binding = "DB"
@@ -12,12 +13,16 @@ database_name = "lockbox-vault"
 database_id = "a62712d1-c9c6-4ebe-a805-fb6f1e69cb4a"
 migrations_dir = "drizzle"
 
-[durable_objects]
-bindings = [{ name = "SYNC_HUB", class_name = "VaultSyncHub" }]
-
+# Preserve the Durable Object migration history even though real-time sync is
+# not shipped in v1. Cloudflare requires an explicit deletion migration before
+# the previously deployed class can be removed from the Worker bundle.
 [[migrations]]
 tag = "v1"
 new_classes = ["VaultSyncHub"]
+
+[[migrations]]
+tag = "v2"
+deleted_classes = ["VaultSyncHub"]
 
 [[ratelimits]]
 name = "AUTH_LIMITER"

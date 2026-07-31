@@ -22,7 +22,6 @@ import {
   encryptUserKey,
   decryptUserKey,
   makeAuthHash,
-  generateRecoveryKey,
 } from '../keys.js';
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
@@ -414,20 +413,6 @@ describe('keys', () => {
     expect(typeof hash).toBe('string');
     expect(hash.length).toBeGreaterThan(0);
     expect(() => fromBase64(hash)).not.toThrow();
-  });
-
-  it('generateRecoveryKey returns a formatted string', () => {
-    const key = generateRecoveryKey();
-    expect(typeof key).toBe('string');
-    expect(key.length).toBeGreaterThan(0);
-    // Should contain dashes (formatted in groups)
-    expect(key).toContain('-');
-  });
-
-  it('generateRecoveryKey returns different values each call', () => {
-    const k1 = generateRecoveryKey();
-    const k2 = generateRecoveryKey();
-    expect(k1).not.toBe(k2);
   });
 
   it('full key lifecycle: derive → encrypt user key → decrypt → verify', async () => {

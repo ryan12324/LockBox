@@ -9,6 +9,8 @@
  *    extension (background / content) context where private keys stay safe.
  */
 
+import { getPublicSuffix } from 'tldts';
+
 // ─── Data structures ────────────────────────────────────────────────────────────
 
 export interface StoredPasskey {
@@ -125,6 +127,78 @@ export function base64urlDecode(str: string): Uint8Array {
   return bytes;
 }
 
+/** Validate a canonical unpadded base64url value and its decoded byte length. */
+export function isValidBase64url(
+  value: unknown,
+  minBytes: number,
+  maxBytes: number
+): value is string {
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]+$/.test(value)) return false;
+  try {
+    const decoded = base64urlDecode(value);
+    return (
+      decoded.length >= minBytes &&
+      decoded.length <= maxBytes &&
+      base64urlEncode(decoded) === value
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate and normalize an RP ID against the actual caller origin.
+ *
+ * WebAuthn permits the exact origin host or a registrable parent-domain suffix,
+ * but never an unrelated host or a public suffix such as `com` / `co.uk`.
+ * Private suffixes (for example `github.io`) are treated as registry boundaries.
+ */
+export function resolveRpIdForOrigin(origin: string, requestedRpId?: string): string | null {
+  try {
+    const originUrl = new URL(origin);
+    const originHost = originUrl.hostname.toLowerCase();
+    const isLoopback =
+      originHost === 'localhost' || originHost === '127.0.0.1' || originHost === '[::1]';
+
+    if (originUrl.protocol !== 'https:' && !(originUrl.protocol === 'http:' && isLoopback)) {
+      return null;
+    }
+
+    const rawRpId = requestedRpId ?? originHost;
+    if (rawRpId.length === 0 || rawRpId.length > 253 || rawRpId.endsWith('.')) return null;
+
+    const rpUrl = new URL(`https://${rawRpId}`);
+    const rpId = rpUrl.hostname.toLowerCase();
+    if (rpUrl.host !== rawRpId.toLowerCase() || rpUrl.pathname !== '/') return null;
+
+    if (rpId === originHost) return rpId;
+    if (!originHost.endsWith(`.${rpId}`)) return null;
+
+    const publicSuffix = getPublicSuffix(rpId, { allowPrivateDomains: true });
+    if (!publicSuffix || publicSuffix === rpId) return null;
+    return rpId;
+  } catch {
+    return null;
+  }
+}
+
+/** Bind an untrusted page claim to the URL Chrome reports for the sending frame. */
+export function resolveWebAuthnCaller(
+  senderUrl: string | undefined,
+  claimedOrigin: string,
+  requestedRpId?: string
+): { origin: string; rpId: string } | null {
+  if (!senderUrl) return null;
+  try {
+    const senderOrigin = new URL(senderUrl).origin;
+    if (claimedOrigin !== senderOrigin) return null;
+    const rpId = resolveRpIdForOrigin(senderOrigin, requestedRpId);
+    return rpId ? { origin: senderOrigin, rpId } : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Credential helpers ─────────────────────────────────────────────────────────
 
 /** Generate a random 32-byte credential ID. */
@@ -146,8 +220,10 @@ export function createAuthenticatorData(
   credentialId?: Uint8Array,
   publicKeyCOSE?: Uint8Array
 ): Uint8Array {
-  // flags: UP (0x01) | UV (0x04) | BE (0x08) | BS (0x10) | AT if attested (0x40)
-  const flags = credentialId ? 0x5d : 0x1d; // UP + UV + BE + BS + AT  or  UP + UV + BE + BS
+  // Consent establishes user presence (UP), but this software authenticator does
+  // not perform user verification and must not claim backup eligibility/state.
+  // Registration additionally includes attested credential data (AT).
+  const flags = credentialId ? 0x41 : 0x01;
 
   const counterBuf = new Uint8Array(4);
   new DataView(counterBuf.buffer).setUint32(0, counter, false);

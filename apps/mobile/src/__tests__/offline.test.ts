@@ -3,7 +3,7 @@
  * Tests buildPushPayload, mergeSyncResponse, markPushedAsSynced, and performSync.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   buildPushPayload,
   mergeSyncResponse,
@@ -13,7 +13,7 @@ import {
   type SyncVaultItem,
   type SyncSharedFolder,
 } from '../offline/sync-queue';
-import type { StoragePlugin, StoredVaultItem, SyncStatus } from '../plugins/storage';
+import type { StoragePlugin, StoredVaultItem } from '../plugins/storage';
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 
@@ -25,6 +25,7 @@ function makeStoredItem(overrides: Partial<StoredVaultItem> = {}): StoredVaultIt
     tags: [],
     favorite: false,
     revisionDate: '2024-01-01T00:00:00.000Z',
+    baseRevisionDate: '2024-01-01T00:00:00.000Z',
     syncStatus: 'synced',
     ...overrides,
   };
@@ -63,43 +64,49 @@ function makeStoragePlugin(overrides: Partial<StoragePlugin> = {}): StoragePlugi
 describe('buildPushPayload', () => {
   it('returns empty payload when no pending items', () => {
     const payload = buildPushPayload([]);
-    expect(payload.created).toHaveLength(0);
-    expect(payload.updated).toHaveLength(0);
-    expect(payload.deleted).toHaveLength(0);
+    expect(payload).toEqual({ changes: [] });
   });
 
-  it('groups pending_create items into created array', () => {
+  it('maps pending_create items to create changes', () => {
     const items = [
       makeStoredItem({ id: 'item-1', syncStatus: 'pending_create' }),
       makeStoredItem({ id: 'item-2', syncStatus: 'pending_create' }),
     ];
     const payload = buildPushPayload(items);
-    expect(payload.created).toHaveLength(2);
-    expect(payload.created[0].id).toBe('item-1');
-    expect(payload.created[1].id).toBe('item-2');
-    expect(payload.updated).toHaveLength(0);
-    expect(payload.deleted).toHaveLength(0);
+    expect(payload.changes).toHaveLength(2);
+    expect(payload.changes[0]).toMatchObject({ operation: 'create', itemId: 'item-1' });
+    expect(payload.changes[1]).toMatchObject({ operation: 'create', itemId: 'item-2' });
   });
 
-  it('groups pending_update items into updated array', () => {
+  it('maps pending_update items to update changes', () => {
     const items = [
-      makeStoredItem({ id: 'item-1', syncStatus: 'pending_update' }),
+      makeStoredItem({
+        id: 'item-1',
+        syncStatus: 'pending_update',
+        revisionDate: '2024-02-01T00:00:00.000Z',
+        baseRevisionDate: '2024-01-01T00:00:00.000Z',
+      }),
     ];
     const payload = buildPushPayload(items);
-    expect(payload.updated).toHaveLength(1);
-    expect(payload.updated[0].id).toBe('item-1');
-    expect(payload.created).toHaveLength(0);
+    expect(payload.changes).toEqual([
+      expect.objectContaining({
+        operation: 'update',
+        itemId: 'item-1',
+        expectedRevisionDate: '2024-01-01T00:00:00.000Z',
+      }),
+    ]);
   });
 
-  it('groups pending_delete items into deleted array', () => {
+  it('maps pending_delete items to delete changes', () => {
     const items = [
       makeStoredItem({ id: 'item-1', syncStatus: 'pending_delete' }),
       makeStoredItem({ id: 'item-2', syncStatus: 'pending_delete' }),
     ];
     const payload = buildPushPayload(items);
-    expect(payload.deleted).toHaveLength(2);
-    expect(payload.deleted).toContain('item-1');
-    expect(payload.deleted).toContain('item-2');
+    expect(payload.changes).toEqual([
+      { operation: 'delete', itemId: 'item-1' },
+      { operation: 'delete', itemId: 'item-2' },
+    ]);
   });
 
   it('handles mixed sync statuses', () => {
@@ -109,9 +116,11 @@ describe('buildPushPayload', () => {
       makeStoredItem({ id: 'deleted-item', syncStatus: 'pending_delete' }),
     ];
     const payload = buildPushPayload(items);
-    expect(payload.created).toHaveLength(1);
-    expect(payload.updated).toHaveLength(1);
-    expect(payload.deleted).toHaveLength(1);
+    expect(payload.changes.map((change) => change.operation)).toEqual([
+      'create',
+      'update',
+      'delete',
+    ]);
   });
 
   it('includes encryptedData in created items', () => {
@@ -124,8 +133,25 @@ describe('buildPushPayload', () => {
       }),
     ];
     const payload = buildPushPayload(items);
-    expect(payload.created[0].encryptedData).toBe('my-encrypted-blob');
-    expect(payload.created[0].type).toBe('login');
+    expect(payload.changes[0]).toMatchObject({
+      operation: 'create',
+      itemId: 'item-1',
+      encryptedData: 'my-encrypted-blob',
+      type: 'login',
+    });
+  });
+
+  it('sends explicit empty metadata so updates can clear server state', () => {
+    const payload = buildPushPayload([
+      makeStoredItem({
+        id: 'item-1',
+        syncStatus: 'pending_update',
+        folderId: undefined,
+        tags: [],
+        favorite: false,
+      }),
+    ]);
+    expect(payload.changes[0]).toMatchObject({ folderId: null, tags: [], favorite: false });
   });
 
   it('skips synced items (not pending)', () => {
@@ -133,9 +159,7 @@ describe('buildPushPayload', () => {
       makeStoredItem({ id: 'item-1', syncStatus: 'synced' }),
     ];
     const payload = buildPushPayload(items);
-    expect(payload.created).toHaveLength(0);
-    expect(payload.updated).toHaveLength(0);
-    expect(payload.deleted).toHaveLength(0);
+    expect(payload.changes).toHaveLength(0);
   });
 });
 
@@ -313,7 +337,10 @@ describe('performSync', () => {
       getLastSyncTimestamp: vi.fn().mockResolvedValue({ timestamp: '2024-01-01T00:00:00.000Z' }),
     });
 
-    const pushFn = vi.fn().mockResolvedValue(undefined);
+    const pushFn = vi.fn().mockResolvedValue({
+      results: [{ itemId: 'item-1', status: 'ok', serverRevisionDate: pendingItem.revisionDate }],
+      serverTimestamp: '2024-06-01T00:00:00.000Z',
+    });
     const pullFn = vi.fn().mockResolvedValue({
       added: [makeSyncItem({ id: 'server-item' })],
       modified: [],
@@ -329,6 +356,37 @@ describe('performSync', () => {
     expect(result.pushed).toBe(1);
     expect(result.pulled).toBe(1);
     expect(result.timestamp).toBe('2024-06-01T00:00:00.000Z');
+  });
+
+  it('keeps conflicted pushes pending and reports the conflict', async () => {
+    const pendingItem = makeStoredItem({ id: 'item-1', syncStatus: 'pending_update' });
+    const storage = makeStoragePlugin({
+      getPendingItems: vi.fn().mockResolvedValue({ items: [pendingItem] }),
+    });
+    const pushFn = vi.fn().mockResolvedValue({
+      results: [
+        {
+          itemId: 'item-1',
+          status: 'conflict',
+          serverRevisionDate: '2024-05-01T00:00:00.000Z',
+        },
+      ],
+      serverTimestamp: '2024-06-01T00:00:00.000Z',
+    });
+    const pullFn = vi.fn().mockResolvedValue({
+      added: [],
+      modified: [],
+      deleted: [],
+      folders: [],
+      serverTimestamp: '2024-06-01T00:00:00.000Z',
+    } as SyncResponse);
+
+    const result = await performSync(storage, pushFn, pullFn);
+
+    expect(result.pushed).toBe(0);
+    expect(result.conflicts).toBe(1);
+    expect(storage.updateSyncStatus).not.toHaveBeenCalled();
+    expect(storage.deleteItem).not.toHaveBeenCalled();
   });
 
   it('skips push when no pending items', async () => {

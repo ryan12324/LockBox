@@ -15,9 +15,8 @@ vi.mock('@capacitor/core', () => ({
       _pluginName: name,
       isEnabled: vi.fn().mockResolvedValue({ enabled: false }),
       requestEnable: vi.fn().mockResolvedValue(undefined),
-      getCredentialsForUri: vi.fn().mockResolvedValue({ credentials: [] }),
-      saveCredential: vi.fn().mockResolvedValue(undefined),
-      removeCredential: vi.fn().mockResolvedValue(undefined),
+      replaceCredentialIndex: vi.fn().mockResolvedValue({ indexed: 0 }),
+      clearCredentialIndex: vi.fn().mockResolvedValue(undefined),
       getPasskeysForUri: vi.fn().mockResolvedValue({ passkeys: [] }),
       checkAvailability: vi
         .fn()
@@ -59,24 +58,21 @@ describe('AutofillPlugin interface', () => {
     await expect(Autofill.requestEnable()).resolves.toBeUndefined();
   });
 
-  it('getCredentialsForUri returns credentials array', async () => {
-    const result = await Autofill.getCredentialsForUri({ uri: 'https://example.com' });
-    expect(result).toHaveProperty('credentials');
-    expect(Array.isArray(result.credentials)).toBe(true);
-  });
-
-  it('saveCredential accepts encrypted data', async () => {
-    await expect(
-      Autofill.saveCredential({
+  it('replaceCredentialIndex accepts decrypted fields for immediate native encryption', async () => {
+    const result = await Autofill.replaceCredentialIndex({
+      credentials: [{
         id: 'item-123',
-        encryptedData: 'base64-encrypted-blob',
-        uri: 'https://example.com',
-      })
-    ).resolves.toBeUndefined();
+        name: 'Example',
+        username: 'alice@example.com',
+        password: 'secret',
+        uris: ['https://example.com'],
+      }],
+    });
+    expect(result).toEqual({ indexed: 0 });
   });
 
-  it('removeCredential accepts item id', async () => {
-    await expect(Autofill.removeCredential({ id: 'item-123' })).resolves.toBeUndefined();
+  it('clearCredentialIndex resolves', async () => {
+    await expect(Autofill.clearCredentialIndex()).resolves.toBeUndefined();
   });
 });
 
@@ -207,8 +203,7 @@ describe('StoragePlugin interface', () => {
 // ─── SyncStatus type ──────────────────────────────────────────────────────────
 
 describe('SyncStatus type', () => {
-  it('defines all valid sync statuses', async () => {
-    const {} = await import('../plugins/storage');
+  it('defines all valid sync statuses', () => {
     const validStatuses = ['synced', 'pending_create', 'pending_update', 'pending_delete'];
     expect(validStatuses).toHaveLength(4);
     expect(validStatuses).toContain('synced');

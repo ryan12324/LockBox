@@ -18,6 +18,9 @@ import {
   buildAttestationObject,
   buildClientDataJSON,
   findMatchingPasskeys,
+  isValidBase64url,
+  resolveRpIdForOrigin,
+  resolveWebAuthnCaller,
 } from '../../lib/webauthn.js';
 import type { StoredPasskey } from '../../lib/webauthn.js';
 
@@ -101,20 +104,18 @@ describe('createAuthenticatorData', () => {
     expect(data.slice(0, 32)).toEqual(rpIdHash);
   });
 
-  it('sets UP + UV + BE + BS flags (0x1d) for assertion', () => {
+  it('sets only the truthful UP flag (0x01) for assertion', () => {
     const rpIdHash = new Uint8Array(32);
     const data = createAuthenticatorData(rpIdHash, 0);
-    // flags at byte 32: UP (0x01) | UV (0x04) | BE (0x08) | BS (0x10) = 0x1d
-    expect(data[32]).toBe(0x1d);
+    expect(data[32]).toBe(0x01);
   });
 
-  it('sets UP + UV + BE + BS + AT flags (0x5d) for attestation', () => {
+  it('sets only UP + AT flags (0x41) for attestation', () => {
     const rpIdHash = new Uint8Array(32);
     const credId = new Uint8Array(16).fill(0xcc);
     const pubKey = new Uint8Array(10).fill(0xdd);
     const data = createAuthenticatorData(rpIdHash, 0, credId, pubKey);
-    // flags at byte 32: UP (0x01) | UV (0x04) | BE (0x08) | BS (0x10) | AT (0x40) = 0x5d
-    expect(data[32]).toBe(0x5d);
+    expect(data[32]).toBe(0x41);
   });
 
   it('encodes counter as big-endian uint32', () => {
@@ -147,6 +148,70 @@ describe('createAuthenticatorData', () => {
 
     // pubKey at offset 63
     expect(data.slice(63, 68)).toEqual(pubKey);
+  });
+});
+
+// ─── RP ID / caller validation ───────────────────────────────────────────────
+
+describe('resolveRpIdForOrigin', () => {
+  it('accepts an exact HTTPS origin host', () => {
+    expect(resolveRpIdForOrigin('https://login.example.com', 'login.example.com')).toBe(
+      'login.example.com'
+    );
+  });
+
+  it('accepts a registrable parent domain', () => {
+    expect(resolveRpIdForOrigin('https://login.example.co.uk', 'example.co.uk')).toBe(
+      'example.co.uk'
+    );
+  });
+
+  it('rejects unrelated domains and public suffixes', () => {
+    expect(resolveRpIdForOrigin('https://example.com', 'evil.com')).toBeNull();
+    expect(resolveRpIdForOrigin('https://shop.example.co.uk', 'co.uk')).toBeNull();
+  });
+
+  it('treats private suffixes as registry boundaries', () => {
+    expect(resolveRpIdForOrigin('https://alice.github.io', 'github.io')).toBeNull();
+  });
+
+  it('rejects insecure non-loopback origins', () => {
+    expect(resolveRpIdForOrigin('http://example.com', 'example.com')).toBeNull();
+    expect(resolveRpIdForOrigin('http://localhost', 'localhost')).toBe('localhost');
+  });
+});
+
+describe('resolveWebAuthnCaller', () => {
+  it('binds the claim to the sender URL origin', () => {
+    expect(
+      resolveWebAuthnCaller(
+        'https://login.example.com/account?next=1',
+        'https://login.example.com',
+        'example.com'
+      )
+    ).toEqual({ origin: 'https://login.example.com', rpId: 'example.com' });
+  });
+
+  it('rejects a forged origin claim', () => {
+    expect(
+      resolveWebAuthnCaller(
+        'https://evil.example/page',
+        'https://bank.example',
+        'bank.example'
+      )
+    ).toBeNull();
+  });
+});
+
+describe('isValidBase64url', () => {
+  it('accepts canonical values within the byte bounds', () => {
+    expect(isValidBase64url(base64urlEncode(new Uint8Array(32)), 16, 64)).toBe(true);
+  });
+
+  it('rejects padding, invalid characters, and out-of-range values', () => {
+    expect(isValidBase64url('YWJjZA==', 1, 64)).toBe(false);
+    expect(isValidBase64url('not/base64', 1, 64)).toBe(false);
+    expect(isValidBase64url(base64urlEncode(new Uint8Array(4)), 16, 64)).toBe(false);
   });
 });
 
@@ -438,7 +503,7 @@ describe('p1363ToDer', () => {
   });
 
   it('produces verifiable signatures when used with signChallenge', async () => {
-    const { publicKeySPKI, privateKeyPKCS8 } = await generatePasskeyKeyPair();
+    const { privateKeyPKCS8 } = await generatePasskeyKeyPair();
     const privKey = await importPrivateKey(privateKeyPKCS8);
 
     const authData = new Uint8Array(37).fill(0x01);

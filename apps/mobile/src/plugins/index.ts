@@ -5,9 +5,9 @@
 export { Autofill } from './autofill';
 export type {
   AutofillPlugin,
-  AutofillCredential,
+  AutofillIndexCredential,
   AutofillEnabledResult,
-  AutofillCredentialsResult,
+  AutofillIndexResult,
 } from './autofill';
 
 export { Biometric } from './biometric';
@@ -28,9 +28,6 @@ export type {
   StorageTimestampResult,
   SyncStatus,
 } from './storage';
-
-export { QRScanner } from './qr-scanner';
-export type { QRScannerPlugin, QRScanResult, QRScannerAvailabilityResult } from './qr-scanner';
 
 export { encryptFile, decryptFile } from './file-crypto';
 
@@ -55,32 +52,3 @@ export type {
   PasskeyAuthenticationResult,
   StoredPasskeyInfo,
 } from './credential-manager';
-
-export {
-  Fido2,
-  registerFido2Key,
-  authenticateFido2,
-  wrapMasterKeyWithPrf,
-  unwrapMasterKeyWithPrf,
-  setupHardwareKey,
-  unlockWithHardwareKey,
-  listHardwareKeys,
-  removeHardwareKey,
-} from './fido2';
-export type {
-  Fido2Plugin,
-  Fido2RegistrationResult,
-  Fido2AuthenticationResult,
-  Fido2RegistrationOptions,
-  Fido2AuthenticationOptions,
-  HardwareKeyInfo,
-} from './fido2';
-
-export {
-  QR_SYNC_EXPIRY_MS,
-  generateSyncQR,
-  processSyncQR,
-  scanSyncQR,
-  isPayloadExpired,
-  getRemainingSeconds,
-} from './qr-sync';

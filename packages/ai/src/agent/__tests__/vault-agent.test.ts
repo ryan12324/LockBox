@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { AgentEvent, AgentToolCall, VaultItem, Folder } from '@lockbox/types';
+import type { AgentEvent, VaultItem, Folder } from '@lockbox/types';
 import type {
   LLMProvider,
   ChatResponse,
@@ -46,7 +46,6 @@ vi.mock('../../health/analyzer.js', () => ({
 }));
 
 import { VaultAgent } from '../vault-agent.js';
-import type { VaultAgentOptions } from '../vault-agent.js';
 import type { AgentContext } from '../executor.js';
 import { SYSTEM_PROMPT } from '../../prompts/system.js';
 

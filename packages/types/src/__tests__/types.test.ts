@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import type {
-  VaultItem,
   LoginItem,
   SecureNoteItem,
   CardItem,
@@ -203,8 +202,11 @@ describe('Type Guards', () => {
         type: 'login',
         encryptedData: 'base64-encoded-ciphertext',
         revisionDate: '2024-01-01T00:00:00Z',
+        folderId: null,
         tags: [],
         favorite: false,
+        createdAt: '2024-01-01T00:00:00Z',
+        deletedAt: null,
       };
 
       // API types

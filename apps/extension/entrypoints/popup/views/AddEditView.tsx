@@ -40,6 +40,7 @@ export function AddEditView({
   const [uris, setUris] = useState<string[]>(loginItem?.uris?.length ? loginItem.uris : ['']);
   const [totpSecret, setTotpSecret] = useState(loginItem?.totp || '');
   const [generatingAlias, setGeneratingAlias] = useState(false);
+  const [aliasError, setAliasError] = useState('');
 
   const noteItem = editItem?.type === 'note' ? (editItem as SecureNoteItem) : null;
   const [content, setContent] = useState(noteItem?.content || '');
@@ -323,6 +324,7 @@ export function AddEditView({
                     size="sm"
                     onClick={async () => {
                       setGeneratingAlias(true);
+                      setAliasError('');
                       try {
                         const res = await sendMessage<{
                           success: boolean;
@@ -331,9 +333,15 @@ export function AddEditView({
                         }>({
                           type: 'generate-alias',
                         });
-                        if (res.success && res.alias) setUsername(res.alias);
-                      } catch {
-                        // ignore
+                        if (res.success && res.alias) {
+                          setUsername(res.alias);
+                        } else {
+                          setAliasError(res.error ?? 'Configure email aliases in Settings first');
+                        }
+                      } catch (err) {
+                        setAliasError(
+                          err instanceof Error ? err.message : 'Failed to generate email alias',
+                        );
                       } finally {
                         setGeneratingAlias(false);
                       }
@@ -345,6 +353,11 @@ export function AddEditView({
                   </Button>
                 </div>
               </div>
+              {aliasError && (
+                <p className="mt-1 text-xs text-[var(--color-error)]" role="alert">
+                  {aliasError}
+                </p>
+              )}
             </div>
             <div>
               <div className="flex gap-1">

@@ -10,39 +10,24 @@ import android.service.autofill.FillCallback
 import android.service.autofill.FillRequest
 import android.service.autofill.FillResponse
 import android.service.autofill.SaveCallback
-import android.service.autofill.SaveInfo
 import android.service.autofill.SaveRequest
 import android.view.autofill.AutofillId
-import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
 import dev.lockbox.app.R
-import dev.lockbox.app.credentialprovider.GetPasskeyActivity
-import dev.lockbox.app.credentialprovider.PasskeyMetadataEntity
 import dev.lockbox.app.storage.VaultDatabase
-import dev.lockbox.app.storage.VaultItemEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 
 /**
- * LockboxAutofillService — Android Autofill Framework integration.
- *
- * Runs in a SEPARATE PROCESS from the Capacitor WebView.
- * Uses Room DB as a bridge to access encrypted vault items.
- *
- * Flow:
- * 1. Android triggers onFillRequest when user focuses an autofillable field
- * 2. Service traverses the AssistStructure to find username/password fields
- * 3. Queries Room DB for matching credentials (by URI/package name)
- * 4. Builds FillResponse with Dataset options
- * 5. User picks a credential → Android fills the fields
+ * Android Autofill Framework service backed by a biometric-gated local index.
+ * Matching uses exact salted domain/package hashes. Selecting a dataset launches
+ * AutofillAuthActivity, which authenticates the user and decrypts that one entry.
  */
 class LockboxAutofillService : AutofillService() {
-
-    companion object {
-        private const val PASSKEY_REQUEST_CODE_BASE = 2000
-    }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -55,273 +40,135 @@ class LockboxAutofillService : AutofillService() {
             callback.onSuccess(null)
             return
         }
-
-        // Parse the AssistStructure to find autofillable fields
-        val parsedFields = parseStructure(structure)
-
-        if (parsedFields.usernameId == null && parsedFields.passwordId == null) {
+        val fields = parseStructure(structure)
+        if (fields.usernameId == null && fields.passwordId == null) {
             callback.onSuccess(null)
             return
         }
 
-        // Get the web domain or app package for credential matching
-        val identifier = parsedFields.webDomain ?: parsedFields.packageName ?: run {
+        val identifier = fields.webDomain ?: fields.packageName ?: run {
             callback.onSuccess(null)
             return
         }
 
         serviceScope.launch {
             try {
-                val db = VaultDatabase.getInstance(applicationContext)
-                val items = db.vaultItemDao().getByTypeAndStatus("login", "synced")
-
-                val responseBuilder = FillResponse.Builder()
-                var hasDatasets = false
-
-                for (item in items) {
-                    val dataset = buildDataset(item, parsedFields)
-                    if (dataset != null) {
-                        responseBuilder.addDataset(dataset)
-                        hasDatasets = true
+                val targetHash = AutofillCrypto.hashIdentifier(applicationContext, identifier)
+                val credentials = VaultDatabase.getInstance(applicationContext)
+                    .autofillCredentialDao()
+                    .getAll()
+                    .filter { credential ->
+                        val hashes = JSONArray(credential.domainHashes)
+                        (0 until hashes.length()).any { hashes.optString(it) == targetHash }
                     }
-                }
 
-                // Query passkey metadata for matching rpId (web domain)
-                val webDomain = parsedFields.webDomain
-                if (webDomain != null) {
-                    val passkeys = db.passkeyMetadataDao().getByRpId(webDomain)
-                    for ((index, passkey) in passkeys.withIndex()) {
-                        val dataset = buildPasskeyDataset(passkey, parsedFields, index)
-                        if (dataset != null) {
-                            responseBuilder.addDataset(dataset)
-                            hasDatasets = true
-                        }
-                    }
-                }
-
-                if (!hasDatasets) {
+                if (cancellationSignal.isCanceled || credentials.isEmpty()) {
                     callback.onSuccess(null)
                     return@launch
                 }
 
-                // Add save info so Android offers to save new credentials
-                val saveInfoBuilder = SaveInfo.Builder(
-                    SaveInfo.SAVE_DATA_TYPE_USERNAME or SaveInfo.SAVE_DATA_TYPE_PASSWORD,
-                    arrayOfNulls<AutofillId>(0)
-                )
-
-                val requiredIds = mutableListOf<AutofillId>()
-                parsedFields.usernameId?.let { requiredIds.add(it) }
-                parsedFields.passwordId?.let { requiredIds.add(it) }
-
-                if (requiredIds.isNotEmpty()) {
-                    responseBuilder.setSaveInfo(
-                        SaveInfo.Builder(
-                            SaveInfo.SAVE_DATA_TYPE_USERNAME or SaveInfo.SAVE_DATA_TYPE_PASSWORD,
-                            requiredIds.toTypedArray()
-                        ).build()
-                    )
+                val response = FillResponse.Builder()
+                credentials.forEachIndexed { index, credential ->
+                    response.addDataset(buildAuthenticationDataset(credential, fields, index))
                 }
-
-                callback.onSuccess(responseBuilder.build())
-            } catch (e: Exception) {
-                callback.onFailure("Lockbox autofill error: ${e.message}")
+                callback.onSuccess(response.build())
+            } catch (error: Exception) {
+                callback.onFailure("Lockbox could not load autofill credentials")
             }
         }
     }
 
+    /** Saving is intentionally not advertised until the main vault can confirm it. */
     override fun onSaveRequest(request: SaveRequest, callback: SaveCallback) {
-        val structure = request.fillContexts.lastOrNull()?.structure ?: run {
-            callback.onFailure("No structure available")
-            return
-        }
-
-        val parsedFields = parseStructure(structure)
-        val webDomain = parsedFields.webDomain ?: parsedFields.packageName
-
-        // Extract entered values from the structure
-        val username = parsedFields.usernameValue
-        val password = parsedFields.passwordValue
-
-        if (username == null && password == null) {
-            callback.onFailure("No credentials to save")
-            return
-        }
-
-        serviceScope.launch {
-            try {
-                val db = VaultDatabase.getInstance(applicationContext)
-                // Store as pending_create — will be encrypted and synced by the main app
-                val entity = VaultItemEntity(
-                    id = java.util.UUID.randomUUID().toString(),
-                    encryptedData = "", // Will be encrypted by main app
-                    type = "login",
-                    revisionDate = java.time.Instant.now().toString(),
-                    syncStatus = "pending_create",
-                    folderId = null,
-                    tags = null,
-                    favorite = false
-                )
-                db.vaultItemDao().upsert(entity)
-                callback.onSuccess()
-            } catch (e: Exception) {
-                callback.onFailure("Failed to save credential: ${e.message}")
-            }
-        }
+        callback.onSuccess()
     }
 
-    private fun buildDataset(
-        item: VaultItemEntity,
-        fields: ParsedAutofillFields
-    ): Dataset? {
-        val presentation = RemoteViews(packageName, R.layout.autofill_item).apply {
-            setTextViewText(R.id.autofill_item_label, "Lockbox credential")
-            setTextViewText(R.id.autofill_item_sublabel, item.id.take(8))
-        }
-
-        val datasetBuilder = Dataset.Builder(presentation)
-        var hasValues = false
-
-        fields.usernameId?.let { id ->
-            datasetBuilder.setValue(id, AutofillValue.forText(""))
-            hasValues = true
-        }
-
-        fields.passwordId?.let { id ->
-            datasetBuilder.setValue(id, AutofillValue.forText(""))
-            hasValues = true
-        }
-
-        return if (hasValues) datasetBuilder.build() else null
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
     }
 
-    /**
-     * Build a Dataset for a passkey entry. Uses a PendingIntent to
-     * GetPasskeyActivity so that passkey assertion happens on selection.
-     */
-    private fun buildPasskeyDataset(
-        passkey: PasskeyMetadataEntity,
+    private fun buildAuthenticationDataset(
+        credential: AutofillCredentialEntity,
         fields: ParsedAutofillFields,
         index: Int
-    ): Dataset? {
+    ): Dataset {
         val presentation = RemoteViews(packageName, R.layout.autofill_item).apply {
-            setTextViewText(R.id.autofill_item_label, "Passkey: ${passkey.userName}")
-            setTextViewText(R.id.autofill_item_sublabel, passkey.rpName)
+            setTextViewText(R.id.autofill_item_label, "Unlock Lockbox credential")
+            setTextViewText(R.id.autofill_item_sublabel, "Authentication required")
         }
 
-        val intent = Intent(applicationContext, GetPasskeyActivity::class.java).apply {
-            putExtra(GetPasskeyActivity.EXTRA_CREDENTIAL_ID, passkey.credentialId)
+        val intent = Intent(applicationContext, AutofillAuthActivity::class.java).apply {
+            putExtra(AutofillAuthActivity.EXTRA_CREDENTIAL_ID, credential.id)
+            fields.usernameId?.let { putExtra(AutofillAuthActivity.EXTRA_USERNAME_ID, it) }
+            fields.passwordId?.let { putExtra(AutofillAuthActivity.EXTRA_PASSWORD_ID, it) }
         }
         val pendingIntent = PendingIntent.getActivity(
             applicationContext,
-            PASSKEY_REQUEST_CODE_BASE + index,
+            AUTH_REQUEST_CODE_BASE xor credential.id.hashCode() xor index,
             intent,
-            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_CANCEL_CURRENT
         )
 
-        val datasetBuilder = Dataset.Builder(presentation)
-        datasetBuilder.setAuthentication(pendingIntent.intentSender)
-
-        fields.usernameId?.let { id ->
-            datasetBuilder.setValue(id, AutofillValue.forText(passkey.userName))
-        }
-        fields.passwordId?.let { id ->
-            datasetBuilder.setValue(id, AutofillValue.forText(""))
-        }
-
-        return datasetBuilder.build()
+        return Dataset.Builder(presentation).apply {
+            setAuthentication(pendingIntent.intentSender)
+            fields.usernameId?.let { setValue(it, null, presentation) }
+            fields.passwordId?.let { setValue(it, null, presentation) }
+        }.build()
     }
 
-    /**
-     * Parse an AssistStructure to find username and password autofill fields.
-     */
     private fun parseStructure(structure: AssistStructure): ParsedAutofillFields {
         val result = ParsedAutofillFields()
-
-        for (i in 0 until structure.windowNodeCount) {
-            val windowNode = structure.getWindowNodeAt(i)
-            val rootNode = windowNode.rootViewNode
-            traverseNode(rootNode, result)
+        for (windowIndex in 0 until structure.windowNodeCount) {
+            traverseNode(structure.getWindowNodeAt(windowIndex).rootViewNode, result)
         }
-
         return result
     }
 
-    /**
-     * Recursively traverse view nodes to find autofillable fields.
-     */
-    private fun traverseNode(
-        node: AssistStructure.ViewNode,
-        result: ParsedAutofillFields
-    ) {
-        // Check web domain
-        if (node.webDomain != null && result.webDomain == null) {
-            result.webDomain = node.webDomain
-        }
+    private fun traverseNode(node: AssistStructure.ViewNode, result: ParsedAutofillFields) {
+        if (result.webDomain == null) result.webDomain = node.webDomain
+        if (result.packageName == null) result.packageName = node.idPackage
 
-        // Check package name
-        if (node.idPackage != null && result.packageName == null) {
-            result.packageName = node.idPackage
-        }
-
-        // Check if this node is autofillable
-        val autofillHints = node.autofillHints
-        if (autofillHints != null && node.autofillId != null) {
-            for (hint in autofillHints) {
+        val autofillId = node.autofillId
+        if (autofillId != null) {
+            node.autofillHints?.forEach { hint ->
                 when {
-                    hint.contains("username", ignoreCase = true) ||
-                    hint.contains("email", ignoreCase = true) -> {
-                        result.usernameId = node.autofillId
-                        result.usernameValue = node.text?.toString()
-                    }
-                    hint.contains("password", ignoreCase = true) -> {
-                        result.passwordId = node.autofillId
-                        result.passwordValue = node.text?.toString()
-                    }
+                    result.usernameId == null &&
+                        (hint.contains("username", true) || hint.contains("email", true)) ->
+                        result.usernameId = autofillId
+                    result.passwordId == null && hint.contains("password", true) ->
+                        result.passwordId = autofillId
                 }
+            }
+
+            val attributes = node.htmlInfo?.attributes
+            val inputType = attributes?.find { it.first.equals("type", true) }?.second
+            val name = attributes?.find { it.first.equals("name", true) }?.second.orEmpty()
+            if (
+                result.usernameId == null &&
+                (inputType == "email" || inputType == "text") &&
+                listOf("user", "email", "login").any { name.contains(it, true) }
+            ) {
+                result.usernameId = autofillId
+            }
+            if (result.passwordId == null && inputType == "password") {
+                result.passwordId = autofillId
             }
         }
 
-        // Also check HTML attributes for web forms
-        val htmlInfo = node.htmlInfo
-        if (htmlInfo != null) {
-            val inputType = htmlInfo.attributes?.find { it.first == "type" }?.second
-            when (inputType) {
-                "email", "text" -> {
-                    val name = htmlInfo.attributes?.find { it.first == "name" }?.second ?: ""
-                    if (name.contains("user", ignoreCase = true) ||
-                        name.contains("email", ignoreCase = true) ||
-                        name.contains("login", ignoreCase = true)) {
-                        if (result.usernameId == null) {
-                            result.usernameId = node.autofillId
-                            result.usernameValue = node.text?.toString()
-                        }
-                    }
-                }
-                "password" -> {
-                    if (result.passwordId == null) {
-                        result.passwordId = node.autofillId
-                        result.passwordValue = node.text?.toString()
-                    }
-                }
-            }
+        for (childIndex in 0 until node.childCount) {
+            traverseNode(node.getChildAt(childIndex), result)
         }
+    }
 
-        // Recurse into children
-        for (i in 0 until node.childCount) {
-            traverseNode(node.getChildAt(i), result)
-        }
+    companion object {
+        private const val AUTH_REQUEST_CODE_BASE = 4_000
     }
 }
 
-/**
- * Parsed autofill fields extracted from AssistStructure traversal.
- */
 data class ParsedAutofillFields(
     var usernameId: AutofillId? = null,
     var passwordId: AutofillId? = null,
-    var usernameValue: String? = null,
-    var passwordValue: String? = null,
     var webDomain: String? = null,
     var packageName: String? = null
 )

@@ -66,7 +66,7 @@ export default function ItemPanelHeader({
             </Button>
           </>
         )}
-        <Button variant="ghost" size="sm" onClick={onClose} className="p-1.5">
+        <Button variant="ghost" size="sm" onClick={onClose} className="p-1.5" aria-label="Close item panel">
           ✕
         </Button>
       </div>

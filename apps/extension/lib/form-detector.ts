@@ -3,6 +3,8 @@
  * Scans DOM for login forms, identity forms, and identifies field types.
  */
 
+import { resolveRpIdForOrigin } from './webauthn.js';
+
 export interface DetectedForm {
   formElement: HTMLElement | null;
   usernameField: HTMLInputElement | null;
@@ -203,12 +205,22 @@ export function detectForms(root: Document | Element): DetectedForm[] {
 /** Check if a URL domain matches a vault item URI. */
 export function urlMatchesUri(pageUrl: string, itemUri: string): boolean {
   try {
-    const pageHost = new URL(pageUrl).hostname.replace(/^www\./, '');
-    const itemHost = new URL(itemUri).hostname.replace(/^www\./, '');
-    return pageHost === itemHost || pageHost.endsWith(`.${itemHost}`) || itemHost.endsWith(`.${pageHost}`);
+    const page = new URL(pageUrl);
+    const item = new URL(itemUri);
+    const pageHost = page.hostname.toLowerCase().replace(/^www\./, '');
+    const itemHost = item.hostname.toLowerCase().replace(/^www\./, '');
+    const isLoopback =
+      pageHost === 'localhost' || pageHost === '127.0.0.1' || pageHost === '[::1]';
+
+    if (page.protocol !== 'https:' && !(page.protocol === 'http:' && isLoopback)) return false;
+    if (pageHost === itemHost) return true;
+    if (!pageHost.endsWith(`.${itemHost}`)) return false;
+
+    // Do not treat a registry boundary (including private suffixes such as
+    // github.io) as a credential-sharing parent domain.
+    return resolveRpIdForOrigin(page.origin, itemHost) === itemHost;
   } catch {
-    // If URI is not a valid URL, do a simple string match
-    return pageUrl.includes(itemUri) || itemUri.includes(new URL(pageUrl).hostname);
+    return false;
   }
 }
 

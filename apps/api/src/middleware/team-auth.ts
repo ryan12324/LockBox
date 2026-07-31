@@ -10,13 +10,24 @@ import { teamMembers } from '../db/schema.js';
 type Bindings = { DB: D1Database };
 type Variables = { userId: string; teamRole?: string };
 
-const ROLE_HIERARCHY: Record<string, number> = { owner: 4, admin: 3, member: 2, custom: 1 };
+export type TeamRole = 'owner' | 'admin' | 'member' | 'custom';
+
+const ROLE_HIERARCHY = new Map<TeamRole, number>([
+  ['owner', 4],
+  ['admin', 3],
+  ['member', 2],
+  ['custom', 1],
+]);
+
+export function isTeamRole(value: unknown): value is TeamRole {
+  return typeof value === 'string' && ROLE_HIERARCHY.has(value as TeamRole);
+}
 
 /**
  * Middleware factory that requires the authenticated user to be a member of the team
  * specified by `:id` param, with at least the given minimum role.
  */
-export function requireTeamRole(minRole: keyof typeof ROLE_HIERARCHY) {
+export function requireTeamRole(minRole: TeamRole) {
   return createMiddleware<{ Bindings: Bindings; Variables: Variables }>(async (c, next) => {
     const userId = c.get('userId');
     const teamId = c.req.param('id');
@@ -31,8 +42,8 @@ export function requireTeamRole(minRole: keyof typeof ROLE_HIERARCHY) {
 
     if (!member) return c.json({ error: 'Not a team member' }, 403);
 
-    const userLevel = ROLE_HIERARCHY[member.role] ?? 0;
-    const requiredLevel = ROLE_HIERARCHY[minRole] ?? 0;
+    const userLevel = isTeamRole(member.role) ? (ROLE_HIERARCHY.get(member.role) ?? 0) : 0;
+    const requiredLevel = ROLE_HIERARCHY.get(minRole) ?? Number.POSITIVE_INFINITY;
     if (userLevel < requiredLevel) {
       return c.json({ error: 'Insufficient permissions' }, 403);
     }

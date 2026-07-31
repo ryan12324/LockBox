@@ -95,10 +95,13 @@ export function createLockIconOverlay(field: HTMLInputElement, onClick: () => vo
       height: 100%;
     }
     button:hover { opacity: 1; }
+    button:focus-visible { opacity: 1; outline: 2px solid #8B7355; outline-offset: 2px; border-radius: 4px; }
   `;
 
   const btn = document.createElement('button');
+  btn.type = 'button';
   btn.title = 'Autofill with Lockbox';
+  btn.setAttribute('aria-label', 'Autofill with Lockbox');
   btn.textContent = '\uD83D\uDD10';
 
   shadow.appendChild(style);
@@ -151,8 +154,8 @@ export function createSuggestionDropdown(
   const rect = anchorField.getBoundingClientRect();
   host.style.cssText = `
     position: fixed;
-    left: ${rect.left + window.scrollX}px;
-    top: ${rect.bottom + window.scrollY + 2}px;
+    left: ${rect.left}px;
+    top: ${rect.bottom + 2}px;
     z-index: 2147483647;
     min-width: ${rect.width}px;
   `;
@@ -180,39 +183,48 @@ export function createSuggestionDropdown(
          letter-spacing: 0.05em;
        }
        .item {
+         width: 100%;
          padding: 8px 12px;
          cursor: pointer;
          display: flex;
          flex-direction: column;
          gap: 2px;
+         background: transparent;
+         border: 0;
          border-bottom: 1px solid #DDD6CC;
+         font: inherit;
+         text-align: left;
        }
        .item:last-child { border-bottom: none; }
        .item:hover { background: rgba(196,168,130,0.1); }
+       .item:focus-visible { outline: 2px solid #8B7355; outline-offset: -2px; }
        .item-name { font-weight: 500; color: #2C2825; }
        .item-username { color: #7A7168; font-size: 12px; }
      </style>
     <div class="dropdown">
       <div class="header">🔐 Lockbox</div>
-      ${items
-        .map(
-          (item) => `
-        <div class="item" data-id="${item.id}">
-          <span class="item-name">${escapeHtml(item.name)}</span>
-          <span class="item-username">${escapeHtml(item.username)}</span>
-        </div>
-      `
-        )
-        .join('')}
     </div>
   `;
 
-  shadow.querySelectorAll('.item').forEach((el, i) => {
-    el.addEventListener('click', () => {
-      onSelect(items[i]);
+  const dropdown = shadow.querySelector('.dropdown')!;
+  for (const item of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'item';
+
+    const name = document.createElement('span');
+    name.className = 'item-name';
+    name.textContent = item.name;
+    const username = document.createElement('span');
+    username.className = 'item-username';
+    username.textContent = item.username;
+    button.append(name, username);
+    button.addEventListener('click', () => {
+      onSelect(item);
       host.remove();
     });
-  });
+    dropdown.appendChild(button);
+  }
 
   document.body.appendChild(host);
 
@@ -226,14 +238,6 @@ export function createSuggestionDropdown(
   setTimeout(() => document.addEventListener('click', closeHandler), 0);
 
   return host;
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 // ─── Identity autofill ──────────────────────────────────────────────────────────────
@@ -293,8 +297,8 @@ export function createIdentitySuggestionDropdown(
   const rect = anchorField.getBoundingClientRect();
   host.style.cssText = `
     position: fixed;
-    left: ${rect.left + window.scrollX}px;
-    top: ${rect.bottom + window.scrollY + 2}px;
+    left: ${rect.left}px;
+    top: ${rect.bottom + 2}px;
     z-index: 2147483647;
     min-width: ${rect.width}px;
   `;
@@ -322,39 +326,48 @@ export function createIdentitySuggestionDropdown(
          letter-spacing: 0.05em;
        }
        .item {
+         width: 100%;
          padding: 8px 12px;
          cursor: pointer;
          display: flex;
          flex-direction: column;
          gap: 2px;
+         background: transparent;
+         border: 0;
          border-bottom: 1px solid #DDD6CC;
+         font: inherit;
+         text-align: left;
        }
        .item:last-child { border-bottom: none; }
        .item:hover { background: rgba(196,168,130,0.1); }
+       .item:focus-visible { outline: 2px solid #8B7355; outline-offset: -2px; }
        .item-name { font-weight: 500; color: #2C2825; }
        .item-detail { color: #7A7168; font-size: 12px; }
      </style>
      <div class="dropdown">
        <div class="header">🆔 Lockbox Identity</div>
-      ${items
-        .map(
-          (item) => `
-        <div class="item" data-id="${item.id}">
-          <span class="item-name">${escapeHtml(item.name)}</span>
-          <span class="item-detail">${escapeHtml(item.detail)}</span>
-        </div>
-      `
-        )
-        .join('')}
     </div>
   `;
 
-  shadow.querySelectorAll('.item').forEach((el, i) => {
-    el.addEventListener('click', () => {
-      onSelect(items[i]);
+  const dropdown = shadow.querySelector('.dropdown')!;
+  for (const item of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'item';
+
+    const name = document.createElement('span');
+    name.className = 'item-name';
+    name.textContent = item.name;
+    const detail = document.createElement('span');
+    detail.className = 'item-detail';
+    detail.textContent = item.detail;
+    button.append(name, detail);
+    button.addEventListener('click', () => {
+      onSelect(item);
       host.remove();
     });
-  });
+    dropdown.appendChild(button);
+  }
 
   document.body.appendChild(host);
 

@@ -27,6 +27,7 @@ data class VaultItemEntity(
     val encryptedData: String,
     val type: String,
     val revisionDate: String,
+    val baseRevisionDate: String? = null,
     val syncStatus: String, // 'synced' | 'pending_create' | 'pending_update' | 'pending_delete'
     val folderId: String? = null,
     val tags: String? = null, // JSON array string
@@ -58,6 +59,7 @@ class StoragePlugin : Plugin() {
         val encryptedData = call.getString("encryptedData") ?: return call.reject("encryptedData is required")
         val type = call.getString("type") ?: return call.reject("type is required")
         val revisionDate = call.getString("revisionDate") ?: return call.reject("revisionDate is required")
+        val requestedBaseRevisionDate = call.getString("baseRevisionDate")
         val syncStatus = call.getString("syncStatus") ?: return call.reject("syncStatus is required")
         val folderId = call.getString("folderId")
         val tags = call.getArray("tags")?.toString()
@@ -66,11 +68,20 @@ class StoragePlugin : Plugin() {
         pluginScope.launch {
             try {
                 val db = VaultDatabase.getInstance(context)
+                val existing = db.vaultItemDao().getById(id)
+                val baseRevisionDate = when (syncStatus) {
+                    "synced" -> requestedBaseRevisionDate ?: revisionDate
+                    "pending_create" -> null
+                    else -> requestedBaseRevisionDate
+                        ?: existing?.baseRevisionDate
+                        ?: existing?.revisionDate
+                }
                 val entity = VaultItemEntity(
                     id = id,
                     encryptedData = encryptedData,
                     type = type,
                     revisionDate = revisionDate,
+                    baseRevisionDate = baseRevisionDate,
                     syncStatus = syncStatus,
                     folderId = folderId,
                     tags = tags,
@@ -214,9 +225,14 @@ class StoragePlugin : Plugin() {
                             encryptedData = obj.getString("encryptedData"),
                             type = obj.getString("type"),
                             revisionDate = obj.getString("revisionDate"),
+                            baseRevisionDate = if (obj.isNull("baseRevisionDate")) {
+                                obj.getString("revisionDate")
+                            } else {
+                                obj.getString("baseRevisionDate")
+                            },
                             syncStatus = obj.getString("syncStatus"),
-                            folderId = obj.optString("folderId", null),
-                            tags = obj.optString("tags", null),
+                            folderId = if (obj.isNull("folderId")) null else obj.getString("folderId"),
+                            tags = if (obj.isNull("tags")) null else obj.getString("tags"),
                             favorite = obj.optBoolean("favorite", false)
                         )
                     )
@@ -288,6 +304,7 @@ class StoragePlugin : Plugin() {
         obj.put("encryptedData", entity.encryptedData)
         obj.put("type", entity.type)
         obj.put("revisionDate", entity.revisionDate)
+        obj.put("baseRevisionDate", entity.baseRevisionDate ?: JSObject.NULL)
         obj.put("syncStatus", entity.syncStatus)
         obj.put("folderId", entity.folderId ?: JSObject.NULL)
         obj.put("favorite", entity.favorite)

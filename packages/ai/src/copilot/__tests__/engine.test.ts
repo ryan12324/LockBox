@@ -5,7 +5,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type {
   LoginItem,
-  SecurityAction,
   BreachCheckResult,
   VaultHealthSummary,
 } from '@lockbox/types';
@@ -205,6 +204,28 @@ describe('SecurityCopilot', () => {
 
       const low = actions.filter((a) => a.priority === 'low' && a.type === 'rotate');
       expect(low).toHaveLength(0);
+    });
+
+    it('respects custom age thresholds and escalates critically old passwords', async () => {
+      const vault = [
+        makeItem({
+          id: 'custom-age',
+          name: 'Custom Age',
+          password: 'xK#9pLm!vQ2w$Rz7',
+          updatedAt: daysAgo(45),
+        }),
+      ];
+
+      const posture = await copilot.evaluate(vault, {
+        ageThresholdDays: 30,
+        criticalAgeDays: 40,
+      });
+
+      const ageAction = posture.actions.find(
+        (action) => action.type === 'rotate' && action.affectedItems.includes('custom-age')
+      );
+      expect(ageAction?.priority).toBe('high');
+      expect(ageAction?.message).toContain('Rotate it as soon as possible');
     });
 
     it('generates enable-2fa actions for 2FA-capable domains without TOTP', () => {

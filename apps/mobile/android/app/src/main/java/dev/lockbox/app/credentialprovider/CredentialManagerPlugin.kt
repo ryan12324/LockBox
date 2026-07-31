@@ -217,6 +217,8 @@ class CredentialManagerPlugin : Plugin() {
                 }
 
                 call.resolve(resultObj)
+            } catch (e: androidx.credentials.exceptions.NoCredentialException) {
+                call.reject("No passkey is available for this account")
             } catch (e: Exception) {
                 call.reject("Passkey authentication failed: ${e.message}")
             }

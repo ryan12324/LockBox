@@ -41,7 +41,7 @@ export interface LoginResponse {
     salt: string; // Base64-encoded
     encryptedUserKey: string; // Base64-encoded — client decrypts with master key
   };
-    hasKeyPair?: boolean;
+  hasKeyPair?: boolean;
 }
 
 /**
@@ -69,10 +69,11 @@ export interface SyncResponse {
  * Client sends encrypted data and metadata.
  */
 export interface VaultItemCreateRequest {
+  id: string;
   type: VaultItemType;
-  encryptedData: string; // Base64-encoded AES-256-GCM ciphertext
-  iv: string; // Base64-encoded 96-bit IV
-  folderId?: string;
+  encryptedData: string; // base64(iv).base64(AES-256-GCM ciphertext)
+  revisionDate: string; // ISO 8601 and part of the ciphertext AAD
+  folderId?: string | null;
   tags?: string[];
   favorite?: boolean;
 }
@@ -82,9 +83,11 @@ export interface VaultItemCreateRequest {
  * Client sends updated encrypted data and metadata.
  */
 export interface VaultItemUpdateRequest {
-  encryptedData: string; // Base64-encoded AES-256-GCM ciphertext
-  iv: string; // Base64-encoded 96-bit IV
-  folderId?: string;
+  encryptedData: string;
+  revisionDate: string;
+  /** Revision returned by the server before this edit; stale updates conflict. */
+  expectedRevisionDate: string;
+  folderId?: string | null;
   tags?: string[];
   favorite?: boolean;
 }

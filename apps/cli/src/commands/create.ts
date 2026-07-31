@@ -6,7 +6,7 @@
 import { Command } from 'commander';
 import * as readline from 'node:readline';
 import type { VaultItemType } from '@lockbox/types';
-import { encryptString, toUtf8, toBase64 } from '@lockbox/crypto';
+import { encryptString, toUtf8 } from '@lockbox/crypto';
 import { getSession, getApiUrl } from '../lib/session.js';
 import { createApi } from '../lib/api.js';
 import { getUserKey } from './unlock.js';
@@ -130,10 +130,6 @@ export const createCommand = new Command('create')
       const aesKey = userKey.slice(0, 32);
       const encryptedData = await encryptString(JSON.stringify(itemData), aesKey, aad);
 
-      // Extract IV from encrypted data (format: base64(iv).base64(ciphertext))
-      const dotIndex = encryptedData.indexOf('.');
-      const iv = encryptedData.slice(0, dotIndex);
-
       const apiUrl = getApiUrl(parentOpts.apiUrl);
       const api = createApi(apiUrl);
       const result = await api.vault.createItem(
@@ -141,7 +137,6 @@ export const createCommand = new Command('create')
           id,
           type: opts.type,
           encryptedData,
-          iv,
           revisionDate: now,
           tags: [],
           favorite: false,
@@ -150,9 +145,9 @@ export const createCommand = new Command('create')
       );
 
       if (parentOpts.json) {
-        console.log(JSON.stringify({ success: true, id: result.id ?? id }));
+        console.log(JSON.stringify({ success: true, id: result.id }));
       } else {
-        console.log(`Created ${opts.type} item: ${result.id ?? id}`);
+        console.log(`Created ${opts.type} item: ${result.id}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create item';

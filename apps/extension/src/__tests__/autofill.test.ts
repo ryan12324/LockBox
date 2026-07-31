@@ -5,7 +5,7 @@
  * Uses jsdom environment (configured in vitest.config.ts)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { simulateFill, fillForm } from '../../lib/autofill.js';
 import type { DetectedForm } from '../../lib/form-detector.js';
 
