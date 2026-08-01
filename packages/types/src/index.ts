@@ -20,6 +20,8 @@ export type {
   RegisterRequest,
   LoginRequest,
   LoginResponse,
+  AuthenticatedLoginResponse,
+  TwoFactorRequiredLoginResponse,
   SyncRequest,
   SyncResponse,
   VaultItemCreateRequest,
@@ -134,3 +136,14 @@ export {
   LOCKBOX_PROTOCOL_VERSION,
 } from './discovery.js';
 export type { LockboxDiscoveryDocument, LockboxHealthResponse } from './discovery.js';
+
+// Login website and native-application URI helpers
+export {
+  ANDROID_APP_URI_PREFIX,
+  getAndroidAppPackageName,
+  getLoginUriHref,
+  getLoginUriValidationError,
+  isAndroidAppUri,
+  normalizeAndroidAppUri,
+  normalizeLoginUriForStorage,
+} from './login-uri.js';

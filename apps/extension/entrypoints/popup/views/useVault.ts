@@ -2,22 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import type { VaultItem, LoginItem, Folder, VaultHealthSummary } from '@lockbox/types';
 import { SecurityCopilot, LifecycleTracker } from '@lockbox/ai';
 import { getApiBaseUrl } from '../../../lib/storage.js';
-import { sendMessage } from './shared.js';
+import { refreshItemFromServer, sendMessage } from './shared.js';
 
 type SFE = { folderId: string; teamId: string; folderName: string; permissionLevel: string };
-
-function matchSharedByHostname(sharedArr: VaultItem[], hostname: string): VaultItem[] {
-  return sharedArr.filter((item) => {
-    if (item.type !== 'login') return false;
-    return ((item as LoginItem).uris || []).some((u) => {
-      try {
-        return new URL(u.startsWith('http') ? u : `https://${u}`).hostname === hostname;
-      } catch {
-        return u.includes(hostname);
-      }
-    });
-  });
-}
 
 export function useVault() {
   const [apiConfigured, setApiConfigured] = useState<boolean | null>(null);
@@ -65,22 +52,10 @@ export function useVault() {
       } catch {
         setSiteHost('Current site');
       }
-      sendMessage<{ items: VaultItem[] }>({ type: 'get-matches', url })
-        .then(async ({ items }) => {
-          try {
-            const { items: sr } = await sendMessage<{ items: Record<string, VaultItem> }>({
-              type: 'get-shared-items',
-            });
-            let h = '';
-            try {
-              h = new URL(url).hostname;
-            } catch {
-              h = '';
-            }
-            setSiteItems([...items, ...matchSharedByHostname(Object.values(sr || {}), h)]);
-          } catch {
-            setSiteItems(items);
-          }
+      sendMessage<{ items: VaultItem[]; error?: string }>({ type: 'get-matches', url })
+        .then(({ items, error }) => {
+          if (error) throw new Error(error);
+          setSiteItems(items);
         })
         .catch(console.error);
     });
@@ -89,19 +64,21 @@ export function useVault() {
   const loadVault = useCallback(() => {
     if (!unlocked) return;
     Promise.all([
-      sendMessage<{ items: Record<string, VaultItem> }>({ type: 'get-shared-items' }),
+      sendMessage<{ items: Record<string, VaultItem>; error?: string }>({ type: 'get-shared-items' }),
       sendMessage<{ sharedFolders: SFE[] }>({ type: 'get-shared-folders' }),
       sendMessage<{ hasKeyPair: boolean }>({ type: 'has-keypair' }),
     ])
       .then(([ir, fr, kr]) => {
+        if (ir.error) throw new Error(ir.error);
         setSharedItems(Object.values(ir.items || {}));
         setSharedFolders(fr.sharedFolders || []);
         setHasKeyPair(kr.hasKeyPair);
       })
       .catch((e) => console.error('Failed to load shared items:', e));
 
-    sendMessage<{ items: VaultItem[]; folders: Folder[] }>({ type: 'get-vault' })
-      .then(async ({ items, folders: f }) => {
+    sendMessage<{ items: VaultItem[]; folders: Folder[]; error?: string }>({ type: 'get-vault' })
+      .then(async ({ items, folders: f, error }) => {
+        if (error) throw new Error(error);
         setAllItems(items);
         setFolders(f ?? []);
         Promise.all(
@@ -181,6 +158,16 @@ export function useVault() {
     refreshSiteMatches();
   }
 
+  const refreshItem = useCallback(async (itemId: string): Promise<VaultItem> => {
+    const freshItem = await refreshItemFromServer(itemId);
+    const replace = (items: VaultItem[]) =>
+      items.map((item) => (item.id === freshItem.id ? freshItem : item));
+    setAllItems(replace);
+    setSiteItems(replace);
+    setSharedItems(replace);
+    return freshItem;
+  }, []);
+
   return {
     apiConfigured,
     setApiConfigured,
@@ -204,5 +191,6 @@ export function useVault() {
     loadVault,
     handleLock,
     handleSaveOrDelete,
+    refreshItem,
   };
 }

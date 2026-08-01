@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { hotp, totp, getRemainingSeconds } from '../totp';
 import { base32Encode, base32Decode } from '../base32';
 import { parseOtpAuthUri, buildOtpAuthUri } from '../uri';
+import { generateTotp, parseTotpSecret } from '../secret';
 
 /**
  * RFC 6238 Appendix B Test Vectors
@@ -130,7 +131,7 @@ describe('otpauth:// URI Parsing and Building', () => {
     expect(params.issuer).toBe('Example');
     expect(params.period).toBe(30);
     expect(params.digits).toBe(6);
-    expect(params.algorithm).toBe('SHA1');
+    expect(params.algorithm).toBe('SHA-1');
   });
 
   it('should parse a HOTP URI', () => {
@@ -160,7 +161,7 @@ describe('otpauth:// URI Parsing and Building', () => {
       issuer: 'Example',
       period: 30,
       digits: 6,
-      algorithm: 'SHA1',
+      algorithm: 'SHA-1' as const,
     };
     
     const uri = buildOtpAuthUri(params);
@@ -220,19 +221,26 @@ describe('getRemainingSeconds', () => {
     expect(remaining60).toBeGreaterThanOrEqual(0);
     expect(remaining60).toBeLessThanOrEqual(60);
   });
+
+  it('should calculate against an explicit time', () => {
+    expect(getRemainingSeconds(30, 59_000)).toBe(1);
+    expect(getRemainingSeconds(60, 59_000)).toBe(1);
+  });
 });
 
 describe('TOTP with different algorithms', () => {
-  const secret = asciiToBytes('12345678901234567890');
-
-  it('should support SHA-256', async () => {
-    const code = await totp(secret, 59 * 1000, { period: 30, digits: 6, algorithm: 'SHA-256' });
-    expect(code).toMatch(/^\d{6}$/);
+  it('should match the RFC SHA-256 vector', async () => {
+    const secret = asciiToBytes('12345678901234567890123456789012');
+    const code = await totp(secret, 59 * 1000, { period: 30, digits: 8, algorithm: 'SHA-256' });
+    expect(code).toBe('46119246');
   });
 
-  it('should support SHA-512', async () => {
-    const code = await totp(secret, 59 * 1000, { period: 30, digits: 6, algorithm: 'SHA-512' });
-    expect(code).toMatch(/^\d{6}$/);
+  it('should match the RFC SHA-512 vector', async () => {
+    const secret = asciiToBytes(
+      '1234567890123456789012345678901234567890123456789012345678901234',
+    );
+    const code = await totp(secret, 59 * 1000, { period: 30, digits: 8, algorithm: 'SHA-512' });
+    expect(code).toBe('90693936');
   });
 });
 
@@ -247,5 +255,56 @@ describe('TOTP with different digit counts', () => {
   it('should generate 7-digit codes', async () => {
     const code = await totp(secret, 59 * 1000, { period: 30, digits: 7, algorithm: 'SHA-1' });
     expect(code).toMatch(/^\d{7}$/);
+  });
+});
+
+describe('cross-surface TOTP secret handling', () => {
+  it('accepts grouped raw Base32 keys', () => {
+    const parsed = parseTotpSecret('JBSW Y3DP-EBLW 64TM MQ======');
+    expect(parsed.source).toBe('base32');
+    expect(parsed.period).toBe(30);
+    expect(parsed.digits).toBe(6);
+    expect(parsed.algorithm).toBe('SHA-1');
+  });
+
+  it('accepts legacy keys with non-canonical trailing padding', async () => {
+    const unpadded = await generateTotp('JBSWY3DPEHPK3PXP', 59_000);
+    const legacyPadded = await generateTotp('JBSWY3DPEHPK3PXP======', 59_000);
+    expect(legacyPadded.code).toBe(unpadded.code);
+  });
+
+  it('honors algorithm, digits, and period from otpauth URIs', async () => {
+    const secret = asciiToBytes('12345678901234567890123456789012');
+    const uri = buildOtpAuthUri({
+      type: 'totp',
+      secret,
+      account: 'user@example.com',
+      issuer: 'Example',
+      period: 60,
+      digits: 8,
+      algorithm: 'SHA-256',
+    });
+    const generated = await generateTotp(uri, 59_000);
+    expect(generated.code).toBe('18920136');
+    expect(generated.remaining).toBe(1);
+    expect(generated.period).toBe(60);
+    expect(generated.digits).toBe(8);
+    expect(generated.algorithm).toBe('SHA-256');
+  });
+
+  it('rejects HOTP URIs in TOTP fields', () => {
+    expect(() =>
+      parseTotpSecret(
+        'otpauth://hotp/Example:user?secret=JBSWY3DPEHPK3PXP&issuer=Example&counter=0',
+      ),
+    ).toThrow('HOTP keys are not supported');
+  });
+
+  it('rejects invalid URI options instead of silently defaulting', () => {
+    expect(() =>
+      parseTotpSecret(
+        'otpauth://totp/Example:user?secret=JBSWY3DPEHPK3PXP&period=0&digits=9&algorithm=MD5',
+      ),
+    ).toThrow();
   });
 });

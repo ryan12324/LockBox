@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Icon } from '@lockbox/design';
+import { Button, Icon, SiteFavicon, getEntryFaviconSources } from '@lockbox/design';
 import type { VaultItem } from '@lockbox/types';
 import { sendMessage, typeIcon } from './shared.js';
 
@@ -108,7 +108,12 @@ export function TrashView({ onBack }: { onBack: () => void }) {
             <div key={item.id} className="p-3 border-b border-[var(--color-border)]">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <Icon name={typeIcon(item.type)} size={16} className="shrink-0" />
+                  <SiteFavicon
+                    sources={getEntryFaviconSources(item)}
+                    fallbackIcon={typeIcon(item.type)}
+                    size={18}
+                    className="shrink-0"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-[var(--color-text)] truncate">
                       {item.name}

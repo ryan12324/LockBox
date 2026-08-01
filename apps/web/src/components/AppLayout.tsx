@@ -198,7 +198,8 @@ export default function AppLayout() {
       <header className="app-header">
         <div className="app-header__brand">
           <span className="app-brandmark" aria-hidden="true">
-            <img src="/brand/lockbox-app-icon.png" alt="" />
+            <img className="app-brandmark__tile" src="/brand/lockbox-app-icon.png" alt="" />
+            <img className="app-brandmark__mark" src="/brand/lockbox-mark.png" alt="" />
           </span>
           <span className="app-header__wordmark">Lockbox</span>
         </div>

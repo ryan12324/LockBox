@@ -2,6 +2,20 @@ export { themeColors, type ThemeMode } from './tokens/colors.js';
 export { radii } from './tokens/radii.js';
 export { durations } from './tokens/animations.js';
 export { Icon, type IconProps, type IconName } from './components/Icon.js';
+export {
+  SiteFavicon,
+  clearSiteIconCache,
+  getCachedSiteIconUrls,
+  getEntryFaviconSources,
+  getSiteFaviconUrl,
+  getSiteIconUrls,
+  recordSiteIconFailure,
+  recordSiteIconSuccess,
+  SITE_ICON_CACHE_MAX_ENTRIES,
+  SITE_ICON_FAILURE_TTL_MS,
+  SITE_ICON_SUCCESS_TTL_MS,
+  type SiteFaviconProps,
+} from './components/SiteFavicon.js';
 export { lockboxIcons } from './icons/generated.js';
 
 export {

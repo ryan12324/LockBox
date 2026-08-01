@@ -4,6 +4,7 @@ import { decryptVaultItem } from '../lib/crypto.js';
 import { Button } from '@lockbox/design';
 import { useToast } from '../providers/ToastProvider.js';
 import type { VaultItem } from '@lockbox/types';
+import { getApiUrl } from '../lib/server-connection.js';
 
 interface ItemHistoryPanelProps {
   itemId: string;
@@ -24,8 +25,6 @@ interface FetchedVersion {
   revisionDate: string;
   createdAt: string;
 }
-
-const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 function formatRelativeTime(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -53,7 +52,7 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
   useEffect(() => {
     if (!session) return;
 
-    fetch(`${API_BASE}/api/vault/items/${itemId}/versions`, {
+    fetch(getApiUrl(`/api/vault/items/${itemId}/versions`), {
       headers: { Authorization: `Bearer ${session.token}` },
     })
       .then((res) => res.json())
@@ -70,7 +69,7 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
     setLoadingVersion(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/versions/${versionId}`, {
+      const res = await fetch(getApiUrl(`/api/vault/items/${itemId}/versions/${versionId}`), {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       const data = await res.json();
@@ -94,7 +93,7 @@ export default function ItemHistoryPanel({ itemId, onClose, onRestore }: ItemHis
 
     try {
       const res = await fetch(
-        `${API_BASE}/api/vault/items/${itemId}/versions/${versionId}/restore`,
+        getApiUrl(`/api/vault/items/${itemId}/versions/${versionId}/restore`),
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.token}` },

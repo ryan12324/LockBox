@@ -1,21 +1,26 @@
 package dev.lockbox.app.credentialprovider
 
-import android.app.Activity
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.view.WindowManager
 import androidx.annotation.RequiresApi
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.credentials.CreatePublicKeyCredentialRequest
 import androidx.credentials.CreatePublicKeyCredentialResponse
 import androidx.credentials.provider.PendingIntentHandler
+import androidx.fragment.app.FragmentActivity
+import dev.lockbox.app.autofill.AutofillCrypto
 import dev.lockbox.app.storage.VaultDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.security.KeyPairGenerator
@@ -24,6 +29,7 @@ import java.security.SecureRandom
 import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
 import java.time.Instant
+import java.util.UUID
 
 /**
  * Creates passkeys selected through Android's credential-provider UI.
@@ -33,27 +39,25 @@ import java.time.Instant
  *
  * This activity:
  * 1. Parses the WebAuthn create request from the framework
- * 2. Generates an EC P-256 key pair in Android Keystore
+ * 2. Requires strong biometric verification and generates an exportable EC P-256 key
  * 3. Builds authenticatorData with attestedCredentialData
  * 4. Creates an attestation object (fmt="none")
  * 5. Stores passkey metadata in Room DB
  * 6. Returns the credential response to the calling app
  *
- * SECURITY: Private keys never leave Android Keystore.
- * Metadata in Room is unencrypted (rpId, userName) for service queries.
+ * SECURITY: The PKCS#8 private key is immediately hybrid-encrypted to a
+ * biometric-bound Android Keystore key. Room never receives plaintext key
+ * material, and vault export requires a fresh biometric authorization.
  */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
-class CreatePasskeyActivity : Activity() {
+class CreatePasskeyActivity : FragmentActivity() {
 
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     companion object {
-        private const val ANDROID_KEYSTORE = "AndroidKeyStore"
-        private const val KEYSTORE_PREFIX = "lockbox_passkey_"
-
-        // UP=1 | AT=64. The system picker supplies user presence, but this
-        // activity does not claim biometric verification or cloud backup.
-        private const val REGISTRATION_FLAGS: Byte = 0x41
+        // UP=1 | UV=4 | BE=8 | AT=64. The credential is backup-eligible and
+        // every registration is gated by BIOMETRIC_STRONG.
+        private const val REGISTRATION_FLAGS: Byte = 0x4D
 
         // AAGUID: 16 zero bytes (anonymous software authenticator)
         private val AAGUID = ByteArray(16)
@@ -61,6 +65,7 @@ class CreatePasskeyActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
 
         val providerRequest = PendingIntentHandler.retrieveProviderCreateCredentialRequest(intent)
         val request = providerRequest?.callingRequest as? CreatePublicKeyCredentialRequest
@@ -69,18 +74,60 @@ class CreatePasskeyActivity : Activity() {
             return
         }
 
-        activityScope.launch {
-            try {
-                handleCreateRequest(request, providerRequest.callingAppInfo)
-            } catch (e: Exception) {
-                finishWithError("Create passkey failed: ${e.message}")
-            }
+        val accountId = PasskeyAccountState.get(applicationContext)
+        if (accountId == null) {
+            finishWithError("Unlock Lockbox before saving a passkey")
+            return
         }
+
+        authenticateAndCreate(request, providerRequest.callingAppInfo, accountId)
+    }
+
+    override fun onDestroy() {
+        activityScope.cancel()
+        super.onDestroy()
+    }
+
+    private fun authenticateAndCreate(
+        request: CreatePublicKeyCredentialRequest,
+        callingAppInfo: androidx.credentials.provider.CallingAppInfo,
+        accountId: String
+    ) {
+        val prompt = BiometricPrompt(
+            this,
+            ContextCompat.getMainExecutor(this),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    activityScope.launch {
+                        try {
+                            handleCreateRequest(request, callingAppInfo, accountId)
+                        } catch (error: Exception) {
+                            withContext(Dispatchers.Main) {
+                                finishWithError("Create passkey failed: ${error.message}")
+                            }
+                        }
+                    }
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    setResult(RESULT_CANCELED)
+                    finish()
+                }
+            }
+        )
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Save passkey to Lockbox")
+            .setSubtitle("Verify that it's you")
+            .setNegativeButtonText("Cancel")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .build()
+        prompt.authenticate(promptInfo)
     }
 
     private suspend fun handleCreateRequest(
         request: CreatePublicKeyCredentialRequest,
-        callingAppInfo: androidx.credentials.provider.CallingAppInfo
+        callingAppInfo: androidx.credentials.provider.CallingAppInfo,
+        accountId: String
     ) {
         val json = JSONObject(request.requestJson)
         val rpJson = json.getJSONObject("rp")
@@ -105,55 +152,62 @@ class CreatePasskeyActivity : Activity() {
         }
         require(supportedAlgorithm) { "No supported public-key algorithm" }
 
-        val userVerification = json.optJSONObject("authenticatorSelection")
-            ?.optString("userVerification", "preferred")
-            ?: "preferred"
-        require(userVerification != "required") {
-            "This provider cannot satisfy required user verification"
-        }
-
         val db = VaultDatabase.getInstance(applicationContext)
         val excludedCredentials = json.optJSONArray("excludeCredentials")
         if (excludedCredentials != null && excludedCredentials.length() > 0) {
             val excludedIds = (0 until excludedCredentials.length()).mapNotNull { index ->
                 excludedCredentials.optJSONObject(index)?.optString("id")?.takeIf { it.isNotBlank() }
             }.toSet()
-            require(db.passkeyMetadataDao().getByRpId(rpId).none { it.credentialId in excludedIds }) {
+            require(
+                db.passkeyMetadataDao()
+                    .getByRpIdAndAccount(rpId, accountId)
+                    .none { it.credentialId in excludedIds }
+            ) {
                 "A matching excluded credential already exists"
             }
         }
+
+        val verifiedCaller = verifyPasskeyCaller(applicationContext, rpId, callingAppInfo)
 
         // Generate a random credential ID (32 bytes)
         val credentialIdBytes = ByteArray(32)
         SecureRandom().nextBytes(credentialIdBytes)
         val credentialId = base64urlEncode(credentialIdBytes)
 
-        // Generate EC P-256 key pair in Android Keystore
-        val keystoreAlias = "$KEYSTORE_PREFIX$credentialId"
-        generateKeystoreKeyPair(keystoreAlias)
-
-        // Get public key coordinates
-        val keyStore = java.security.KeyStore.getInstance(ANDROID_KEYSTORE)
-        keyStore.load(null)
-        val publicKey = keyStore.getCertificate(keystoreAlias).publicKey as ECPublicKey
+        // Generate an exportable EC key only in memory. It is encrypted before
+        // persistence so the same credential can later sync to other devices.
+        val keyPair = KeyPairGenerator.getInstance("EC").apply {
+            initialize(ECGenParameterSpec("secp256r1"), SecureRandom())
+        }.generateKeyPair()
+        val publicKey = keyPair.public as ECPublicKey
         val ecPoint = publicKey.w
         val x = toUnsigned32Bytes(ecPoint.affineX)
         val y = toUnsigned32Bytes(ecPoint.affineY)
 
-        val origin = request.origin?.takeIf { it.isNotBlank() }
-            ?: getCallingAppOrigin(callingAppInfo)
-
-        // Build clientDataJSON bound to the verified calling application.
-        val clientDataJson = JSONObject().apply {
-            put("type", "webauthn.create")
-            put("challenge", challengeB64)
-            put("origin", origin)
-            put("androidPackageName", callingAppInfo.packageName)
-        }.toString()
-        val clientDataBytes = clientDataJson.toByteArray(Charsets.UTF_8)
+        // Privileged browsers supply the client-data hash after Lockbox verifies
+        // their delegated origin. Credential Manager carries the original client
+        // data back to the browser, so providers omit a conflicting reconstruction.
+        val clientDataBytes = if (verifiedCaller.privilegedBrowserCall) {
+            require(request.clientDataHash != null) { "Browser request did not provide client data" }
+            null
+        } else {
+            JSONObject().apply {
+                put("type", "webauthn.create")
+                put("challenge", challengeB64)
+                put("origin", verifiedCaller.origin)
+                put("androidPackageName", callingAppInfo.packageName)
+            }.toString().toByteArray(Charsets.UTF_8)
+        }
 
         // Build COSE public key (77 bytes)
         val coseKey = buildCoseKey(x, y)
+        val protectedPrivateKey = AutofillCrypto.encrypt(
+            AutofillCrypto.ensureKeyPair().public,
+            JSONObject()
+                .put("privateKey", base64urlEncode(keyPair.private.encoded))
+                .toString()
+        )
+        val vaultItemId = UUID.randomUUID().toString()
 
         // Build authenticator data with attested credential data
         val rpIdHash = MessageDigest.getInstance("SHA-256").digest(rpId.toByteArray(Charsets.UTF_8))
@@ -171,8 +225,13 @@ class CreatePasskeyActivity : Activity() {
                 userName = userName,
                 userDisplayName = userDisplayName,
                 userId = userId,
-                keystoreAlias = keystoreAlias,
-                createdAt = Instant.now().toString()
+                keystoreAlias = "",
+                createdAt = Instant.now().toString(),
+                encryptedPrivateKey = protectedPrivateKey,
+                publicKey = base64urlEncode(coseKey),
+                vaultItemId = vaultItemId,
+                accountId = accountId,
+                source = PasskeyMetadataEntity.SOURCE_PENDING
             )
         )
 
@@ -182,7 +241,9 @@ class CreatePasskeyActivity : Activity() {
             put("rawId", credentialId)
             put("type", "public-key")
             put("response", JSONObject().apply {
-                put("clientDataJSON", base64urlEncode(clientDataBytes))
+                if (clientDataBytes != null) {
+                    put("clientDataJSON", base64urlEncode(clientDataBytes))
+                }
                 put("attestationObject", base64urlEncode(attestationObject))
             })
         }
@@ -192,29 +253,6 @@ class CreatePasskeyActivity : Activity() {
         PendingIntentHandler.setCreateCredentialResponse(resultIntent, response)
         setResult(RESULT_OK, resultIntent)
         finish()
-    }
-
-    /**
-     * Generate an EC P-256 key pair in Android Keystore. The system credential
-     * picker establishes user presence; this implementation does not claim UV.
-     */
-    private fun generateKeystoreKeyPair(alias: String) {
-        val keyPairGenerator = KeyPairGenerator.getInstance(
-            KeyProperties.KEY_ALGORITHM_EC,
-            ANDROID_KEYSTORE
-        )
-
-        val spec = KeyGenParameterSpec.Builder(
-            alias,
-            KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-        )
-            .setAlgorithmParameterSpec(ECGenParameterSpec("secp256r1"))
-            .setDigests(KeyProperties.DIGEST_SHA256)
-            .setUserAuthenticationRequired(false)
-            .build()
-
-        keyPairGenerator.initialize(spec)
-        keyPairGenerator.generateKeyPair()
     }
 
     /**
@@ -250,7 +288,7 @@ class CreatePasskeyActivity : Activity() {
             32 + 1 + 4 + 16 + 2 + credentialId.size + coseKey.size
         )
         buffer.put(rpIdHash)                        // rpIdHash (32)
-        buffer.put(REGISTRATION_FLAGS)               // flags (0x5D)
+        buffer.put(REGISTRATION_FLAGS)               // flags (UP | UV | BE | AT)
         buffer.putInt(0)                             // counter (0, initial)
         buffer.put(AAGUID)                           // aaguid (16 zeros)
         buffer.putShort(credentialId.size.toShort()) // credIdLen (2)

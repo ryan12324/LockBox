@@ -39,6 +39,13 @@ export interface AutofillPasskeysResult {
   passkeys: AutofillPasskeyEntry[];
 }
 
+/** Decrypted passkey material accepted only during an unlocked vault refresh. */
+export interface AutofillPasskeyIndexEntry extends AutofillPasskeyEntry {
+  userId: string;
+  privateKey: string;
+  createdAt: string;
+}
+
 /**
  * AutofillPlugin interface — defines the contract between TypeScript and native Kotlin.
  *
@@ -58,6 +65,11 @@ export interface AutofillPlugin {
   /** Rebuild the native index. Native code encrypts every credential immediately. */
   replaceCredentialIndex(options: {
     credentials: AutofillIndexCredential[];
+  }): Promise<AutofillIndexResult>;
+
+  /** Rebuild the biometric-gated passkey index from encrypted vault items. */
+  replacePasskeyIndex(options: {
+    passkeys: AutofillPasskeyIndexEntry[];
   }): Promise<AutofillIndexResult>;
 
   /** Remove every indexed credential, used when logging out. */

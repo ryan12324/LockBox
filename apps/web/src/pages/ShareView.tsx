@@ -2,8 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { redeemShareLink, getShareAuthToken } from '../lib/team-crypto.js';
-import { Button, Input, Card, Badge, Textarea, Icon, type IconName } from '@lockbox/design';
+import {
+  Button,
+  Input,
+  Card,
+  Badge,
+  Textarea,
+  Icon,
+  SiteFavicon,
+  getEntryFaviconSources,
+  type IconName,
+} from '@lockbox/design';
 import type { VaultItem, LoginItem, SecureNoteItem, CardItem } from '@lockbox/types';
+import { generateTotp } from '@lockbox/totp';
 
 export default function ShareView() {
   const { shareId } = useParams<{ shareId: string }>();
@@ -14,6 +25,9 @@ export default function ShareView() {
   const [maxViews, setMaxViews] = useState<number>(0);
 
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+  const [totpRemaining, setTotpRemaining] = useState(0);
+  const [totpError, setTotpError] = useState('');
 
   useEffect(() => {
     async function fetchSharedItem() {
@@ -50,6 +64,35 @@ export default function ShareView() {
 
     fetchSharedItem();
   }, [shareId]);
+
+  useEffect(() => {
+    const secret = item?.type === 'login' ? (item as LoginItem).totp : undefined;
+    if (!secret) {
+      setTotpCode('');
+      setTotpRemaining(0);
+      setTotpError('');
+      return;
+    }
+
+    const refresh = async () => {
+      try {
+        const generated = await generateTotp(secret);
+        setTotpCode(generated.code);
+        setTotpRemaining(generated.remaining);
+        setTotpError('');
+      } catch (generationError) {
+        setTotpCode('');
+        setTotpRemaining(0);
+        setTotpError(
+          generationError instanceof Error ? generationError.message : 'Invalid authenticator key',
+        );
+      }
+    };
+
+    void refresh();
+    const interval = window.setInterval(refresh, 1000);
+    return () => window.clearInterval(interval);
+  }, [item]);
 
   function safeExternalUrl(value: string): string | null {
     try {
@@ -122,13 +165,20 @@ export default function ShareView() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Input
               type="text"
-              label="TOTP Secret"
+              label="Authenticator code"
               readOnly
-              value={loginItem.totp}
+              value={totpError || totpCode || '------'}
               className="flex-1"
               style={{ fontFamily: 'var(--font-mono)' }}
             />
-            {renderCopyButton(loginItem.totp, 'totp', 'Copy TOTP')}
+            {!totpError && totpCode && (
+              <>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}>
+                  {totpRemaining}s
+                </span>
+                {renderCopyButton(totpCode, 'totp', 'Copy authenticator code')}
+              </>
+            )}
           </div>
         )}
         {loginItem.uris && loginItem.uris.length > 0 && loginItem.uris[0] && (
@@ -372,7 +422,12 @@ export default function ShareView() {
                       flex: '0 0 auto',
                     }}
                   >
-                    <Icon name={typeIcons[item.type] ?? 'file'} size={20} />
+                    <SiteFavicon
+                      sources={getEntryFaviconSources(item)}
+                      fallbackIcon={typeIcons[item.type] ?? 'file'}
+                      size={22}
+                      fill
+                    />
                   </span>
                   <div style={{ minWidth: 0 }}>
                   <h1

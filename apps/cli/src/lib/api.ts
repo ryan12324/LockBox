@@ -6,6 +6,7 @@
 import type {
   KdfConfig,
   LoginResponse,
+  AuthenticatedLoginResponse,
   SyncResponse,
   EncryptedVaultItem,
   Folder,
@@ -50,6 +51,11 @@ export function createApi(apiUrl: string) {
         request<LoginResponse>(apiUrl, '/api/auth/login', {
           method: 'POST',
           body: JSON.stringify(body),
+        }),
+      validateTwoFactor: (tempToken: string, code: string) =>
+        request<AuthenticatedLoginResponse>(apiUrl, '/api/auth/2fa/validate', {
+          method: 'POST',
+          body: JSON.stringify({ tempToken, code }),
         }),
       kdfParams: (email: string) =>
         request<{ kdfConfig: KdfConfig; salt: string }>(

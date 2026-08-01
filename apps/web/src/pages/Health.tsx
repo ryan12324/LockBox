@@ -4,7 +4,15 @@ import { useAuthStore } from '../store/auth.js';
 import { useHealthStore } from '../store/health.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
-import { Card, Badge, Button, Icon, type IconName } from '@lockbox/design';
+import {
+  Card,
+  Badge,
+  Button,
+  Icon,
+  SiteFavicon,
+  getEntryFaviconSources,
+  type IconName,
+} from '@lockbox/design';
 import IssueList from '../components/IssueList.js';
 import type { VaultItem } from '@lockbox/types';
 import { analyzeVaultHealth, analyzeItem, SecurityCopilot, LifecycleTracker } from '@lockbox/ai';
@@ -562,7 +570,12 @@ export default function Health() {
                         }}
                       >
                         <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <div className="flex items-center" style={{ gap: 12 }}>
+                          <div className="flex items-center" style={{ gap: 10 }}>
+                            <SiteFavicon
+                              sources={getEntryFaviconSources(item)}
+                              fallbackIcon="key"
+                              size={20}
+                            />
                             <span
                               style={{
                                 color: 'var(--color-text)',
@@ -640,6 +653,12 @@ export default function Health() {
                           className="flex items-center justify-between"
                           style={{ marginBottom: 8 }}
                         >
+                          <div className="flex items-center" style={{ gap: 8, minWidth: 0 }}>
+                            <SiteFavicon
+                              sources={getEntryFaviconSources(item)}
+                              fallbackIcon="key"
+                              size={20}
+                            />
                           <h3
                             style={{
                               fontWeight: 600,
@@ -653,6 +672,7 @@ export default function Health() {
                           >
                             {item.name}
                           </h3>
+                          </div>
                           <div className="flex" style={{ gap: 4 }}>
                             {info.tfa.map((method) => (
                               <Badge key={method} variant="default">

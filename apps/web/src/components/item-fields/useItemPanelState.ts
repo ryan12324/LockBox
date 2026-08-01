@@ -6,6 +6,11 @@ import { decryptDocument, encryptDocument } from '../../lib/document-crypto.js';
 import { copyWithFeedback } from '../../lib/copy-utils.js';
 import { decryptString, toUtf8 } from '@lockbox/crypto';
 import { useToast } from '../../providers/ToastProvider.js';
+import {
+  getLoginUriValidationError,
+  isAndroidAppUri,
+  normalizeLoginUriForStorage,
+} from '@lockbox/types';
 import type {
   VaultItem,
   LoginItem,
@@ -18,7 +23,7 @@ import type {
   Folder,
   VaultItemType,
 } from '@lockbox/types';
-import { totp, getRemainingSeconds, base32Decode, parseOtpAuthUri } from '@lockbox/totp';
+import { generateTotp, parseTotpSecret } from '@lockbox/totp';
 import { generatePassword } from '@lockbox/generator';
 import { SecurityAlertEngine, suggestTags } from '@lockbox/ai';
 import type { SecurityAlert } from '@lockbox/ai';
@@ -40,6 +45,7 @@ interface UseItemPanelStateArgs {
   items: VaultItem[];
   onSave: () => void;
   onDelete: () => void;
+  refreshItem: (itemId: string) => Promise<VaultItem>;
 }
 
 export function useItemPanelState({
@@ -49,6 +55,7 @@ export function useItemPanelState({
   items,
   onSave,
   onDelete,
+  refreshItem,
 }: UseItemPanelStateArgs) {
   const { session, userKey } = useAuthStore();
   const { toast } = useToast();
@@ -208,17 +215,9 @@ export function useItemPanelState({
     let intervalId: ReturnType<typeof setInterval>;
     const go = async () => {
       try {
-        let s: Uint8Array,
-          period = 30;
-        if (totpSecret.startsWith('otpauth://')) {
-          const p = parseOtpAuthUri(totpSecret);
-          s = p.secret;
-          period = p.period || 30;
-        } else {
-          s = base32Decode(totpSecret);
-        }
-        setTotpCode(await totp(s, Date.now(), { period }));
-        setTotpRemaining(getRemainingSeconds(period));
+        const generated = await generateTotp(totpSecret);
+        setTotpCode(generated.code);
+        setTotpRemaining(generated.remaining);
       } catch {
         setTotpCode('Invalid secret');
         setTotpRemaining(0);
@@ -259,7 +258,13 @@ export function useItemPanelState({
   }, [session, type]);
 
   useEffect(() => {
-    if (currentMode === 'view' && type === 'login' && uris.length > 0 && uris[0]) {
+    if (
+      currentMode === 'view' &&
+      type === 'login' &&
+      uris.length > 0 &&
+      uris[0] &&
+      !isAndroidAppUri(uris[0])
+    ) {
       try {
         const e = new SecurityAlertEngine();
         setAlerts(
@@ -275,9 +280,20 @@ export function useItemPanelState({
 
   async function copyToClipboard(text: string, field: string, element?: HTMLElement | null) {
     if (!text) return;
-    await copyWithFeedback(text, element);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
+    try {
+      if (currentMode === 'view' && item) {
+        const freshItem = await refreshItem(item.id);
+        if (JSON.stringify(freshItem) !== JSON.stringify(item)) {
+          toast('This item changed on the server. Review the refreshed value, then copy again.', 'warning');
+          return;
+        }
+      }
+      await copyWithFeedback(text, element);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 2000);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Could not refresh this item.', 'error');
+    }
   }
 
   const handleGenerateAlias = async () => {
@@ -383,8 +399,10 @@ export function useItemPanelState({
           type: 'login',
           username,
           password,
-          uris: uris.filter((u) => u.trim()),
-          totp: totpSecret || undefined,
+          uris: uris
+            .filter((u) => u.trim())
+            .map(normalizeLoginUriForStorage),
+          totp: totpSecret.trim() || undefined,
         } as LoginItem;
       case 'note':
         return { ...b, type: 'note', content } as SecureNoteItem;
@@ -448,8 +466,21 @@ export function useItemPanelState({
   const handleSave = async () => {
     if (!session || !userKey) return toast('Session expired — please log in again', 'error');
     if (!name.trim()) return toast('Name is required', 'error');
-    if (type === 'login' && !username.trim() && !password.trim())
-      return toast('Username or password is required', 'error');
+    if (type === 'login' && !username.trim() && !password.trim() && !totpSecret.trim())
+      return toast('Username, password, or authenticator key is required', 'error');
+    if (type === 'login') {
+      const uriError = uris
+        .map(getLoginUriValidationError)
+        .find((message): message is string => Boolean(message));
+      if (uriError) return toast(uriError, 'error');
+    }
+    if (type === 'login' && totpSecret.trim()) {
+      try {
+        parseTotpSecret(totpSecret);
+      } catch (error) {
+        return toast(error instanceof Error ? error.message : 'Invalid authenticator key', 'error');
+      }
+    }
     if (type === 'card' && !number.trim()) return toast('Card number is required', 'error');
     if (type === 'card' && (!expMonth || !expYear.trim()))
       return toast('Expiration date is required', 'error');

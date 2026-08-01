@@ -19,6 +19,7 @@
     "@capacitor/android": "^6.2.0",
     "@capacitor/cli": "^6.2.0",
     "@capacitor/network": "^6.0.0",
+    "@lockbox/importers": "*",
     "@lockbox/types": "*"
   },
   "devDependencies": {

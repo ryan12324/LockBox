@@ -259,7 +259,9 @@ async function handleDetectedCredentials(creds: ExtractedCredentials): Promise<v
       url: creds.url,
       username: creds.username,
       password: creds.password,
-    })) as { result: CredentialCheckResult; itemId?: string };
+    })) as { result?: CredentialCheckResult; itemId?: string; error?: string };
+
+    if (response.error || !response.result) return;
 
     if (response.result === 'match') return; // Already saved, nothing to do
 

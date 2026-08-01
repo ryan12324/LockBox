@@ -20,7 +20,7 @@ import {
   toBase64,
   fromBase64,
 } from '@lockbox/crypto';
-import { totp as generateTOTP, parseOtpAuthUri } from '@lockbox/totp';
+import { generateTotp } from '@lockbox/totp';
 import { checkBatch } from '@lockbox/crypto';
 import { analyzeVaultHealth, analyzeItem } from '@lockbox/ai';
 import { generatePassword, generatePassphrase } from '@lockbox/generator';
@@ -35,6 +35,8 @@ import type { VaultItem, LoginItem, PasskeyItem, KdfConfig, Folder } from '@lock
 import { api } from '../lib/api.js';
 import type { AuthenticatedLoginResponse } from '../lib/api.js';
 import { checkSite as checkTwoFaSite } from '../lib/twofa-directory.js';
+import { getTotpErrorMessage } from '../lib/totp-errors.js';
+import { createItemRefreshCoordinator } from '../lib/item-refresh.js';
 import {
   base64urlEncode,
   base64urlDecode,
@@ -371,6 +373,92 @@ async function loadTeamData(token: string): Promise<void> {
   }
 }
 
+async function decryptSharedFolderSnapshot(folderId: string, token: string): Promise<VaultItem[]> {
+  const folderKey = sharedFolderKeys.get(folderId);
+  if (!folderKey) throw new Error('The shared-folder key is not available.');
+
+  const response = await api.sharing.listSharedFolderItems(folderId, token);
+  const nextItems: VaultItem[] = [];
+  for (const encryptedItem of response.items) {
+    if (encryptedItem.deletedAt) continue;
+    const aad = toUtf8(`${encryptedItem.id}:${encryptedItem.revisionDate}`);
+    let decryptedItem: VaultItem;
+    try {
+      const plaintext = await decryptString(encryptedItem.encryptedData, folderKey, aad);
+      decryptedItem = JSON.parse(plaintext) as VaultItem;
+    } catch {
+      throw new Error('A shared vault item could not be decrypted. Nothing stale was used.');
+    }
+    if (
+      decryptedItem.id !== encryptedItem.id ||
+      decryptedItem.type !== encryptedItem.type ||
+      decryptedItem.revisionDate !== encryptedItem.revisionDate
+    ) {
+      throw new Error('A shared vault item did not match its server metadata.');
+    }
+    nextItems.push(decryptedItem);
+  }
+  return nextItems;
+}
+
+async function refreshLoadedSharedFolders(token: string): Promise<void> {
+  const nextItems = new Map<string, VaultItem[]>();
+  for (const folderId of sharedFolderKeys.keys()) {
+    nextItems.set(folderId, await decryptSharedFolderSnapshot(folderId, token));
+  }
+  sharedItems = nextItems;
+}
+
+const refreshVaultItem = createItemRefreshCoordinator<VaultItem>({
+  isPersonalItem: (itemId) => vaultItems.has(itemId),
+  refreshPersonalItem: async (itemId) => {
+    if (!userKey) throw new Error('Vault is locked');
+    const token = await getSessionToken();
+    if (!token) throw new Error('Not authenticated');
+
+    const { item: encryptedItem } = await api.vault.getItem(itemId, token);
+    if (encryptedItem.deletedAt) {
+      vaultItems.delete(itemId);
+      searchEngine = null;
+      throw new Error('This vault item was deleted on the server.');
+    }
+
+    const decryptedItem = await decryptVaultItem(
+      encryptedItem.encryptedData,
+      encryptedItem.id,
+      encryptedItem.revisionDate
+    );
+    if (!decryptedItem) throw new Error('The latest vault item could not be decrypted.');
+    if (
+      decryptedItem.id !== encryptedItem.id ||
+      decryptedItem.type !== encryptedItem.type ||
+      decryptedItem.revisionDate !== encryptedItem.revisionDate
+    ) {
+      throw new Error('The latest vault item did not match its server metadata.');
+    }
+    return decryptedItem;
+  },
+  commitPersonalItem: (item) => {
+    vaultItems.set(item.id, item);
+    searchEngine = null;
+  },
+  findSharedFolderId: (itemId) => {
+    for (const [folderId, items] of sharedItems) {
+      if (items.some((item) => item.id === itemId)) return folderId;
+    }
+    return null;
+  },
+  refreshSharedFolder: async (folderId) => {
+    if (!userKey) throw new Error('Vault is locked');
+    const token = await getSessionToken();
+    if (!token) throw new Error('Not authenticated');
+    return decryptSharedFolderSnapshot(folderId, token);
+  },
+  commitSharedFolder: (folderId, items) => {
+    sharedItems.set(folderId, items);
+  },
+});
+
 // ─── Message handlers ─────────────────────────────────────────────────────────
 
 type Message =
@@ -381,6 +469,8 @@ type Message =
   | { type: 'get-matches'; url: string }
   | { type: 'get-vault' }
   | { type: 'get-totp'; secret: string }
+  | { type: 'get-item-totp'; itemId: string }
+  | { type: 'refresh-item'; itemId: string }
   | { type: 'generate-password'; opts: Parameters<typeof generatePassword>[0] }
   | { type: 'generate-passphrase'; opts: Parameters<typeof generatePassphrase>[0] }
   | { type: 'activity' }
@@ -458,10 +548,24 @@ async function signPasskeyAssertion(
       break;
     }
   }
-  if (!matchedItem?.privateKey) return { fallback: true };
+  if (!matchedItem) return { fallback: true };
+
+  // Passkeys are secrets too: refresh the exact item and reject a deleted,
+  // changed, or undecryptable credential instead of signing with cached data.
+  const freshItem = await refreshVaultItem(matchedItem.id);
+  if (freshItem.type !== 'passkey') return { fallback: true };
+  const freshPasskey = freshItem as PasskeyItem & { privateKey?: string };
+  if (
+    freshPasskey.credentialId !== credentialId ||
+    freshPasskey.rpId !== rpId ||
+    !freshPasskey.privateKey
+  ) {
+    return { fallback: true };
+  }
+  matchedItem = freshPasskey;
 
   // Import private key and sign
-  const privKeyBytes = base64urlDecode(matchedItem.privateKey);
+  const privKeyBytes = base64urlDecode(freshPasskey.privateKey);
   const privKey = await importPrivateKey(privKeyBytes);
   const newCounter = matchedItem.counter + 1;
 
@@ -597,22 +701,72 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
 
     case 'get-matches': {
       if (!userKey) return { items: [] };
-      const matches = getMatchingItems(message.url);
-      return { items: matches };
+      try {
+        const token = await getSessionToken();
+        if (!token) return { items: [], error: 'Not authenticated' };
+        await Promise.all([loadVault(token), refreshLoadedSharedFolders(token)]);
+        return { items: getMatchingItems(message.url) };
+      } catch (error) {
+        return {
+          items: [],
+          error: error instanceof Error ? error.message : 'Could not refresh matching items.',
+        };
+      }
     }
 
     case 'get-vault': {
       if (!userKey) return { items: [], locked: true };
-      return { items: Array.from(vaultItems.values()), folders, locked: false };
+      try {
+        const token = await getSessionToken();
+        if (!token) return { items: [], folders: [], locked: false, error: 'Not authenticated' };
+        await loadVault(token);
+        return { items: Array.from(vaultItems.values()), folders, locked: false };
+      } catch (error) {
+        return {
+          items: [],
+          folders: [],
+          locked: false,
+          error: error instanceof Error ? error.message : 'Could not refresh the vault.',
+        };
+      }
     }
 
     case 'get-totp': {
       try {
-        const { secret } = parseOtpAuthUri(message.secret);
-        const code = await generateTOTP(secret);
-        return { code };
-      } catch {
-        return { code: null, error: 'Invalid TOTP secret' };
+        return await generateTotp(message.secret);
+      } catch (error) {
+        return {
+          code: null,
+          remaining: 0,
+          error: getTotpErrorMessage(error),
+        };
+      }
+    }
+
+    case 'get-item-totp': {
+      try {
+        const item = await refreshVaultItem(message.itemId);
+        if (item.type !== 'login' || !(item as LoginItem).totp) {
+          return { code: null, remaining: 0, error: 'This item has no authenticator key.' };
+        }
+        return await generateTotp((item as LoginItem).totp!);
+      } catch (error) {
+        return {
+          code: null,
+          remaining: 0,
+          error: error instanceof Error ? error.message : 'Could not refresh this item.',
+        };
+      }
+    }
+
+    case 'refresh-item': {
+      try {
+        return { success: true, item: await refreshVaultItem(message.itemId) };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Could not refresh this item.',
+        };
       }
     }
 
@@ -808,6 +962,7 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
+        await loadVault(token);
         for (const item of vaultItems.values()) {
           if (item.folderId !== message.id) continue;
           const now = new Date().toISOString();
@@ -847,6 +1002,9 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
     case 'run-health-analysis': {
       if (!userKey) return { success: false, error: 'Vault is locked' };
       try {
+        const token = await getSessionToken();
+        if (!token) return { success: false, error: 'Not authenticated' };
+        await loadVault(token);
         const items = Array.from(vaultItems.values());
         const logins = items.filter(
           (i) => i.type === 'login'
@@ -864,6 +1022,9 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
 
     case 'run-breach-check': {
       try {
+        const token = await getSessionToken();
+        if (!token) return { success: false, error: 'Not authenticated' };
+        await loadVault(token);
         const result = await runBreachCheck();
         return { success: true, ...result };
       } catch (err) {
@@ -927,11 +1088,21 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
     }
 
     case 'get-shared-items': {
-      const allItems: VaultItem[] = [];
-      for (const items of sharedItems.values()) {
-        allItems.push(...items);
+      try {
+        const token = await getSessionToken();
+        if (!token) return { items: [], error: 'Not authenticated' };
+        await refreshLoadedSharedFolders(token);
+        const allItems: VaultItem[] = [];
+        for (const items of sharedItems.values()) {
+          allItems.push(...items);
+        }
+        return { items: allItems };
+      } catch (error) {
+        return {
+          items: [],
+          error: error instanceof Error ? error.message : 'Could not refresh shared items.',
+        };
       }
-      return { items: allItems };
     }
 
     case 'get-shared-folders': {
@@ -949,40 +1120,34 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
       const { url, username, password } = message;
       try {
         new URL(url);
-        for (const item of vaultItems.values()) {
-          if (item.type !== 'login') continue;
-          const login = item as LoginItem;
-          for (const uri of login.uris ?? []) {
-            if (urlMatchesUri(url, uri)) {
-              if (login.username === username && login.password === password) {
-                return { result: 'match' as const };
-              }
-              if (login.username === username && login.password !== password) {
-                return { result: 'update' as const, itemId: login.id };
-              }
-            }
-          }
-        }
-        // Also check shared items
+        const candidates: VaultItem[] = [...vaultItems.values()];
         for (const folderItems of sharedItems.values()) {
-          for (const item of folderItems) {
-            if (item.type !== 'login') continue;
-            const login = item as LoginItem;
-            for (const uri of login.uris ?? []) {
-              if (urlMatchesUri(url, uri)) {
-                if (login.username === username && login.password === password) {
-                  return { result: 'match' as const };
-                }
-                if (login.username === username && login.password !== password) {
-                  return { result: 'update' as const, itemId: login.id };
-                }
-              }
-            }
+          candidates.push(...folderItems);
+        }
+
+        for (const candidate of candidates) {
+          if (
+            candidate.type !== 'login' ||
+            !(candidate as LoginItem).uris?.some((uri) => urlMatchesUri(url, uri))
+          ) {
+            continue;
+          }
+          const refreshed = await refreshVaultItem(candidate.id);
+          if (refreshed.type !== 'login') continue;
+          const login = refreshed as LoginItem;
+          if (!(login.uris ?? []).some((uri) => urlMatchesUri(url, uri))) continue;
+          if (login.username === username && login.password === password) {
+            return { result: 'match' as const };
+          }
+          if (login.username === username && login.password !== password) {
+            return { result: 'update' as const, itemId: login.id };
           }
         }
         return { result: 'new' as const };
-      } catch {
-        return { result: 'new' as const };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : 'Could not refresh saved credentials.',
+        };
       }
     }
 
@@ -1040,7 +1205,7 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
       try {
-        const existing = vaultItems.get(message.itemId);
+        const existing = await refreshVaultItem(message.itemId);
         if (!existing || existing.type !== 'login') {
           return { success: false, error: 'Item not found' };
         }
@@ -1407,6 +1572,10 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
         ) {
           return { fallback: true };
         }
+
+        const token = await getSessionToken();
+        if (!token) return { fallback: true };
+        await loadVault(token);
 
         // Find matching passkeys in the vault
         const allPasskeys: StoredPasskey[] = [];

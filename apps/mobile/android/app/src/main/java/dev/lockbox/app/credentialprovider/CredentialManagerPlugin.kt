@@ -1,17 +1,25 @@
 package dev.lockbox.app.credentialprovider
 
+import android.content.ComponentName
 import android.os.Build
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import dev.lockbox.app.autofill.AutofillCrypto
 import dev.lockbox.app.storage.VaultDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.security.KeyStore
 
 /**
@@ -48,6 +56,41 @@ class CredentialManagerPlugin : Plugin() {
         val result = JSObject()
         result.put("available", Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
         call.resolve(result)
+    }
+
+    /** Check whether Lockbox is enabled as an Android Credential Provider. */
+    @PluginMethod
+    fun isProviderEnabled(call: PluginCall) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            call.resolve(JSObject().put("available", false).put("enabled", false))
+            return
+        }
+        val enabled = try {
+            val manager = context.getSystemService(android.credentials.CredentialManager::class.java)
+            manager.isEnabledCredentialProviderService(
+                ComponentName(context, LockboxCredentialProviderService::class.java)
+            )
+        } catch (_: Exception) {
+            false
+        }
+        call.resolve(JSObject().put("available", true).put("enabled", enabled))
+    }
+
+    /** Open Android's provider picker using the Credential Manager API. */
+    @PluginMethod
+    fun requestEnableProvider(call: PluginCall) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            call.reject("Credential Manager requires Android 14+")
+            return
+        }
+        try {
+            androidx.credentials.CredentialManager.create(context)
+                .createSettingsPendingIntent()
+                .send()
+            call.resolve()
+        } catch (error: Exception) {
+            call.reject("Failed to open passkey provider settings", error)
+        }
     }
 
     /**
@@ -236,10 +279,19 @@ class CredentialManagerPlugin : Plugin() {
         pluginScope.launch {
             try {
                 val db = VaultDatabase.getInstance(context)
-                val passkeys = if (rpId != null) {
-                    db.passkeyMetadataDao().getByRpId(rpId)
+                val accountId = PasskeyAccountState.get(context)
+                val passkeys = if (accountId == null) {
+                    emptyList()
+                } else if (rpId != null) {
+                    db.passkeyMetadataDao().getByRpIdAndAccount(rpId, accountId)
                 } else {
-                    db.passkeyMetadataDao().getAll()
+                    db.passkeyMetadataDao().getBySourceAndAccount(
+                        PasskeyMetadataEntity.SOURCE_PENDING,
+                        accountId
+                    ) + db.passkeyMetadataDao().getBySourceAndAccount(
+                        PasskeyMetadataEntity.SOURCE_SYNCED,
+                        accountId
+                    )
                 }
 
                 val passkeyArray = JSArray()
@@ -260,6 +312,146 @@ class CredentialManagerPlugin : Plugin() {
         }
     }
 
+    /** List only metadata for device-created passkeys awaiting vault upload. */
+    @PluginMethod
+    fun getPendingPasskeys(call: PluginCall) {
+        pluginScope.launch {
+            try {
+                val accountId = PasskeyAccountState.get(context)
+                    ?: return@launch call.resolve(JSObject().put("passkeys", JSArray()))
+                val passkeys = VaultDatabase.getInstance(context)
+                    .passkeyMetadataDao()
+                    .getBySourceAndAccount(PasskeyMetadataEntity.SOURCE_PENDING, accountId)
+                val result = JSArray()
+                for (passkey in passkeys) {
+                    result.put(
+                        JSObject()
+                            .put("credentialId", passkey.credentialId)
+                            .put("vaultItemId", passkey.vaultItemId)
+                            .put("rpId", passkey.rpId)
+                            .put("userName", passkey.userName)
+                    )
+                }
+                call.resolve(JSObject().put("passkeys", result))
+            } catch (error: Exception) {
+                call.reject("Failed to list pending passkeys", error)
+            }
+        }
+    }
+
+    /**
+     * Export one pending private key after BIOMETRIC_STRONG authorization.
+     * Plaintext exists only in this callback and the unlocked Capacitor process.
+     */
+    @PluginMethod
+    fun exportPendingPasskey(call: PluginCall) {
+        val credentialId = call.getString("credentialId") ?: return call.reject("credentialId is required")
+        pluginScope.launch {
+            try {
+                val accountId = PasskeyAccountState.get(context)
+                    ?: throw SecurityException("Unlock Lockbox before syncing passkeys")
+                val metadata = VaultDatabase.getInstance(context)
+                    .passkeyMetadataDao()
+                    .getByCredentialIdAndAccount(credentialId, accountId)
+                    ?: throw IllegalArgumentException("Pending passkey not found")
+                require(metadata.source == PasskeyMetadataEntity.SOURCE_PENDING) {
+                    "Passkey is not awaiting sync"
+                }
+                require(
+                    metadata.encryptedPrivateKey != null &&
+                        metadata.publicKey.isNotBlank() &&
+                        metadata.vaultItemId.isNotBlank()
+                ) { "Pending passkey is incomplete" }
+
+                val deviceKey = AutofillCrypto.getPrivateKey()
+                    ?: throw IllegalStateException("Biometric passkey protection is unavailable")
+                val decryptCipher = AutofillCrypto.createUnwrapCipher(deviceKey)
+                withContext(Dispatchers.Main) {
+                    showExportPrompt(call, metadata, decryptCipher)
+                }
+            } catch (error: Exception) {
+                call.reject(error.message ?: "Failed to prepare passkey sync", error)
+            }
+        }
+    }
+
+    private fun showExportPrompt(
+        call: PluginCall,
+        metadata: PasskeyMetadataEntity,
+        decryptCipher: javax.crypto.Cipher
+    ) {
+        val fragmentActivity = activity as? FragmentActivity
+            ?: return call.reject("Passkey sync requires an active Lockbox window")
+        val prompt = BiometricPrompt(
+            fragmentActivity,
+            ContextCompat.getMainExecutor(fragmentActivity),
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    pluginScope.launch {
+                        try {
+                            val authenticatedCipher = result.cryptoObject?.cipher
+                                ?: throw SecurityException("Biometric key was not authorized")
+                            val envelope = AutofillCrypto.parseEnvelope(metadata.encryptedPrivateKey!!)
+                            val payload = JSONObject(
+                                AutofillCrypto.decryptPayload(envelope, authenticatedCipher)
+                            )
+                            val exported = JSObject()
+                                .put("vaultItemId", metadata.vaultItemId)
+                                .put("credentialId", metadata.credentialId)
+                                .put("rpId", metadata.rpId)
+                                .put("rpName", metadata.rpName)
+                                .put("userId", metadata.userId)
+                                .put("userName", metadata.userName)
+                                .put("userDisplayName", metadata.userDisplayName)
+                                .put("publicKey", metadata.publicKey)
+                                .put("privateKey", payload.getString("privateKey"))
+                                .put("createdAt", metadata.createdAt)
+                            call.resolve(exported)
+                        } catch (error: Exception) {
+                            call.reject("Failed to decrypt the pending passkey", error)
+                        }
+                    }
+                }
+
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    call.reject("Passkey sync was cancelled")
+                }
+            }
+        )
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Sync passkey to Lockbox")
+            .setSubtitle("${metadata.userName} · ${metadata.rpName}")
+            .setNegativeButtonText("Not now")
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .build()
+        prompt.authenticate(promptInfo, BiometricPrompt.CryptoObject(decryptCipher))
+    }
+
+    /** Mark the durable outbox row complete only after encrypted vault upload. */
+    @PluginMethod
+    fun markPasskeySynced(call: PluginCall) {
+        val credentialId = call.getString("credentialId") ?: return call.reject("credentialId is required")
+        val vaultItemId = call.getString("vaultItemId") ?: return call.reject("vaultItemId is required")
+        pluginScope.launch {
+            try {
+                val accountId = PasskeyAccountState.get(context)
+                    ?: throw SecurityException("No active Lockbox account")
+                val updated = VaultDatabase.getInstance(context)
+                    .passkeyMetadataDao()
+                    .updateSource(
+                        credentialId,
+                        vaultItemId,
+                        accountId,
+                        PasskeyMetadataEntity.SOURCE_SYNCED
+                    )
+                require(updated == 1) { "Pending passkey no longer exists" }
+                call.resolve()
+            } catch (error: Exception) {
+                call.reject("Failed to acknowledge passkey sync", error)
+            }
+        }
+    }
+
     /**
      * Delete a stored passkey — removes from Room DB and Android Keystore.
      */
@@ -273,19 +465,21 @@ class CredentialManagerPlugin : Plugin() {
         pluginScope.launch {
             try {
                 val db = VaultDatabase.getInstance(context)
-                val metadata = db.passkeyMetadataDao().getByCredentialId(credentialId)
+                val accountId = PasskeyAccountState.get(context)
+                    ?: throw SecurityException("No active Lockbox account")
+                val metadata = db.passkeyMetadataDao()
+                    .getByCredentialIdAndAccount(credentialId, accountId)
+                    ?: throw IllegalArgumentException("Passkey not found")
 
                 // Delete private key from Keystore
-                if (metadata != null) {
-                    try {
-                        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
-                        keyStore.load(null)
-                        if (keyStore.containsAlias(metadata.keystoreAlias)) {
-                            keyStore.deleteEntry(metadata.keystoreAlias)
-                        }
-                    } catch (e: Exception) {
-                        // Best-effort keystore cleanup — don't fail the whole operation
+                try {
+                    val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+                    keyStore.load(null)
+                    if (keyStore.containsAlias(metadata.keystoreAlias)) {
+                        keyStore.deleteEntry(metadata.keystoreAlias)
                     }
+                } catch (_: Exception) {
+                    // Best-effort keystore cleanup — don't fail the whole operation
                 }
 
                 // Delete metadata from Room

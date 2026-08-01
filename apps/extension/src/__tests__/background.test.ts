@@ -7,6 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { urlMatchesUri as hostnameMatches } from '../../lib/form-detector.js';
+import { getTotpErrorMessage } from '../../lib/totp-errors.js';
 
 describe('background URL matching logic', () => {
   it('matches exact hostname', () => {
@@ -38,6 +39,20 @@ describe('background URL matching logic', () => {
     expect(hostnameMatches('http://localhost', 'http://localhost')).toBe(true);
   });
 
+  it('keeps Android application URIs out of browser matching', () => {
+    expect(
+      hostnameMatches(
+        'https://android.octopusenergy.octopus.energy/',
+        'androidapp://android.octopusenergy.octopus.energy',
+      ),
+    ).toBe(false);
+  });
+
+  it('does not cross website schemes even when hosts match', () => {
+    expect(hostnameMatches('https://example.com', 'http://example.com')).toBe(false);
+    expect(hostnameMatches('http://localhost', 'https://localhost')).toBe(false);
+  });
+
   it('does not match different domains', () => {
     expect(hostnameMatches('https://evil.com', 'https://example.com')).toBe(false);
   });
@@ -57,6 +72,17 @@ describe('background URL matching logic', () => {
   });
 });
 
+describe('TOTP error reporting', () => {
+  it('preserves DOMException-style messages without requiring Error inheritance', () => {
+    expect(getTotpErrorMessage({ message: 'WebCrypto operation failed' }))
+      .toBe('WebCrypto operation failed');
+  });
+
+  it('uses a safe fallback for opaque failures', () => {
+    expect(getTotpErrorMessage(null)).toBe('Authenticator code generation failed');
+  });
+});
+
 // ─── Message type validation ──────────────────────────────────────────────────
 
 type MessageType =
@@ -67,6 +93,8 @@ type MessageType =
   | 'get-matches'
   | 'get-vault'
   | 'get-totp'
+  | 'get-item-totp'
+  | 'refresh-item'
   | 'generate-password'
   | 'generate-passphrase'
   | 'activity'
@@ -90,6 +118,8 @@ const VALID_MESSAGE_TYPES: MessageType[] = [
   'get-matches',
   'get-vault',
   'get-totp',
+  'get-item-totp',
+  'refresh-item',
   'generate-password',
   'generate-passphrase',
   'activity',
@@ -115,6 +145,8 @@ describe('background message types', () => {
     expect(VALID_MESSAGE_TYPES).toContain('get-matches');
     expect(VALID_MESSAGE_TYPES).toContain('get-vault');
     expect(VALID_MESSAGE_TYPES).toContain('get-totp');
+    expect(VALID_MESSAGE_TYPES).toContain('get-item-totp');
+    expect(VALID_MESSAGE_TYPES).toContain('refresh-item');
     expect(VALID_MESSAGE_TYPES).toContain('generate-password');
     expect(VALID_MESSAGE_TYPES).toContain('generate-passphrase');
     expect(VALID_MESSAGE_TYPES).toContain('activity');
@@ -131,8 +163,8 @@ describe('background message types', () => {
     expect(VALID_MESSAGE_TYPES).toContain('update-credentials');
   });
 
-  it('has 21 message types total', () => {
-    expect(VALID_MESSAGE_TYPES).toHaveLength(21);
+  it('has 23 message types total', () => {
+    expect(VALID_MESSAGE_TYPES).toHaveLength(23);
   });
 });
 

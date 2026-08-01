@@ -22,6 +22,7 @@ The removed prototypes are evidence of product intent, not safe implementation p
 | Candidate    | Automatic background breach monitoring | The extension's nominal 24-hour background breach alarm                                                                  | User-initiated HIBP k-anonymity checks with explicit failure reporting                                                   |
 | Candidate    | Real-time sync notifications            | Cloudflare Durable Object WebSocket hub, authenticated upgrade route, and deployment binding                             | Durable REST delta sync, polling, conflict detection, and travel-mode filtering                                          |
 | Candidate    | Private server-side URL reputation      | The hash-only reputation path that previously treated missing reputation evidence as safe                               | Local phishing heuristics and authenticated plaintext-URL heuristic analysis                                             |
+| Candidate    | Additional password-manager imports     | The multi-provider selector for Bitwarden, Chrome, Firefox, 1Password, and KeePass plus unsafe generic auto-detection     | A production LastPass adapter/review flow and Bitwarden-compatible Lockbox export                                        |
 
 ## 1. Hardware-backed vault unlock
 
@@ -225,6 +226,28 @@ The hash-only reputation path no longer returns `safe: true` when no reputation 
 - Client warnings cite the reason and freshness, allow a deliberate override, and do not block native browser protections.
 - Tests include hash collisions/prefix ambiguity, provider outage, stale feeds, malicious redirects, Unicode domains, and false positives.
 
+## 9. Additional password-manager import adapters
+
+### Removed or deferred surface
+
+The v1 import screen previously advertised Bitwarden, Chrome, Firefox, 1Password, and KeePass through small format-specific CSV helpers and a generic fallback. Those paths did not provide the LastPass flow's schema verification, row-level diagnostics, folder mapping, TOTP validation, duplicate decisions, encrypted batch workflow, or lossless handling guarantees, so they are not exposed as production imports in v1. The compatibility helpers remain covered internally while v1 presents only the production LastPass adapter.
+
+### Prerequisites and decisions
+
+- Prioritize providers from real migration demand: Bitwarden, 1Password, Google Password Manager/Chrome, Firefox, KeePass, Dashlane, and Safari/iCloud Keychain.
+- Collect versioned, synthetic export fixtures for every supported provider and format; never use customer vault exports as test fixtures.
+- Decide per provider whether to support CSV, JSON, encrypted archives, or native bundles such as 1PUX, and publish any fields that the source format cannot represent.
+- Map logins, secure notes, cards, identities, passkeys, folders/collections, tags, favourites, custom fields, multiple URLs, attachments, and TOTP explicitly rather than forcing everything into login rows.
+- Keep format detection deterministic. Unknown or ambiguous files must stop with an actionable error instead of falling back to another provider parser.
+
+### Acceptance criteria
+
+- Every adapter uses the shared provider contract and the same local preview, selection, duplicate, folder, progress, failure, and encrypted-write workflow as LastPass.
+- Supported source fields are preserved losslessly or called out before import; secrets never appear in diagnostics, logs, analytics, screenshots, or network request metadata.
+- Malformed quoting, duplicate/missing headers, oversized files, invalid TOTP, unexpected columns, empty records, Unicode, multiline fields, and provider-version changes have fixture-backed tests.
+- Automatic duplicate handling is conservative: ambiguous records are imported rather than silently skipped, and users can choose skip or keep-both for safe matches.
+- Web, extension entry points, and Android/foldable layouts expose the same provider availability and privacy copy, with production builds and migration smoke tests for each adapter.
+
 ## Suggested sequence
 
 1. Specify, threat-model, and externally review the committed recovery-key protocol and versioned envelope format.
@@ -234,6 +257,7 @@ The hash-only reputation path no longer returns `safe: true` when no reputation 
 5. Add real-time invalidation after REST sync correctness and observability are stable in production.
 6. Add opt-in background breach monitoring and private reputation only when their privacy and unknown-state UX are complete.
 7. Add BYOK/provider storage, then ship a read-only assistant before enabling any mutating vault tools.
+8. Add password-manager adapters one provider at a time through the shared LastPass workflow; do not restore the generic fallback selector.
 
 ## Definition of done for every v2 candidate
 

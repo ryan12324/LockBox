@@ -14,7 +14,13 @@ export function toBase64(bytes: Uint8Array): string {
 
 /** Decode a base64 string to a Uint8Array. */
 export function fromBase64(b64: string): Uint8Array {
-  const binary = atob(b64);
+  if (typeof b64 !== 'string') throw new Error('Invalid Base64 data');
+  let binary: string;
+  try {
+    binary = atob(b64);
+  } catch {
+    throw new Error('Invalid Base64 data');
+  }
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);

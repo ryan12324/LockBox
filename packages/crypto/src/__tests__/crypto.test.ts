@@ -38,6 +38,11 @@ describe('utils', () => {
     expect(toBase64(bytes)).toBe('TWFu');
   });
 
+  it('fromBase64 reports invalid input without exposing a platform atob error', () => {
+    expect(() => fromBase64(undefined as unknown as string)).toThrow('Invalid Base64 data');
+    expect(() => fromBase64('not base64!')).toThrow('Invalid Base64 data');
+  });
+
   it('toUtf8 / fromUtf8 round-trip', () => {
     const str = 'Hello, 世界! 🔐';
     expect(fromUtf8(toUtf8(str))).toBe(str);

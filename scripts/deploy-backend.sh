@@ -21,6 +21,9 @@ WRANGLER="bunx wrangler"
 LOCKBOX_CORS_ORIGINS="${LOCKBOX_CORS_ORIGINS:-https://lockbox-web.pages.dev,http://localhost:5173,https://localhost}"
 LOCKBOX_EXTENSION_IDS="${LOCKBOX_EXTENSION_IDS:-}"
 R2_BUCKET_NAME="lockbox-attachments"
+LOCKBOX_TOTP_ENCRYPTION_KEY="${LOCKBOX_TOTP_ENCRYPTION_KEY:-}"
+LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS="${LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS:-}"
+TOTP_SECRETS_FILE=""
 
 # ── Colors ────────────────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -33,6 +36,21 @@ info()  { echo -e "${CYAN}▸${NC} $1"; }
 ok()    { echo -e "${GREEN}✓${NC} $1"; }
 warn()  { echo -e "${YELLOW}!${NC} $1"; }
 fail()  { echo -e "${RED}✗${NC} $1"; exit 1; }
+
+cleanup() {
+  if [ -n "$TOTP_SECRETS_FILE" ] && [ -f "$TOTP_SECRETS_FILE" ]; then
+    rm -f -- "$TOTP_SECRETS_FILE"
+  fi
+}
+trap cleanup EXIT
+
+validate_totp_encryption_key() {
+  LOCKBOX_KEY_TO_VALIDATE="$1" bun -e '
+    const value = process.env.LOCKBOX_KEY_TO_VALIDATE ?? "";
+    const decoded = Buffer.from(value, "base64");
+    if (decoded.byteLength !== 32 || decoded.toString("base64") !== value) process.exit(1);
+  '
+}
 
 # ── Preflight checks ─────────────────────────────────────────────────
 command -v bun  >/dev/null 2>&1 || fail "bun is required. Install: https://bun.sh"
@@ -116,8 +134,41 @@ ok "Migrations applied"
 
 # ── 7. Deploy ────────────────────────────────────────────────────────
 info "Deploying Worker..."
+DEPLOY_SECRET_ARGS=()
+if [ -n "$LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS" ] && [ -z "$LOCKBOX_TOTP_ENCRYPTION_KEY" ]; then
+  fail "LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS requires LOCKBOX_TOTP_ENCRYPTION_KEY"
+fi
+
+if [ -n "$LOCKBOX_TOTP_ENCRYPTION_KEY" ]; then
+  validate_totp_encryption_key "$LOCKBOX_TOTP_ENCRYPTION_KEY" \
+    || fail "LOCKBOX_TOTP_ENCRYPTION_KEY must be exactly 32 random bytes encoded as Base64"
+  if [ -n "$LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS" ]; then
+    validate_totp_encryption_key "$LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS" \
+      || fail "LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS must be exactly 32 random bytes encoded as Base64"
+  fi
+
+  umask 077
+  TOTP_SECRETS_FILE=$(mktemp "${TMPDIR:-/tmp}/lockbox-worker-secrets.XXXXXX")
+  printf 'TOTP_ENCRYPTION_KEY=%s\n' "$LOCKBOX_TOTP_ENCRYPTION_KEY" > "$TOTP_SECRETS_FILE"
+  if [ -n "$LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS" ]; then
+    printf 'TOTP_ENCRYPTION_KEY_PREVIOUS=%s\n' \
+      "$LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS" >> "$TOTP_SECRETS_FILE"
+  fi
+  DEPLOY_SECRET_ARGS=(--secrets-file "$TOTP_SECRETS_FILE")
+else
+  if ! $WRANGLER secret list --format json \
+    | bun -e '
+        const parsed = JSON.parse(await Bun.stdin.text());
+        const secrets = Array.isArray(parsed) ? parsed : (parsed.result ?? []);
+        process.exit(secrets.some((entry) => entry.name === "TOTP_ENCRYPTION_KEY") ? 0 : 1);
+      '; then
+    fail "Set LOCKBOX_TOTP_ENCRYPTION_KEY for the first deployment (generate it with: openssl rand -base64 32)"
+  fi
+fi
+
 DEPLOY_OUTPUT=$(
   $WRANGLER deploy \
+    "${DEPLOY_SECRET_ARGS[@]}" \
     --var "CORS_ORIGINS:${LOCKBOX_CORS_ORIGINS}" \
     --var "EXTENSION_IDS:${LOCKBOX_EXTENSION_IDS}" \
     2>&1

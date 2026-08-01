@@ -32,7 +32,7 @@ export interface LoginRequest {
  * User login response.
  * Server returns session token and user data needed for client-side decryption.
  */
-export interface LoginResponse {
+export interface AuthenticatedLoginResponse {
   token: string; // Session token for Authorization header
   user: {
     id: string;
@@ -43,6 +43,14 @@ export interface LoginResponse {
   };
   hasKeyPair?: boolean;
 }
+
+/** Password verification succeeded and account TOTP/backup-code verification is required. */
+export interface TwoFactorRequiredLoginResponse {
+  requires2FA: true;
+  tempToken: string;
+}
+
+export type LoginResponse = AuthenticatedLoginResponse | TwoFactorRequiredLoginResponse;
 
 /**
  * Vault sync request.

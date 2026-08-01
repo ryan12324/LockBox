@@ -57,12 +57,30 @@ export interface StoredPasskeyInfo {
   userName: string;
 }
 
+export interface PendingPasskeyInfo extends StoredPasskeyInfo {
+  vaultItemId: string;
+}
+
+export interface ExportedPendingPasskey extends PendingPasskeyInfo {
+  rpName: string;
+  userId: string;
+  userDisplayName: string;
+  publicKey: string;
+  privateKey: string;
+  createdAt: string;
+}
+
 /** Native plugin interface for Credential Manager */
 export interface CredentialManagerPlugin {
   isAvailable(): Promise<{ available: boolean }>;
+  isProviderEnabled(): Promise<{ available: boolean; enabled: boolean }>;
+  requestEnableProvider(): Promise<void>;
   createPasskey(options: PasskeyCreationOptions): Promise<PasskeyCreationResult>;
   authenticate(options: PasskeyAuthenticationOptions): Promise<PasskeyAuthenticationResult>;
   getStoredPasskeys(options?: { rpId?: string }): Promise<{ passkeys: StoredPasskeyInfo[] }>;
+  getPendingPasskeys(): Promise<{ passkeys: PendingPasskeyInfo[] }>;
+  exportPendingPasskey(options: { credentialId: string }): Promise<ExportedPendingPasskey>;
+  markPasskeySynced(options: { credentialId: string; vaultItemId: string }): Promise<void>;
   deletePasskey(options: { credentialId: string }): Promise<void>;
 }
 

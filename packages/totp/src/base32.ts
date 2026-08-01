@@ -9,8 +9,23 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
  * Decode a base32-encoded string to Uint8Array
  */
 export function base32Decode(str: string): Uint8Array {
-  // Remove padding and convert to uppercase
-  const input = str.toUpperCase().replace(/=/g, '');
+  // Accept the common grouped presentation used by authenticator setup pages,
+  // while still rejecting misplaced padding and non-Base32 characters.
+  const compact = str.trim().toUpperCase().replace(/[\s-]+/g, '');
+  if (!compact) {
+    throw new Error('Base32 secret must not be empty');
+  }
+  if (compact.length > 4096 || !/^[A-Z2-7]+=*$/.test(compact)) {
+    throw new Error('Invalid base32 secret');
+  }
+
+  // Padding carries no secret bits. Some older importers and QR exporters add
+  // the wrong number of trailing '=' characters, so accept and canonicalize
+  // trailing padding while still rejecting '=' in the middle of a key.
+  const input = compact.replace(/=+$/, '');
+  if ([1, 3, 6].includes(input.length % 8)) {
+    throw new Error('Invalid base32 length');
+  }
   
   const bytes: number[] = [];
   let buffer = 0;
@@ -40,6 +55,9 @@ export function base32Decode(str: string): Uint8Array {
  * Encode a Uint8Array to base32 string
  */
 export function base32Encode(bytes: Uint8Array): string {
+  if (bytes.byteLength === 0) {
+    throw new Error('Base32 input must not be empty');
+  }
   let result = '';
   let buffer = 0;
   let bufferLength = 0;

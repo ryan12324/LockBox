@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Card, Icon } from '@lockbox/design';
-import { getRemainingSeconds } from '@lockbox/totp';
+import { Button, Card, Icon, SiteFavicon, getEntryFaviconSources } from '@lockbox/design';
+import { generateTotp } from '@lockbox/totp';
+import { getAndroidAppPackageName, getLoginUriHref } from '@lockbox/types';
 import type {
   VaultItem,
   LoginItem,
@@ -11,7 +12,8 @@ import type {
   DocumentItem,
   Folder,
 } from '@lockbox/types';
-import { sendMessage, typeIcon, formatFileSize } from './shared.js';
+import { refreshItemFromServer, sendMessage, typeIcon, formatFileSize } from './shared.js';
+import { getTotpErrorMessage } from '../../../lib/totp-errors.js';
 
 export function ItemDetailView({
   item,
@@ -20,6 +22,7 @@ export function ItemDetailView({
   onDelete,
   onBack,
   onHistory,
+  onRefresh,
 }: {
   item: VaultItem;
   folders: Folder[];
@@ -27,6 +30,7 @@ export function ItemDetailView({
   onDelete: () => void;
   onBack: () => void;
   onHistory: () => void;
+  onRefresh: (item: VaultItem) => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -36,6 +40,7 @@ export function ItemDetailView({
   const [deleting, setDeleting] = useState(false);
   const [totpCode, setTotpCode] = useState('');
   const [totpRemaining, setTotpRemaining] = useState(0);
+  const [totpError, setTotpError] = useState('');
   const [attachments, setAttachments] = useState<
     Array<{ id: string; fileName: string; fileSize: number; mimeType: string; createdAt: string }>
   >([]);
@@ -46,6 +51,7 @@ export function ItemDetailView({
   >([]);
   const [versionsLoading, setVersionsLoading] = useState(false);
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
+  const [useError, setUseError] = useState('');
 
   const login = item.type === 'login' ? (item as LoginItem) : null;
   const note = item.type === 'note' ? (item as SecureNoteItem) : null;
@@ -61,9 +67,20 @@ export function ItemDetailView({
 
   async function copyField(text: string, field: string) {
     if (!text) return;
-    await navigator.clipboard.writeText(text);
-    setCopied(field);
-    setTimeout(() => setCopied(null), 2000);
+    setUseError('');
+    try {
+      const freshItem = await refreshItemFromServer(item.id);
+      if (JSON.stringify(freshItem) !== JSON.stringify(item)) {
+        onRefresh(freshItem);
+        setUseError('This item changed on the server. Review the refreshed value, then copy again.');
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      setCopied(field);
+      setTimeout(() => setCopied(null), 2000);
+    } catch (error) {
+      setUseError(error instanceof Error ? error.message : 'Could not refresh this item.');
+    }
   }
 
   useEffect(() => {
@@ -71,12 +88,16 @@ export function ItemDetailView({
     let intervalId: ReturnType<typeof setInterval>;
 
     async function refresh() {
-      const result = await sendMessage<{ code: string | null }>({
-        type: 'get-totp',
-        secret: login!.totp,
-      });
-      if (result.code) setTotpCode(result.code);
-      setTotpRemaining(getRemainingSeconds());
+      try {
+        const result = await generateTotp(login!.totp!);
+        setTotpCode(result.code);
+        setTotpRemaining(result.remaining);
+        setTotpError('');
+      } catch (error) {
+        setTotpCode('');
+        setTotpRemaining(0);
+        setTotpError(getTotpErrorMessage(error));
+      }
     }
 
     refresh();
@@ -189,7 +210,11 @@ export function ItemDetailView({
           <Icon name="arrow-left" size={17} />
           <span className="sr-only">Back</span>
         </Button>
-        <Icon name={typeIcon(item.type)} size={18} />
+        <SiteFavicon
+          sources={getEntryFaviconSources(item)}
+          fallbackIcon={typeIcon(item.type)}
+          size={20}
+        />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-[var(--color-text)] truncate">{item.name}</div>
           {folder && (
@@ -211,6 +236,9 @@ export function ItemDetailView({
       </div>
 
       <div className="flex-1 overflow-y-auto p-3">
+        {useError && (
+          <p role="alert" className="mb-2 text-xs text-[var(--color-error)]">{useError}</p>
+        )}
         {item.favorite && (
           <div className="text-xs text-[var(--color-warning)] mb-2 flex items-center gap-1">
             <Icon name="star" size={14} />
@@ -227,17 +255,21 @@ export function ItemDetailView({
                 toggle: () => setShowPassword(!showPassword),
                 shown: showPassword,
               })}
-            {login.totp && totpCode && (
+            {login.totp && (totpCode || totpError) && (
               <div className="mb-2">
                 <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)] px-3 mb-1">
                   TOTP Code
                 </div>
                 <Card variant="surface" padding="sm">
                   <div className="flex items-center justify-between">
-                    <span className="font-mono text-[18px] tracking-widest text-[var(--color-primary)] font-bold">
-                      {totpCode.slice(0, 3)} {totpCode.slice(3)}
-                    </span>
-                    <div className="flex items-center gap-1">
+                    {totpCode ? (
+                      <span className="font-mono text-[18px] tracking-widest text-[var(--color-primary)] font-bold">
+                        {totpCode.slice(0, totpCode.length / 2)} {totpCode.slice(totpCode.length / 2)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-[var(--color-error)]">{totpError}</span>
+                    )}
+                    {totpCode && <div className="flex items-center gap-1">
                       <span
                         className={`text-xs ${totpRemaining <= 5 ? 'text-[var(--color-error)]' : 'text-[var(--color-text-tertiary)]'}`}
                       >
@@ -246,41 +278,54 @@ export function ItemDetailView({
                       <Button variant="ghost" size="sm" onClick={() => copyField(totpCode, 'totp')}>
                         <Icon name={copied === 'totp' ? 'check' : 'copy'} size={16} />
                       </Button>
-                    </div>
+                    </div>}
                   </div>
                 </Card>
               </div>
             )}
             {login.uris
               ?.filter((u) => u.trim())
-              .map((uri, idx) => (
-                <div key={idx} className="mb-1">
-                  {idx === 0 && (
-                    <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)] px-3 mb-1">
-                      URIs
-                    </div>
-                  )}
-                  <Card variant="surface" padding="sm">
-                    <div className="flex items-center justify-between">
-                      <a
-                        href={uri.startsWith('http') ? uri : `https://${uri}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-[var(--color-primary)] no-underline truncate max-w-[250px]"
-                      >
-                        {uri}
-                      </a>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyField(uri, `uri-${idx}`)}
-                      >
-                        <Icon name={copied === `uri-${idx}` ? 'check' : 'copy'} size={16} />
-                      </Button>
-                    </div>
-                  </Card>
-                </div>
-              ))}
+              .map((uri, idx) => {
+                const appPackage = getAndroidAppPackageName(uri);
+                const href = getLoginUriHref(uri);
+                return (
+                  <div key={idx} className="mb-1">
+                    {idx === 0 && (
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)] px-3 mb-1">
+                        URIs
+                      </div>
+                    )}
+                    <Card variant="surface" padding="sm">
+                      <div className="flex items-center justify-between gap-2">
+                        {appPackage ? (
+                          <span className="flex items-center gap-1.5 min-w-0 text-xs text-[var(--color-text)]">
+                            <Icon name="brand-android" size={16} />
+                            <span className="truncate font-mono">{appPackage}</span>
+                          </span>
+                        ) : href ? (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-[var(--color-primary)] no-underline truncate max-w-[250px]"
+                          >
+                            {uri}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-[var(--color-text)] truncate max-w-[250px]">{uri}</span>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyField(uri, `uri-${idx}`)}
+                        >
+                          <Icon name={copied === `uri-${idx}` ? 'check' : 'copy'} size={16} />
+                        </Button>
+                      </div>
+                    </Card>
+                  </div>
+                );
+              })}
           </>
         )}
 

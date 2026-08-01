@@ -8,6 +8,7 @@ import { createCommand } from './commands/create.js';
 import { generateCommand } from './commands/generate.js';
 import { syncCommand } from './commands/sync.js';
 import { exportCommand } from './commands/export.js';
+import { totpCommand } from './commands/totp.js';
 
 const program = new Command();
 
@@ -26,5 +27,6 @@ program.addCommand(createCommand);
 program.addCommand(generateCommand);
 program.addCommand(syncCommand);
 program.addCommand(exportCommand);
+program.addCommand(totpCommand);
 
 program.parse();

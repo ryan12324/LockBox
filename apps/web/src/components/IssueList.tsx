@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { Card, Badge, Button, Icon, type IconName } from '@lockbox/design';
+import {
+  Card,
+  Badge,
+  Button,
+  Icon,
+  SiteFavicon,
+  getEntryFaviconSources,
+  type IconName,
+} from '@lockbox/design';
 import type { PasswordHealthReport, VaultItem } from '@lockbox/types';
 
 interface IssueListProps {
@@ -127,7 +135,12 @@ export default function IssueList({ reports, items, onItemClick }: IssueListProp
                   >
                     <div className="flex items-center space-x-4">
                       <div className="w-10 h-10 rounded-[var(--radius-md)] bg-[var(--color-surface)] flex items-center justify-center border border-[var(--color-border)] flex-shrink-0 text-[var(--color-text-secondary)]">
-                        <Icon name={itemIcons[item.type] ?? 'file'} size={18} />
+                        <SiteFavicon
+                          sources={getEntryFaviconSources(item)}
+                          fallbackIcon={itemIcons[item.type] ?? 'file'}
+                          size={20}
+                          fill
+                        />
                       </div>
 
                       <div className="flex flex-col">

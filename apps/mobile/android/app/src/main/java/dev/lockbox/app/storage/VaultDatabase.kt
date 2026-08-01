@@ -22,7 +22,7 @@ import dev.lockbox.app.autofill.AutofillCredentialEntity
  */
 @Database(
     entities = [VaultItemEntity::class, PasskeyMetadataEntity::class, AutofillCredentialEntity::class],
-    version = 5,
+    version = 7,
     exportSchema = true
 )
 abstract class VaultDatabase : RoomDatabase() {
@@ -109,6 +109,31 @@ abstract class VaultDatabase : RoomDatabase() {
             }
         }
 
+        /** Add biometric-gated encrypted material for passkeys synced from the vault. */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE passkey_metadata ADD COLUMN encryptedPrivateKey TEXT")
+                db.execSQL(
+                    "ALTER TABLE passkey_metadata ADD COLUMN source TEXT NOT NULL DEFAULT 'local'"
+                )
+            }
+        }
+
+        /** Bind passkeys to an account and support durable, idempotent vault export. */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE passkey_metadata ADD COLUMN publicKey TEXT NOT NULL DEFAULT ''"
+                )
+                db.execSQL(
+                    "ALTER TABLE passkey_metadata ADD COLUMN vaultItemId TEXT NOT NULL DEFAULT ''"
+                )
+                db.execSQL(
+                    "ALTER TABLE passkey_metadata ADD COLUMN accountId TEXT NOT NULL DEFAULT ''"
+                )
+            }
+        }
+
         @Volatile
         private var instance: VaultDatabase? = null
 
@@ -134,7 +159,14 @@ abstract class VaultDatabase : RoomDatabase() {
                 DATABASE_NAME
             )
                 .enableMultiInstanceInvalidation()
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6,
+                    MIGRATION_6_7
+                )
                 .build()
         }
     }

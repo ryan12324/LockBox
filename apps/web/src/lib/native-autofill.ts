@@ -1,4 +1,4 @@
-import type { LoginItem, VaultItem } from '@lockbox/types';
+import type { LoginItem, PasskeyItem, VaultItem } from '@lockbox/types';
 
 interface CapacitorBridge {
   isNativePlatform(): boolean;
@@ -16,9 +16,36 @@ function getCapacitor(): CapacitorBridge | null {
   return bridge;
 }
 
+function getCredentialManager(): CapacitorBridge | null {
+  const bridge = (window as unknown as { Capacitor?: CapacitorBridge }).Capacitor;
+  if (!bridge?.isNativePlatform() || !bridge.isPluginAvailable('CredentialManager')) return null;
+  return bridge;
+}
+
 export interface NativeAutofillStatus {
   supported: boolean;
   enabled: boolean;
+}
+
+export interface NativePasskeyStatus {
+  supported: boolean;
+  enabled: boolean;
+}
+
+export interface PendingNativePasskey {
+  credentialId: string;
+  vaultItemId: string;
+  rpId: string;
+  userName: string;
+}
+
+export interface ExportedNativePasskey extends PendingNativePasskey {
+  rpName: string;
+  userId: string;
+  userDisplayName: string;
+  publicKey: string;
+  privateKey: string;
+  createdAt: string;
 }
 
 export async function getNativeAutofillStatus(): Promise<NativeAutofillStatus> {
@@ -34,7 +61,20 @@ export async function openNativeAutofillSettings(): Promise<void> {
   await bridge.nativePromise('Autofill', 'requestEnable', {});
 }
 
-export async function syncNativeAutofillIndex(items: VaultItem[]): Promise<void> {
+export async function getNativePasskeyStatus(): Promise<NativePasskeyStatus> {
+  const bridge = getCredentialManager();
+  if (!bridge) return { supported: false, enabled: false };
+  const result = await bridge.nativePromise('CredentialManager', 'isProviderEnabled', {});
+  return { supported: result.available === true, enabled: result.enabled === true };
+}
+
+export async function openNativePasskeySettings(): Promise<void> {
+  const bridge = getCredentialManager();
+  if (!bridge) throw new Error('Android passkeys require Android 14 or later');
+  await bridge.nativePromise('CredentialManager', 'requestEnableProvider', {});
+}
+
+export async function syncNativeAutofillIndex(items: VaultItem[], accountId: string): Promise<void> {
   const bridge = getCapacitor();
   if (!bridge) return;
 
@@ -49,7 +89,55 @@ export async function syncNativeAutofillIndex(items: VaultItem[]): Promise<void>
       uris: item.uris ?? [],
     }));
 
-  await bridge.nativePromise('Autofill', 'replaceCredentialIndex', { credentials });
+  const passkeys = items
+    .filter((item): item is PasskeyItem => item.type === 'passkey')
+    .filter((item) => Boolean(item.privateKey))
+    .map((item) => ({
+      id: item.id,
+      credentialId: item.credentialId,
+      rpId: item.rpId,
+      rpName: item.rpName,
+      userName: item.userName,
+      userDisplayName: item.userName,
+      userId: item.userId,
+      publicKey: item.publicKey,
+      privateKey: item.privateKey,
+      createdAt: item.createdAt,
+    }));
+
+  await Promise.all([
+    bridge.nativePromise('Autofill', 'replaceCredentialIndex', { credentials }),
+    bridge.nativePromise('Autofill', 'replacePasskeyIndex', { passkeys, accountId }),
+  ]);
+}
+
+export async function getPendingNativePasskeys(): Promise<PendingNativePasskey[]> {
+  const bridge = getCredentialManager();
+  if (!bridge) return [];
+  const result = await bridge.nativePromise('CredentialManager', 'getPendingPasskeys', {});
+  return Array.isArray(result.passkeys) ? (result.passkeys as PendingNativePasskey[]) : [];
+}
+
+export async function exportPendingNativePasskey(
+  credentialId: string
+): Promise<ExportedNativePasskey> {
+  const bridge = getCredentialManager();
+  if (!bridge) throw new Error('Android passkey sync is not available on this device');
+  return bridge.nativePromise('CredentialManager', 'exportPendingPasskey', {
+    credentialId,
+  }) as unknown as Promise<ExportedNativePasskey>;
+}
+
+export async function markNativePasskeySynced(
+  credentialId: string,
+  vaultItemId: string
+): Promise<void> {
+  const bridge = getCredentialManager();
+  if (!bridge) return;
+  await bridge.nativePromise('CredentialManager', 'markPasskeySynced', {
+    credentialId,
+    vaultItemId,
+  });
 }
 
 export async function clearNativeAutofillIndex(): Promise<void> {

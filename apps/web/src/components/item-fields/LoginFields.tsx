@@ -1,5 +1,10 @@
 import React from 'react';
 import { Button, Icon, Input } from '@lockbox/design';
+import {
+  getAndroidAppPackageName,
+  getLoginUriHref,
+  isAndroidAppUri,
+} from '@lockbox/types';
 
 export interface LoginFieldsProps {
   mode: 'view' | 'edit' | 'add';
@@ -42,6 +47,8 @@ export default function LoginFields({
   onGeneratePassword,
   onRotatePassword,
 }: LoginFieldsProps) {
+  const hasValidTotpCode = /^\d{6,8}$/.test(totpCode);
+
   if (mode === 'view') {
     return (
       <div className="space-y-4">
@@ -121,6 +128,7 @@ export default function LoginFields({
                   variant="ghost"
                   size="sm"
                   onClick={(e) => copyToClipboard(totpCode, 'totp', e.currentTarget)}
+                  disabled={!hasValidTotpCode}
                   style={{ padding: '6px', minHeight: 'auto' }}
                 >
                   <Icon name={copiedField === 'totp' ? 'check' : 'copy'} size={17} />
@@ -137,29 +145,45 @@ export default function LoginFields({
             <div className="space-y-2">
               {uris
                 .filter((u) => u.trim())
-                .map((uri, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]"
-                  >
-                    <a
-                      href={uri.startsWith('http') ? uri : `https://${uri}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary)] hover:underline truncate"
+                .map((uri, idx) => {
+                  const appPackage = getAndroidAppPackageName(uri);
+                  const href = getLoginUriHref(uri);
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between gap-3 p-3 bg-[var(--color-bg-subtle)] rounded-[var(--radius-md)] border border-[var(--color-border)]"
                     >
-                      {uri}
-                    </a>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => copyToClipboard(uri, `uri-${idx}`, e.currentTarget)}
-                      style={{ padding: '6px', minHeight: 'auto' }}
-                    >
-                      <Icon name={copiedField === `uri-${idx}` ? 'check' : 'copy'} size={17} />
-                    </Button>
-                  </div>
-                ))}
+                      {appPackage ? (
+                        <span className="flex items-center gap-2 min-w-0 text-sm text-[var(--color-text)]">
+                          <Icon name="brand-android" size={18} />
+                          <span className="min-w-0 flex flex-col">
+                            <strong className="text-xs font-semibold text-[var(--color-text-secondary)]">Android app</strong>
+                            <span className="truncate font-mono">{appPackage}</span>
+                          </span>
+                        </span>
+                      ) : href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary)] hover:underline truncate"
+                        >
+                          {uri}
+                        </a>
+                      ) : (
+                        <span className="text-sm text-[var(--color-text)] truncate">{uri}</span>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => copyToClipboard(uri, `uri-${idx}`, e.currentTarget)}
+                        style={{ padding: '6px', minHeight: 'auto' }}
+                      >
+                        <Icon name={copiedField === `uri-${idx}` ? 'check' : 'copy'} size={17} />
+                      </Button>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}
@@ -222,7 +246,9 @@ export default function LoginFields({
                   newUris[idx] = e.target.value;
                   setUris(newUris);
                 }}
-                placeholder="https://example.com"
+                placeholder={isAndroidAppUri(uri) || /^androidapp:/i.test(uri)
+                  ? 'androidapp://com.example.app'
+                  : 'https://example.com'}
               />
             </div>
             <Button
@@ -235,14 +261,28 @@ export default function LoginFields({
             </Button>
           </div>
         ))}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setUris([...uris, ''])}
-          style={{ color: 'var(--color-primary)' }}
-        >
-          + Add URI
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setUris([...uris, ''])}
+            style={{ color: 'var(--color-primary)' }}
+          >
+            <Icon name="world" size={16} /> Add website
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setUris([...uris, 'androidapp://'])}
+            style={{ color: 'var(--color-primary)' }}
+          >
+            <Icon name="brand-android" size={16} /> Add Android app
+          </Button>
+        </div>
+        <p className="mt-2 mb-0 text-xs text-[var(--color-text-tertiary)] leading-relaxed">
+          Android apps use their package name, for example{' '}
+          <code>androidapp://android.octopusenergy.octopus.energy</code>.
+        </p>
       </div>
     </div>
   );

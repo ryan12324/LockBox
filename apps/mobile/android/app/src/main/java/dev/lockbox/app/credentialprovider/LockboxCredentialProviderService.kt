@@ -64,7 +64,8 @@ class LockboxCredentialProviderService : CredentialProviderService() {
                     // Do not enumerate account metadata when the caller did not
                     // provide a valid relying-party ID.
                     if (rpId == null) continue
-                    val passkeys = db.passkeyMetadataDao().getByRpId(rpId)
+                    val accountId = PasskeyAccountState.get(applicationContext) ?: continue
+                    val passkeys = db.passkeyMetadataDao().getByRpIdAndAccount(rpId, accountId)
 
                     for (passkey in passkeys) {
                         val pendingIntent = buildGetPendingIntent(passkey.credentialId)
@@ -101,7 +102,10 @@ class LockboxCredentialProviderService : CredentialProviderService() {
             try {
                 val responseBuilder = BeginCreateCredentialResponse.Builder()
 
-                if (request.type == PUBLIC_KEY_TYPE) {
+                if (
+                    request.type == PUBLIC_KEY_TYPE &&
+                    PasskeyAccountState.get(applicationContext) != null
+                ) {
                     val pendingIntent = buildCreatePendingIntent()
                     val slice = PasskeySliceHelper.buildCreateSlice(
                         applicationContext,

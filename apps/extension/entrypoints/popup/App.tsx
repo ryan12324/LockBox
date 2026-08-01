@@ -1,5 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { Badge, Icon, type IconName } from '@lockbox/design';
+import type { VaultItem } from '@lockbox/types';
 import type { ViewState, Tab } from './views/shared.js';
 import { useVault } from './views/useVault.js';
 import { SetupView } from './views/SetupView.js';
@@ -11,6 +12,7 @@ import { TrashView } from './views/TrashView.js';
 import { SettingsView } from './views/SettingsView.js';
 import { VersionHistoryView } from './views/HistoryView.js';
 import { SiteTab, VaultTab, SharedTab, GeneratorTab, TotpTab } from './views/TabsView.js';
+import { openLastPassImport } from '../../lib/import.js';
 
 type MoreSection = 'menu' | 'shared' | 'generator' | 'totp';
 
@@ -37,10 +39,12 @@ function MoreMenu({
   breachedCount,
   onSection,
   onView,
+  onImport,
 }: {
   breachedCount: number;
   onSection: (section: MoreSection) => void;
   onView: (state: ViewState) => void;
+  onImport: () => void;
 }) {
   const item = (
     label: string,
@@ -65,6 +69,7 @@ function MoreMenu({
       {item('Shared items', 'Items shared through teams', 'users', () => onSection('shared'))}
       {item('Generator', 'Create a password or passphrase', 'wand', () => onSection('generator'))}
       {item('Authenticator codes', 'View and copy time-based codes', 'key', () => onSection('totp'))}
+      {item('Import passwords', 'Review a LastPass CSV in the web vault', 'upload', onImport)}
       {item(
         'Security',
         breachedCount > 0 ? `${breachedCount} ${breachedCount === 1 ? 'item needs' : 'items need'} attention` : 'Review password health',
@@ -83,6 +88,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('site');
   const [moreSection, setMoreSection] = useState<MoreSection>('menu');
   const [viewState, setViewState] = useState<ViewState>({ view: 'tabs' });
+  const [refreshingItem, setRefreshingItem] = useState(false);
+  const [itemRefreshError, setItemRefreshError] = useState('');
+  const [toolError, setToolError] = useState('');
   const goTabs = useCallback(() => setViewState({ view: 'tabs' }), []);
 
   function handleSaveOrDelete() {
@@ -95,9 +103,33 @@ export default function App() {
     setViewState({ view: 'tabs' });
   }
 
+  async function handleOpenImport() {
+    setToolError('');
+    try {
+      await openLastPassImport();
+    } catch (error) {
+      setToolError(error instanceof Error ? error.message : 'Could not open the import page.');
+    }
+  }
+
   function selectTab(tab: Tab) {
     setActiveTab(tab);
     if (tab !== 'more') setMoreSection('menu');
+  }
+
+  async function openItem(item: Pick<VaultItem, 'id'>) {
+    setRefreshingItem(true);
+    setItemRefreshError('');
+    try {
+      const freshItem = await vault.refreshItem(item.id);
+      setViewState({ view: 'detail', item: freshItem });
+    } catch (error) {
+      setItemRefreshError(
+        error instanceof Error ? error.message : 'Could not refresh this item. Try again.'
+      );
+    } finally {
+      setRefreshingItem(false);
+    }
   }
 
   if (vault.loading) {
@@ -118,13 +150,22 @@ export default function App() {
     );
   }
 
-  if (viewState.view === 'detail') return <Shell><ItemDetailView item={viewState.item} folders={vault.folders} onEdit={() => setViewState({ view: 'edit', item: viewState.item })} onDelete={handleSaveOrDelete} onBack={goTabs} onHistory={() => setViewState({ view: 'history', item: viewState.item })} /></Shell>;
+  if (refreshingItem) {
+    return (
+      <div className="extension-loading" role="status">
+        <Icon name="loader-2" size={24} />
+        <span>Refreshing item…</span>
+      </div>
+    );
+  }
+
+  if (viewState.view === 'detail') return <Shell><ItemDetailView item={viewState.item} folders={vault.folders} onEdit={() => setViewState({ view: 'edit', item: viewState.item })} onDelete={handleSaveOrDelete} onBack={goTabs} onHistory={() => setViewState({ view: 'history', item: viewState.item })} onRefresh={(item) => setViewState({ view: 'detail', item })} /></Shell>;
   if (viewState.view === 'add') return <Shell><AddEditView editItem={null} folders={vault.folders} onSave={handleSaveOrDelete} onCancel={goTabs} /></Shell>;
-  if (viewState.view === 'edit') return <Shell><AddEditView editItem={viewState.item} folders={vault.folders} onSave={handleSaveOrDelete} onCancel={() => setViewState({ view: 'detail', item: viewState.item })} /></Shell>;
+  if (viewState.view === 'edit') return <Shell><AddEditView editItem={viewState.item} folders={vault.folders} onSave={handleSaveOrDelete} onCancel={() => void openItem(viewState.item)} /></Shell>;
   if (viewState.view === 'health') return <Shell><HealthSummaryView onBack={goTabs} filterBreached={'filterBreached' in viewState ? viewState.filterBreached : undefined} allItems={vault.allItems} /></Shell>;
   if (viewState.view === 'trash') return <Shell><TrashView onBack={goTabs} /></Shell>;
   if (viewState.view === 'settings') return <Shell><SettingsView onBack={goTabs} /></Shell>;
-  if (viewState.view === 'history') return <Shell><VersionHistoryView item={viewState.item} onBack={() => setViewState({ view: 'detail', item: viewState.item })} /></Shell>;
+  if (viewState.view === 'history') return <Shell><VersionHistoryView item={viewState.item} onBack={() => void openItem(viewState.item)} /></Shell>;
 
   return (
     <Shell>
@@ -148,6 +189,22 @@ export default function App() {
         </div>
       )}
 
+      {itemRefreshError && (
+        <div role="alert" className="extension-warning">
+          <Icon name="alert-circle" size={19} />
+          <div><strong>Item not opened</strong><span>{itemRefreshError}</span></div>
+          <button type="button" className="lb-icon-button" aria-label="Dismiss error" onClick={() => setItemRefreshError('')}><Icon name="x" size={18} /></button>
+        </div>
+      )}
+
+      {toolError && (
+        <div role="alert" className="extension-warning">
+          <Icon name="alert-circle" size={19} />
+          <div><strong>Import not opened</strong><span>{toolError}</span></div>
+          <button type="button" className="lb-icon-button" aria-label="Dismiss error" onClick={() => setToolError('')}><Icon name="x" size={18} /></button>
+        </div>
+      )}
+
       <div
         role="tabpanel"
         id={`lockbox-tabpanel-${activeTab}`}
@@ -155,9 +212,9 @@ export default function App() {
         className="extension-content"
       >
         {activeTab === 'site' && <SiteTab items={vault.siteItems} siteHost={vault.siteHost} onOpenVault={() => selectTab('vault')} />}
-        {activeTab === 'vault' && <VaultTab items={vault.allItems} folders={vault.folders} onSelectItem={(item) => setViewState({ view: 'detail', item })} onAddItem={() => setViewState({ view: 'add' })} rotationMap={vault.rotationMap} attachmentCounts={vault.attachmentCounts} />}
-        {activeTab === 'more' && moreSection === 'menu' && <MoreMenu breachedCount={vault.breachedCount} onSection={setMoreSection} onView={setViewState} />}
-        {activeTab === 'more' && moreSection === 'shared' && <><MoreHeader title="Shared items" onBack={() => setMoreSection('menu')} /><SharedTab sharedItems={vault.sharedItems} sharedFolders={vault.sharedFolders} hasKeyPair={vault.hasKeyPair} onSelectItem={(item) => setViewState({ view: 'detail', item })} /></>}
+        {activeTab === 'vault' && <VaultTab items={vault.allItems} folders={vault.folders} onSelectItem={(item) => void openItem(item)} onAddItem={() => setViewState({ view: 'add' })} rotationMap={vault.rotationMap} attachmentCounts={vault.attachmentCounts} />}
+        {activeTab === 'more' && moreSection === 'menu' && <MoreMenu breachedCount={vault.breachedCount} onSection={setMoreSection} onView={setViewState} onImport={() => void handleOpenImport()} />}
+        {activeTab === 'more' && moreSection === 'shared' && <><MoreHeader title="Shared items" onBack={() => setMoreSection('menu')} /><SharedTab sharedItems={vault.sharedItems} sharedFolders={vault.sharedFolders} hasKeyPair={vault.hasKeyPair} onSelectItem={(item) => void openItem(item)} /></>}
         {activeTab === 'more' && moreSection === 'generator' && <><MoreHeader title="Generator" onBack={() => setMoreSection('menu')} /><GeneratorTab /></>}
         {activeTab === 'more' && moreSection === 'totp' && <><MoreHeader title="Authenticator codes" onBack={() => setMoreSection('menu')} /><TotpTab items={vault.allItems} onAddItem={() => setViewState({ view: 'add' })} /></>}
       </div>

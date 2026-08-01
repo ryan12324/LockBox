@@ -31,7 +31,7 @@ export interface LoginItem extends VaultItem {
   type: 'login';
   username: string;
   password: string;
-  uris: string[]; // URLs where this credential applies
+  uris: string[]; // Website URLs or native app locators such as androidapp://com.example.app
   totp?: string; // otpauth:// URI for TOTP generation
 }
 
@@ -96,6 +96,13 @@ export interface PasskeyItem extends VaultItem {
   counter: number;       // Signature counter
   transports: string[];  // e.g. ["internal", "hybrid"]
   createdAt: string;     // ISO 8601
+  /**
+   * PKCS#8 P-256 private key encoded as unpadded base64url.
+   *
+   * This field only exists inside the encrypted vault payload. It must never be
+   * copied into server-visible metadata, logs, analytics, or plaintext storage.
+   */
+  privateKey?: string;
 }
 
 /**

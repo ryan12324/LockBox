@@ -4,6 +4,7 @@
  */
 
 import type { LoginItem, VaultItem } from '@lockbox/types';
+import { lastPassAdapter, parseCsv } from '@lockbox/importers';
 
 export type ImportFormat =
   | 'bitwarden'
@@ -16,35 +17,7 @@ export type ImportFormat =
 
 /** Parse CSV text into rows (handles quoted fields with commas). */
 export function parseCSV(text: string): string[][] {
-  const rows: string[][] = [];
-  const lines = text.trim().split('\n');
-
-  for (const line of lines) {
-    const fields: string[] = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (ch === ',' && !inQuotes) {
-        fields.push(current);
-        current = '';
-      } else {
-        current += ch;
-      }
-    }
-    fields.push(current);
-    rows.push(fields);
-  }
-
-  return rows;
+  return parseCsv(text).rows.map((row) => row.values);
 }
 
 /** Detect import format from CSV headers. */
@@ -159,20 +132,7 @@ export function parseOnePassword(text: string): VaultItem[] {
 
 /** Parse LastPass CSV export. */
 export function parseLastPass(text: string): VaultItem[] {
-  const rows = parseCSV(text);
-  if (rows.length < 2) return [];
-
-  const headers = rows[0].map((h) => h.toLowerCase().trim());
-  const idx = (name: string) => headers.indexOf(name);
-
-  return rows.slice(1).map((row) => {
-    const name = row[idx('name')] ?? '';
-    const url = row[idx('url')] ?? '';
-    const username = row[idx('username')] ?? '';
-    const password = row[idx('password')] ?? '';
-    const totp = row[idx('totp')] ?? undefined;
-    return makeLoginItem(name, username, password, url, totp || undefined);
-  });
+  return lastPassAdapter.parse(text).records.map((record) => record.item);
 }
 
 /** Parse KeePass CSV export. */

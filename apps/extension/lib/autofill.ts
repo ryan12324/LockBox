@@ -6,6 +6,11 @@
 
 import type { DetectedForm, DetectedIdentityForm, IdentityFieldType } from './form-detector.js';
 import type { IdentityItem } from '@lockbox/types';
+import {
+  getCachedSiteIconUrls,
+  recordSiteIconFailure,
+  recordSiteIconSuccess,
+} from '@lockbox/design';
 import { iconifySvg } from './iconify.js';
 import { INJECTED_BRAND_STYLES, lockboxBrandMarkup } from './injected-brand.js';
 /**
@@ -148,8 +153,8 @@ export function createLockIconOverlay(field: HTMLInputElement, onClick: () => vo
  */
 export function createSuggestionDropdown(
   anchorField: HTMLInputElement,
-  items: Array<{ id: string; name: string; username: string }>,
-  onSelect: (item: { id: string; name: string; username: string }) => void
+  items: Array<{ id: string; name: string; username: string; uris?: string[] }>,
+  onSelect: (item: { id: string; name: string; username: string; uris?: string[] }) => void
 ): HTMLElement {
   const host = document.createElement('div');
 
@@ -188,9 +193,10 @@ export function createSuggestionDropdown(
          width: 100%;
          padding: 8px 12px;
          cursor: pointer;
-         display: flex;
-         flex-direction: column;
-         gap: 2px;
+         display: grid;
+         grid-template-columns: 30px minmax(0, 1fr);
+         align-items: center;
+         gap: 9px;
          background: transparent;
          border: 0;
          border-bottom: 1px solid #DDD6CC;
@@ -200,7 +206,33 @@ export function createSuggestionDropdown(
        .item:last-child { border-bottom: none; }
        .item:hover { background: rgba(196,168,130,0.1); }
        .item:focus-visible { outline: 2px solid #8B7355; outline-offset: -2px; }
+       .item-icon {
+         width: 28px;
+         height: 28px;
+         position: relative;
+         display: inline-flex;
+         align-items: center;
+         justify-content: center;
+         color: #735137;
+         background: #F3F0EB;
+         border: 1px solid #DDD6CC;
+         border-radius: 7px;
+         overflow: hidden;
+       }
+       .item-icon img {
+         position: absolute;
+         inset: 0;
+         width: 100%;
+         height: 100%;
+         object-fit: cover;
+         border-radius: inherit;
+         opacity: 0;
+       }
+       .item-icon[data-loaded="true"] img { opacity: 1; }
+       .item-icon[data-loaded="true"] svg { visibility: hidden; }
+       .item-copy { min-width: 0; display: grid; gap: 2px; }
        .item-name { font-weight: 500; color: #2C2825; }
+       .item-name, .item-username { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
        .item-username { color: #7A7168; font-size: 12px; }
     </style>
     <div class="dropdown">
@@ -220,7 +252,38 @@ export function createSuggestionDropdown(
     const username = document.createElement('span');
     username.className = 'item-username';
     username.textContent = item.username;
-    button.append(name, username);
+    const icon = document.createElement('span');
+    icon.className = 'item-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = iconifySvg('world', { size: 16 });
+    const siteIconUrls = getCachedSiteIconUrls(item.uris);
+    if (siteIconUrls.length > 0) {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.width = 28;
+      image.height = 28;
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      image.referrerPolicy = 'no-referrer';
+      let candidateIndex = 0;
+      image.src = siteIconUrls[candidateIndex];
+      image.addEventListener('load', () => {
+        recordSiteIconSuccess(siteIconUrls[candidateIndex]);
+        icon.dataset.loaded = 'true';
+      });
+      image.addEventListener('error', () => {
+        recordSiteIconFailure(siteIconUrls[candidateIndex]);
+        delete icon.dataset.loaded;
+        candidateIndex++;
+        if (candidateIndex < siteIconUrls.length) image.src = siteIconUrls[candidateIndex];
+        else image.remove();
+      });
+      icon.appendChild(image);
+    }
+    const copy = document.createElement('span');
+    copy.className = 'item-copy';
+    copy.append(name, username);
+    button.append(icon, copy);
     button.addEventListener('click', () => {
       onSelect(item);
       host.remove();

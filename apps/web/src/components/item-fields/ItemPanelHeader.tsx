@@ -1,9 +1,10 @@
-import { Button, Icon, type IconName } from '@lockbox/design';
+import { Button, Icon, SiteFavicon, type IconName } from '@lockbox/design';
 
 export interface ItemPanelHeaderProps {
   currentMode: 'view' | 'edit' | 'add';
   type: string;
   name: string;
+  siteSources: readonly string[];
   loading: boolean;
   onShare: () => void;
   onHistory: () => void;
@@ -26,6 +27,7 @@ export default function ItemPanelHeader({
   currentMode,
   type,
   name,
+  siteSources,
   loading,
   onShare,
   onHistory,
@@ -42,7 +44,12 @@ export default function ItemPanelHeader({
     <header className="item-panel__header">
       <div className="item-panel__heading">
         <span className="item-panel__type-icon" aria-hidden="true">
-          <Icon name={typeIcons[type] ?? 'file'} size={20} />
+          <SiteFavicon
+            sources={siteSources}
+            fallbackIcon={typeIcons[type] ?? 'file'}
+            size={22}
+            fill
+          />
         </span>
         <div>
           <span className="item-panel__eyebrow">

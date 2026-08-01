@@ -73,7 +73,7 @@ export const vaultItems = sqliteTable('vault_items', {
 // TOTP settings for account-level 2FA
 export const userTotpSettings = sqliteTable('user_totp_settings', {
   userId: text('user_id').primaryKey().references(() => users.id),
-  encryptedTotpSecret: text('encrypted_totp_secret').notNull(), // encrypted with auth hash derivative
+  encryptedTotpSecret: text('encrypted_totp_secret').notNull(), // versioned AES-GCM envelope
   enabled: integer('enabled').notNull().default(0), // 0 = setup pending, 1 = active
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });

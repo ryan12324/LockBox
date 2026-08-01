@@ -5,6 +5,7 @@ import { Button, Input } from '@lockbox/design';
 import type { KdfConfig } from '@lockbox/types';
 import AuthShell from '../components/AuthShell.js';
 import { api, ApiError } from '../lib/api.js';
+import { isNativeLockboxApp } from '../lib/server-connection.js';
 import { useToast } from '../providers/ToastProvider.js';
 import { useAuthStore } from '../store/auth.js';
 
@@ -25,6 +26,7 @@ export default function Login() {
   const [masterKeyCache, setMasterKeyCache] = useState<Uint8Array | null>(null);
   const [twoFaCode, setTwoFaCode] = useState('');
   const [isBackupCode, setIsBackupCode] = useState(false);
+  const nativeApp = isNativeLockboxApp();
 
   async function finishLogin(response: AuthenticatedLogin, masterKey: Uint8Array) {
     const userKey = await decryptUserKey(response.user.encryptedUserKey, masterKey);
@@ -44,7 +46,7 @@ export default function Login() {
     event.preventDefault();
     setLoading(true);
     try {
-      const kdf = (await api.auth.kdfParams(email)) as { kdfConfig: KdfConfig; salt: string };
+      const kdf = await api.auth.kdfParams(email);
       const masterKey = await deriveKey(password, fromBase64(kdf.salt), kdf.kdfConfig);
       const authHash = await makeAuthHash(masterKey, password);
       const response = (await api.auth.login({ email, authHash })) as LoginResponse;
@@ -98,7 +100,10 @@ export default function Login() {
       title={verifying ? 'Verify this sign-in' : 'Welcome back'}
       description={verifying ? 'Confirm the code from your second factor to open this vault.' : 'Sign in to decrypt and manage your vault on this device.'}
       icon={verifying ? 'shield-check' : 'key'}
-      footer={!verifying ? <>New to Lockbox? <Link to="/register">Create a vault</Link></> : undefined}
+      footer={!verifying ? <>
+        <span>New to Lockbox? <Link to="/register">Create a vault</Link></span>
+        {nativeApp && <span className="auth-panel__footer-action"><Link to="/setup">Use a different Lockbox server</Link></span>}
+      </> : undefined}
     >
       {verifying ? (
         <form onSubmit={handle2FASubmit} className="auth-form">

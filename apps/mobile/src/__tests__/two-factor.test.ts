@@ -314,12 +314,14 @@ describe('disable2FA', () => {
     const responseData = { disabled: true };
     mockFetchResponse(responseData);
 
-    const result = await disable2FA('auth-token', 'https://api.test.com');
+    const result = await disable2FA('123456', 'auth-token', 'https://api.test.com');
 
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url, options] = mockFetch.mock.calls[0];
     expect(url).toBe('https://api.test.com/api/auth/2fa/disable');
     expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ code: '123456' });
+    expect(options.headers['Authorization']).toBe('Bearer auth-token');
     expect(result.disabled).toBe(true);
   });
 });

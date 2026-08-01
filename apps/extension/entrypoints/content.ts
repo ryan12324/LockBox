@@ -7,10 +7,11 @@
  * Proxies crypto operations through the background service worker.
  */
 
-import { detectForms, detectIdentityForms } from '../lib/form-detector.js';
+import { detectForms, detectIdentityForms, detectOtpFields } from '../lib/form-detector.js';
 import {
   fillForm,
   fillIdentityForm,
+  simulateFill,
   createLockIconOverlay,
   createSuggestionDropdown,
   createIdentitySuggestionDropdown,
@@ -58,20 +59,42 @@ function openExtensionPopup(): void {
 
 /** Get vault items matching the current page URL. */
 async function getMatchingItems(): Promise<VaultItem[]> {
-  const result = await sendMessage<{ items: VaultItem[] }>({
+  const result = await sendMessage<{ items: VaultItem[]; error?: string }>({
     type: 'get-matches',
     url: window.location.href,
   });
+  if (result.error) throw new Error(result.error);
   return result.items ?? [];
 }
 
 /** Get all identity items from the vault. */
 async function getIdentityItems(): Promise<IdentityItem[]> {
-  const result = await sendMessage<{ items: VaultItem[]; locked: boolean }>({
+  const result = await sendMessage<{ items: VaultItem[]; locked: boolean; error?: string }>({
     type: 'get-vault',
   });
   if (result.locked) return [];
+  if (result.error) throw new Error(result.error);
   return (result.items ?? []).filter((i): i is IdentityItem => i.type === 'identity');
+}
+
+async function refreshItemForUse(itemId: string, expectedType: 'login'): Promise<LoginItem>;
+async function refreshItemForUse(itemId: string, expectedType: 'identity'): Promise<IdentityItem>;
+async function refreshItemForUse(
+  itemId: string,
+  expectedType: 'login' | 'identity'
+): Promise<LoginItem | IdentityItem> {
+  const result = await sendMessage<{
+    success: boolean;
+    item?: VaultItem;
+    error?: string;
+  }>({ type: 'refresh-item', itemId });
+  if (!result.success || !result.item) {
+    throw new Error(result.error || 'Could not refresh this item.');
+  }
+  if (result.item.type !== expectedType) {
+    throw new Error(`This item is no longer a ${expectedType}.`);
+  }
+  return result.item as LoginItem | IdentityItem;
 }
 
 /** Handle autofill for a detected form. */
@@ -126,27 +149,48 @@ async function handleAutofill(
 
   if (loginItems.length === 1) {
     // Single match — fill immediately
-    fillForm(
-      { formElement: null, usernameField, passwordField, submitButton: null },
-      loginItems[0].username,
-      loginItems[0].password
-    );
-    filledItem = loginItems[0];
+    try {
+      const freshItem = await refreshItemForUse(loginItems[0].id, 'login');
+      fillForm(
+        { formElement: null, usernameField, passwordField, submitButton: null },
+        freshItem.username,
+        freshItem.password
+      );
+      filledItem = freshItem;
+    } catch {
+      createStatusDropdown(passwordField, 'error', [
+        { label: 'Retry', onClick: () => void handleAutofill(passwordField, usernameField) },
+      ]);
+      return;
+    }
   } else {
     // Multiple matches — show dropdown
     createSuggestionDropdown(
       passwordField,
-      loginItems.map((i) => ({ id: i.id, name: i.name, username: i.username })),
+      loginItems.map((i) => ({
+        id: i.id,
+        name: i.name,
+        username: i.username,
+        uris: i.uris,
+      })),
       (selected) => {
         const item = loginItems.find((i) => i.id === selected.id);
         if (item) {
-          fillForm(
-            { formElement: null, usernameField, passwordField, submitButton: null },
-            item.username,
-            item.password
-          );
-          // Check 2FA after dropdown selection
-          checkTwoFaAfterAutofill(item).catch(() => {});
+          void (async () => {
+            try {
+              const freshItem = await refreshItemForUse(item.id, 'login');
+              fillForm(
+                { formElement: null, usernameField, passwordField, submitButton: null },
+                freshItem.username,
+                freshItem.password
+              );
+              checkTwoFaAfterAutofill(freshItem).catch(() => {});
+            } catch {
+              createStatusDropdown(passwordField, 'error', [
+                { label: 'Retry', onClick: () => void handleAutofill(passwordField, usernameField) },
+              ]);
+            }
+          })();
         }
       }
     );
@@ -156,6 +200,75 @@ async function handleAutofill(
   if (filledItem) {
     checkTwoFaAfterAutofill(filledItem).catch(() => {});
   }
+}
+
+type TotpGenerationResult = {
+  code: string | null;
+  remaining: number;
+  error?: string;
+};
+
+async function fillTotp(field: HTMLInputElement, item: LoginItem): Promise<void> {
+  const result = await sendMessage<TotpGenerationResult>({
+    type: 'get-item-totp',
+    itemId: item.id,
+  });
+  if (!result.code) {
+    createStatusDropdown(field, 'error', [
+      { label: 'Edit in Lockbox', onClick: () => openExtensionPopup() },
+    ]);
+    return;
+  }
+  simulateFill(field, result.code);
+}
+
+/** Fill a standalone second-factor field from logins matching this site. */
+async function handleTotpAutofill(field: HTMLInputElement): Promise<void> {
+  if (!(await isVaultUnlocked())) {
+    createStatusDropdown(field, 'locked', [
+      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+    ]);
+    return;
+  }
+
+  let items: LoginItem[];
+  try {
+    items = (await getMatchingItems()).filter(
+      (item): item is LoginItem =>
+        item.type === 'login' && Boolean((item as LoginItem).totp),
+    );
+  } catch {
+    createStatusDropdown(field, 'error', [
+      { label: 'Retry', onClick: () => void handleTotpAutofill(field) },
+    ]);
+    return;
+  }
+
+  if (items.length === 0) {
+    createStatusDropdown(field, 'no-matches', [
+      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+    ]);
+    return;
+  }
+
+  if (items.length === 1) {
+    await fillTotp(field, items[0]);
+    return;
+  }
+
+  createSuggestionDropdown(
+    field,
+    items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      username: item.username,
+      uris: item.uris,
+    })),
+    (selected) => {
+      const item = items.find((candidate) => candidate.id === selected.id);
+      if (item) void fillTotp(field, item);
+    },
+  );
 }
 
 /** Handle autofill for a detected identity form. */
@@ -198,7 +311,16 @@ async function handleIdentityAutofill(
 
   if (identityItems.length === 1) {
     // Single identity — fill immediately
-    fillIdentityForm(identityForm, identityItems[0]);
+    try {
+      fillIdentityForm(
+        identityForm,
+        await refreshItemForUse(identityItems[0].id, 'identity')
+      );
+    } catch {
+      createStatusDropdown(firstField, 'error', [
+        { label: 'Retry', onClick: () => void handleIdentityAutofill(identityForm) },
+      ]);
+    }
   } else {
     // Multiple identities — show dropdown
     createIdentitySuggestionDropdown(
@@ -211,7 +333,13 @@ async function handleIdentityAutofill(
       (selected) => {
         const item = identityItems.find((i) => i.id === selected.id);
         if (item) {
-          fillIdentityForm(identityForm, item);
+          void refreshItemForUse(item.id, 'identity')
+            .then((freshItem) => fillIdentityForm(identityForm, freshItem))
+            .catch(() => {
+              createStatusDropdown(firstField, 'error', [
+                { label: 'Retry', onClick: () => void handleIdentityAutofill(identityForm) },
+              ]);
+            });
         }
       }
     );
@@ -407,6 +535,16 @@ function injectOverlays(): void {
 
     createLockIconOverlay(firstField, () => {
       handleIdentityAutofill(identityForm).catch(console.error);
+    });
+  }
+
+  // Standalone OTP steps often appear after the password form has navigated
+  // away, so they need their own detector and explicit user-triggered fill.
+  for (const otpField of detectOtpFields(document)) {
+    if (injectedFields.has(otpField)) continue;
+    injectedFields.add(otpField);
+    createLockIconOverlay(otpField, () => {
+      handleTotpAutofill(otpField).catch(console.error);
     });
   }
 }

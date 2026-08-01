@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { Button, Icon, Input, Select, Textarea } from '@lockbox/design';
 import { generatePassword } from '@lockbox/generator';
+import { parseTotpSecret } from '@lockbox/totp';
+import {
+  getLoginUriValidationError,
+  isAndroidAppUri,
+  normalizeLoginUriForStorage,
+} from '@lockbox/types';
 import type {
   VaultItem,
   LoginItem,
@@ -103,9 +109,28 @@ export function AddEditView({
       setError('Name is required');
       return;
     }
-    if (type === 'login' && !username.trim() && !password.trim()) {
-      setError('Username or password is required');
+    if (type === 'login' && !username.trim() && !password.trim() && !totpSecret.trim()) {
+      setError('Username, password, or authenticator key is required');
       return;
+    }
+    if (type === 'login') {
+      const uriError = uris
+        .map(getLoginUriValidationError)
+        .find((message): message is string => Boolean(message));
+      if (uriError) {
+        setError(uriError);
+        return;
+      }
+    }
+    if (type === 'login' && totpSecret.trim()) {
+      try {
+        parseTotpSecret(totpSecret);
+      } catch (validationError) {
+        setError(
+          validationError instanceof Error ? validationError.message : 'Invalid authenticator key',
+        );
+        return;
+      }
     }
     if (type === 'card' && !number.trim()) {
       setError('Card number is required');
@@ -130,8 +155,10 @@ export function AddEditView({
           ...base,
           username,
           password,
-          uris: uris.filter((u) => u.trim()),
-          totp: totpSecret || undefined,
+          uris: uris
+            .filter((u) => u.trim())
+            .map(normalizeLoginUriForStorage),
+          totp: totpSecret.trim() || undefined,
         };
       } else if (type === 'note') {
         itemData = {
@@ -419,7 +446,9 @@ export function AddEditView({
                       u[idx] = e.target.value;
                       setUris(u);
                     }}
-                    placeholder="https://example.com"
+                    placeholder={isAndroidAppUri(uri) || /^androidapp:/i.test(uri)
+                      ? 'androidapp://com.example.app'
+                      : 'https://example.com'}
                     className="flex-1"
                   />
                   <div className="flex items-end">
@@ -433,9 +462,21 @@ export function AddEditView({
                   </div>
                 </div>
               ))}
-              <Button variant="ghost" size="sm" onClick={() => setUris([...uris, ''])}>
-                + Add URI
-              </Button>
+              <div className="flex flex-wrap gap-1">
+                <Button variant="ghost" size="sm" onClick={() => setUris([...uris, ''])}>
+                  <Icon name="world" size={15} /> Add website
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setUris([...uris, 'androidapp://'])}
+                >
+                  <Icon name="brand-android" size={15} /> Add Android app
+                </Button>
+              </div>
+              <p className="mt-1 mb-0 text-[10px] leading-relaxed text-[var(--color-text-tertiary)]">
+                Example: androidapp://android.octopusenergy.octopus.energy
+              </p>
             </div>
           </>
         )}

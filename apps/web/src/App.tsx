@@ -1,8 +1,10 @@
-import React, { lazy, Suspense, useEffect } from 'react';
+import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/auth.js';
 import { ToastProvider } from './providers/ToastProvider.js';
 import { startFoldableLayout } from './lib/foldable-layout.js';
+import { getServerConnection, isNativeLockboxApp } from './lib/server-connection.js';
+import { startThemeSync } from './lib/theme.js';
 
 const Register = lazy(() => import('./pages/Register.js'));
 const Login = lazy(() => import('./pages/Login.js'));
@@ -17,6 +19,7 @@ const Health = lazy(() => import('./pages/Health.js'));
 const AppLayout = lazy(() => import('./components/AppLayout.js'));
 const Teams = lazy(() => import('./pages/Teams.js'));
 const TeamDetail = lazy(() => import('./pages/TeamDetail.js'));
+const ServerSetup = lazy(() => import('./pages/ServerSetup.js'));
 const AUTO_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -27,7 +30,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { session, isLocked, lastActivity, lock, updateActivity } = useAuthStore();
+  const { session, isLocked, lastActivity, lock, logout, updateActivity } = useAuthStore();
+  const nativeApp = isNativeLockboxApp();
+  const [serverConfigured, setServerConfigured] = useState(
+    () => !nativeApp || getServerConnection() !== null
+  );
+
+  useEffect(() => {
+    if (nativeApp && !serverConfigured && session) logout();
+  }, [nativeApp, serverConfigured, session, logout]);
 
   // Auto-lock after inactivity
   useEffect(() => {
@@ -51,45 +62,66 @@ export default function App() {
   }, [updateActivity]);
 
   useEffect(() => startFoldableLayout(), []);
+  useEffect(() => startThemeSync(), []);
 
   return (
     <ToastProvider>
-        <Suspense
-          fallback={
-            <div
-              role="status"
-              className="min-h-screen flex items-center justify-center text-sm text-[var(--color-text-secondary)]"
-            >
-              Loading Lockbox…
-            </div>
-          }
-        >
-          <Routes>
-          <Route path="/register" element={<Register />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/unlock" element={<Unlock />} />
-          <Route path="/share/:shareId" element={<ShareView />} />
-
-          <Route
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
+      <Suspense
+        fallback={
+          <div
+            role="status"
+            className="min-h-screen flex items-center justify-center text-sm text-[var(--color-text-secondary)]"
           >
-            <Route path="/vault" element={<Vault />} />
-            <Route path="/trash" element={<Trash />} />
-            <Route path="/generator" element={<Generator />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/settings/import-export" element={<ImportExport />} />
-            <Route path="/health" element={<Health />} />
-            <Route path="/teams" element={<Teams />} />
-            <Route path="/teams/:teamId" element={<TeamDetail />} />
-          </Route>
+            Loading Lockbox…
+          </div>
+        }
+      >
+        <Routes>
+          {nativeApp && (
+            <Route
+              path="/setup"
+              element={
+                <ServerSetup
+                  onComplete={() => {
+                    logout();
+                    setServerConfigured(true);
+                  }}
+                />
+              }
+            />
+          )}
 
-          <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />
-          </Routes>
-        </Suspense>
+          {nativeApp && !serverConfigured ? (
+            <Route path="*" element={<Navigate to="/setup" replace />} />
+          ) : (
+            <>
+              <Route path="/register" element={<Register />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/unlock" element={<Unlock />} />
+              <Route path="/share/:shareId" element={<ShareView />} />
+
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="/vault" element={<Vault />} />
+                <Route path="/trash" element={<Trash />} />
+                <Route path="/generator" element={<Generator />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/settings/import-export" element={<ImportExport />} />
+                <Route path="/health" element={<Health />} />
+                <Route path="/teams" element={<Teams />} />
+                <Route path="/teams/:teamId" element={<TeamDetail />} />
+              </Route>
+
+              <Route path="/" element={<Navigate to={session ? '/vault' : '/login'} replace />} />
+            </>
+          )}
+        </Routes>
+      </Suspense>
     </ToastProvider>
   );
 }

@@ -16,6 +16,7 @@ export interface DetectedForm {
 export type FieldType =
   | 'username'
   | 'password'
+  | 'otp'
   | 'email'
   | 'first-name'
   | 'last-name'
@@ -31,7 +32,7 @@ export type FieldType =
   | 'unknown';
 
 /** Identity-specific field types. */
-export type IdentityFieldType = Exclude<FieldType, 'username' | 'password' | 'email' | 'unknown'>;
+export type IdentityFieldType = Exclude<FieldType, 'username' | 'password' | 'email' | 'otp' | 'unknown'>;
 
 /** All identity field types for iteration. */
 const IDENTITY_FIELD_TYPES: ReadonlySet<string> = new Set<string>([
@@ -50,6 +51,10 @@ export function detectFieldType(
   const autocomplete = (input.autocomplete ?? '').toLowerCase();
   const placeholder = (input.placeholder ?? '').toLowerCase();
   const ariaLabel = (input.getAttribute('aria-label') ?? '').toLowerCase();
+
+  // The autocomplete hint is the strongest OTP signal and is commonly used
+  // on text, tel, and number inputs.
+  if (autocomplete === 'one-time-code') return 'otp';
 
   if (type === 'password') return 'password';
   if (type === 'email') return 'email';
@@ -81,6 +86,20 @@ export function detectFieldType(
 
   // Heuristic pattern matching on name/id/placeholder/aria-label
   const allText = `${name} ${id} ${placeholder} ${ariaLabel}`;
+
+  const otpPatterns = [
+    'one-time-code',
+    'one time code',
+    'verification-code',
+    'verification code',
+    'auth-code',
+    'auth code',
+    '2fa',
+    'mfa',
+    'totp',
+    'otp',
+  ];
+  if (otpPatterns.some((pattern) => allText.includes(pattern))) return 'otp';
 
   // Identity field patterns (check before username to avoid false positives)
   const identityPatterns: Array<{ patterns: string[]; fieldType: FieldType }> = [
@@ -202,6 +221,17 @@ export function detectForms(root: Document | Element): DetectedForm[] {
   return forms;
 }
 
+/** Detect visible one-time-code fields, including form-less verification steps. */
+export function detectOtpFields(root: Document | Element): HTMLInputElement[] {
+  return Array.from(
+    root.querySelectorAll<HTMLInputElement>(
+      'input:not([type="hidden"]):not([type="password"]):not([type="submit"])',
+    ),
+  ).filter(
+    (input) => !input.disabled && !input.readOnly && detectFieldType(input) === 'otp',
+  );
+}
+
 /** Check if a URL domain matches a vault item URI. */
 export function urlMatchesUri(pageUrl: string, itemUri: string): boolean {
   try {
@@ -209,10 +239,14 @@ export function urlMatchesUri(pageUrl: string, itemUri: string): boolean {
     const item = new URL(itemUri);
     const pageHost = page.hostname.toLowerCase().replace(/^www\./, '');
     const itemHost = item.hostname.toLowerCase().replace(/^www\./, '');
-    const isLoopback =
+    const pageIsLoopback =
       pageHost === 'localhost' || pageHost === '127.0.0.1' || pageHost === '[::1]';
+    const itemIsLoopback =
+      itemHost === 'localhost' || itemHost === '127.0.0.1' || itemHost === '[::1]';
 
-    if (page.protocol !== 'https:' && !(page.protocol === 'http:' && isLoopback)) return false;
+    if (page.protocol !== 'https:' && !(page.protocol === 'http:' && pageIsLoopback)) return false;
+    if (item.protocol !== 'https:' && !(item.protocol === 'http:' && itemIsLoopback)) return false;
+    if (page.protocol !== item.protocol) return false;
     if (pageHost === itemHost) return true;
     if (!pageHost.endsWith(`.${itemHost}`)) return false;
 

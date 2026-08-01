@@ -2,7 +2,7 @@
   width: min(100% - 40px, 1040px);
   min-height: 100dvh;
   margin-inline: auto;
-  padding: 48px 0;
+  padding: calc(48px + var(--safe-area-top)) 0 calc(48px + var(--safe-area-bottom));
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
   align-items: center;
@@ -29,6 +29,8 @@
   height: auto;
   display: block;
 }
+
+.dark .auth-brand__logo { filter: brightness(0) invert(1); }
 
 .auth-story__content { max-width: 520px; padding: 56px 0; }
 .auth-story__icon {
@@ -105,7 +107,9 @@
 .auth-form .lb-button[type='submit'] { width: 100%; margin-top: 2px; }
 .auth-form__actions { display: grid; gap: 4px; }
 .auth-form__actions .lb-button { width: 100%; }
-.auth-panel__footer { margin-top: 24px; color: var(--color-text-secondary); font-size: var(--font-size-sm); text-align: center; }
+.auth-form__hint { margin: 8px 0 0; color: var(--color-text-tertiary); font-size: var(--font-size-xs); line-height: var(--line-height-normal); }
+.auth-panel__footer { margin-top: 24px; display: grid; gap: 8px; color: var(--color-text-secondary); font-size: var(--font-size-sm); text-align: center; }
+.auth-panel__footer-action { padding-top: 8px; border-top: 1px solid var(--color-border); }
 .auth-panel__footer a { color: var(--color-primary); font-weight: var(--font-weight-medium); text-decoration: none; }
 .auth-panel__footer a:hover { text-decoration: underline; }
 
@@ -132,7 +136,7 @@
 @media (max-width: 799px) {
   .auth-page {
     width: min(100% - 28px, 460px);
-    padding: 28px 0;
+    padding: calc(28px + var(--safe-area-top)) 0 calc(28px + var(--safe-area-bottom));
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -145,5 +149,15 @@
 
 @media (max-width: 380px) {
   .auth-page { width: 100%; padding: 0; }
-  .auth-panel { min-height: 100dvh; padding: 22px 18px; border: 0; border-radius: 0; box-shadow: none; }
+  .auth-panel {
+    min-height: 100dvh;
+    padding:
+      calc(22px + var(--safe-area-top))
+      calc(18px + var(--safe-area-right))
+      calc(22px + var(--safe-area-bottom))
+      calc(18px + var(--safe-area-left));
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
 }

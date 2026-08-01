@@ -6,9 +6,11 @@
  * https://www.rfc-editor.org/rfc/rfc4226
  */
 
+export type TOTPAlgorithm = 'SHA-1' | 'SHA-256' | 'SHA-512';
+
 export interface HOTPOptions {
   digits?: number;
-  algorithm?: 'SHA-1' | 'SHA-256' | 'SHA-512';
+  algorithm?: TOTPAlgorithm;
 }
 
 export interface TOTPOptions extends HOTPOptions {
@@ -30,6 +32,16 @@ export async function hotp(
 ): Promise<string> {
   const digits = opts?.digits ?? 6;
   const algorithm = opts?.algorithm ?? 'SHA-1';
+
+  if (!Number.isSafeInteger(counter) || counter < 0) {
+    throw new Error('HOTP counter must be a non-negative safe integer');
+  }
+  if (!Number.isInteger(digits) || digits < 6 || digits > 8) {
+    throw new Error('OTP digits must be an integer between 6 and 8');
+  }
+  if (secret.byteLength === 0) {
+    throw new Error('OTP secret must not be empty');
+  }
   
   // Convert counter to 8-byte big-endian buffer
   const counterBuffer = new ArrayBuffer(8);
@@ -79,6 +91,13 @@ export async function totp(
 ): Promise<string> {
   const period = opts?.period ?? 30;
   const currentTime = time ?? Date.now();
+
+  if (!Number.isInteger(period) || period <= 0) {
+    throw new Error('TOTP period must be a positive integer');
+  }
+  if (!Number.isFinite(currentTime) || currentTime < 0) {
+    throw new Error('TOTP time must be a non-negative finite number');
+  }
   
   // Convert milliseconds to seconds and calculate counter
   const counter = Math.floor(currentTime / 1000 / period);
@@ -95,8 +114,15 @@ export async function totp(
  * @param period - The TOTP period in seconds (default 30)
  * @returns Number of seconds remaining (0-period)
  */
-export function getRemainingSeconds(period?: number): number {
+export function getRemainingSeconds(period?: number, time?: number): number {
   const p = period ?? 30;
-  const now = Math.floor(Date.now() / 1000);
+  if (!Number.isInteger(p) || p <= 0) {
+    throw new Error('TOTP period must be a positive integer');
+  }
+  const currentTime = time ?? Date.now();
+  if (!Number.isFinite(currentTime) || currentTime < 0) {
+    throw new Error('TOTP time must be a non-negative finite number');
+  }
+  const now = Math.floor(currentTime / 1000);
   return p - (now % p);
 }

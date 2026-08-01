@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { detectFieldType, detectForms, urlMatchesUri, detectIdentityForms, isIdentityForm, isIdentityFieldType } from '../../lib/form-detector.js';
+import { detectFieldType, detectForms, detectOtpFields, urlMatchesUri, detectIdentityForms, isIdentityForm, isIdentityFieldType } from '../../lib/form-detector.js';
 
 // ─── detectFieldType ──────────────────────────────────────────────────────────
 
@@ -75,6 +75,42 @@ describe('detectFieldType', () => {
   it('returns unknown for text input with no hints', () => {
     const input = makeInput({ type: 'text' });
     expect(detectFieldType(input)).toBe('unknown');
+  });
+
+  it('detects autocomplete one-time-code on a tel input', () => {
+    const input = makeInput({ type: 'tel', autocomplete: 'one-time-code' });
+    expect(detectFieldType(input)).toBe('otp');
+  });
+
+  it('detects common TOTP verification labels', () => {
+    const input = makeInput({ type: 'text', 'aria-label': 'Enter TOTP verification code' });
+    expect(detectFieldType(input)).toBe('otp');
+  });
+
+  it('does not mistake a payment-card security code for TOTP', () => {
+    const input = makeInput({ type: 'text', autocomplete: 'cc-csc', 'aria-label': 'Security code' });
+    expect(detectFieldType(input)).toBe('unknown');
+  });
+});
+
+describe('detectOtpFields', () => {
+  it('finds OTP fields without requiring a password form', () => {
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <input type="text" name="search" />
+      <input type="tel" autocomplete="one-time-code" />
+      <input type="text" name="mfa-code" />
+    `;
+    expect(detectOtpFields(container)).toHaveLength(2);
+  });
+
+  it('ignores disabled and read-only OTP fields', () => {
+    const container = document.createElement('div');
+    container.innerHTML = `
+      <input autocomplete="one-time-code" disabled />
+      <input name="otp" readonly />
+    `;
+    expect(detectOtpFields(container)).toHaveLength(0);
   });
 });
 
@@ -221,6 +257,15 @@ describe('urlMatchesUri', () => {
 
   it('does not match partial domain names', () => {
     expect(urlMatchesUri('https://notexample.com', 'https://example.com')).toBe(false);
+  });
+
+  it('does not match a native Android app URI to an HTTPS page', () => {
+    expect(
+      urlMatchesUri(
+        'https://android.octopusenergy.octopus.energy/',
+        'androidapp://android.octopusenergy.octopus.energy',
+      ),
+    ).toBe(false);
   });
 
   it('handles invalid URIs gracefully', () => {

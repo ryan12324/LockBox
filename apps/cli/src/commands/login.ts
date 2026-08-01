@@ -9,6 +9,8 @@ import * as readline from 'node:readline';
 import { getApiUrl, saveSession } from '../lib/session.js';
 import { createApi } from '../lib/api.js';
 import { deriveKeysFromPassword } from '../lib/crypto.js';
+import type { AuthenticatedLoginResponse, LoginResponse } from '@lockbox/types';
+import type { LockboxApi } from '../lib/api.js';
 
 /** Prompt for input from stdin. Optionally hide input for passwords. */
 function prompt(question: string, hidden = false): Promise<string> {
@@ -59,6 +61,18 @@ function prompt(question: string, hidden = false): Promise<string> {
 
 export { prompt };
 
+export async function completeTwoFactorLogin(
+  response: LoginResponse,
+  api: LockboxApi,
+  requestCode: () => Promise<string> = () => prompt('Authenticator or backup code: '),
+): Promise<AuthenticatedLoginResponse> {
+  if (!('requires2FA' in response)) return response;
+
+  const code = (await requestCode()).trim();
+  if (!code) throw new Error('Authenticator or backup code is required.');
+  return api.auth.validateTwoFactor(response.tempToken, code);
+}
+
 export const loginCommand = new Command('login')
   .description('Authenticate with the Lockbox API')
   .option('--email <email>', 'Email address')
@@ -87,7 +101,10 @@ export const loginCommand = new Command('login')
 
       // Authenticate with server
       const api = createApi(apiUrl);
-      const response = await api.auth.login({ email, authHash });
+      const response = await completeTwoFactorLogin(
+        await api.auth.login({ email, authHash }),
+        api,
+      );
 
       // Save session (token only — NEVER keys)
       saveSession({

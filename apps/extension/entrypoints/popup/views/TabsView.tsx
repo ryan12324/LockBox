@@ -1,5 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Input, Select, Badge, Card, Icon, type IconName } from '@lockbox/design';
+import {
+  Button,
+  Input,
+  Select,
+  Badge,
+  Card,
+  Icon,
+  SiteFavicon,
+  getEntryFaviconSources,
+  type IconName,
+} from '@lockbox/design';
+import { generateTotp } from '@lockbox/totp';
 import {
   generatePassword,
   generatePassphrase,
@@ -7,15 +18,24 @@ import {
   detectPasswordRules,
   generateCompliant,
 } from '@lockbox/generator';
-import { getRemainingSeconds } from '@lockbox/totp';
 import type { VaultItem, LoginItem, Folder } from '@lockbox/types';
 import type { SearchResult } from '@lockbox/ai';
 import type { PasswordRules, PasswordFieldMetadata } from '@lockbox/generator';
 import { openWebVault } from '../../../lib/web-vault.js';
-import { sendMessage } from './shared.js';
+import { getTotpErrorMessage } from '../../../lib/totp-errors.js';
+import { refreshItemFromServer, sendMessage } from './shared.js';
 
 const itemTypeIcon = (type: string): IconName =>
   ({ login: 'key', note: 'note', card: 'credit-card', identity: 'id', passkey: 'fingerprint', document: 'file-description' })[type] as IconName ?? 'file';
+
+async function getFreshLoginField(
+  itemId: string,
+  field: 'username' | 'password'
+): Promise<string> {
+  const item = await refreshItemFromServer(itemId);
+  if (item.type !== 'login') throw new Error('This item is no longer a login.');
+  return (item as LoginItem)[field] ?? '';
+}
 
 export function SiteTab({
   items,
@@ -27,11 +47,21 @@ export function SiteTab({
   onOpenVault: () => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [useError, setUseError] = useState('');
 
   async function copyToClipboard(text: string, id: string) {
     await navigator.clipboard.writeText(text);
     setCopied(id);
     setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function copyFreshField(itemId: string, field: 'username' | 'password', copyId: string) {
+    setUseError('');
+    try {
+      await copyToClipboard(await getFreshLoginField(itemId, field), copyId);
+    } catch (error) {
+      setUseError(error instanceof Error ? error.message : 'Could not refresh this item.');
+    }
   }
 
   if (items.length === 0) {
@@ -60,11 +90,19 @@ export function SiteTab({
         <span>{siteHost}</span>
         <small>{items.length} {items.length === 1 ? 'saved item' : 'saved items'} for this page</small>
       </div>
+      {useError && <p role="alert" className="px-3 text-xs text-[var(--color-error)]">{useError}</p>}
       <div className="extension-site__list">
       {items.map((item) => (
         <article key={item.id} className="extension-site__item">
           <div className="extension-site__title">
-            <span><Icon name={itemTypeIcon(item.type)} size={18} /></span>
+            <span>
+              <SiteFavicon
+                sources={getEntryFaviconSources(item)}
+                fallbackIcon={itemTypeIcon(item.type)}
+                size={20}
+                fill
+              />
+            </span>
             <div><strong>{item.name}</strong><small>{item.type === 'login' ? (item as LoginItem).username : item.type}</small></div>
           </div>
           {item.type === 'login' && (
@@ -72,7 +110,7 @@ export function SiteTab({
                 <Button
                   variant={copied === `u-${item.id}` ? 'primary' : 'secondary'}
                   size="sm"
-                  onClick={() => copyToClipboard((item as LoginItem).username, `u-${item.id}`)}
+                  onClick={() => void copyFreshField(item.id, 'username', `u-${item.id}`)}
                 >
                   <Icon name={copied === `u-${item.id}` ? 'check' : 'user'} size={17} />
                   {copied === `u-${item.id}` ? 'Copied' : 'Username'}
@@ -80,7 +118,7 @@ export function SiteTab({
                 <Button
                   variant={copied === `p-${item.id}` ? 'primary' : 'secondary'}
                   size="sm"
-                  onClick={() => copyToClipboard((item as LoginItem).password, `p-${item.id}`)}
+                  onClick={() => void copyFreshField(item.id, 'password', `p-${item.id}`)}
                 >
                   <Icon name={copied === `p-${item.id}` ? 'check' : 'copy'} size={17} />
                   {copied === `p-${item.id}` ? 'Copied' : 'Password'}
@@ -113,6 +151,7 @@ export function VaultTab({
   const [search, setSearch] = useState('');
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [useError, setUseError] = useState('');
   const [semanticResults, setSemanticResults] = useState<SearchResult[] | null>(null);
   const [searchingRemote, setSearchingRemote] = useState(false);
 
@@ -120,6 +159,15 @@ export function VaultTab({
     await navigator.clipboard.writeText(text);
     setCopied(id);
     setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function copyFreshField(itemId: string, field: 'username' | 'password', copyId: string) {
+    setUseError('');
+    try {
+      await copyToClipboard(await getFreshLoginField(itemId, field), copyId);
+    } catch (error) {
+      setUseError(error instanceof Error ? error.message : 'Could not refresh this item.');
+    }
   }
 
   useEffect(() => {
@@ -192,6 +240,7 @@ export function VaultTab({
             ]}
           />
         )}
+        {useError && <div role="alert" className="text-xs text-[var(--color-error)] px-1">{useError}</div>}
       </div>
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
@@ -207,7 +256,14 @@ export function VaultTab({
             >
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                  <span className="extension-type-icon"><Icon name={itemTypeIcon(item.type)} size={17} /></span>
+                  <span className="extension-type-icon">
+                    <SiteFavicon
+                      sources={getEntryFaviconSources(item)}
+                      fallbackIcon={itemTypeIcon(item.type)}
+                      size={20}
+                      fill
+                    />
+                  </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1">
                       <div className="text-sm font-medium text-[var(--color-text)] truncate">
@@ -237,7 +293,7 @@ export function VaultTab({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        copyToClipboard((item as LoginItem).username, `u-${item.id}`);
+                        void copyFreshField(item.id, 'username', `u-${item.id}`);
                       }}
                       title="Copy username"
                     >
@@ -248,7 +304,7 @@ export function VaultTab({
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
-                        copyToClipboard((item as LoginItem).password, `p-${item.id}`);
+                        void copyFreshField(item.id, 'password', `p-${item.id}`);
                       }}
                       title="Copy password"
                     >
@@ -283,6 +339,7 @@ export function SharedTab({
   onSelectItem: (item: VaultItem) => void;
 }) {
   const [copied, setCopied] = useState<string | null>(null);
+  const [useError, setUseError] = useState('');
   const [openingWebVault, setOpeningWebVault] = useState(false);
   const [webVaultError, setWebVaultError] = useState('');
 
@@ -290,6 +347,15 @@ export function SharedTab({
     await navigator.clipboard.writeText(text);
     setCopied(id);
     setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function copyFreshField(itemId: string, field: 'username' | 'password', copyId: string) {
+    setUseError('');
+    try {
+      await copyToClipboard(await getFreshLoginField(itemId, field), copyId);
+    } catch (error) {
+      setUseError(error instanceof Error ? error.message : 'Could not refresh this item.');
+    }
   }
 
   async function handleOpenTeams() {
@@ -363,6 +429,7 @@ export function SharedTab({
 
   return (
     <div className="flex-1 overflow-y-auto">
+      {useError && <p role="alert" className="px-3 pt-2 text-xs text-[var(--color-error)]">{useError}</p>}
       {sharedItems.map((item) => {
         const folderName = sharedFolders.find((f) => f.folderId === item.folderId)?.folderName;
         return (
@@ -373,7 +440,14 @@ export function SharedTab({
           >
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <span className="extension-type-icon"><Icon name={itemTypeIcon(item.type)} size={17} /></span>
+                <span className="extension-type-icon">
+                  <SiteFavicon
+                    sources={getEntryFaviconSources(item)}
+                    fallbackIcon={itemTypeIcon(item.type)}
+                    size={20}
+                    fill
+                  />
+                </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-[1px]">
                     <div className="text-sm font-medium text-[var(--color-text)] truncate">
@@ -395,7 +469,7 @@ export function SharedTab({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      copyToClipboard((item as LoginItem).username, `u-${item.id}`);
+                      void copyFreshField(item.id, 'username', `u-${item.id}`);
                     }}
                     title="Copy username"
                   >
@@ -406,7 +480,7 @@ export function SharedTab({
                     size="sm"
                     onClick={(e) => {
                       e.stopPropagation();
-                      copyToClipboard((item as LoginItem).password, `p-${item.id}`);
+                      void copyFreshField(item.id, 'password', `p-${item.id}`);
                     }}
                     title="Copy password"
                   >
@@ -647,36 +721,88 @@ function TotpItem({ item }: { item: LoginItem }) {
   const [code, setCode] = useState('------');
   const [remaining, setRemaining] = useState(30);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!item.totp) return;
+    let cancelled = false;
+    let interval: ReturnType<typeof setInterval> | undefined;
 
-    async function refresh() {
-      const result = await sendMessage<{ code: string | null }>({
-        type: 'get-totp',
-        secret: item.totp,
-      });
-      if (result.code) setCode(result.code);
-      setRemaining(getRemainingSeconds());
+    async function generate(secret: string) {
+      try {
+        const result = await generateTotp(secret);
+        if (cancelled) return;
+        setCode(result.code);
+        setRemaining(result.remaining);
+        setError('');
+      } catch (generationError) {
+        if (cancelled) return;
+        setCode('------');
+        setRemaining(0);
+        setError(getTotpErrorMessage(generationError));
+      }
     }
 
-    refresh();
-    const interval = setInterval(refresh, 1000);
-    return () => clearInterval(interval);
-  }, [item.totp]);
+    void (async () => {
+      try {
+        const freshItem = await refreshItemFromServer(item.id);
+        if (freshItem.type !== 'login' || !(freshItem as LoginItem).totp) {
+          throw new Error('This item has no authenticator key.');
+        }
+        const secret = (freshItem as LoginItem).totp!;
+        await generate(secret);
+        if (!cancelled) interval = setInterval(() => void generate(secret), 1000);
+      } catch (refreshError) {
+        if (cancelled) return;
+        setCode('------');
+        setRemaining(0);
+        setError(refreshError instanceof Error ? refreshError.message : 'Could not refresh this item.');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
+  }, [item.id]);
 
   async function copy() {
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (error || !/^\d{6,8}$/.test(code)) return;
+    try {
+      const freshItem = await refreshItemFromServer(item.id);
+      if (freshItem.type !== 'login' || !(freshItem as LoginItem).totp) {
+        throw new Error('This item has no authenticator key.');
+      }
+      const freshCode = await generateTotp((freshItem as LoginItem).totp!);
+      await navigator.clipboard.writeText(freshCode.code);
+      setCode(freshCode.code);
+      setRemaining(freshCode.remaining);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (copyError) {
+      setError(copyError instanceof Error ? copyError.message : 'Could not refresh this item.');
+    }
   }
 
   return (
     <div className="p-3 border-b border-[var(--color-border)] flex justify-between items-center hover:bg-[var(--color-bg-subtle)] transition-colors">
-      <div>
-        <div className="text-xs font-medium text-[var(--color-text)]">{item.name}</div>
-        <div className="text-[20px] font-bold font-mono text-[var(--color-primary)] tracking-[0.1em] mt-0.5">
-          {code.slice(0, 3)} {code.slice(3)}
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="extension-type-icon">
+          <SiteFavicon
+            sources={getEntryFaviconSources(item)}
+            fallbackIcon="key"
+            size={20}
+            fill
+          />
+        </span>
+        <div className="min-w-0">
+          <div className="text-xs font-medium text-[var(--color-text)] truncate">{item.name}</div>
+          {error ? (
+            <div className="text-xs text-[var(--color-error)] mt-1">{error}</div>
+          ) : (
+            <div className="text-[20px] font-bold font-mono text-[var(--color-primary)] tracking-[0.1em] mt-0.5">
+              {code.slice(0, code.length / 2)} {code.slice(code.length / 2)}
+            </div>
+          )}
         </div>
       </div>
       <div className="flex flex-col items-center gap-1">
@@ -685,7 +811,7 @@ function TotpItem({ item }: { item: LoginItem }) {
         >
           {remaining}s
         </div>
-        <Button variant={copied ? 'primary' : 'secondary'} size="sm" onClick={copy}>
+        <Button variant={copied ? 'primary' : 'secondary'} size="sm" onClick={copy} disabled={Boolean(error)}>
           <Icon name={copied ? 'check' : 'copy'} size={16} />
           <span className="sr-only">{copied ? 'Copied' : 'Copy code'}</span>
         </Button>

@@ -35,6 +35,8 @@ type Bindings = {
   AUTH_LIMITER: RateLimit;
   CORS_ORIGINS?: string;
   EXTENSION_IDS?: string;
+  TOTP_ENCRYPTION_KEY?: string;
+  TOTP_ENCRYPTION_KEY_PREVIOUS?: string;
   ATTACHMENTS: R2Bucket;
 };
 

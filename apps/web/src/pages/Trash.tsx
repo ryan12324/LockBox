@@ -2,8 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../store/auth.js';
 import { useVaultFilterStore } from '../store/vault.js';
 import { api } from '../lib/api.js';
+import { getApiUrl } from '../lib/server-connection.js';
 import { decryptVaultItem } from '../lib/crypto.js';
-import { Button, Card, Badge, Icon, Modal, type IconName } from '@lockbox/design';
+import {
+  Button,
+  Card,
+  Badge,
+  Icon,
+  Modal,
+  SiteFavicon,
+  getEntryFaviconSources,
+  type IconName,
+} from '@lockbox/design';
 import type { VaultItem } from '@lockbox/types';
 import { useToast } from '../providers/ToastProvider.js';
 
@@ -48,8 +58,7 @@ export default function Trash() {
     setLoading(true);
     setError(null);
     try {
-      const API_BASE = import.meta.env.VITE_API_URL ?? '';
-      const res = await fetch(`${API_BASE}/api/vault/trash`, {
+      const res = await fetch(getApiUrl('/api/vault/trash'), {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       if (!res.ok) throw new Error('Failed to load trash');
@@ -241,7 +250,12 @@ export default function Trash() {
                       flexShrink: 0,
                     }}
                   >
-                    <Icon name={typeIcon(item.type)} size={19} />
+                    <SiteFavicon
+                      sources={getEntryFaviconSources(item)}
+                      fallbackIcon={typeIcon(item.type)}
+                      size={20}
+                      fill
+                    />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p

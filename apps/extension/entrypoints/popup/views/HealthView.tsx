@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Badge, Card, Icon } from '@lockbox/design';
+import {
+  Button,
+  Badge,
+  Card,
+  Icon,
+  SiteFavicon,
+  getEntryFaviconSources,
+} from '@lockbox/design';
 import type { VaultItem, VaultHealthSummary, PasswordHealthReport } from '@lockbox/types';
 import { sendMessage } from './shared.js';
 
@@ -208,20 +215,30 @@ export function HealthSummaryView({
                   </Card>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {displayReports.slice(0, filterBreached ? undefined : 10).map((report, idx) => (
-                      <Card key={idx} variant="surface" padding="sm">
-                        <div className="text-sm font-medium text-[var(--color-text)] mb-1.5 truncate">
-                          {allItems.find((i) => i.id === report.itemId)?.name || 'Unknown Item'}
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {report.issues.map((i, iidx) => (
-                            <Badge key={iidx} variant={i.type === 'breached' ? 'error' : 'warning'}>
-                              {i.type.toUpperCase()}
-                            </Badge>
-                          ))}
-                        </div>
-                      </Card>
-                    ))}
+                    {displayReports.slice(0, filterBreached ? undefined : 10).map((report, idx) => {
+                      const item = allItems.find((candidate) => candidate.id === report.itemId);
+                      return (
+                        <Card key={idx} variant="surface" padding="sm">
+                          <div className="flex items-center gap-2 mb-1.5 min-w-0">
+                            <SiteFavicon
+                              sources={item ? getEntryFaviconSources(item) : []}
+                              fallbackIcon="key"
+                              size={18}
+                            />
+                            <div className="text-sm font-medium text-[var(--color-text)] truncate">
+                              {item?.name || 'Unknown Item'}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {report.issues.map((issue, issueIndex) => (
+                              <Badge key={issueIndex} variant={issue.type === 'breached' ? 'error' : 'warning'}>
+                                {issue.type.toUpperCase()}
+                              </Badge>
+                            ))}
+                          </div>
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -6,6 +6,7 @@ import { Button, Icon, Input } from '@lockbox/design';
 import type { KdfConfig } from '@lockbox/types';
 import AuthShell from '../components/AuthShell.js';
 import { api } from '../lib/api.js';
+import { isNativeLockboxApp } from '../lib/server-connection.js';
 import { useAuthStore } from '../store/auth.js';
 import { useToast } from '../providers/ToastProvider.js';
 
@@ -28,6 +29,7 @@ export default function Register() {
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
   const strength = password ? evaluateStrength(password) : null;
+  const nativeApp = isNativeLockboxApp();
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -79,7 +81,10 @@ export default function Register() {
       title="Make one password count"
       description="Your master password protects the encryption key for everything you store in Lockbox."
       icon="shield-check"
-      footer={<>Already have a vault? <Link to="/login">Sign in</Link></>}
+      footer={<>
+        <span>Already have a vault? <Link to="/login">Sign in</Link></span>
+        {nativeApp && <span className="auth-panel__footer-action"><Link to="/setup">Use a different Lockbox server</Link></span>}
+      </>}
     >
       <form onSubmit={handleSubmit} className="auth-form">
         <Input name="email" type="email" required autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} label="Email" placeholder="you@example.com" />

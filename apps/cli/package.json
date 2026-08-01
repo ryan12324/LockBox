@@ -18,6 +18,7 @@
   "dependencies": {
     "@lockbox/crypto": "workspace:*",
     "@lockbox/generator": "workspace:*",
+    "@lockbox/totp": "workspace:*",
     "@lockbox/types": "workspace:*",
     "commander": "^13.0.0"
   },

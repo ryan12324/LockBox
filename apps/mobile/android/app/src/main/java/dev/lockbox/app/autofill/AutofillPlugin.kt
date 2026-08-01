@@ -8,6 +8,8 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import dev.lockbox.app.credentialprovider.PasskeyMetadataEntity
+import dev.lockbox.app.credentialprovider.PasskeyAccountState
 import dev.lockbox.app.storage.VaultDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import android.util.Base64
 
 /**
  * Capacitor bridge for maintaining Android's device-local autofill index.
@@ -85,7 +88,7 @@ class AutofillPlugin : Plugin() {
                     val uris = credential.optJSONArray("uris") ?: JSONArray()
                     val hashes = linkedSetOf<String>()
                     for (uriIndex in 0 until minOf(uris.length(), MAX_URIS_PER_CREDENTIAL)) {
-                        val identifier = extractIdentifier(uris.optString(uriIndex)) ?: continue
+                        val identifier = AutofillIdentifier.extract(uris.optString(uriIndex)) ?: continue
                         hashes.add(AutofillCrypto.hashIdentifier(context, identifier))
                     }
                     if (hashes.isEmpty()) continue
@@ -113,11 +116,90 @@ class AutofillPlugin : Plugin() {
         }
     }
 
+    /**
+     * Replace passkeys imported from the encrypted Lockbox vault.
+     *
+     * The WebView can call this only after decrypting the vault. Native code
+     * immediately hybrid-encrypts each PKCS#8 private key to the same
+     * biometric-bound Keystore key used by Android Autofill. Device-created
+     * passkeys are kept separately and are not removed by this refresh.
+     */
+    @PluginMethod
+    fun replacePasskeyIndex(call: PluginCall) {
+        val passkeys = call.getArray("passkeys") ?: return call.reject("passkeys is required")
+        val accountId = call.getString("accountId")?.takeIf { it.isNotBlank() && it.length <= 100 }
+            ?: return call.reject("accountId is required")
+        if (passkeys.length() > MAX_PASSKEYS) {
+            call.reject("Too many passkeys")
+            return
+        }
+
+        pluginScope.launch {
+            try {
+                val publicKey = AutofillCrypto.ensureKeyPair().public
+                val entities = mutableListOf<PasskeyMetadataEntity>()
+
+                for (index in 0 until passkeys.length()) {
+                    val passkey = passkeys.optJSONObject(index)
+                        ?: throw IllegalArgumentException("Invalid passkey entry")
+                    val credentialId = passkey.requireCanonicalBase64url("credentialId", 16, 1024)
+                    val vaultItemId = passkey.requireVaultItemId("id")
+                    val rpId = passkey.requireRpId("rpId")
+                    val rpName = passkey.requireBoundedString("rpName", 1, 500)
+                    val userName = passkey.requireBoundedString("userName", 1, 10_000)
+                    val userDisplayName = passkey.optString("userDisplayName", userName)
+                    if (userDisplayName.length > 10_000) {
+                        throw IllegalArgumentException("Invalid userDisplayName")
+                    }
+                    val userId = passkey.requireCanonicalBase64url("userId", 1, 1024)
+                    val privateKey = passkey.requireCanonicalBase64url("privateKey", 64, 4096)
+                    val cosePublicKey = passkey.requireCanonicalBase64url("publicKey", 64, 1024)
+                    val createdAt = passkey.requireBoundedString("createdAt", 1, 100)
+
+                    val protectedKey = AutofillCrypto.encrypt(
+                        publicKey,
+                        JSONObject().put("privateKey", privateKey).toString()
+                    )
+                    entities.add(
+                        PasskeyMetadataEntity(
+                            credentialId = credentialId,
+                            rpId = rpId,
+                            rpName = rpName,
+                            userName = userName,
+                            userDisplayName = userDisplayName,
+                            userId = userId,
+                            keystoreAlias = "",
+                            createdAt = createdAt,
+                            encryptedPrivateKey = protectedKey,
+                            publicKey = cosePublicKey,
+                            vaultItemId = vaultItemId,
+                            accountId = accountId,
+                            source = PasskeyMetadataEntity.SOURCE_SYNCED
+                        )
+                    )
+                }
+
+                val passkeyDao = VaultDatabase.getInstance(context).passkeyMetadataDao()
+                // Existing non-exportable keys predate account binding. Claim
+                // them on the first successful unlock so upgrades keep working.
+                passkeyDao.adoptLegacyLocal(accountId)
+                passkeyDao.replaceSynced(entities)
+                PasskeyAccountState.set(context, accountId)
+                call.resolve(JSObject().put("indexed", entities.size))
+            } catch (error: Exception) {
+                call.reject("Failed to update passkey index", error)
+            }
+        }
+    }
+
     @PluginMethod
     fun clearCredentialIndex(call: PluginCall) {
         pluginScope.launch {
             try {
-                VaultDatabase.getInstance(context).autofillCredentialDao().deleteAll()
+                val database = VaultDatabase.getInstance(context)
+                database.autofillCredentialDao().deleteAll()
+                database.passkeyMetadataDao().deleteBySource(PasskeyMetadataEntity.SOURCE_SYNCED)
+                PasskeyAccountState.clear(context)
                 call.resolve()
             } catch (error: Exception) {
                 call.reject("Failed to clear autofill index", error)
@@ -128,13 +210,18 @@ class AutofillPlugin : Plugin() {
     @PluginMethod
     fun getPasskeysForUri(call: PluginCall) {
         val uri = call.getString("uri") ?: return call.reject("URI is required")
-        val domain = extractIdentifier(uri) ?: return call.reject("Invalid URI")
+        val domain = AutofillIdentifier.extract(uri) ?: return call.reject("Invalid URI")
 
         pluginScope.launch {
             try {
-                val passkeys = VaultDatabase.getInstance(context)
-                    .passkeyMetadataDao()
-                    .getByRpId(domain)
+                val accountId = PasskeyAccountState.get(context)
+                val passkeys = if (accountId == null) {
+                    emptyList()
+                } else {
+                    VaultDatabase.getInstance(context)
+                        .passkeyMetadataDao()
+                        .getByRpIdAndAccount(domain, accountId)
+                }
                 val result = org.json.JSONArray()
                 for (passkey in passkeys) {
                     result.put(
@@ -153,30 +240,58 @@ class AutofillPlugin : Plugin() {
         }
     }
 
-    private fun extractIdentifier(value: String): String? {
-        if (value.isBlank()) return null
-        val parsed = Uri.parse(if (value.contains("://")) value else "https://$value")
-        val scheme = parsed.scheme?.lowercase() ?: return null
-        val host = parsed.host ?: return null
-        if (scheme == "https") return AutofillCrypto.normalizeIdentifier(host)
-        if (scheme == "http" && isLoopback(host)) return AutofillCrypto.normalizeIdentifier(host)
-        if (scheme == "androidapp") return AutofillCrypto.normalizeIdentifier(host)
-        return null
-    }
-
-    private fun isLoopback(host: String): Boolean {
-        val normalized = host.lowercase().trim('[', ']')
-        return normalized == "localhost" || normalized == "127.0.0.1" || normalized == "::1"
-    }
-
     private fun JSONObject.requireBoundedString(key: String, min: Int, max: Int): String {
         val value = optString(key, "")
         if (value.length !in min..max) throw IllegalArgumentException("Invalid $key")
         return value
     }
 
+    private fun JSONObject.requireCanonicalBase64url(
+        key: String,
+        minBytes: Int,
+        maxBytes: Int
+    ): String {
+        val value = optString(key, "")
+        if (!value.matches(Regex("^[A-Za-z0-9_-]+$"))) {
+            throw IllegalArgumentException("Invalid $key")
+        }
+        val decoded = try {
+            Base64.decode(value, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        } catch (_: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid $key")
+        }
+        if (decoded.size !in minBytes..maxBytes) {
+            throw IllegalArgumentException("Invalid $key")
+        }
+        val canonical = Base64.encodeToString(
+            decoded,
+            Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
+        )
+        if (canonical != value) throw IllegalArgumentException("Invalid $key")
+        return value
+    }
+
+    private fun JSONObject.requireRpId(key: String): String {
+        val value = optString(key, "")
+        if (value.isEmpty() || value.length > 253 || value.endsWith('.') || value != value.lowercase()) {
+            throw IllegalArgumentException("Invalid $key")
+        }
+        val label = Regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+        if (!value.split('.').all(label::matches)) throw IllegalArgumentException("Invalid $key")
+        return value
+    }
+
+    private fun JSONObject.requireVaultItemId(key: String): String {
+        val value = optString(key, "")
+        if (!value.matches(Regex("^[A-Za-z0-9_-]{1,100}$"))) {
+            throw IllegalArgumentException("Invalid $key")
+        }
+        return value
+    }
+
     companion object {
         private const val MAX_CREDENTIALS = 5_000
         private const val MAX_URIS_PER_CREDENTIAL = 50
+        private const val MAX_PASSKEYS = 5_000
     }
 }

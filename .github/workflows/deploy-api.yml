@@ -75,14 +75,39 @@ jobs:
 
       - name: Deploy Worker
         run: |
+          if [ -z "$TOTP_ENCRYPTION_KEY" ]; then
+            echo "Set the TOTP_ENCRYPTION_KEY repository secret before deploying."
+            exit 1
+          fi
+          LOCKBOX_KEY_TO_VALIDATE="$TOTP_ENCRYPTION_KEY" bun -e '
+            const value = process.env.LOCKBOX_KEY_TO_VALIDATE ?? "";
+            const decoded = Buffer.from(value, "base64");
+            if (decoded.byteLength !== 32 || decoded.toString("base64") !== value) process.exit(1);
+          '
+
+          umask 077
+          secrets_file="$(mktemp)"
+          printf 'TOTP_ENCRYPTION_KEY=%s\n' "$TOTP_ENCRYPTION_KEY" > "$secrets_file"
+          if [ -n "$TOTP_ENCRYPTION_KEY_PREVIOUS" ]; then
+            LOCKBOX_KEY_TO_VALIDATE="$TOTP_ENCRYPTION_KEY_PREVIOUS" bun -e '
+              const value = process.env.LOCKBOX_KEY_TO_VALIDATE ?? "";
+              const decoded = Buffer.from(value, "base64");
+              if (decoded.byteLength !== 32 || decoded.toString("base64") !== value) process.exit(1);
+            '
+            printf 'TOTP_ENCRYPTION_KEY_PREVIOUS=%s\n' "$TOTP_ENCRYPTION_KEY_PREVIOUS" >> "$secrets_file"
+          fi
+
           cors_origins="${LOCKBOX_CORS_ORIGINS:-https://lockbox-web.pages.dev,http://localhost:5173,https://localhost}"
           extension_ids="${LOCKBOX_EXTENSION_IDS:-}"
           bunx wrangler deploy \
+            --secrets-file "$secrets_file" \
             --var "CORS_ORIGINS:$cors_origins" \
             --var "EXTENSION_IDS:$extension_ids"
         working-directory: apps/api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TOTP_ENCRYPTION_KEY: ${{ secrets.TOTP_ENCRYPTION_KEY }}
+          TOTP_ENCRYPTION_KEY_PREVIOUS: ${{ secrets.TOTP_ENCRYPTION_KEY_PREVIOUS }}
           LOCKBOX_CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
           LOCKBOX_EXTENSION_IDS: ${{ vars.EXTENSION_IDS }}

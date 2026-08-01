@@ -173,6 +173,19 @@ describe('parseLastPass', () => {
     const gmail = items[1] as { totp?: string };
     expect(gmail.totp).toBe('JBSWY3DPEHPK3PXP');
   });
+
+  it('routes http://sn records through the shared secure-note parser', () => {
+    const items = parseLastPass(
+      'url,username,password,extra,name,grouping,fav\nhttp://sn,,,Private note,Recovery note,,0',
+    );
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      type: 'note',
+      name: 'Recovery note',
+      content: 'Private note',
+    });
+  });
 });
 
 // ─── parseKeePass ─────────────────────────────────────────────────────────────

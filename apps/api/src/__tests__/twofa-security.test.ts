@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { readdir, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { Miniflare } from 'miniflare';
-import { base32Encode, totp } from '@lockbox/totp';
+import { base32Encode, parseOtpAuthUri, totp } from '@lockbox/totp';
 
 import { app } from '../index.js';
 
@@ -18,6 +18,7 @@ const TEST_SALT = toBase64(new Uint8Array(16).fill(3));
 const TEST_ENCRYPTED_USER_KEY = `${toBase64(new Uint8Array(12).fill(4))}.${toBase64(
   new Uint8Array(80).fill(5)
 )}`;
+const TEST_TOTP_ENCRYPTION_KEY = toBase64(new Uint8Array(32).fill(42));
 
 async function sha256Hex(value: string): Promise<string> {
   const bytes = new TextEncoder().encode(value);
@@ -63,6 +64,7 @@ describe('2FA pre-authentication boundary', () => {
     const env = {
       DB: database,
       AUTH_LIMITER: { limit: async () => ({ success: true }) },
+      TOTP_ENCRYPTION_KEY: TEST_TOTP_ENCRYPTION_KEY,
     } as unknown as TestEnv;
 
     const authHash = toBase64(new Uint8Array(32).fill(6));
@@ -141,6 +143,13 @@ describe('2FA pre-authentication boundary', () => {
     expect(validationResponse.status).toBe(200);
     const validation = (await validationResponse.json()) as { token: string };
     expect(validation.token).not.toBe(login.tempToken);
+
+    const migratedSettings = await database
+      .prepare('SELECT encrypted_totp_secret FROM user_totp_settings WHERE user_id = ?')
+      .bind(registered.user.id)
+      .first<{ encrypted_totp_secret: string }>();
+    expect(migratedSettings!.encrypted_totp_secret).toMatch(/^v1\./);
+    expect(migratedSettings!.encrypted_totp_secret).not.toBe(base32Encode(secret));
 
     const authenticatedRequest = await app.request(
       '/api/vault',
@@ -228,12 +237,115 @@ describe('2FA pre-authentication boundary', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tempToken, code: backupCode }),
         },
-        env
+        { ...env, TOTP_ENCRYPTION_KEY: undefined } as unknown as TestEnv
       );
 
     const firstBackupLogin = await loginForBackup();
     expect((await validateBackup(firstBackupLogin.tempToken)).status).toBe(200);
     const secondBackupLogin = await loginForBackup();
     expect((await validateBackup(secondBackupLogin.tempToken)).status).toBe(401);
+  });
+
+  it('completes setup, verification, status, and disable as one working flow', async () => {
+    const env = {
+      DB: database,
+      AUTH_LIMITER: { limit: async () => ({ success: true }) },
+      TOTP_ENCRYPTION_KEY: TEST_TOTP_ENCRYPTION_KEY,
+    } as unknown as TestEnv;
+    const email = 'totp-flow@example.com';
+    const registerResponse = await app.request(
+      '/api/auth/register',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          authHash: toBase64(new Uint8Array(32).fill(8)),
+          encryptedUserKey: TEST_ENCRYPTED_USER_KEY,
+          kdfConfig: { type: 'argon2id', iterations: 3, memory: 65536, parallelism: 4 },
+          salt: TEST_SALT,
+        }),
+      },
+      env,
+    );
+    expect(registerResponse.status).toBe(201);
+    const registered = (await registerResponse.json()) as {
+      token: string;
+      user: { id: string };
+    };
+    const authenticated = { Authorization: `Bearer ${registered.token}` };
+
+    const unconfiguredSetup = await app.request(
+      '/api/auth/2fa/setup',
+      { method: 'POST', headers: authenticated },
+      { ...env, TOTP_ENCRYPTION_KEY: undefined } as unknown as TestEnv,
+    );
+    expect(unconfiguredSetup.status).toBe(503);
+
+    const unconfiguredRow = await database
+      .prepare('SELECT user_id FROM user_totp_settings WHERE user_id = ?')
+      .bind(registered.user.id)
+      .first();
+    expect(unconfiguredRow).toBeNull();
+
+    const setupResponse = await app.request(
+      '/api/auth/2fa/setup',
+      { method: 'POST', headers: authenticated },
+      env,
+    );
+    expect(setupResponse.status).toBe(200);
+    const setup = (await setupResponse.json()) as { secret: string; otpauthUri: string };
+    const parsed = parseOtpAuthUri(setup.otpauthUri);
+    expect(parsed.type).toBe('totp');
+    expect(parsed.issuer).toBe('Lockbox');
+    expect(parsed.account).toBe(email);
+
+    const storedSettings = await database
+      .prepare('SELECT encrypted_totp_secret FROM user_totp_settings WHERE user_id = ?')
+      .bind(registered.user.id)
+      .first<{ encrypted_totp_secret: string }>();
+    expect(storedSettings!.encrypted_totp_secret).toMatch(/^v1\./);
+    expect(storedSettings!.encrypted_totp_secret).not.toContain(setup.secret);
+
+    const code = await totp(parsed.secret);
+    const verifyResponse = await app.request(
+      '/api/auth/2fa/verify',
+      {
+        method: 'POST',
+        headers: { ...authenticated, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      },
+      env,
+    );
+    expect(verifyResponse.status).toBe(200);
+    const verified = (await verifyResponse.json()) as { enabled: boolean; backupCodes: string[] };
+    expect(verified.enabled).toBe(true);
+    expect(verified.backupCodes).toHaveLength(8);
+
+    const enabledStatus = await app.request(
+      '/api/auth/2fa/status',
+      { headers: authenticated },
+      env,
+    );
+    expect(await enabledStatus.json()).toEqual({ enabled: true });
+
+    const disableResponse = await app.request(
+      '/api/auth/2fa/disable',
+      {
+        method: 'POST',
+        headers: { ...authenticated, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: await totp(parsed.secret) }),
+      },
+      env,
+    );
+    expect(disableResponse.status).toBe(200);
+    expect(await disableResponse.json()).toEqual({ disabled: true });
+
+    const disabledStatus = await app.request(
+      '/api/auth/2fa/status',
+      { headers: authenticated },
+      env,
+    );
+    expect(await disabledStatus.json()).toEqual({ enabled: false });
   });
 });

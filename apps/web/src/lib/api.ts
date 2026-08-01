@@ -2,9 +2,13 @@
  * API client — thin fetch wrapper with auth header injection.
  */
 
-import type { EncryptedVaultItem, Folder } from '@lockbox/types';
+import type { EncryptedVaultItem, Folder, KdfConfig } from '@lockbox/types';
+import { getApiUrl } from './server-connection.js';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? '';
+export interface KdfParamsResponse {
+  kdfConfig: KdfConfig;
+  salt: string;
+}
 
 export class ApiError extends Error {
   constructor(
@@ -27,14 +31,90 @@ async function request<T>(
   };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE}${path}`, { ...fetchOptions, headers });
-  const data = await res.json().catch(() => ({}));
+  const res = await fetch(getApiUrl(path), { ...fetchOptions, headers });
+  if (res.status === 204) return {} as T;
+
+  const contentType = res.headers.get('content-type')?.toLowerCase() ?? '';
+  if (!contentType.includes('application/json')) {
+    if (!res.ok) throw new ApiError(res.status, res.statusText || 'Request failed');
+    throw new ApiError(
+      502,
+      'The configured server did not return a Lockbox API response. Reconnect your web vault.'
+    );
+  }
+
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    throw new ApiError(
+      502,
+      'The Lockbox API returned malformed JSON. Try again or reconnect the web vault.'
+    );
+  }
 
   if (!res.ok) {
     throw new ApiError(res.status, (data as { error?: string }).error ?? res.statusText);
   }
 
   return data as T;
+}
+
+function decodedBase64Length(value: unknown): number | null {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > 256 ||
+    value.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(value)
+  ) {
+    return null;
+  }
+  try {
+    return atob(value).length;
+  } catch {
+    return null;
+  }
+}
+
+function isValidKdfConfig(value: unknown): value is KdfConfig {
+  if (!value || typeof value !== 'object') return false;
+  const config = value as Record<string, unknown>;
+  if (!Number.isInteger(config.iterations)) return false;
+
+  if (config.type === 'argon2id') {
+    return (
+      (config.iterations as number) >= 1 &&
+      (config.iterations as number) <= 10 &&
+      Number.isInteger(config.memory) &&
+      (config.memory as number) >= 8_192 &&
+      (config.memory as number) <= 1_048_576 &&
+      Number.isInteger(config.parallelism) &&
+      (config.parallelism as number) >= 1 &&
+      (config.parallelism as number) <= 16
+    );
+  }
+
+  return (
+    config.type === 'pbkdf2' &&
+    (config.iterations as number) >= 100_000 &&
+    (config.iterations as number) <= 5_000_000
+  );
+}
+
+/** Validate server-controlled KDF values before any value reaches a crypto decoder. */
+export function validateKdfParams(value: unknown): KdfParamsResponse {
+  if (!value || typeof value !== 'object') {
+    throw new ApiError(502, 'The Lockbox API returned invalid login parameters.');
+  }
+  const response = value as Record<string, unknown>;
+  if (decodedBase64Length(response.salt) !== 16 || !isValidKdfConfig(response.kdfConfig)) {
+    throw new ApiError(
+      502,
+      'The Lockbox API returned invalid login parameters. Reconnect the web vault or update the server.'
+    );
+  }
+  return response as unknown as KdfParamsResponse;
 }
 
 export const api = {
@@ -44,7 +124,9 @@ export const api = {
     login: (body: object) =>
       request('/api/auth/login', { method: 'POST', body: JSON.stringify(body) }),
     kdfParams: (email: string) =>
-      request(`/api/auth/kdf-params?email=${encodeURIComponent(email)}`),
+      request<unknown>(`/api/auth/kdf-params?email=${encodeURIComponent(email)}`).then(
+        validateKdfParams
+      ),
     logout: (token: string) =>
       request('/api/auth/logout', { method: 'POST', token }),
     me: (token: string) => request('/api/auth/me', { token }),
@@ -91,6 +173,8 @@ export const api = {
       const qs = params ? '?' + new URLSearchParams(params).toString() : '';
       return request<{ items: EncryptedVaultItem[]; folders: Folder[] }>(`/api/vault${qs}`, { token });
     },
+    getItem: (id: string, token: string) =>
+      request<{ item: EncryptedVaultItem }>(`/api/vault/items/${id}`, { token }),
     createItem: (body: object, token: string) =>
       request('/api/vault/items', { method: 'POST', body: JSON.stringify(body), token }),
     updateItem: (id: string, body: object, token: string) =>
@@ -102,7 +186,7 @@ export const api = {
     permanentDelete: (id: string, token: string) =>
       request(`/api/vault/items/${id}/permanent`, { method: 'DELETE', token }),
     createFolder: (body: object, token: string) =>
-      request('/api/vault/folders', { method: 'POST', body: JSON.stringify(body), token }),
+      request<{ folder: Folder }>('/api/vault/folders', { method: 'POST', body: JSON.stringify(body), token }),
     updateFolder: (id: string, body: object, token: string) =>
       request(`/api/vault/folders/${id}`, { method: 'PUT', body: JSON.stringify(body), token }),
     deleteFolder: (id: string, token: string) =>
@@ -216,7 +300,7 @@ export const api = {
       const body = new FormData();
       body.append('file', file, 'document.lockbox');
       body.append('plaintextSize', String(plaintextSize));
-      const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/document`, {
+      const res = await fetch(getApiUrl(`/api/vault/items/${itemId}/document`), {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body,
@@ -230,7 +314,7 @@ export const api = {
       return data as { success: boolean; size: number };
     },
     download: async (itemId: string, token: string) => {
-      const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/document`, {
+      const res = await fetch(getApiUrl(`/api/vault/items/${itemId}/document`), {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {

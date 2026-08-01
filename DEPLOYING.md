@@ -24,10 +24,24 @@ The API uses these Cloudflare resources:
 - D1 database `lockbox-vault`
 - R2 bucket `lockbox-attachments`
 - Workers rate-limit binding `AUTH_LIMITER`
+- Worker secret `TOTP_ENCRYPTION_KEY` for account TOTP seed encryption
 
 The repository does not contain a real D1 ID. `apps/api/wrangler.toml` intentionally uses an all-zero placeholder.
 
 ### Assisted deployment
+
+Generate the TOTP encryption key once for the first deployment. It must remain
+stable; losing or replacing it without the rotation procedure makes existing
+authenticator codes unavailable.
+
+```bash
+export LOCKBOX_TOTP_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+bun run deploy:api
+unset LOCKBOX_TOTP_ENCRYPTION_KEY
+```
+
+The script uploads the value as an encrypted Worker secret. On later deploys it
+reuses the remote secret, so the shell variable is not required.
 
 ```bash
 bun run deploy:api
@@ -70,9 +84,22 @@ Copy the resulting ID into the local `database_id` field in `apps/api/wrangler.t
 
 ```bash
 cd apps/api
+export TOTP_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+printf '%s' "$TOTP_ENCRYPTION_KEY" | bunx wrangler secret put TOTP_ENCRYPTION_KEY
+unset TOTP_ENCRYPTION_KEY
 bunx wrangler d1 migrations apply lockbox-vault --remote
 bunx wrangler deploy
 ```
+
+For local Worker development, place the same format of key in
+`apps/api/.dev.vars` as `TOTP_ENCRYPTION_KEY=...`. The repository ignores
+`.dev.vars*`; never commit this value.
+
+To rotate the key without immediately invalidating existing TOTP factors, keep
+the old value in the `TOTP_ENCRYPTION_KEY_PREVIOUS` Worker secret while setting
+the new value as `TOTP_ENCRYPTION_KEY`. Each successful TOTP operation rewraps
+that account under the new key. Do not remove the previous key until every
+active account has migrated or reset its factor.
 
 Confirm the deployed health endpoint:
 
@@ -204,10 +231,12 @@ Never commit the keystore or its passwords. Back up the signing key independentl
 
 The required Cloudflare repository secrets are:
 
-| Secret                  | Purpose                              |
-| ----------------------- | ------------------------------------ |
-| `CLOUDFLARE_API_TOKEN`  | Worker, D1, R2, and Pages deployment |
-| `CLOUDFLARE_ACCOUNT_ID` | Target Cloudflare account            |
+| Secret                         | Purpose                                      |
+| ------------------------------ | -------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`         | Worker, D1, R2, and Pages deployment         |
+| `CLOUDFLARE_ACCOUNT_ID`        | Target Cloudflare account                    |
+| `TOTP_ENCRYPTION_KEY`          | Stable 32-byte Base64 account TOTP key       |
+| `TOTP_ENCRYPTION_KEY_PREVIOUS` | Optional old key during a controlled rotation |
 
 The API deployment also requires these repository variables:
 

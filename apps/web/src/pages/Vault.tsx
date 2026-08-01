@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Icon, Input, Select, type IconName } from '@lockbox/design';
+import {
+  Badge,
+  Button,
+  Icon,
+  Input,
+  Select,
+  SiteFavicon,
+  getEntryFaviconSources,
+  type IconName,
+} from '@lockbox/design';
 import type {
   VaultItem,
   EncryptedVaultItem,
@@ -18,6 +27,8 @@ import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
 import { copyWithFeedback } from '../lib/copy-utils.js';
 import { syncNativeAutofillIndex } from '../lib/native-autofill.js';
+import { syncPendingNativePasskeys } from '../lib/native-passkey-sync.js';
+import { fetchFreshVaultItem } from '../lib/vault-freshness.js';
 import ItemPanel from '../components/ItemPanel.js';
 
 const typeLabels: Record<string, string> = {
@@ -90,6 +101,7 @@ export default function Vault() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [refreshingItemId, setRefreshingItemId] = useState<string | null>(null);
   const [corruptItems, setCorruptItems] = useState<EncryptedVaultItem[]>([]);
   const [deletingCorruptId, setDeletingCorruptId] = useState<string | null>(null);
   const [panelState, setPanelState] = useState<{
@@ -145,9 +157,41 @@ export default function Vault() {
       setItems(decrypted);
       setCorruptItems(corrupt);
       void indexItems(decrypted);
-      syncNativeAutofillIndex(decrypted).catch(() => {
-        toast('Vault loaded, but Android autofill could not refresh yet.', 'warning');
-      });
+      void (async () => {
+        try {
+          await syncNativeAutofillIndex(decrypted, session.userId);
+        } catch {
+          toast('Vault loaded, but Android autofill and passkeys could not refresh yet.', 'warning');
+        }
+
+        try {
+          const syncResult = await syncPendingNativePasskeys({
+            items: decrypted,
+            existingItemIds: response.items
+              .filter((item) => !item.deletedAt)
+              .map((item) => item.id),
+            token: session.token,
+            userKey,
+          });
+          if (syncResult.addedItems.length > 0) {
+            const merged = [...decrypted, ...syncResult.addedItems]
+              .sort((a, b) => a.name.localeCompare(b.name));
+            setItems(merged);
+            void indexItems(merged);
+          }
+          if (syncResult.syncedCount > 0) {
+            toast(
+              `${syncResult.syncedCount} Android ${syncResult.syncedCount === 1 ? 'passkey' : 'passkeys'} synced to your encrypted vault.`,
+              'success'
+            );
+          }
+          if (syncResult.remainingCount > 0) {
+            toast('Your passkey is still safe on this device and will sync after biometric approval.', 'warning');
+          }
+        } catch {
+          toast('Android passkey sync will retry the next time you unlock your vault.', 'warning');
+        }
+      })();
     } catch {
       setLoadError(true);
       toast('Your vault could not be loaded. Check your connection and try again.', 'error');
@@ -210,6 +254,59 @@ export default function Vault() {
       }, 30_000);
     } catch {
       toast('Could not copy to the clipboard.', 'error');
+    }
+  }
+
+  function commitFreshItem(freshItem: VaultItem) {
+    setItems((current) =>
+      current
+        .map((candidate) => (candidate.id === freshItem.id ? freshItem : candidate))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+  }
+
+  async function getFreshItem(itemId: string): Promise<VaultItem> {
+    if (!session || !userKey) throw new Error('Session expired — please log in again.');
+    const freshItem = await fetchFreshVaultItem(itemId, session.token, userKey);
+    commitFreshItem(freshItem);
+    setPanelState((current) =>
+      current?.item?.id === freshItem.id ? { ...current, item: freshItem } : current
+    );
+    return freshItem;
+  }
+
+  async function openFreshItem(itemId: string) {
+    setRefreshingItemId(itemId);
+    try {
+      setPanelState({ mode: 'view', item: await getFreshItem(itemId) });
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : 'This item could not be refreshed from the server.',
+        'error'
+      );
+    } finally {
+      setRefreshingItemId(null);
+    }
+  }
+
+  async function copyFreshLoginField(
+    itemId: string,
+    field: 'username' | 'password',
+    copyId: string,
+    element: HTMLElement
+  ) {
+    setRefreshingItemId(itemId);
+    try {
+      const freshItem = await getFreshItem(itemId);
+      if (freshItem.type !== 'login') throw new Error('This item is no longer a login.');
+      await copyToClipboard((freshItem as LoginItem)[field] ?? '', copyId, element);
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : 'This item could not be refreshed from the server.',
+        'error'
+      );
+    } finally {
+      setRefreshingItemId(null);
     }
   }
 
@@ -332,11 +429,17 @@ export default function Vault() {
                       <button
                         type="button"
                         className="vault-row__main"
-                        onClick={() => setPanelState({ mode: 'view', item })}
+                        onClick={() => void openFreshItem(item.id)}
+                        disabled={refreshingItemId === item.id}
                         aria-label={`Open ${item.name}`}
                       >
                         <span className="vault-row__icon" aria-hidden="true">
-                          <Icon name={typeIcons[item.type] ?? 'file'} size={20} />
+                          <SiteFavicon
+                            sources={getEntryFaviconSources(item)}
+                            fallbackIcon={typeIcons[item.type] ?? 'file'}
+                            size={22}
+                            fill
+                          />
                         </span>
                         <span className="vault-row__content">
                           <span className="vault-row__title-line">
@@ -357,11 +460,13 @@ export default function Vault() {
                           <button
                             type="button"
                             className="lb-icon-button"
-                            onClick={(event) => void copyToClipboard(
-                              (item as LoginItem).username ?? '',
+                            onClick={(event) => void copyFreshLoginField(
+                              item.id,
+                              'username',
                               `${item.id}-username`,
                               event.currentTarget
                             )}
+                            disabled={refreshingItemId === item.id}
                             aria-label={`Copy username for ${item.name}`}
                           >
                             <Icon name={copiedId === `${item.id}-username` ? 'check' : 'user'} size={18} />
@@ -369,11 +474,13 @@ export default function Vault() {
                           <button
                             type="button"
                             className="lb-icon-button"
-                            onClick={(event) => void copyToClipboard(
-                              (item as LoginItem).password ?? '',
+                            onClick={(event) => void copyFreshLoginField(
+                              item.id,
+                              'password',
                               item.id,
                               event.currentTarget
                             )}
+                            disabled={refreshingItemId === item.id}
                             aria-label={`Copy password for ${item.name}`}
                           >
                             <Icon name={copiedId === item.id ? 'check' : 'copy'} size={18} />
@@ -430,6 +537,7 @@ export default function Vault() {
                 void loadVault();
               }}
               onClose={() => setPanelState(null)}
+              refreshItem={getFreshItem}
             />
           ) : (
             <div className="vault-detail-empty">

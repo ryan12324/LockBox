@@ -7,6 +7,7 @@ import { Command } from 'commander';
 import * as readline from 'node:readline';
 import type { VaultItemType } from '@lockbox/types';
 import { encryptString, toUtf8 } from '@lockbox/crypto';
+import { parseTotpSecret } from '@lockbox/totp';
 import { createApi } from '../lib/api.js';
 import { unlockForCommand } from './unlock.js';
 import { prompt } from './login.js';
@@ -29,10 +30,13 @@ async function promptForLoginFields(): Promise<Record<string, unknown>> {
   const username = await ask('Username: ');
   const password = await prompt('Password: ', true);
   const uri = await ask('URI (optional): ');
+  const totp = (await prompt('Authenticator key (optional): ', true)).trim();
+  if (totp) parseTotpSecret(totp);
   return {
     username,
     password,
     uris: uri ? [uri] : [],
+    totp: totp || undefined,
   };
 }
 

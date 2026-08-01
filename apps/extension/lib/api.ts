@@ -175,6 +175,8 @@ export const api = {
       const qs = params ? '?' + new URLSearchParams(params).toString() : '';
       return request<{ items: EncryptedVaultItem[]; folders: Folder[] }>(`/api/vault${qs}`, { token });
     },
+    getItem: (id: string, token: string) =>
+      request<{ item: EncryptedVaultItem }>(`/api/vault/items/${id}`, { token }),
     createItem: (body: object, token: string) =>
       request('/api/vault/items', { method: 'POST', body: JSON.stringify(body), token }),
     updateItem: (id: string, body: object, token: string) =>

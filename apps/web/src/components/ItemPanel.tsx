@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { VaultItem, Folder } from '@lockbox/types';
-import { Button, Card, Icon } from '@lockbox/design';
+import { Button, Card, Icon, getEntryFaviconSources } from '@lockbox/design';
 import ItemHistoryPanel from './ItemHistoryPanel.js';
 import AttachmentSection from './AttachmentSection.js';
 import ShareLinkModal from './ShareLinkModal.js';
@@ -57,6 +57,7 @@ interface ItemPanelProps {
   onSave: () => void;
   onDelete: () => void;
   onClose: () => void;
+  refreshItem: (itemId: string) => Promise<VaultItem>;
 }
 
 export default function ItemPanel({
@@ -67,9 +68,10 @@ export default function ItemPanel({
   onSave,
   onDelete,
   onClose,
+  refreshItem,
 }: ItemPanelProps) {
   const navigate = useNavigate();
-  const s = useItemPanelState({ mode, item, folders, items, onSave, onDelete });
+  const s = useItemPanelState({ mode, item, folders, items, onSave, onDelete, refreshItem });
   const loginP = { ...s.loginP, onRotatePassword: () => navigate('/health') };
 
   // Imperative hidden file input for document type (keeps raw elements out of JSX)
@@ -140,6 +142,7 @@ export default function ItemPanel({
           currentMode={s.currentMode}
           type={s.type}
           name={s.name}
+          siteSources={item ? getEntryFaviconSources(item) : []}
           loading={s.loading}
           onShare={() => s.setShowShareModal(true)}
           onHistory={() => s.setShowHistory(true)}

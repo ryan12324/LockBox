@@ -65,7 +65,10 @@ describe('AutofillPlugin interface', () => {
         name: 'Example',
         username: 'alice@example.com',
         password: 'secret',
-        uris: ['https://example.com'],
+        uris: [
+          'androidapp://android.octopusenergy.octopus.energy',
+          'https://android.octopusenergy.octopus.energy/',
+        ],
       }],
     });
     expect(result).toEqual({ indexed: 0 });

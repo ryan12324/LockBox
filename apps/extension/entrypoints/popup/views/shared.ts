@@ -17,6 +17,18 @@ export async function sendMessage<T>(message: object): Promise<T> {
   return chrome.runtime.sendMessage(message) as Promise<T>;
 }
 
+export async function refreshItemFromServer(itemId: string): Promise<VaultItem> {
+  const response = await sendMessage<{
+    success: boolean;
+    item?: VaultItem;
+    error?: string;
+  }>({ type: 'refresh-item', itemId });
+  if (!response.success || !response.item) {
+    throw new Error(response.error || 'Could not refresh this item.');
+  }
+  return response.item;
+}
+
 export const typeIcon = (type: string): IconName =>
   ({
     login: 'key',

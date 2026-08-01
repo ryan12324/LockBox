@@ -4,6 +4,7 @@ import { encryptFile, decryptFile } from '../lib/file-crypto.js';
 import { encryptString, decryptString } from '@lockbox/crypto';
 import { Button, Icon } from '@lockbox/design';
 import { useToast } from '../providers/ToastProvider.js';
+import { getApiUrl } from '../lib/server-connection.js';
 
 interface Attachment {
   id: string;
@@ -51,8 +52,6 @@ export default function AttachmentSection({ itemId, mode }: Props) {
   const [quotaUsed, setQuotaUsed] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const API_BASE = import.meta.env.VITE_API_URL ?? '';
-
   const fetchAttachments = async () => {
     if (mode === 'add' || !session?.token || !userKey) {
       setLoading(false);
@@ -61,7 +60,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
 
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/attachments`, {
+      const res = await fetch(getApiUrl(`/api/vault/items/${itemId}/attachments`), {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       if (!res.ok) throw new Error('Failed to load attachments');
@@ -153,7 +152,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
         formData.append('encryptedName', encName);
         formData.append('encryptedMimeType', encMime);
 
-        const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/attachments`, {
+        const res = await fetch(getApiUrl(`/api/vault/items/${itemId}/attachments`), {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.token}` },
           body: formData,
@@ -186,7 +185,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
   const handleDownload = async (a: DecryptedAttachment) => {
     if (!session?.token || !userKey) return;
     try {
-      const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/attachments/${a.id}`, {
+      const res = await fetch(getApiUrl(`/api/vault/items/${itemId}/attachments/${a.id}`), {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       if (!res.ok) throw new Error('Download failed');
@@ -219,7 +218,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
     if (!a.mimeType.startsWith('image/') || a.previewUrl || !session?.token || !userKey) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/attachments/${a.id}`, {
+      const res = await fetch(getApiUrl(`/api/vault/items/${itemId}/attachments/${a.id}`), {
         headers: { Authorization: `Bearer ${session.token}` },
       });
       if (!res.ok) return;
@@ -247,7 +246,7 @@ export default function AttachmentSection({ itemId, mode }: Props) {
     if (!session?.token) return;
 
     try {
-      const res = await fetch(`${API_BASE}/api/vault/items/${itemId}/attachments/${a.id}`, {
+      const res = await fetch(getApiUrl(`/api/vault/items/${itemId}/attachments/${a.id}`), {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${session.token}` },
       });

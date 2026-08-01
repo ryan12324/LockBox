@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Card, Icon } from '@lockbox/design';
+import { Button, Card, Icon, SiteFavicon, getEntryFaviconSources } from '@lockbox/design';
 import type { VaultItem, LoginItem } from '@lockbox/types';
 import { sendMessage, typeIcon } from './shared.js';
 
@@ -62,7 +62,11 @@ export function VersionHistoryView({ item, onBack }: { item: VaultItem; onBack: 
           <Icon name="arrow-left" size={17} />
           <span className="sr-only">Back</span>
         </Button>
-        <Icon name={typeIcon(item.type)} size={18} />
+        <SiteFavicon
+          sources={getEntryFaviconSources(item)}
+          fallbackIcon={typeIcon(item.type)}
+          size={20}
+        />
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-[var(--color-text)] truncate">{item.name}</div>
           <div className="text-[10px] text-[var(--color-text-tertiary)]">Version History</div>

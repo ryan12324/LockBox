@@ -28,6 +28,7 @@
     "@lockbox/crypto": "*",
     "@lockbox/design": "*",
     "@lockbox/generator": "*",
+    "@lockbox/importers": "*",
     "@lockbox/totp": "*",
     "@lockbox/types": "*",
     "@tailwindcss/vite": "^4.3.3",

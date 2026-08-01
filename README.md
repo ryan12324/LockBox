@@ -51,6 +51,16 @@ There is no master-password recovery in v1. Losing the master password means los
 
 Shared packages under `packages/` provide cryptography, types, TOTP, password generation, local security analysis, and design components.
 
+### Android app URIs
+
+Login items can target native Android applications with the standard package URI form:
+
+```text
+androidapp://android.octopusenergy.octopus.energy
+```
+
+Use **Add Android app** in the login editor and enter the package name shown in the app's Play Store URL. Existing HTTPS-shaped package entries such as `https://android.octopusenergy.octopus.energy/` remain compatible with Android autofill, but `androidapp://` is preferred because it is explicitly isolated from browser matching.
+
 Cloudflare resource usage may incur charges depending on your plan and traffic. Consult the current Cloudflare pricing and limits for Workers, D1, R2, and rate limiting.
 
 ## Quick start

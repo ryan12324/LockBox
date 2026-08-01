@@ -20,7 +20,7 @@
  * 5. Display backup codes to user (one-time display)
  *
  * Disable flow:
- * 1. POST /api/auth/2fa/disable → { disabled: true }
+ * 1. POST /api/auth/2fa/disable { code } → { disabled: true }
  */
 
 /** API base URL — read from Vite env at build time */
@@ -210,6 +210,7 @@ export async function validate2FACode(
  * Initiate 2FA setup — returns secret and otpauthUri for QR code display.
  * Requires an authenticated session.
  *
+ * @param code - Current 6-digit authenticator code
  * @param token - Auth session token
  * @param apiBase - Optional API base URL override
  */
@@ -250,11 +251,13 @@ export async function verify2FASetup(
  * @param apiBase - Optional API base URL override
  */
 export async function disable2FA(
+  code: string,
   token: string,
   apiBase?: string
 ): Promise<TwoFactorDisableResponse> {
   return twoFactorRequest<TwoFactorDisableResponse>('/api/auth/2fa/disable', {
     method: 'POST',
+    body: JSON.stringify({ code }),
     token,
     apiBase,
   });

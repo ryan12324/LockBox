@@ -3,6 +3,9 @@ main = "src/index.ts"
 compatibility_date = "2026-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+[secrets]
+required = ["TOTP_ENCRYPTION_KEY"]
+
 [vars]
 CORS_ORIGINS = "https://lockbox-web.pages.dev,http://localhost:5173,https://localhost"
 EXTENSION_IDS = ""

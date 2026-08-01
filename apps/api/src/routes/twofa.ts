@@ -16,9 +16,15 @@ import {
 } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { totp } from '@lockbox/totp';
-import { base32Encode, base32Decode } from '@lockbox/totp';
+import { base32Encode } from '@lockbox/totp';
+import {
+  decryptStoredTotpSecret,
+  encryptTotpSecret,
+  TotpSecretUnavailableError,
+  type TotpSecretBindings,
+} from '../services/totp-secret.js';
 
-type Bindings = { DB: D1Database; AUTH_LIMITER: RateLimit };
+type Bindings = { DB: D1Database; AUTH_LIMITER: RateLimit } & TotpSecretBindings;
 type Variables = { userId: string };
 
 export const twofaRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -57,6 +63,31 @@ function isTotpCode(value: unknown): value is string {
 
 function isLoginVerificationCode(value: unknown): value is string {
   return typeof value === 'string' && (/^\d{6}$/.test(value) || /^[a-fA-F0-9]{16}$/.test(value));
+}
+
+async function loadTotpSecret(
+  db: ReturnType<typeof createDb>,
+  userId: string,
+  stored: string,
+  bindings: TotpSecretBindings,
+): Promise<Uint8Array> {
+  const { secret, migratedEnvelope } = await decryptStoredTotpSecret(stored, userId, bindings);
+  if (migratedEnvelope) {
+    await db
+      .update(userTotpSettings)
+      .set({ encryptedTotpSecret: migratedEnvelope })
+      .where(
+        and(
+          eq(userTotpSettings.userId, userId),
+          eq(userTotpSettings.encryptedTotpSecret, stored),
+        ),
+      );
+  }
+  return secret;
+}
+
+function isTotpSecretUnavailable(error: unknown): error is TotpSecretUnavailableError {
+  return error instanceof TotpSecretUnavailableError;
 }
 
 // ─── GET /status ─────────────────────────────────────────────────────────────
@@ -99,6 +130,20 @@ twofaRoutes.post('/setup', authMiddleware, async (c) => {
   const secretBytes = crypto.getRandomValues(new Uint8Array(20));
   const base32Secret = base32Encode(secretBytes);
 
+  let encryptedSecret: string;
+  try {
+    encryptedSecret = await encryptTotpSecret(
+      secretBytes,
+      userId,
+      c.env.TOTP_ENCRYPTION_KEY,
+    );
+  } catch (error) {
+    if (isTotpSecretUnavailable(error)) {
+      return c.json({ error: 'Two-factor authentication is temporarily unavailable' }, 503);
+    }
+    throw error;
+  }
+
   // Build otpauth URI
   const otpauthUri = `otpauth://totp/Lockbox:${encodeURIComponent(user.email)}?secret=${base32Secret}&issuer=Lockbox`;
 
@@ -109,13 +154,13 @@ twofaRoutes.post('/setup', authMiddleware, async (c) => {
     .insert(userTotpSettings)
     .values({
       userId,
-      encryptedTotpSecret: base32Secret,
+      encryptedTotpSecret: encryptedSecret,
       enabled: 0,
       createdAt: now,
     })
     .onConflictDoUpdate({
       target: userTotpSettings.userId,
-      set: { encryptedTotpSecret: base32Secret, enabled: 0, createdAt: now },
+      set: { encryptedTotpSecret: encryptedSecret, enabled: 0, createdAt: now },
     });
 
   return c.json({ secret: base32Secret, otpauthUri });
@@ -150,8 +195,15 @@ twofaRoutes.post('/verify', authMiddleware, async (c) => {
     return c.json({ error: '2FA is already enabled' }, 409);
   }
 
-  // Decode secret and verify code
-  const secretBytes = base32Decode(settings.encryptedTotpSecret);
+  let secretBytes: Uint8Array;
+  try {
+    secretBytes = await loadTotpSecret(db, userId, settings.encryptedTotpSecret, c.env);
+  } catch (error) {
+    if (isTotpSecretUnavailable(error)) {
+      return c.json({ error: 'Two-factor authentication is temporarily unavailable' }, 503);
+    }
+    throw error;
+  }
   const valid = await verifyTotpCode(secretBytes, code);
 
   if (!valid) {
@@ -218,8 +270,15 @@ twofaRoutes.post('/disable', authMiddleware, async (c) => {
     return c.json({ error: '2FA is not enabled' }, 400);
   }
 
-  // Verify code
-  const secretBytes = base32Decode(settings.encryptedTotpSecret);
+  let secretBytes: Uint8Array;
+  try {
+    secretBytes = await loadTotpSecret(db, userId, settings.encryptedTotpSecret, c.env);
+  } catch (error) {
+    if (isTotpSecretUnavailable(error)) {
+      return c.json({ error: 'Two-factor authentication is temporarily unavailable' }, 503);
+    }
+    throw error;
+  }
   const valid = await verifyTotpCode(secretBytes, code);
 
   if (!valid) {
@@ -285,12 +344,25 @@ twofaRoutes.post('/validate', async (c) => {
     return c.json({ error: '2FA is not enabled for this account' }, 400);
   }
 
-  // Try TOTP verification first
-  const secretBytes = base32Decode(settings.encryptedTotpSecret);
-  let valid = /^\d{6}$/.test(code) && (await verifyTotpCode(secretBytes, code));
-
-  // If TOTP fails, try backup code
-  if (!valid) {
+  let valid = false;
+  if (/^\d{6}$/.test(code)) {
+    try {
+      const secretBytes = await loadTotpSecret(
+        db,
+        userId,
+        settings.encryptedTotpSecret,
+        c.env,
+      );
+      valid = await verifyTotpCode(secretBytes, code);
+    } catch (error) {
+      if (isTotpSecretUnavailable(error)) {
+        return c.json({ error: 'Two-factor authentication is temporarily unavailable' }, 503);
+      }
+      throw error;
+    }
+  } else {
+    // Recovery codes are deliberately independent of TOTP encryption-key
+    // availability so an operational key incident cannot lock out recovery.
     const codeHash = await sha256(code.toLowerCase());
     const backupCode = await db
       .select()

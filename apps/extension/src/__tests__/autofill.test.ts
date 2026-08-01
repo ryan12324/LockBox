@@ -6,7 +6,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { simulateFill, fillForm } from '../../lib/autofill.js';
+import { clearSiteIconCache } from '@lockbox/design';
+import { createSuggestionDropdown, simulateFill, fillForm } from '../../lib/autofill.js';
 import type { DetectedForm } from '../../lib/form-detector.js';
 
 // ─── simulateFill ─────────────────────────────────────────────────────────────
@@ -147,5 +148,66 @@ describe('fillForm', () => {
 
     expect(usernameEvents).toContain('input');
     expect(passwordEvents).toContain('input');
+  });
+});
+
+// ─── createSuggestionDropdown ────────────────────────────────────────────────
+
+describe('createSuggestionDropdown', () => {
+  beforeEach(() => clearSiteIconCache());
+
+  it('reuses a successful candidate and suppresses both candidates after they fail', () => {
+    const field = document.createElement('input');
+    field.getBoundingClientRect = () => ({
+      x: 20,
+      y: 40,
+      left: 20,
+      top: 40,
+      right: 220,
+      bottom: 72,
+      width: 200,
+      height: 32,
+      toJSON: () => ({}),
+    });
+    document.body.appendChild(field);
+
+    const host = createSuggestionDropdown(
+      field,
+      [{ id: 'entry-1', name: 'Example', username: 'user@example.com', uris: ['https://example.com/login'] }],
+      () => undefined
+    );
+    const icon = host.shadowRoot!.querySelector<HTMLElement>('.item-icon')!;
+    const image = icon.querySelector<HTMLImageElement>('img')!;
+
+    expect(image.src).toBe('https://example.com/apple-touch-icon.png');
+    image.dispatchEvent(new Event('error'));
+    expect(image.src).toBe('https://example.com/favicon.ico');
+    expect(icon.dataset.loaded).toBeUndefined();
+
+    image.dispatchEvent(new Event('load'));
+    expect(icon.dataset.loaded).toBe('true');
+    host.remove();
+
+    const cachedHost = createSuggestionDropdown(
+      field,
+      [{ id: 'entry-1', name: 'Example', username: 'user@example.com', uris: ['https://example.com/login'] }],
+      () => undefined
+    );
+    const cachedIcon = cachedHost.shadowRoot!.querySelector<HTMLElement>('.item-icon')!;
+    const cachedImage = cachedIcon.querySelector<HTMLImageElement>('img')!;
+    expect(cachedImage.src).toBe('https://example.com/favicon.ico');
+
+    cachedImage.dispatchEvent(new Event('error'));
+    expect(cachedIcon.querySelector('img')).toBeNull();
+    cachedHost.remove();
+
+    const failedHost = createSuggestionDropdown(
+      field,
+      [{ id: 'entry-1', name: 'Example', username: 'user@example.com', uris: ['https://example.com/login'] }],
+      () => undefined
+    );
+    const failedIcon = failedHost.shadowRoot!.querySelector<HTMLElement>('.item-icon')!;
+    expect(failedIcon.querySelector('img')).toBeNull();
+    expect(failedIcon.querySelector('svg')).not.toBeNull();
   });
 });

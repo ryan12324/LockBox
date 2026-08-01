@@ -6,7 +6,7 @@ import { Command } from 'commander';
 import { getSession, getApiUrl, saveSession, type Session } from '../lib/session.js';
 import { deriveKeysFromPassword, decryptUserKeyFromMaster } from '../lib/crypto.js';
 import { createApi } from '../lib/api.js';
-import { prompt } from './login.js';
+import { completeTwoFactorLogin, prompt } from './login.js';
 
 export interface UnlockedVault {
   session: Session;
@@ -30,7 +30,11 @@ export async function unlockForCommand(apiUrlFlag?: string): Promise<UnlockedVau
   }
 
   const { masterKey, authHash } = await deriveKeysFromPassword(password, session.email, apiUrl);
-  const response = await createApi(apiUrl).auth.login({ email: session.email, authHash });
+  const api = createApi(apiUrl);
+  const response = await completeTwoFactorLogin(
+    await api.auth.login({ email: session.email, authHash }),
+    api,
+  );
   const userKey = await decryptUserKeyFromMaster(response.user.encryptedUserKey, masterKey);
   const refreshedSession: Session = {
     token: response.token,

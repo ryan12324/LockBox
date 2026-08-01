@@ -15,15 +15,17 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Button, Input, Select, Card, Icon } from '@lockbox/design';
 import {
   getNativeAutofillStatus,
+  getNativePasskeyStatus,
   openNativeAutofillSettings,
+  openNativePasskeySettings,
 } from '../lib/native-autofill.js';
+import { applyThemePreference, type ThemePreference } from '../lib/theme.js';
 
-type Theme = 'system' | 'light' | 'dark';
 type AutoLockMinutes = 1 | 5 | 15 | 30 | 60;
 type ClipboardSeconds = 10 | 20 | 30 | 60;
 
 interface Settings {
-  theme: Theme;
+  theme: ThemePreference;
   autoLockMinutes: AutoLockMinutes;
   clipboardSeconds: ClipboardSeconds;
 }
@@ -97,15 +99,22 @@ export default function Settings() {
     supported: boolean;
     enabled: boolean;
   }>({ supported: false, enabled: false });
+  const [nativePasskeys, setNativePasskeys] = useState<{
+    supported: boolean;
+    enabled: boolean;
+  }>({ supported: false, enabled: false });
   const [nativeAutofillLoading, setNativeAutofillLoading] = useState(false);
   const [nativeAutofillError, setNativeAutofillError] = useState('');
 
   useEffect(() => {
     let mounted = true;
     const refresh = () => {
-      getNativeAutofillStatus()
-        .then((status) => {
-          if (mounted) setNativeAutofill(status);
+      Promise.all([getNativeAutofillStatus(), getNativePasskeyStatus()])
+        .then(([autofillStatus, passkeyStatus]) => {
+          if (mounted) {
+            setNativeAutofill(autofillStatus);
+            setNativePasskeys(passkeyStatus);
+          }
         })
         .catch(() => {});
     };
@@ -148,14 +157,7 @@ export default function Settings() {
 
   useEffect(() => {
     saveSettings(settings);
-    if (settings.theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else if (settings.theme === 'light') {
-      document.documentElement.classList.remove('dark');
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.classList.toggle('dark', prefersDark);
-    }
+    applyThemePreference(settings.theme);
   }, [settings]);
 
   useEffect(() => {
@@ -199,6 +201,20 @@ export default function Settings() {
     } catch (error) {
       setNativeAutofillError(
         error instanceof Error ? error.message : 'Could not open Android autofill settings'
+      );
+    } finally {
+      setNativeAutofillLoading(false);
+    }
+  }
+
+  async function handleOpenPasskeySettings() {
+    setNativeAutofillLoading(true);
+    setNativeAutofillError('');
+    try {
+      await openNativePasskeySettings();
+    } catch (error) {
+      setNativeAutofillError(
+        error instanceof Error ? error.message : 'Could not open Android passkey settings'
       );
     } finally {
       setNativeAutofillLoading(false);
@@ -960,7 +976,7 @@ export default function Settings() {
                 Theme
               </label>
               <div style={{ display: 'flex', gap: 10 }}>
-                {(['system', 'light', 'dark'] as Theme[]).map((t) => (
+                {(['system', 'light', 'dark'] as ThemePreference[]).map((t) => (
                   <Button
                     key={t}
                     variant={settings.theme === t ? 'primary' : 'secondary'}
@@ -1175,34 +1191,66 @@ export default function Settings() {
             )}
           </Card>
 
-          {nativeAutofill.supported && (
+          {(nativeAutofill.supported || nativePasskeys.supported) && (
             <Card variant="surface" padding="lg">
-              <h2 style={{ ...sectionHeading, marginBottom: 8 }}>Android Autofill</h2>
+              <h2 style={{ ...sectionHeading, marginBottom: 8 }}>Android Autofill & Passkeys</h2>
               <p style={{ ...descStyle, marginBottom: 16 }}>
-                Let Android offer your Lockbox logins in apps and browsers. Credentials stay in a
-                biometric-protected local index and are cleared when you sign out.
+                Let Android offer your Lockbox logins and synced passkeys in apps and browsers.
+                Private key material stays encrypted behind strong biometric authentication on
+                this device.
               </p>
-              <p
-                role="status"
-                style={{
-                  margin: '0 0 12px',
-                  fontSize: 'var(--font-size-sm)',
-                  color: nativeAutofill.enabled
-                    ? 'var(--color-success)'
-                    : 'var(--color-text-secondary)',
-                }}
-              >
-                {nativeAutofill.enabled ? 'Enabled on this device' : 'Not enabled on this device'}
-              </p>
-              <Button
-                type="button"
-                variant={nativeAutofill.enabled ? 'secondary' : 'primary'}
-                size="sm"
-                loading={nativeAutofillLoading}
-                onClick={handleOpenAutofillSettings}
-              >
-                {nativeAutofill.enabled ? 'Open autofill settings' : 'Enable Android autofill'}
-              </Button>
+              <div style={{ display: 'grid', gap: 12 }}>
+                {nativeAutofill.supported && (
+                  <div>
+                    <p
+                      role="status"
+                      style={{
+                        margin: '0 0 8px',
+                        fontSize: 'var(--font-size-sm)',
+                        color: nativeAutofill.enabled
+                          ? 'var(--color-success)'
+                          : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      Password autofill: {nativeAutofill.enabled ? 'enabled' : 'not enabled'}
+                    </p>
+                    <Button
+                      type="button"
+                      variant={nativeAutofill.enabled ? 'secondary' : 'primary'}
+                      size="sm"
+                      loading={nativeAutofillLoading}
+                      onClick={handleOpenAutofillSettings}
+                    >
+                      {nativeAutofill.enabled ? 'Open autofill settings' : 'Enable autofill'}
+                    </Button>
+                  </div>
+                )}
+                {nativePasskeys.supported && (
+                  <div>
+                    <p
+                      role="status"
+                      style={{
+                        margin: '0 0 8px',
+                        fontSize: 'var(--font-size-sm)',
+                        color: nativePasskeys.enabled
+                          ? 'var(--color-success)'
+                          : 'var(--color-text-secondary)',
+                      }}
+                    >
+                      Passkey provider: {nativePasskeys.enabled ? 'enabled' : 'not enabled'}
+                    </p>
+                    <Button
+                      type="button"
+                      variant={nativePasskeys.enabled ? 'secondary' : 'primary'}
+                      size="sm"
+                      loading={nativeAutofillLoading}
+                      onClick={handleOpenPasskeySettings}
+                    >
+                      {nativePasskeys.enabled ? 'Open passkey settings' : 'Enable passkeys'}
+                    </Button>
+                  </div>
+                )}
+              </div>
               {nativeAutofillError && (
                 <p
                   role="alert"
