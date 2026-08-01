@@ -169,6 +169,7 @@ export default function AppLayout() {
     }
     if (location.pathname === '/trash') return 'Trash';
     if (location.pathname === '/health') return 'Security';
+    if (location.pathname === '/cleanup') return 'Cleanup';
     if (location.pathname.startsWith('/teams')) return 'Teams';
     if (location.pathname === '/generator') return 'Generator';
     if (location.pathname.startsWith('/settings')) return 'Settings';
@@ -247,6 +248,9 @@ export default function AppLayout() {
               )}
               {navButton('Security', 'shield-check', location.pathname === '/health', () =>
                 navigate('/health')
+              )}
+              {navButton('Cleanup', 'sparkles', location.pathname === '/cleanup', () =>
+                navigate('/cleanup')
               )}
               {navButton('Generator', 'wand', location.pathname === '/generator', () =>
                 navigate('/generator')

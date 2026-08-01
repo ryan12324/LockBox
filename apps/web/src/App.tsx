@@ -16,6 +16,7 @@ const Generator = lazy(() => import('./pages/Generator.js'));
 const Settings = lazy(() => import('./pages/Settings.js'));
 const ImportExport = lazy(() => import('./pages/ImportExport.js'));
 const Health = lazy(() => import('./pages/Health.js'));
+const Cleanup = lazy(() => import('./pages/Cleanup.js'));
 const AppLayout = lazy(() => import('./components/AppLayout.js'));
 const Teams = lazy(() => import('./pages/Teams.js'));
 const TeamDetail = lazy(() => import('./pages/TeamDetail.js'));
@@ -113,6 +114,7 @@ export default function App() {
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/settings/import-export" element={<ImportExport />} />
                 <Route path="/health" element={<Health />} />
+                <Route path="/cleanup" element={<Cleanup />} />
                 <Route path="/teams" element={<Teams />} />
                 <Route path="/teams/:teamId" element={<TeamDetail />} />
               </Route>

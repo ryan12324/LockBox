@@ -2,7 +2,7 @@
  * API client — thin fetch wrapper with auth header injection.
  */
 
-import type { EncryptedVaultItem, Folder, KdfConfig } from '@lockbox/types';
+import type { Attachment, EncryptedVaultItem, Folder, KdfConfig } from '@lockbox/types';
 import { getApiUrl } from './server-connection.js';
 
 export interface KdfParamsResponse {
@@ -201,6 +201,13 @@ export const api = {
         body: JSON.stringify({ travelSafe }),
         token,
       }),
+  },
+  attachments: {
+    list: (itemId: string, token: string) =>
+      request<{
+        attachments: Attachment[];
+        quota: { used: number; limit: number };
+      }>(`/api/vault/items/${itemId}/attachments`, { token }),
   },
   settings: {
     getTravelMode: (token: string) =>
