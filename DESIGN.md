@@ -1,104 +1,107 @@
 ---
-name: Lockbox
-description: A calm, precise vault interface built like a quiet personal ledger.
+name: Authwell
+description: A colourful, calm access platform built around the trusted portal.
 colors:
-  paper: "oklch(0.965 0.008 80)"
-  paper-subtle: "oklch(0.935 0.01 78)"
-  surface: "oklch(0.985 0.005 80)"
-  surface-raised: "oklch(0.997 0.003 80)"
-  line: "oklch(0.84 0.014 75)"
-  line-strong: "oklch(0.69 0.02 68)"
-  ink: "oklch(0.25 0.018 55)"
-  ink-muted: "oklch(0.43 0.02 55)"
-  ink-quiet: "oklch(0.52 0.018 55)"
-  umber: "oklch(0.42 0.055 55)"
-  umber-hover: "oklch(0.36 0.052 55)"
-  umber-active: "oklch(0.31 0.048 55)"
-  positive: "oklch(0.4 0.09 145)"
-  caution: "oklch(0.43 0.1 75)"
-  danger: "oklch(0.44 0.13 28)"
-  information: "oklch(0.43 0.1 250)"
+  canvas: 'oklch(0.972 0.009 278)'
+  canvas-subtle: 'oklch(0.944 0.017 278)'
+  surface: 'oklch(0.986 0.006 278)'
+  surface-raised: 'oklch(0.995 0.004 278)'
+  line: 'oklch(0.86 0.022 278)'
+  line-strong: 'oklch(0.7 0.045 278)'
+  ink: 'oklch(0.24 0.055 274)'
+  ink-muted: 'oklch(0.43 0.045 274)'
+  ink-quiet: 'oklch(0.56 0.035 274)'
+  indigo: 'oklch(0.62 0.24 282)'
+  indigo-hover: 'oklch(0.56 0.25 282)'
+  indigo-active: 'oklch(0.5 0.23 282)'
+  aqua: 'oklch(0.8 0.16 178)'
+  coral: 'oklch(0.71 0.19 25)'
+  yellow: 'oklch(0.84 0.15 90)'
+  positive: 'oklch(0.67 0.15 178)'
+  caution: 'oklch(0.68 0.14 85)'
+  danger: 'oklch(0.64 0.2 25)'
+  information: 'oklch(0.62 0.18 250)'
 typography:
   display:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "1.953rem"
+    fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '1.953rem'
     fontWeight: 600
     lineHeight: 1.25
-    letterSpacing: "-0.018em"
+    letterSpacing: '-0.018em'
   headline:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "1.5625rem"
+    fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '1.5625rem'
     fontWeight: 600
     lineHeight: 1.25
-    letterSpacing: "-0.018em"
+    letterSpacing: '-0.018em'
   title:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "1.25rem"
+    fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '1.25rem'
     fontWeight: 600
     lineHeight: 1.25
-    letterSpacing: "-0.018em"
+    letterSpacing: '-0.018em'
   body:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "1rem"
+    fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '1rem'
     fontWeight: 400
     lineHeight: 1.5
-    letterSpacing: "normal"
+    letterSpacing: 'normal'
   label:
-    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "0.875rem"
+    fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+    fontSize: '0.875rem'
     fontWeight: 500
     lineHeight: 1.25
-    letterSpacing: "0.012em"
+    letterSpacing: '0.012em'
 rounded:
-  sm: "6px"
-  md: "10px"
-  lg: "14px"
-  xl: "18px"
-  full: "9999px"
+  sm: '6px'
+  md: '10px'
+  lg: '14px'
+  xl: '18px'
+  full: '9999px'
 components:
   button-primary:
-    backgroundColor: "{colors.umber}"
-    textColor: "{colors.surface}"
-    typography: "{typography.body}"
-    rounded: "{rounded.md}"
-    padding: "0 16px"
-    height: "44px"
+    backgroundColor: '{colors.indigo}'
+    textColor: '{colors.surface}'
+    typography: '{typography.body}'
+    rounded: '{rounded.md}'
+    padding: '0 16px'
+    height: '44px'
   button-secondary:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body}"
-    rounded: "{rounded.md}"
-    padding: "0 16px"
-    height: "44px"
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body}'
+    rounded: '{rounded.md}'
+    padding: '0 16px'
+    height: '44px'
   field:
-    backgroundColor: "{colors.surface-raised}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body}"
-    rounded: "{rounded.md}"
-    padding: "9px 12px"
-    height: "44px"
+    backgroundColor: '{colors.surface-raised}'
+    textColor: '{colors.ink}'
+    typography: '{typography.body}'
+    rounded: '{rounded.md}'
+    padding: '9px 12px'
+    height: '44px'
   card:
-    backgroundColor: "{colors.surface}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.lg}"
-    padding: "20px"
+    backgroundColor: '{colors.surface}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.lg}'
+    padding: '20px'
 ---
 
-# Design System: Lockbox
+# Design System: Authwell
 
 ## Overview
 
-**Creative North Star: "The Quiet Ledger"**
+**Creative North Star: "The Trusted Portal"**
 
-Lockbox should feel like a well-kept personal ledger: calm enough to trust, structured enough to scan, and precise about every consequential action. Warm paper surfaces and dark ink establish a private, durable atmosphere; restrained umber marks the next action without turning security into spectacle.
+Authwell is the trusted access layer for a person's digital life. Its nested portal mark combines an A, a W, and a protected passage without using a lock or shield. Deep ink establishes confidence; electric indigo identifies primary actions; aqua, coral, and yellow create clear product categories and memorable brand moments.
 
 Density follows the task. The web vault is list-first, the extension is site-first, and Android is thumb-first. Layouts adapt by available window width rather than device name: compact windows use one focused pane and bottom navigation, medium windows may introduce a rail, and expanded windows use a side navigation plus a persistent list-detail workspace. Folding and unfolding must preserve selection, scroll, focus, and typed text; no important control, dialog, or reading column may straddle a hinge.
 
-The system explicitly rejects consumer-fintech gradients, glowing “secure” effects, glassmorphism, fear-based scores, ornamental card grids, and AI-first framing. Security confidence comes from legible state, honest copy, predictable behavior, and visible recovery consequences.
+The system uses colour confidently without letting colour carry security meaning alone. Gradients belong only in large identity moments and generated brand artwork. Product controls remain flat, labelled, and predictable. Security confidence comes from legible state, honest copy, and visible recovery consequences.
 
 **Key Characteristics:**
 
-- Warm, private, paper-like surfaces with one restrained accent.
+- Deep-ink foundations, cool neutral surfaces, and purposeful category colour.
 - List-first information architecture and explicit state labels.
 - Symmetric geometry, compact chrome, and 44px minimum controls.
 - Capability-based responsive behavior from cover display to unfolded dual pane.
@@ -106,23 +109,26 @@ The system explicitly rejects consumer-fintech gradients, glowing “secure” e
 
 ## Colors
 
-The palette is a quiet spectrum of warm paper, umber, and ink, with semantic colors reserved for states that also have text or icon labels.
+The full brand palette is expressive, while task surfaces remain restrained. Every semantic colour is paired with text or an icon label.
 
 ### Primary
 
-- **Ledger Umber:** The sole action accent for primary buttons, active navigation, focus, and selected vault rows. Its rarity is what gives it authority.
+- **Electric Indigo:** The action colour for primary buttons, active navigation, focus, and selected vault rows.
+- **Vivid Aqua:** Passkeys, successful connection, and trusted-device moments.
+- **Coral:** Recovery, urgent attention, and human handoff moments.
+- **Warm Yellow:** Authenticator codes, highlights, and non-destructive caution.
 
 ### Neutral
 
-- **Archive Paper:** The application canvas; warm enough to feel personal without reading as beige decoration.
-- **Clean Leaf:** The principal reading and editing surface.
-- **Ledger Ink:** Primary text and high-value data.
-- **Pencil Note:** Supporting copy, metadata, and field labels.
+- **Soft Canvas:** The cool, lightly indigo-tinted application background.
+- **Raised White:** The principal reading and editing surface.
+- **Deep Ink:** Primary text, dark mode, and high-value data.
+- **Quiet Ink:** Supporting copy, metadata, and field labels.
 - **Hairline Rule:** Dividers and container boundaries; use tonal separation before shadow.
 
 ### Named Rules
 
-**The One-Accent Rule.** Umber is the only routine accent and occupies less than ten percent of a screen; semantic colors never become decoration.
+**The Product Restraint Rule.** Indigo leads task surfaces. Aqua, coral, and yellow appear when they communicate category or state, not as arbitrary decoration.
 
 **The Labeled-State Rule.** Color never carries security meaning alone. Pair every important state with an Iconify icon and concise text.
 
@@ -148,7 +154,7 @@ The palette is a quiet spectrum of warm paper, umber, and ink, with semantic col
 
 ## Elevation
 
-Lockbox is flat by default. Depth comes from lighter surfaces, hairline borders, and pane boundaries; small shadows identify a truly raised control, while the large shadow is reserved for modal dialogs. Blur, glow, and translucent glass are prohibited.
+Authwell is flat by default. Depth comes from lighter surfaces, hairline borders, and pane boundaries; small shadows identify a truly raised control, while the large shadow is reserved for modal dialogs. Blur, glow, and translucent glass are prohibited.
 
 ### Shadow Vocabulary
 
@@ -165,19 +171,19 @@ Lockbox is flat by default. Depth comes from lighter surfaces, hairline borders,
 ### Buttons
 
 - **Shape:** Gently squared corners (10px) and a 44px minimum target on every platform.
-- **Primary:** Ledger Umber with Clean Leaf text, medium weight, and one short imperative label.
+- **Primary:** Electric Indigo with near-white text, medium weight, and one short imperative label.
 - **Hover / Focus:** Hover darkens only; focus uses a three-pixel visible ring; press moves down one pixel without bounce or scale.
 - **Secondary / Ghost:** Secondary buttons use a hairline border; ghost buttons appear only in compact toolbars and never substitute for the primary action.
 
 ### Chips
 
-- **Style:** Quiet paper fill, hairline boundary, and sentence-case label. Semantic chips pair color with an icon or explicit state word.
-- **State:** Selected filters use umber text plus a visible selection marker; selection never depends on fill color alone.
+- **Style:** Quiet tinted fill, hairline boundary, and sentence-case label. Semantic chips pair color with an icon or explicit state word.
+- **State:** Selected filters use indigo text plus a visible selection marker; selection never depends on fill color alone.
 
 ### Cards / Containers
 
 - **Corner Style:** Symmetric, restrained rounding (14px).
-- **Background:** Clean Leaf or a slightly raised leaf; never transparent glass.
+- **Background:** Raised White or a slightly tinted surface; never transparent glass.
 - **Shadow Strategy:** Flat by default; see the Elevation rules.
 - **Border:** One-pixel Hairline Rule around discrete cards; adjacent vault rows use dividers instead of individual cards.
 - **Internal Padding:** 12px compact, 20px standard, 28px spacious.
@@ -186,7 +192,7 @@ Lockbox is flat by default. Depth comes from lighter surfaces, hairline borders,
 
 - **Style:** Opaque raised surface, one-pixel boundary, 10px corners, and a 44px minimum height.
 - **Focus:** Umber boundary plus a clearly visible three-pixel focus ring.
-- **Error / Disabled:** Errors use danger color, `aria-invalid`, and an associated sentence below the field. Disabled fields use a quiet paper fill and remain legible.
+- **Error / Disabled:** Errors use danger color, `aria-invalid`, and an associated sentence below the field. Disabled fields use a quiet tinted fill and remain legible.
 
 ### Navigation
 

@@ -109,7 +109,7 @@ class LockboxCredentialProviderService : CredentialProviderService() {
                     val pendingIntent = buildCreatePendingIntent()
                     val slice = PasskeySliceHelper.buildCreateSlice(
                         applicationContext,
-                        "Lockbox",
+                        "Authwell",
                         pendingIntent
                     )
                     responseBuilder.addCreateEntry(CreateEntry(slice))

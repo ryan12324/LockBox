@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Cloudflare self-hosted password manager",
+  "description": "Authwell, a self-hosted access platform for passwords, passkeys, and authenticator codes",
   "packageManager": "bun@1.3.10",
   "workspaces": [
     "apps/*",
@@ -28,6 +28,7 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "brand:authwell": "node scripts/generate-authwell-assets.mjs",
     "deploy:api": "./scripts/deploy-backend.sh",
     "deploy:web": "./scripts/deploy-web.sh"
   },

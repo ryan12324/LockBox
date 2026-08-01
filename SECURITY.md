@@ -12,7 +12,7 @@ Security fixes target the current `1.x` release line. Self-hosters are responsib
 
 ## Threat model
 
-Lockbox is designed so the backend stores encrypted vault payloads and does not possess the master password, master key, user key, shared-folder keys, or share-link fragment secret. Client cryptography uses AES-256-GCM with contextual AAD; account secrets are derived with configured Argon2id or PBKDF2 parameters; shared-folder keys are wrapped with validated RSA-OAEP-2048/SHA-256 keys.
+Authwell is designed so the backend stores encrypted vault payloads and does not possess the master password, master key, user key, shared-folder keys, or share-link fragment secret. Client cryptography uses AES-256-GCM with contextual AAD; account secrets are derived with configured Argon2id or PBKDF2 parameters; shared-folder keys are wrapped with validated RSA-OAEP-2048/SHA-256 keys.
 
 The design does not protect against:
 
@@ -37,11 +37,11 @@ There is no master-password recovery in v1. Two-factor backup codes recover only
 
 ## Security status
 
-Lockbox v1 has automated unit, integration, authorization-boundary, type, lint, browser-extension, web production-build, and Android release-build checks. These checks reduce regressions but are not a substitute for professional cryptographic and application-security review.
+Authwell v1 has automated unit, integration, authorization-boundary, type, lint, browser-extension, web production-build, and Android release-build checks. These checks reduce regressions but are not a substitute for professional cryptographic and application-security review.
 
 The 2026-07-31 release audit leaves two upstream advisories without a published fixed version:
 
-- `GHSA-qwww-vcr4-c8h2` affects React Router's React Server Components mode. Lockbox is a static Vite single-page application and does not enable React Router framework/RSC actions, so the vulnerable path is not reachable in v1.
-- `GHSA-4x5r-pxfx-6jf8` affects Babel source-map handling while building untrusted source. Lockbox builds only reviewed repository source in CI, and Babel is not shipped as application runtime code.
+- `GHSA-qwww-vcr4-c8h2` affects React Router's React Server Components mode. Authwell is a static Vite single-page application and does not enable React Router framework/RSC actions, so the vulnerable path is not reachable in v1.
+- `GHSA-4x5r-pxfx-6jf8` affects Babel source-map handling while building untrusted source. Authwell builds only reviewed repository source in CI, and Babel is not shipped as application runtime code.
 
 Recheck both advisories before every release and remove this exception as soon as fixed versions are available. Any introduction of React Server Components or builds of untrusted source invalidates this assessment.

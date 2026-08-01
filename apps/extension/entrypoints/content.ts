@@ -106,7 +106,7 @@ async function handleAutofill(
   const unlocked = await isVaultUnlocked();
   if (!unlocked) {
     createStatusDropdown(passwordField, 'locked', [
-      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+      { label: 'Open Authwell', onClick: () => openExtensionPopup() },
     ]);
     return;
   }
@@ -130,7 +130,7 @@ async function handleAutofill(
   // 3. No matches — show status dropdown
   if (items.length === 0) {
     createStatusDropdown(passwordField, 'no-matches', [
-      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+      { label: 'Open Authwell', onClick: () => openExtensionPopup() },
     ]);
     return;
   }
@@ -140,7 +140,7 @@ async function handleAutofill(
 
   if (loginItems.length === 0) {
     createStatusDropdown(passwordField, 'no-matches', [
-      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+      { label: 'Open Authwell', onClick: () => openExtensionPopup() },
     ]);
     return;
   }
@@ -187,7 +187,10 @@ async function handleAutofill(
               checkTwoFaAfterAutofill(freshItem).catch(() => {});
             } catch {
               createStatusDropdown(passwordField, 'error', [
-                { label: 'Retry', onClick: () => void handleAutofill(passwordField, usernameField) },
+                {
+                  label: 'Retry',
+                  onClick: () => void handleAutofill(passwordField, usernameField),
+                },
               ]);
             }
           })();
@@ -215,7 +218,7 @@ async function fillTotp(field: HTMLInputElement, item: LoginItem): Promise<void>
   });
   if (!result.code) {
     createStatusDropdown(field, 'error', [
-      { label: 'Edit in Lockbox', onClick: () => openExtensionPopup() },
+      { label: 'Edit in Authwell', onClick: () => openExtensionPopup() },
     ]);
     return;
   }
@@ -226,7 +229,7 @@ async function fillTotp(field: HTMLInputElement, item: LoginItem): Promise<void>
 async function handleTotpAutofill(field: HTMLInputElement): Promise<void> {
   if (!(await isVaultUnlocked())) {
     createStatusDropdown(field, 'locked', [
-      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+      { label: 'Open Authwell', onClick: () => openExtensionPopup() },
     ]);
     return;
   }
@@ -234,8 +237,7 @@ async function handleTotpAutofill(field: HTMLInputElement): Promise<void> {
   let items: LoginItem[];
   try {
     items = (await getMatchingItems()).filter(
-      (item): item is LoginItem =>
-        item.type === 'login' && Boolean((item as LoginItem).totp),
+      (item): item is LoginItem => item.type === 'login' && Boolean((item as LoginItem).totp)
     );
   } catch {
     createStatusDropdown(field, 'error', [
@@ -246,7 +248,7 @@ async function handleTotpAutofill(field: HTMLInputElement): Promise<void> {
 
   if (items.length === 0) {
     createStatusDropdown(field, 'no-matches', [
-      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+      { label: 'Open Authwell', onClick: () => openExtensionPopup() },
     ]);
     return;
   }
@@ -267,7 +269,7 @@ async function handleTotpAutofill(field: HTMLInputElement): Promise<void> {
     (selected) => {
       const item = items.find((candidate) => candidate.id === selected.id);
       if (item) void fillTotp(field, item);
-    },
+    }
   );
 }
 
@@ -282,7 +284,7 @@ async function handleIdentityAutofill(
   const unlocked = await isVaultUnlocked();
   if (!unlocked) {
     createStatusDropdown(firstField, 'locked', [
-      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+      { label: 'Open Authwell', onClick: () => openExtensionPopup() },
     ]);
     return;
   }
@@ -304,7 +306,7 @@ async function handleIdentityAutofill(
 
   if (identityItems.length === 0) {
     createStatusDropdown(firstField, 'no-matches', [
-      { label: 'Open Lockbox', onClick: () => openExtensionPopup() },
+      { label: 'Open Authwell', onClick: () => openExtensionPopup() },
     ]);
     return;
   }
@@ -312,10 +314,7 @@ async function handleIdentityAutofill(
   if (identityItems.length === 1) {
     // Single identity — fill immediately
     try {
-      fillIdentityForm(
-        identityForm,
-        await refreshItemForUse(identityItems[0].id, 'identity')
-      );
+      fillIdentityForm(identityForm, await refreshItemForUse(identityItems[0].id, 'identity'));
     } catch {
       createStatusDropdown(firstField, 'error', [
         { label: 'Retry', onClick: () => void handleIdentityAutofill(identityForm) },
@@ -403,7 +402,7 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
        width: max-content;
        margin-bottom: 8px;
        padding: 4px 6px;
-       background: #FDFCFA;
+       background: #F7F8FC;
        border-radius: 8px;
      }
      .lockbox-brand__logo { width: 82px; }
@@ -585,7 +584,7 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
      .icon { display: flex; flex-shrink: 0; }
      .lockbox-brand {
        padding: 4px 6px;
-       background: #FDFCFA;
+       background: #F7F8FC;
        border-radius: 8px;
        flex-shrink: 0;
      }

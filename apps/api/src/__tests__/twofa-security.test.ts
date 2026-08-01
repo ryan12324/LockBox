@@ -297,7 +297,7 @@ describe('2FA pre-authentication boundary', () => {
     const setup = (await setupResponse.json()) as { secret: string; otpauthUri: string };
     const parsed = parseOtpAuthUri(setup.otpauthUri);
     expect(parsed.type).toBe('totp');
-    expect(parsed.issuer).toBe('Lockbox');
+    expect(parsed.issuer).toBe('Authwell');
     expect(parsed.account).toBe(email);
 
     const storedSettings = await database

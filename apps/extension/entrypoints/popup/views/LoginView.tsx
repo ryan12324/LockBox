@@ -49,7 +49,7 @@ export function LockedView({
         setError(result.error ?? 'The email or master password is incorrect.');
       }
     } catch {
-      setError('The extension background service did not respond. Close and reopen Lockbox.');
+      setError('The extension background service did not respond. Close and reopen Authwell.');
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export function LockedView({
         setError(result.error ?? 'That verification code was not accepted.');
       }
     } catch {
-      setError('The extension background service did not respond. Close and reopen Lockbox.');
+      setError('The extension background service did not respond. Close and reopen Authwell.');
     } finally {
       setLoading(false);
     }
@@ -93,10 +93,18 @@ export function LockedView({
   return (
     <div className="extension-auth">
       <div className="extension-auth__heading">
-        <img className="extension-auth__logo" src="/brand/lockbox-logo-horizontal.png" alt="Lockbox" />
+        <img
+          className="extension-auth__logo"
+          src="/brand/authwell-logo-horizontal.png"
+          alt="Authwell"
+        />
         <p>{awaitingTwoFactor ? 'Two-factor verification' : 'Vault locked'}</p>
-        <h1>{awaitingTwoFactor ? 'Verify this sign-in' : 'Unlock Lockbox'}</h1>
-        <small>{awaitingTwoFactor ? 'Confirm your second factor to finish unlocking.' : 'Your vault decrypts in the extension after sign-in.'}</small>
+        <h1>{awaitingTwoFactor ? 'Verify this sign-in' : 'Unlock Authwell'}</h1>
+        <small>
+          {awaitingTwoFactor
+            ? 'Confirm your second factor to finish unlocking.'
+            : 'Your vault decrypts in the extension after sign-in.'}
+        </small>
       </div>
 
       {error && (
@@ -121,12 +129,7 @@ export function LockedView({
             placeholder={useBackupCode ? '16-character code' : '6-digit code'}
           />
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="sm"
-            loading={loading}
-          >
+          <Button type="submit" variant="primary" size="sm" loading={loading}>
             {loading ? 'Verifying…' : 'Verify and unlock'}
           </Button>
           <Button
@@ -141,12 +144,7 @@ export function LockedView({
           >
             {useBackupCode ? 'Use authenticator code' : 'Use a backup code'}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={cancelVerification}
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={cancelVerification}>
             Back to sign in
           </Button>
         </form>
@@ -172,20 +170,10 @@ export function LockedView({
             placeholder="Master password"
           />
 
-          <Button
-            type="submit"
-            variant="primary"
-            size="sm"
-            loading={loading}
-          >
+          <Button type="submit" variant="primary" size="sm" loading={loading}>
             {loading ? 'Signing in…' : 'Sign in'}
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void changeServer()}
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={() => void changeServer()}>
             Use a different web vault
           </Button>
         </form>

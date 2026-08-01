@@ -69,7 +69,7 @@ class AutofillAuthActivity : FragmentActivity() {
                             AutofillCrypto.decryptPayload(envelope, authenticatedCipher)
                         )
                         returnDataset(
-                            payload.optString("name", "Lockbox credential"),
+                            payload.optString("name", "Authwell credential"),
                             payload.optString("username", ""),
                             payload.getString("password")
                         )
@@ -84,7 +84,7 @@ class AutofillAuthActivity : FragmentActivity() {
             }
         )
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Lockbox")
+            .setTitle("Unlock Authwell")
             .setSubtitle("Authenticate to fill this credential")
             .setNegativeButtonText("Cancel")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)

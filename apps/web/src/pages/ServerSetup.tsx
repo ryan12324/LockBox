@@ -16,7 +16,7 @@ export default function ServerSetup({ onComplete }: { onComplete: () => void }) 
     event.preventDefault();
     setError('');
     if (!url.trim()) {
-      setError('Enter your Lockbox web vault URL.');
+      setError('Enter your Authwell web vault URL.');
       return;
     }
 
@@ -30,7 +30,7 @@ export default function ServerSetup({ onComplete }: { onComplete: () => void }) 
       setError(
         reason instanceof Error
           ? reason.message
-          : 'Lockbox could not discover the server for that web vault.'
+          : 'Authwell could not discover the server for that web vault.'
       );
     } finally {
       setSaving(false);
@@ -39,9 +39,9 @@ export default function ServerSetup({ onComplete }: { onComplete: () => void }) 
 
   return (
     <AuthShell
-      eyebrow={currentConnection ? 'Server connection' : 'Set up Lockbox'}
+      eyebrow={currentConnection ? 'Server connection' : 'Set up Authwell'}
       title={currentConnection ? 'Change your web vault' : 'Connect your web vault'}
-      description="Enter the same address you use to open Lockbox on the web. The app will discover and verify its API automatically."
+      description="Enter the same address you use to open Authwell on the web. The app will discover and verify its API automatically."
       icon="world"
       footer={currentConnection ? <Link to="/login">Keep current server</Link> : undefined}
     >
@@ -61,7 +61,9 @@ export default function ServerSetup({ onComplete }: { onComplete: () => void }) 
             placeholder="https://vault.example.com"
             error={error || undefined}
           />
-          <p className="auth-form__hint">Use the web vault address, not a copied sign-in or item URL.</p>
+          <p className="auth-form__hint">
+            Use the web vault address, not a copied sign-in or item URL.
+          </p>
         </div>
         <Button type="submit" size="lg" loading={saving}>
           {saving ? 'Checking connection…' : 'Connect vault'}

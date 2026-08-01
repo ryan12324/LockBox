@@ -6,7 +6,7 @@ const WEB_VAULT_UNAVAILABLE =
 export function buildWebVaultUrl(webBaseUrl: string, path: string): string {
   if (!webBaseUrl) throw new Error(WEB_VAULT_UNAVAILABLE);
   if (!path.startsWith('/') || path.startsWith('//')) {
-    throw new Error('Lockbox could not open that web vault page.');
+    throw new Error('Authwell could not open that web vault page.');
   }
 
   try {
@@ -30,6 +30,6 @@ export async function openWebVault(path: string): Promise<void> {
   try {
     await chrome.tabs.create({ url });
   } catch {
-    throw new Error('Lockbox could not open the web vault. Copy its address into a new tab.');
+    throw new Error('Authwell could not open the web vault. Copy its address into a new tab.');
   }
 }

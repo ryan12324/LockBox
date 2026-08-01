@@ -62,7 +62,7 @@ export function setServerConnection(connection: LockboxServerConnection): void {
   const webBaseUrl = parseOrigin(connection.webBaseUrl);
   const apiBaseUrl = parseOrigin(connection.apiBaseUrl);
   if (!webBaseUrl || !apiBaseUrl) {
-    throw new Error('Lockbox could not save an invalid server connection.');
+    throw new Error('Authwell could not save an invalid server connection.');
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ webBaseUrl, apiBaseUrl }));
 }
@@ -79,7 +79,7 @@ export function getApiBaseUrl(): string {
 export function getApiUrl(path: string): string {
   const apiBaseUrl = getApiBaseUrl();
   if (isNativeLockboxApp() && !apiBaseUrl) {
-    throw new Error('No Lockbox server is connected. Connect your web vault first.');
+    throw new Error('No Authwell server is connected. Connect your web vault first.');
   }
   return `${apiBaseUrl}${path}`;
 }

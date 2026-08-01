@@ -151,7 +151,7 @@ class BiometricPlugin : Plugin() {
 
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Enable Biometric Unlock")
-                .setSubtitle("Authenticate to enable biometric unlock for Lockbox")
+                .setSubtitle("Authenticate to enable biometric unlock for Authwell")
                 .setNegativeButtonText("Cancel")
                 .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                 .build()
@@ -170,7 +170,7 @@ class BiometricPlugin : Plugin() {
      */
     @PluginMethod
     fun authenticate(call: PluginCall) {
-        val reason = call.getString("reason") ?: "Unlock Lockbox"
+        val reason = call.getString("reason") ?: "Unlock Authwell"
 
         val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
         val encryptedKeyBase64 = prefs.getString(PREF_ENCRYPTED_USER_KEY, null) ?: run {
@@ -239,7 +239,7 @@ class BiometricPlugin : Plugin() {
             )
 
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Unlock Lockbox")
+                .setTitle("Unlock Authwell")
                 .setSubtitle(reason)
                 .setNegativeButtonText("Cancel")
                 .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)

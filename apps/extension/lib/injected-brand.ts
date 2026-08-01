@@ -1,4 +1,4 @@
-const LOCKBOX_WORDMARK_PATH = 'brand/lockbox-logo-horizontal.png';
+const LOCKBOX_WORDMARK_PATH = 'brand/authwell-logo-horizontal.png';
 
 export const INJECTED_BRAND_STYLES = `
   .lockbox-brand {
@@ -23,7 +23,7 @@ export function getLockboxWordmarkUrl(): string {
 }
 
 export function lockboxBrandMarkup(): string {
-  return `<div class="lockbox-brand"><img class="lockbox-brand__logo" src="${getLockboxWordmarkUrl()}" alt="Lockbox"></div>`;
+  return `<div class="lockbox-brand"><img class="lockbox-brand__logo" src="${getLockboxWordmarkUrl()}" alt="Authwell"></div>`;
 }
 
 export function createLockboxBrand(): HTMLDivElement {
@@ -33,7 +33,7 @@ export function createLockboxBrand(): HTMLDivElement {
   const logo = document.createElement('img');
   logo.className = 'lockbox-brand__logo';
   logo.src = getLockboxWordmarkUrl();
-  logo.alt = 'Lockbox';
+  logo.alt = 'Authwell';
   brand.appendChild(logo);
 
   return brand;

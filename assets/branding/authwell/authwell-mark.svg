@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Authwell portal mark</title>
+  <defs>
+    <linearGradient id="indigo" x1="64" y1="64" x2="448" y2="384" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F5BFF"/>
+      <stop offset="1" stop-color="#705BFF"/>
+    </linearGradient>
+    <linearGradient id="aqua" x1="160" y1="112" x2="352" y2="312" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D6C8"/>
+      <stop offset="1" stop-color="#18C7BA"/>
+    </linearGradient>
+  </defs>
+  <path d="M256 326 218 360c-16 10-35 16-60 16-53 0-86-35-86-88v-74C72 105 154 40 256 40s184 65 184 174v74c0 53-33 88-86 88-25 0-44-6-60-16l-38-34Z" fill="none" stroke="url(#indigo)" stroke-width="58" stroke-linejoin="round"/>
+  <path d="M158 286v-76c0-66 42-106 98-106s98 40 98 106v76" fill="none" stroke="url(#aqua)" stroke-width="52" stroke-linecap="round"/>
+  <path fill="#FF6469" d="M226 284v-78c0-23 12-38 30-38s30 15 30 38v78l-30-27-30 27Z"/>
+</svg>

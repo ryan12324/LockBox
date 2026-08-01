@@ -35,7 +35,7 @@ describe('showCreateConsent', () => {
     expect(host).not.toBeNull();
 
     const shadow = host!.shadowRoot!;
-    expect(shadow.querySelector('.lockbox-brand__logo')?.getAttribute('alt')).toBe('Lockbox');
+    expect(shadow.querySelector('.lockbox-brand__logo')?.getAttribute('alt')).toBe('Authwell');
     expect(shadow.querySelector('.modal-title')!.textContent).toBe('Create a passkey');
     expect(shadow.innerHTML).toContain('Example Corp');
     expect(shadow.innerHTML).toContain('example.com');
@@ -243,7 +243,7 @@ describe('showVaultLockedToast', () => {
     expect(host).not.toBeNull();
 
     const shadow = host!.shadowRoot!;
-    expect(shadow.innerHTML).toContain('Lockbox is locked');
+    expect(shadow.innerHTML).toContain('Authwell is locked');
     expect(shadow.innerHTML).toContain('Unlock to use passkeys');
   });
 
@@ -300,7 +300,7 @@ describe('showUnlockPrompt', () => {
     expect(host).not.toBeNull();
 
     const shadow = host!.shadowRoot!;
-    expect(shadow.querySelector('.modal-title')!.textContent).toBe('Lockbox is locked');
+    expect(shadow.querySelector('.modal-title')!.textContent).toBe('Authwell is locked');
     expect(shadow.innerHTML).toContain('Waiting for unlock');
 
     (shadow.querySelector('[data-action="cancel"]') as HTMLButtonElement).click();

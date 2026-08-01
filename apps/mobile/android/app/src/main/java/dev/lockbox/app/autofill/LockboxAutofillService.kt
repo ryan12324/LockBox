@@ -73,7 +73,7 @@ class LockboxAutofillService : AutofillService() {
                 }
                 callback.onSuccess(response.build())
             } catch (error: Exception) {
-                callback.onFailure("Lockbox could not load autofill credentials")
+                callback.onFailure("Authwell could not load autofill credentials")
             }
         }
     }
@@ -94,7 +94,7 @@ class LockboxAutofillService : AutofillService() {
         index: Int
     ): Dataset {
         val presentation = RemoteViews(packageName, R.layout.autofill_item).apply {
-            setTextViewText(R.id.autofill_item_label, "Unlock Lockbox credential")
+            setTextViewText(R.id.autofill_item_label, "Unlock Authwell credential")
             setTextViewText(R.id.autofill_item_sublabel, "Authentication required")
         }
 

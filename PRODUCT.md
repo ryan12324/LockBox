@@ -1,12 +1,12 @@
-# Lockbox Product Context
+# Authwell Product Context
 
 ## Register
 
-Product application. Lockbox is a security-sensitive, multi-surface password manager rather than a marketing site. Interfaces should favor legibility, predictable workflows, explicit state, and restrained density over spectacle.
+Product application. Authwell is a security-sensitive, multi-surface password manager rather than a marketing site. Interfaces should favor legibility, predictable workflows, explicit state, and restrained density over spectacle.
 
 ## Product Purpose
 
-Lockbox gives people a self-hosted vault they can operate on infrastructure they control. It combines a web vault, browser extension, Android client, command-line client, and Cloudflare backend while keeping vault contents end-to-end encrypted. The v1 promise is dependable password storage, retrieval, autofill, sync, import/export, TOTP, attachments/documents, and carefully bounded sharing—not a collection of experimental security claims.
+Authwell gives people a self-hosted vault they can operate on infrastructure they control. It combines a web vault, browser extension, Android client, command-line client, and Cloudflare backend while keeping vault contents end-to-end encrypted. The v1 promise is dependable password storage, retrieval, autofill, sync, import/export, TOTP, attachments/documents, and carefully bounded sharing—not a collection of experimental security claims.
 
 ## Users
 

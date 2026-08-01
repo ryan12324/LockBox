@@ -244,9 +244,7 @@ export default function Health() {
           ...summary,
           breached: nextBreaches.size,
           overallScore:
-            nextBreaches.size > 0
-              ? Math.min(baseHealthScore.current, 49)
-              : baseHealthScore.current,
+            nextBreaches.size > 0 ? Math.min(baseHealthScore.current, 49) : baseHealthScore.current,
         });
       }
       setReports(
@@ -335,14 +333,24 @@ export default function Health() {
           </div>
         </div>
 
-        <p style={{ margin: 0, color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}>
-          Breach checks are manual. Only the first five characters of each password's SHA-1 hash
-          are sent to Have I Been Pwned.
+        <p
+          style={{
+            margin: 0,
+            color: 'var(--color-text-tertiary)',
+            fontSize: 'var(--font-size-xs)',
+          }}
+        >
+          Breach checks are manual. Only the first five characters of each password's SHA-1 hash are
+          sent to Have I Been Pwned.
         </p>
         {breachMessage && (
           <p
             role="status"
-            style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)' }}
+            style={{
+              margin: 0,
+              color: 'var(--color-text-secondary)',
+              fontSize: 'var(--font-size-xs)',
+            }}
           >
             {breachMessage}
           </p>
@@ -379,39 +387,115 @@ export default function Health() {
                 Nothing to review yet
               </h2>
               <p style={{ color: 'var(--color-text-secondary)', maxWidth: 420, margin: '0 auto' }}>
-                Add a login to receive local, item-specific recommendations. Lockbox does not
-                send vault contents for this review.
+                Add a login to receive local, item-specific recommendations. Authwell does not send
+                vault contents for this review.
               </p>
             </div>
           </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <Card variant="surface" padding="lg">
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: posture?.actions.length ? 20 : 0 }}>
-                <span style={{ width: 44, height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', color: 'var(--color-primary)', background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 14,
+                  marginBottom: posture?.actions.length ? 20 : 0,
+                }}
+              >
+                <span
+                  style={{
+                    width: 44,
+                    height: 44,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flex: '0 0 auto',
+                    color: 'var(--color-primary)',
+                    background: 'var(--color-bg-subtle)',
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                  }}
+                >
                   <Icon name="shield-check" size={22} />
                 </span>
                 <div>
-                  <h2 style={{ margin: 0, color: 'var(--color-text)', fontSize: 'var(--font-size-lg)', fontWeight: 600 }}>
+                  <h2
+                    style={{
+                      margin: 0,
+                      color: 'var(--color-text)',
+                      fontSize: 'var(--font-size-lg)',
+                      fontWeight: 600,
+                    }}
+                  >
                     {summary.breached > 0
                       ? 'Breach results need attention'
                       : summary.weak + summary.reused + summary.old > 0
                         ? 'Review the priorities below'
                         : 'No current password issues found'}
                   </h2>
-                  <p style={{ margin: '5px 0 0', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                    Local analysis reviewed {summary.totalItems} {summary.totalItems === 1 ? 'login' : 'logins'}. Counts may overlap when one item has several issues.
+                  <p
+                    style={{
+                      margin: '5px 0 0',
+                      color: 'var(--color-text-secondary)',
+                      fontSize: 'var(--font-size-sm)',
+                    }}
+                  >
+                    Local analysis reviewed {summary.totalItems}{' '}
+                    {summary.totalItems === 1 ? 'login' : 'logins'}. Counts may overlap when one
+                    item has several issues.
                   </p>
                 </div>
               </div>
               {posture && posture.actions.length > 0 && (
                 <div style={{ display: 'grid', gap: 8 }}>
-                  <h3 style={{ margin: 0, color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', fontWeight: 600 }}>Recommended next steps</h3>
+                  <h3
+                    style={{
+                      margin: 0,
+                      color: 'var(--color-text-secondary)',
+                      fontSize: 'var(--font-size-sm)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Recommended next steps
+                  </h3>
                   {posture.actions.slice(0, 3).map((action, index) => (
-                    <div key={index} style={{ padding: 12, display: 'grid', gridTemplateColumns: '20px minmax(0, 1fr) auto', alignItems: 'center', gap: 9, background: action.priority === 'critical' || action.priority === 'high' ? 'var(--color-error-subtle)' : 'var(--color-bg-subtle)', borderRadius: 'var(--radius-md)' }}>
-                      <Icon name={action.priority === 'critical' || action.priority === 'high' ? 'alert-circle' : 'info-circle'} size={18} />
-                      <span style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>{action.message}</span>
-                      <Badge variant={action.priority === 'critical' || action.priority === 'high' ? 'error' : 'default'}>{action.affectedItems.length} {action.affectedItems.length === 1 ? 'item' : 'items'}</Badge>
+                    <div
+                      key={index}
+                      style={{
+                        padding: 12,
+                        display: 'grid',
+                        gridTemplateColumns: '20px minmax(0, 1fr) auto',
+                        alignItems: 'center',
+                        gap: 9,
+                        background:
+                          action.priority === 'critical' || action.priority === 'high'
+                            ? 'var(--color-error-subtle)'
+                            : 'var(--color-bg-subtle)',
+                        borderRadius: 'var(--radius-md)',
+                      }}
+                    >
+                      <Icon
+                        name={
+                          action.priority === 'critical' || action.priority === 'high'
+                            ? 'alert-circle'
+                            : 'info-circle'
+                        }
+                        size={18}
+                      />
+                      <span style={{ color: 'var(--color-text)', fontSize: 'var(--font-size-sm)' }}>
+                        {action.message}
+                      </span>
+                      <Badge
+                        variant={
+                          action.priority === 'critical' || action.priority === 'high'
+                            ? 'error'
+                            : 'default'
+                        }
+                      >
+                        {action.affectedItems.length}{' '}
+                        {action.affectedItems.length === 1 ? 'item' : 'items'}
+                      </Badge>
                     </div>
                   ))}
                 </div>
@@ -425,47 +509,49 @@ export default function Health() {
                 gap: 16,
               }}
             >
-              {([
-                {
-                  key: 'weak',
-                  label: 'Weak',
-                  count: summary.weak,
-                  iconBg: 'var(--color-error-subtle)',
-                  iconColor: 'var(--color-error)',
-                  icon: 'alert-triangle',
-                },
-                {
-                  key: 'reused',
-                  label: 'Reused',
-                  count: summary.reused,
-                  iconBg: 'var(--color-warning-subtle)',
-                  iconColor: 'var(--color-warning)',
-                  icon: 'arrows-sort',
-                },
-                {
-                  key: 'old',
-                  label: 'Old',
-                  count: summary.old,
-                  iconBg: 'var(--color-warning-subtle)',
-                  iconColor: 'var(--color-warning)',
-                  icon: 'clock',
-                },
-                {
-                  key: 'breached',
-                  label: 'Breached',
-                  count: summary.breached,
-                  iconBg: 'var(--color-error-subtle)',
-                  iconColor: 'var(--color-error)',
-                  icon: 'lock',
-                },
-              ] satisfies Array<{
-                key: string;
-                label: string;
-                count: number;
-                iconBg: string;
-                iconColor: string;
-                icon: IconName;
-              }>).map((cat) => (
+              {(
+                [
+                  {
+                    key: 'weak',
+                    label: 'Weak',
+                    count: summary.weak,
+                    iconBg: 'var(--color-error-subtle)',
+                    iconColor: 'var(--color-error)',
+                    icon: 'alert-triangle',
+                  },
+                  {
+                    key: 'reused',
+                    label: 'Reused',
+                    count: summary.reused,
+                    iconBg: 'var(--color-warning-subtle)',
+                    iconColor: 'var(--color-warning)',
+                    icon: 'arrows-sort',
+                  },
+                  {
+                    key: 'old',
+                    label: 'Old',
+                    count: summary.old,
+                    iconBg: 'var(--color-warning-subtle)',
+                    iconColor: 'var(--color-warning)',
+                    icon: 'clock',
+                  },
+                  {
+                    key: 'breached',
+                    label: 'Breached',
+                    count: summary.breached,
+                    iconBg: 'var(--color-error-subtle)',
+                    iconColor: 'var(--color-error)',
+                    icon: 'lock',
+                  },
+                ] satisfies Array<{
+                  key: string;
+                  label: string;
+                  count: number;
+                  iconBg: string;
+                  iconColor: string;
+                  icon: IconName;
+                }>
+              ).map((cat) => (
                 <Card
                   key={cat.key}
                   variant="surface"
@@ -659,19 +745,19 @@ export default function Health() {
                               fallbackIcon="key"
                               size={20}
                             />
-                          <h3
-                            style={{
-                              fontWeight: 600,
-                              color: 'var(--color-text)',
-                              fontSize: 'var(--font-size-base)',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                              paddingRight: 16,
-                            }}
-                          >
-                            {item.name}
-                          </h3>
+                            <h3
+                              style={{
+                                fontWeight: 600,
+                                color: 'var(--color-text)',
+                                fontSize: 'var(--font-size-base)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                paddingRight: 16,
+                              }}
+                            >
+                              {item.name}
+                            </h3>
                           </div>
                           <div className="flex" style={{ gap: 4 }}>
                             {info.tfa.map((method) => (

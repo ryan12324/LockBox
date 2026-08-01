@@ -1,4 +1,4 @@
-# Lockbox v1 design and UX pass
+# Authwell v1 design and UX pass
 
 Completed 2026-07-31. The design source of truth is [DESIGN.md](DESIGN.md); the complete ledger of capabilities deliberately removed or deferred from v1 is [V2_SCOPE.md](V2_SCOPE.md).
 

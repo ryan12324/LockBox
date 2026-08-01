@@ -102,13 +102,13 @@ export function createLockIconOverlay(field: HTMLInputElement, onClick: () => vo
     }
     button svg { display: block; color: #6B5640; }
     button:hover { opacity: 1; }
-    button:focus-visible { opacity: 1; outline: 2px solid #8B7355; outline-offset: 2px; border-radius: 4px; }
+    button:focus-visible { opacity: 1; outline: 2px solid #635BFF; outline-offset: 2px; border-radius: 4px; }
   `;
 
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.title = 'Autofill with Lockbox';
-  btn.setAttribute('aria-label', 'Autofill with Lockbox');
+  btn.title = 'Autofill with Authwell';
+  btn.setAttribute('aria-label', 'Autofill with Authwell');
   btn.innerHTML = iconifySvg('lock', { size: 16 });
 
   shadow.appendChild(style);
@@ -172,8 +172,8 @@ export function createSuggestionDropdown(
      <style>
        ${INJECTED_BRAND_STYLES}
        .dropdown {
-         background: #FDFCFA;
-         border: 1px solid #DDD6CC;
+         background: #F7F8FC;
+         border: 1px solid #D8DDF0;
          border-radius: 10px;
          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
          overflow: hidden;
@@ -185,8 +185,8 @@ export function createSuggestionDropdown(
          padding: 7px 12px;
          display: flex;
          align-items: center;
-         background: #EAE6DF;
-         border-bottom: 1px solid #DDD6CC;
+         background: #EDEFFA;
+         border-bottom: 1px solid #D8DDF0;
        }
        .header .lockbox-brand__logo { width: 84px; }
        .item {
@@ -199,13 +199,13 @@ export function createSuggestionDropdown(
          gap: 9px;
          background: transparent;
          border: 0;
-         border-bottom: 1px solid #DDD6CC;
+         border-bottom: 1px solid #D8DDF0;
          font: inherit;
          text-align: left;
        }
        .item:last-child { border-bottom: none; }
        .item:hover { background: rgba(196,168,130,0.1); }
-       .item:focus-visible { outline: 2px solid #8B7355; outline-offset: -2px; }
+       .item:focus-visible { outline: 2px solid #635BFF; outline-offset: -2px; }
        .item-icon {
          width: 28px;
          height: 28px;
@@ -213,9 +213,9 @@ export function createSuggestionDropdown(
          display: inline-flex;
          align-items: center;
          justify-content: center;
-         color: #735137;
+         color: #635BFF;
          background: #F3F0EB;
-         border: 1px solid #DDD6CC;
+         border: 1px solid #D8DDF0;
          border-radius: 7px;
          overflow: hidden;
        }
@@ -231,9 +231,9 @@ export function createSuggestionDropdown(
        .item-icon[data-loaded="true"] img { opacity: 1; }
        .item-icon[data-loaded="true"] svg { visibility: hidden; }
        .item-copy { min-width: 0; display: grid; gap: 2px; }
-       .item-name { font-weight: 500; color: #2C2825; }
+       .item-name { font-weight: 500; color: #10162F; }
        .item-name, .item-username { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-       .item-username { color: #7A7168; font-size: 12px; }
+       .item-username { color: #4B5270; font-size: 12px; }
     </style>
     <div class="dropdown">
       <div class="header">${lockboxBrandMarkup()}</div>
@@ -373,8 +373,8 @@ export function createIdentitySuggestionDropdown(
      <style>
        ${INJECTED_BRAND_STYLES}
        .dropdown {
-         background: #FDFCFA;
-         border: 1px solid #DDD6CC;
+         background: #F7F8FC;
+         border: 1px solid #D8DDF0;
          border-radius: 10px;
          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
          overflow: hidden;
@@ -386,8 +386,8 @@ export function createIdentitySuggestionDropdown(
          padding: 7px 12px;
          display: flex;
          align-items: center;
-         background: #EAE6DF;
-         border-bottom: 1px solid #DDD6CC;
+         background: #EDEFFA;
+         border-bottom: 1px solid #D8DDF0;
        }
        .header .lockbox-brand__logo { width: 84px; }
        .item {
@@ -399,15 +399,15 @@ export function createIdentitySuggestionDropdown(
          gap: 2px;
          background: transparent;
          border: 0;
-         border-bottom: 1px solid #DDD6CC;
+         border-bottom: 1px solid #D8DDF0;
          font: inherit;
          text-align: left;
        }
        .item:last-child { border-bottom: none; }
        .item:hover { background: rgba(196,168,130,0.1); }
-       .item:focus-visible { outline: 2px solid #8B7355; outline-offset: -2px; }
-       .item-name { font-weight: 500; color: #2C2825; }
-       .item-detail { color: #7A7168; font-size: 12px; }
+       .item:focus-visible { outline: 2px solid #635BFF; outline-offset: -2px; }
+       .item-name { font-weight: 500; color: #10162F; }
+       .item-detail { color: #4B5270; font-size: 12px; }
      </style>
      <div class="dropdown">
        <div class="header">${lockboxBrandMarkup()}</div>
@@ -497,9 +497,9 @@ export function createStatusDropdown(
   };
 
   const descMap: Record<StatusDropdownType, string> = {
-    locked: 'Unlock Lockbox to autofill this form.',
+    locked: 'Unlock Authwell to autofill this form.',
     'no-matches': 'No saved credentials match this site.',
-    error: 'Could not connect to Lockbox.',
+    error: 'Could not connect to Authwell.',
   };
 
   const icon = iconMap[type];
@@ -510,8 +510,8 @@ export function createStatusDropdown(
   style.textContent = `
      ${INJECTED_BRAND_STYLES}
      .dropdown {
-       background: #FDFCFA;
-       border: 1px solid #DDD6CC;
+       background: #F7F8FC;
+       border: 1px solid #D8DDF0;
        border-radius: 10px;
        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
        overflow: hidden;
@@ -523,8 +523,8 @@ export function createStatusDropdown(
        padding: 7px 12px;
        display: flex;
        align-items: center;
-       background: #EAE6DF;
-       border-bottom: 1px solid #DDD6CC;
+       background: #EDEFFA;
+       border-bottom: 1px solid #D8DDF0;
      }
      .header .lockbox-brand__logo { width: 84px; }
      .body {
@@ -535,11 +535,11 @@ export function createStatusDropdown(
      }
      .icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
      .text { flex: 1; min-width: 0; }
-     .title { font-weight: 600; color: #2C2825; margin-bottom: 2px; }
-     .desc { color: #7A7168; font-size: 12px; line-height: 1.4; }
+     .title { font-weight: 600; color: #10162F; margin-bottom: 2px; }
+     .desc { color: #4B5270; font-size: 12px; line-height: 1.4; }
      .actions {
        padding: 8px 12px;
-       border-top: 1px solid #DDD6CC;
+       border-top: 1px solid #D8DDF0;
        display: flex;
        gap: 8px;
        justify-content: flex-end;
@@ -550,18 +550,18 @@ export function createStatusDropdown(
        font-size: 12px;
        font-weight: 500;
        cursor: pointer;
-       border: 1px solid #DDD6CC;
-       background: #FDFCFA;
-       color: #7A7168;
+       border: 1px solid #D8DDF0;
+       background: #F7F8FC;
+       color: #4B5270;
        transition: background 0.15s;
      }
-     .btn:hover { background: #EAE6DF; }
+     .btn:hover { background: #EDEFFA; }
      .btn-primary {
-       background: #8B7355;
+       background: #635BFF;
        color: white;
-       border-color: #8B7355;
+       border-color: #635BFF;
      }
-     .btn-primary:hover { background: #7A6348; }
+     .btn-primary:hover { background: #554DF0; }
    `;
 
   const dropdown = document.createElement('div');

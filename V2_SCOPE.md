@@ -1,4 +1,4 @@
-# Lockbox v2 scope backlog
+# Authwell v2 scope backlog
 
 This backlog records every user-facing capability deliberately removed or disabled while making v1 release-ready. It was derived from the v1 code diff, deleted clients and plugins, disabled API routes, and release documentation on 2026-07-31.
 
@@ -6,23 +6,23 @@ The removed prototypes are evidence of product intent, not safe implementation p
 
 ## Confirmed product decisions
 
-- **WebAuthn credential storage stays in the product.** Website passkey creation, encrypted vault storage, assertion signing, browser-extension interception with native fallback, and Android Credential Provider integration already ship in v1. This is distinct from using a hardware authenticator to unlock the Lockbox vault.
+- **WebAuthn credential storage stays in the product.** Website passkey creation, encrypted vault storage, assertion signing, browser-extension interception with native fallback, and Android Credential Provider integration already ship in v1. This is distinct from using a hardware authenticator to unlock the Authwell vault.
 - **Real recovery key and emergency kit is committed v2 scope.** It is the first cryptographic v2 delivery priority and must provide an actual client-side recovery envelope rather than a printable but unrelated random value.
 - Hardware-backed vault unlock and trusted-contact emergency access remain separate candidates. Selecting recovery does not implicitly select either feature.
 
 ## Inventory
 
-| Status       | Candidate                               | What was removed from v1                                                                                                 | What v1 keeps                                                                                                            |
-| ------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| Candidate    | Hardware-backed vault unlock            | Web, extension, and Android registration/unlock UI; FIDO2/PRF bridge; setup, challenge, and verify API flows             | Master-password unlock, account TOTP 2FA, website passkey storage/use, and cleanup of legacy key records                 |
-| **Committed** | **Real recovery key and emergency kit** | Registration-time recovery-key generation and a downloadable PDF that claimed to support recovery                       | An explicit no-recovery model and second-factor backup codes                                                             |
-| Candidate    | Cryptographic emergency access          | Trusted contacts, grants, requests, wait periods, approval/rejection/revocation, automatic approval, and vault retrieval | No emergency grant or request can be created in v1                                                                       |
-| Candidate    | QR onboarding and native scanning       | QR session transfer in web/extension/Android, camera scanner plugin, and Android QR TOTP import helpers                  | Normal password/2FA login, encrypted sync after login, and manual TOTP entry                                             |
-| Candidate    | AI assistant and BYOK controls          | Web/extension chat, provider configuration, advanced AI feature controls, and advertised vault-agent actions             | On-device health analysis, semantic search, phishing heuristics, categorization primitives, and security-copilot scoring |
-| Candidate    | Automatic background breach monitoring | The extension's nominal 24-hour background breach alarm                                                                  | User-initiated HIBP k-anonymity checks with explicit failure reporting                                                   |
-| Candidate    | Real-time sync notifications            | Cloudflare Durable Object WebSocket hub, authenticated upgrade route, and deployment binding                             | Durable REST delta sync, polling, conflict detection, and travel-mode filtering                                          |
-| Candidate    | Private server-side URL reputation      | The hash-only reputation path that previously treated missing reputation evidence as safe                               | Local phishing heuristics and authenticated plaintext-URL heuristic analysis                                             |
-| Candidate    | Additional password-manager imports     | The multi-provider selector for Bitwarden, Chrome, Firefox, 1Password, and KeePass plus unsafe generic auto-detection     | A production LastPass adapter/review flow and Bitwarden-compatible Lockbox export                                        |
+| Status        | Candidate                               | What was removed from v1                                                                                                 | What v1 keeps                                                                                                            |
+| ------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Candidate     | Hardware-backed vault unlock            | Web, extension, and Android registration/unlock UI; FIDO2/PRF bridge; setup, challenge, and verify API flows             | Master-password unlock, account TOTP 2FA, website passkey storage/use, and cleanup of legacy key records                 |
+| **Committed** | **Real recovery key and emergency kit** | Registration-time recovery-key generation and a downloadable PDF that claimed to support recovery                        | An explicit no-recovery model and second-factor backup codes                                                             |
+| Candidate     | Cryptographic emergency access          | Trusted contacts, grants, requests, wait periods, approval/rejection/revocation, automatic approval, and vault retrieval | No emergency grant or request can be created in v1                                                                       |
+| Candidate     | QR onboarding and native scanning       | QR session transfer in web/extension/Android, camera scanner plugin, and Android QR TOTP import helpers                  | Normal password/2FA login, encrypted sync after login, and manual TOTP entry                                             |
+| Candidate     | AI assistant and BYOK controls          | Web/extension chat, provider configuration, advanced AI feature controls, and advertised vault-agent actions             | On-device health analysis, semantic search, phishing heuristics, categorization primitives, and security-copilot scoring |
+| Candidate     | Automatic background breach monitoring  | The extension's nominal 24-hour background breach alarm                                                                  | User-initiated HIBP k-anonymity checks with explicit failure reporting                                                   |
+| Candidate     | Real-time sync notifications            | Cloudflare Durable Object WebSocket hub, authenticated upgrade route, and deployment binding                             | Durable REST delta sync, polling, conflict detection, and travel-mode filtering                                          |
+| Candidate     | Private server-side URL reputation      | The hash-only reputation path that previously treated missing reputation evidence as safe                                | Local phishing heuristics and authenticated plaintext-URL heuristic analysis                                             |
+| Candidate     | Additional password-manager imports     | The multi-provider selector for Bitwarden, Chrome, Firefox, 1Password, and KeePass plus unsafe generic auto-detection    | A production LastPass adapter/review flow and Bitwarden-compatible Authwell export                                       |
 
 ## 1. Hardware-backed vault unlock
 
@@ -216,7 +216,7 @@ The hash-only reputation path no longer returns `safe: true` when no reputation 
 
 - Select a maintained reputation source and determine whether it supports hashed prefixes, k-anonymity, private set intersection, or only full URLs.
 - Define `safe`, `suspicious`, `known malicious`, and `unknown` semantics, update cadence, false-positive appeals, and provider outage behavior.
-- Document exactly what is disclosed to Lockbox infrastructure and any upstream provider.
+- Document exactly what is disclosed to Authwell infrastructure and any upstream provider.
 
 ### Acceptance criteria
 

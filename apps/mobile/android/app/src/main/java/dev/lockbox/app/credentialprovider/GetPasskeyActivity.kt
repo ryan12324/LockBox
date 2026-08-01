@@ -78,7 +78,7 @@ class GetPasskeyActivity : FragmentActivity() {
         request: ProviderGetCredentialRequest
     ): PreparedAssertion {
         val accountId = PasskeyAccountState.get(applicationContext)
-            ?: throw SecurityException("Unlock Lockbox before using passkeys")
+            ?: throw SecurityException("Unlock Authwell before using passkeys")
         val metadata = VaultDatabase.getInstance(applicationContext)
             .passkeyMetadataDao()
             .getByCredentialIdAndAccount(credentialId, accountId)
@@ -129,11 +129,11 @@ class GetPasskeyActivity : FragmentActivity() {
         val encryptedKey = prepared.metadata.encryptedPrivateKey
         val decryptCipher = if (encryptedKey != null) {
             val deviceKey = AutofillCrypto.getPrivateKey()
-                ?: return finishWithError("Unlock Lockbox once to prepare synced passkeys")
+                ?: return finishWithError("Unlock Authwell once to prepare synced passkeys")
             try {
                 AutofillCrypto.createUnwrapCipher(deviceKey)
             } catch (_: Exception) {
-                return finishWithError("Synced passkeys need to be refreshed from Lockbox")
+                return finishWithError("Synced passkeys need to be refreshed from Authwell")
             }
         } else {
             null
@@ -170,7 +170,7 @@ class GetPasskeyActivity : FragmentActivity() {
             }
         )
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Use Lockbox passkey")
+            .setTitle("Use Authwell passkey")
             .setSubtitle("${prepared.metadata.userName} · ${prepared.metadata.rpName}")
             .setNegativeButtonText("Cancel")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)

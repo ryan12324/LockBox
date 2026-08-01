@@ -69,7 +69,7 @@ async function loadTotpSecret(
   db: ReturnType<typeof createDb>,
   userId: string,
   stored: string,
-  bindings: TotpSecretBindings,
+  bindings: TotpSecretBindings
 ): Promise<Uint8Array> {
   const { secret, migratedEnvelope } = await decryptStoredTotpSecret(stored, userId, bindings);
   if (migratedEnvelope) {
@@ -77,10 +77,7 @@ async function loadTotpSecret(
       .update(userTotpSettings)
       .set({ encryptedTotpSecret: migratedEnvelope })
       .where(
-        and(
-          eq(userTotpSettings.userId, userId),
-          eq(userTotpSettings.encryptedTotpSecret, stored),
-        ),
+        and(eq(userTotpSettings.userId, userId), eq(userTotpSettings.encryptedTotpSecret, stored))
       );
   }
   return secret;
@@ -132,11 +129,7 @@ twofaRoutes.post('/setup', authMiddleware, async (c) => {
 
   let encryptedSecret: string;
   try {
-    encryptedSecret = await encryptTotpSecret(
-      secretBytes,
-      userId,
-      c.env.TOTP_ENCRYPTION_KEY,
-    );
+    encryptedSecret = await encryptTotpSecret(secretBytes, userId, c.env.TOTP_ENCRYPTION_KEY);
   } catch (error) {
     if (isTotpSecretUnavailable(error)) {
       return c.json({ error: 'Two-factor authentication is temporarily unavailable' }, 503);
@@ -145,7 +138,7 @@ twofaRoutes.post('/setup', authMiddleware, async (c) => {
   }
 
   // Build otpauth URI
-  const otpauthUri = `otpauth://totp/Lockbox:${encodeURIComponent(user.email)}?secret=${base32Secret}&issuer=Lockbox`;
+  const otpauthUri = `otpauth://totp/Authwell:${encodeURIComponent(user.email)}?secret=${base32Secret}&issuer=Authwell`;
 
   // Store or replace the pending secret atomically. The server must retain this
   // secret to verify login codes; it never grants access to vault ciphertext.
@@ -229,7 +222,7 @@ twofaRoutes.post('/verify', authMiddleware, async (c) => {
       codeHash: await sha256(plainCode),
       used: 0,
       createdAt: now,
-    })),
+    }))
   );
 
   // Enabling 2FA and replacing its recovery codes is one account transition.
@@ -347,12 +340,7 @@ twofaRoutes.post('/validate', async (c) => {
   let valid = false;
   if (/^\d{6}$/.test(code)) {
     try {
-      const secretBytes = await loadTotpSecret(
-        db,
-        userId,
-        settings.encryptedTotpSecret,
-        c.env,
-      );
+      const secretBytes = await loadTotpSecret(db, userId, settings.encryptedTotpSecret, c.env);
       valid = await verifyTotpCode(secretBytes, code);
     } catch (error) {
       if (isTotpSecretUnavailable(error)) {

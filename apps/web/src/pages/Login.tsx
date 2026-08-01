@@ -61,7 +61,9 @@ export default function Login() {
       toast(
         error instanceof ApiError && error.status === 401
           ? 'The email or master password is incorrect.'
-          : error instanceof Error ? error.message : 'Sign-in failed. Please try again.',
+          : error instanceof Error
+            ? error.message
+            : 'Sign-in failed. Please try again.',
         'error'
       );
     } finally {
@@ -98,12 +100,26 @@ export default function Login() {
     <AuthShell
       eyebrow={verifying ? 'Two-factor verification' : 'Private by design'}
       title={verifying ? 'Verify this sign-in' : 'Welcome back'}
-      description={verifying ? 'Confirm the code from your second factor to open this vault.' : 'Sign in to decrypt and manage your vault on this device.'}
+      description={
+        verifying
+          ? 'Confirm the code from your second factor to open this vault.'
+          : 'Sign in to decrypt and manage your vault on this device.'
+      }
       icon={verifying ? 'shield-check' : 'key'}
-      footer={!verifying ? <>
-        <span>New to Lockbox? <Link to="/register">Create a vault</Link></span>
-        {nativeApp && <span className="auth-panel__footer-action"><Link to="/setup">Use a different Lockbox server</Link></span>}
-      </> : undefined}
+      footer={
+        !verifying ? (
+          <>
+            <span>
+              New to Authwell? <Link to="/register">Create a vault</Link>
+            </span>
+            {nativeApp && (
+              <span className="auth-panel__footer-action">
+                <Link to="/setup">Use a different Authwell server</Link>
+              </span>
+            )}
+          </>
+        ) : undefined
+      }
     >
       {verifying ? (
         <form onSubmit={handle2FASubmit} className="auth-form">
@@ -121,22 +137,51 @@ export default function Login() {
             label={isBackupCode ? 'Backup code' : 'Authenticator code'}
             placeholder={isBackupCode ? '16-character code' : '6-digit code'}
           />
-          <Button type="submit" size="lg" loading={loading}>Verify and sign in</Button>
+          <Button type="submit" size="lg" loading={loading}>
+            Verify and sign in
+          </Button>
           <div className="auth-form__actions">
-            <Button type="button" variant="ghost" size="sm" onClick={() => {
-              setIsBackupCode((current) => !current);
-              setTwoFaCode('');
-            }}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setIsBackupCode((current) => !current);
+                setTwoFaCode('');
+              }}
+            >
               {isBackupCode ? 'Use authenticator code' : 'Use a backup code'}
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={cancelTwoFactor}>Back to sign in</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={cancelTwoFactor}>
+              Back to sign in
+            </Button>
           </div>
         </form>
       ) : (
         <form onSubmit={handleSubmit} className="auth-form">
-          <Input name="email" type="email" required autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} label="Email" placeholder="you@example.com" />
-          <Input name="password" type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} label="Master password" placeholder="Enter your master password" />
-          <Button type="submit" size="lg" loading={loading}>Sign in</Button>
+          <Input
+            name="email"
+            type="email"
+            required
+            autoComplete="username"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            label="Email"
+            placeholder="you@example.com"
+          />
+          <Input
+            name="password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            label="Master password"
+            placeholder="Enter your master password"
+          />
+          <Button type="submit" size="lg" loading={loading}>
+            Sign in
+          </Button>
         </form>
       )}
     </AuthShell>

@@ -72,7 +72,7 @@ export default function App() {
             role="status"
             className="min-h-screen flex items-center justify-center text-sm text-[var(--color-text-secondary)]"
           >
-            Loading Lockbox…
+            Loading Authwell…
           </div>
         }
       >

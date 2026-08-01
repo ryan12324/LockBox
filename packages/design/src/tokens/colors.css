@@ -1,37 +1,43 @@
-/* Lockbox palette — warm paper, ink, and restrained umber. */
+/* Authwell palette — electric trust grounded by deep ink. */
 :root {
   color-scheme: light;
 
-  --color-bg: oklch(0.965 0.008 80);
-  --color-bg-subtle: oklch(0.935 0.01 78);
-  --color-surface: oklch(0.985 0.005 80);
-  --color-surface-raised: oklch(0.997 0.003 80);
+  --color-bg: oklch(0.972 0.009 278);
+  --color-bg-subtle: oklch(0.944 0.017 278);
+  --color-surface: oklch(0.986 0.006 278);
+  --color-surface-raised: oklch(0.995 0.004 278);
 
-  --color-border: oklch(0.84 0.014 75);
-  --color-border-strong: oklch(0.69 0.02 68);
+  --color-border: oklch(0.86 0.022 278);
+  --color-border-strong: oklch(0.7 0.045 278);
 
-  --color-text: oklch(0.25 0.018 55);
-  --color-text-secondary: oklch(0.43 0.02 55);
-  --color-text-tertiary: oklch(0.52 0.018 55);
+  --color-text: oklch(0.24 0.055 274);
+  --color-text-secondary: oklch(0.43 0.045 274);
+  --color-text-tertiary: oklch(0.56 0.035 274);
 
-  --color-primary: oklch(0.42 0.055 55);
-  --color-primary-hover: oklch(0.36 0.052 55);
-  --color-primary-active: oklch(0.31 0.048 55);
-  --color-primary-fg: oklch(0.985 0.005 80);
-  --color-focus: oklch(0.5 0.07 55);
+  --color-primary: oklch(0.62 0.24 282);
+  --color-primary-hover: oklch(0.56 0.25 282);
+  --color-primary-active: oklch(0.5 0.23 282);
+  --color-primary-fg: oklch(0.985 0.006 278);
+  --color-focus: oklch(0.62 0.24 282);
 
-  --color-error: oklch(0.44 0.13 28);
-  --color-error-subtle: oklch(0.94 0.025 30);
-  --color-success: oklch(0.4 0.09 145);
-  --color-success-subtle: oklch(0.94 0.025 145);
-  --color-warning: oklch(0.43 0.1 75);
-  --color-warning-subtle: oklch(0.94 0.03 80);
-  --color-info: oklch(0.43 0.1 250);
-  --color-info-subtle: oklch(0.94 0.025 250);
+  --color-error: oklch(0.64 0.2 25);
+  --color-error-subtle: oklch(0.95 0.035 25);
+  --color-success: oklch(0.67 0.15 178);
+  --color-success-subtle: oklch(0.95 0.035 178);
+  --color-warning: oklch(0.68 0.14 85);
+  --color-warning-subtle: oklch(0.95 0.04 90);
+  --color-info: oklch(0.62 0.18 250);
+  --color-info-subtle: oklch(0.95 0.035 250);
 
-  --shadow-sm: 0 1px 2px oklch(0.25 0.018 55 / 0.1);
-  --shadow-md: 0 6px 18px oklch(0.25 0.018 55 / 0.1);
-  --shadow-lg: 0 18px 48px oklch(0.2 0.018 55 / 0.16);
+  --color-authwell-indigo: oklch(0.62 0.24 282);
+  --color-authwell-aqua: oklch(0.8 0.16 178);
+  --color-authwell-coral: oklch(0.71 0.19 25);
+  --color-authwell-yellow: oklch(0.84 0.15 90);
+  --color-authwell-ink: oklch(0.24 0.055 274);
+
+  --shadow-sm: 0 1px 2px oklch(0.24 0.055 274 / 0.1);
+  --shadow-md: 0 8px 22px oklch(0.24 0.055 274 / 0.11);
+  --shadow-lg: 0 20px 52px oklch(0.2 0.05 274 / 0.18);
 
   /* Compatibility aliases while the v1 surfaces migrate to the new system. */
   --color-aura: var(--color-primary);
@@ -43,48 +49,48 @@
   --shadow-depress: inset 0 1px 2px oklch(0.25 0.018 55 / 0.12);
   --shadow-aura: none;
 
-  --color-ctx-banking-bg: oklch(0.2 0.012 55);
-  --color-ctx-banking-surface: oklch(0.25 0.014 55);
-  --color-ctx-banking-text: oklch(0.94 0.008 80);
-  --color-ctx-banking-border: oklch(0.38 0.016 55);
+  --color-ctx-banking-bg: oklch(0.2 0.04 274);
+  --color-ctx-banking-surface: oklch(0.25 0.045 274);
+  --color-ctx-banking-text: oklch(0.95 0.008 278);
+  --color-ctx-banking-border: oklch(0.38 0.04 274);
 }
 
 .dark {
   color-scheme: dark;
 
-  --color-bg: oklch(0.17 0.01 55);
-  --color-bg-subtle: oklch(0.2 0.012 55);
-  --color-surface: oklch(0.22 0.013 55);
-  --color-surface-raised: oklch(0.25 0.014 55);
+  --color-bg: oklch(0.18 0.04 274);
+  --color-bg-subtle: oklch(0.215 0.045 274);
+  --color-surface: oklch(0.235 0.045 274);
+  --color-surface-raised: oklch(0.27 0.045 274);
 
-  --color-border: oklch(0.34 0.016 55);
-  --color-border-strong: oklch(0.47 0.018 55);
+  --color-border: oklch(0.34 0.045 274);
+  --color-border-strong: oklch(0.48 0.06 274);
 
-  --color-text: oklch(0.92 0.008 80);
-  --color-text-secondary: oklch(0.74 0.014 72);
-  --color-text-tertiary: oklch(0.64 0.014 65);
+  --color-text: oklch(0.94 0.01 278);
+  --color-text-secondary: oklch(0.77 0.025 278);
+  --color-text-tertiary: oklch(0.66 0.03 278);
 
-  --color-primary: oklch(0.76 0.055 75);
-  --color-primary-hover: oklch(0.82 0.052 78);
-  --color-primary-active: oklch(0.7 0.05 72);
-  --color-primary-fg: oklch(0.2 0.012 55);
-  --color-focus: oklch(0.76 0.055 75);
+  --color-primary: oklch(0.72 0.2 282);
+  --color-primary-hover: oklch(0.77 0.18 282);
+  --color-primary-active: oklch(0.66 0.21 282);
+  --color-primary-fg: oklch(0.98 0.006 278);
+  --color-focus: oklch(0.72 0.2 282);
 
-  --color-error: oklch(0.72 0.12 28);
+  --color-error: oklch(0.74 0.16 25);
   --color-error-subtle: oklch(0.27 0.045 28);
-  --color-success: oklch(0.72 0.085 145);
-  --color-success-subtle: oklch(0.27 0.035 145);
-  --color-warning: oklch(0.78 0.09 80);
-  --color-warning-subtle: oklch(0.28 0.035 80);
-  --color-info: oklch(0.75 0.085 250);
+  --color-success: oklch(0.8 0.14 178);
+  --color-success-subtle: oklch(0.28 0.05 178);
+  --color-warning: oklch(0.84 0.14 90);
+  --color-warning-subtle: oklch(0.29 0.05 90);
+  --color-info: oklch(0.76 0.13 250);
   --color-info-subtle: oklch(0.27 0.035 250);
 
   --shadow-sm: 0 1px 2px oklch(0.05 0 0 / 0.28);
   --shadow-md: 0 8px 20px oklch(0.05 0 0 / 0.3);
   --shadow-lg: 0 20px 52px oklch(0.05 0 0 / 0.42);
 
-  --color-ctx-banking-bg: oklch(0.13 0.008 55);
-  --color-ctx-banking-surface: oklch(0.18 0.01 55);
-  --color-ctx-banking-text: oklch(0.94 0.008 80);
-  --color-ctx-banking-border: oklch(0.31 0.014 55);
+  --color-ctx-banking-bg: oklch(0.14 0.035 274);
+  --color-ctx-banking-surface: oklch(0.19 0.04 274);
+  --color-ctx-banking-text: oklch(0.95 0.008 278);
+  --color-ctx-banking-border: oklch(0.31 0.045 274);
 }

@@ -45,14 +45,14 @@ function parseTrustedOrigin(input: string): URL {
   } catch {
     throw new LockboxDiscoveryError(
       'invalid-url',
-      'Enter the address of your Lockbox web vault, such as https://vault.example.com.'
+      'Enter the address of your Authwell web vault, such as https://vault.example.com.'
     );
   }
 
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopback(url.hostname))) {
     throw new LockboxDiscoveryError(
       'insecure-url',
-      'Your Lockbox web vault must use HTTPS. HTTP is allowed only for local development.'
+      'Your Authwell web vault must use HTTPS. HTTP is allowed only for local development.'
     );
   }
   if (url.username || url.password) {
@@ -97,7 +97,7 @@ function parseApiOrigin(value: unknown, webOrigin: string): string {
   if (typeof value !== 'string' || !value.trim()) {
     throw new LockboxDiscoveryError(
       'discovery-invalid',
-      'The web vault did not provide a valid Lockbox API address.'
+      'The web vault did not provide a valid Authwell API address.'
     );
   }
   if (value === '/') return webOrigin;
@@ -114,12 +114,15 @@ function parseApiOrigin(value: unknown, webOrigin: string): string {
   } catch {
     throw new LockboxDiscoveryError(
       'discovery-invalid',
-      'The web vault published an invalid Lockbox API address.'
+      'The web vault published an invalid Authwell API address.'
     );
   }
 
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopback(url.hostname))) {
-    throw new LockboxDiscoveryError('discovery-invalid', 'The discovered Lockbox API must use HTTPS.');
+    throw new LockboxDiscoveryError(
+      'discovery-invalid',
+      'The discovered Authwell API must use HTTPS.'
+    );
   }
   if (
     url.username ||
@@ -144,12 +147,12 @@ async function readDiscoveryDocument(
     `${webOrigin}${LOCKBOX_DISCOVERY_PATH}`,
     fetchImpl,
     'discovery-unavailable',
-    'Lockbox could not reach that web vault. Check the address and try again.'
+    'Authwell could not reach that web vault. Check the address and try again.'
   );
   if (response.status === 404) {
     throw new LockboxDiscoveryError(
       'discovery-not-found',
-      'This server does not publish Lockbox app connection settings.'
+      'This server does not publish Authwell app connection settings.'
     );
   }
   if (!response.ok) {
@@ -174,12 +177,15 @@ async function readDiscoveryDocument(
     );
   }
   if (!isRecord(body) || body.product !== LOCKBOX_PRODUCT) {
-    throw new LockboxDiscoveryError('discovery-invalid', 'That address is not a Lockbox web vault.');
+    throw new LockboxDiscoveryError(
+      'discovery-invalid',
+      'That address is not an Authwell web vault.'
+    );
   }
   if (body.protocolVersion !== LOCKBOX_PROTOCOL_VERSION) {
     throw new LockboxDiscoveryError(
       'unsupported-protocol',
-      'This Lockbox web vault uses an unsupported app protocol. Update the web vault and Android app together.'
+      'This Authwell web vault uses an unsupported app protocol. Update the web vault and Android app together.'
     );
   }
   return body as unknown as LockboxDiscoveryDocument;
@@ -200,7 +206,7 @@ async function verifyApi(apiOrigin: string, fetchImpl: FetchImplementation): Pro
   }
   assertJsonResponse(
     response,
-    'The discovered server did not return a Lockbox API response.',
+    'The discovered server did not return an Authwell API response.',
     'api-invalid'
   );
 
@@ -221,7 +227,7 @@ async function verifyApi(apiOrigin: string, fetchImpl: FetchImplementation): Pro
   ) {
     throw new LockboxDiscoveryError(
       'api-invalid',
-      'The discovered server could not be verified as a compatible Lockbox API.'
+      'The discovered server could not be verified as a compatible Authwell API.'
     );
   }
 }
@@ -244,7 +250,7 @@ export async function discoverLockboxServer(
       } catch {
         throw new LockboxDiscoveryError(
           'discovery-not-found',
-          'No Lockbox configuration was found there. Enter your web vault address, then redeploy the web vault if needed.'
+          'No Authwell configuration was found there. Enter your web vault address, then redeploy the web vault if needed.'
         );
       }
     }

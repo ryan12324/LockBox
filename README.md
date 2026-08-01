@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="assets/brand/lockbox-logo-horizontal-v2.png" alt="Lockbox" width="420" />
+  <img src="assets/branding/authwell/authwell-logo-horizontal.png" alt="Authwell" width="420" />
 </p>
 
-# Lockbox
+# Authwell
 
-Lockbox is a self-hosted, zero-knowledge password manager for technically comfortable users who want to run their own backend. Vault plaintext and encryption keys stay on the client; the Cloudflare backend stores ciphertext and synchronization metadata.
+Authwell is a self-hosted, zero-knowledge password manager for technically comfortable users who want to run their own backend. Vault plaintext and encryption keys stay on the client; the Cloudflare backend stores ciphertext and synchronization metadata.
 
 Version 1.0.0 includes a web vault, Chrome/Firefox extension, Android app, CLI, and Cloudflare Workers API.
 
-> Lockbox has not received an independent security audit. Review the code and threat model before trusting it with critical credentials. Self-hosting transfers operational responsibility to you, including Cloudflare access, backups, updates, and cost controls.
+> Authwell has not received an independent security audit. Review the code and threat model before trusting it with critical credentials. Self-hosting transfers operational responsibility to you, including Cloudflare access, backups, updates, and cost controls.
 
 ## What ships in v1
 
@@ -144,4 +144,4 @@ CI runs lint, TypeScript checks, Vitest suites, production builds, Chrome/Firefo
 
 ## License
 
-See the [privacy notice](PRIVACY.md) and [security policy](SECURITY.md). Lockbox is licensed under the [MIT License](LICENSE).
+See the [privacy notice](PRIVACY.md) and [security policy](SECURITY.md). Authwell is licensed under the [MIT License](LICENSE).

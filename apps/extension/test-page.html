@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lockbox Extension Test Page</title>
+    <title>Authwell Extension Test Page</title>
     <style>
       *,
       *::before,
@@ -197,7 +197,7 @@
     </style>
   </head>
   <body>
-    <h1>🔒 Lockbox Extension Test Page</h1>
+    <h1>🔒 Authwell Extension Test Page</h1>
     <p class="subtitle">
       Open with the extension installed. Each card tests a specific content script feature. Check
       the console for extension messages.
@@ -517,7 +517,7 @@
       <div class="card">
         <h2>Save New Credentials <span class="tag amber">save banner</span></h2>
         <p>
-          Fill in and submit. If these creds aren't in the vault, a "Save to Lockbox?" banner should
+          Fill in and submit. If these creds aren't in the vault, a "Save to Authwell?" banner should
           appear.
         </p>
         <form id="form-save-new" action="javascript:void(0)" method="POST">
@@ -739,7 +739,7 @@
         try {
           const credential = await navigator.credentials.create({
             publicKey: {
-              rp: { name: 'Lockbox Test', id: window.location.hostname },
+              rp: { name: 'Authwell Test', id: window.location.hostname },
               user: {
                 id: new Uint8Array(16),
                 name: 'test@lockbox.dev',

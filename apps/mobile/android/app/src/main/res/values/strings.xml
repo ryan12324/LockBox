@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Lockbox</string>
+    <string name="app_name">Authwell</string>
     <string name="credential_provider_subtitle">Synced passkeys protected by biometrics</string>
-    <string name="title_activity_main">Lockbox</string>
+    <string name="title_activity_main">Authwell</string>
     <string name="package_name">dev.lockbox.app</string>
     <string name="custom_url_scheme">dev.lockbox.app</string>
 </resources>

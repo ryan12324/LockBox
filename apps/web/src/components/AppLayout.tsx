@@ -161,8 +161,10 @@ export default function AppLayout() {
   const pageTitle = (() => {
     if (isVaultRoute) {
       if (showFavorites) return 'Favorites';
-      if (selectedType) return vaultTypes.find((entry) => entry.type === selectedType)?.label ?? 'Vault';
-      if (selectedFolder) return folders.find((folder) => folder.id === selectedFolder)?.name ?? 'Vault';
+      if (selectedType)
+        return vaultTypes.find((entry) => entry.type === selectedType)?.label ?? 'Vault';
+      if (selectedFolder)
+        return folders.find((folder) => folder.id === selectedFolder)?.name ?? 'Vault';
       return 'Vault';
     }
     if (location.pathname === '/trash') return 'Trash';
@@ -170,7 +172,7 @@ export default function AppLayout() {
     if (location.pathname.startsWith('/teams')) return 'Teams';
     if (location.pathname === '/generator') return 'Generator';
     if (location.pathname.startsWith('/settings')) return 'Settings';
-    return 'Lockbox';
+    return 'Authwell';
   })();
 
   const navButton = (
@@ -198,10 +200,10 @@ export default function AppLayout() {
       <header className="app-header">
         <div className="app-header__brand">
           <span className="app-brandmark" aria-hidden="true">
-            <img className="app-brandmark__tile" src="/brand/lockbox-app-icon.png" alt="" />
-            <img className="app-brandmark__mark" src="/brand/lockbox-mark.png" alt="" />
+            <img className="app-brandmark__tile" src="/brand/authwell-app-icon.png" alt="" />
+            <img className="app-brandmark__mark" src="/brand/authwell-mark.png" alt="" />
           </span>
-          <span className="app-header__wordmark">Lockbox</span>
+          <span className="app-header__wordmark">Authwell</span>
         </div>
         <button
           type="button"
@@ -240,10 +242,18 @@ export default function AppLayout() {
                 isVaultRoute && !selectedFolder && !selectedType && !showFavorites,
                 () => showVault()
               )}
-              {navButton('Favorites', 'star', isVaultRoute && showFavorites, () => showVault({ favorites: true }))}
-              {navButton('Security', 'shield-check', location.pathname === '/health', () => navigate('/health'))}
-              {navButton('Generator', 'wand', location.pathname === '/generator', () => navigate('/generator'))}
-              {navButton('Teams', 'users', location.pathname.startsWith('/teams'), () => navigate('/teams'))}
+              {navButton('Favorites', 'star', isVaultRoute && showFavorites, () =>
+                showVault({ favorites: true })
+              )}
+              {navButton('Security', 'shield-check', location.pathname === '/health', () =>
+                navigate('/health')
+              )}
+              {navButton('Generator', 'wand', location.pathname === '/generator', () =>
+                navigate('/generator')
+              )}
+              {navButton('Teams', 'users', location.pathname.startsWith('/teams'), () =>
+                navigate('/teams')
+              )}
             </div>
 
             <div className="app-nav__section app-nav__browse">
@@ -328,17 +338,28 @@ export default function AppLayout() {
                       >
                         <Input
                           value={editingFolder.name}
-                          onChange={(event) => setEditingFolder({ ...editingFolder, name: event.target.value })}
+                          onChange={(event) =>
+                            setEditingFolder({ ...editingFolder, name: event.target.value })
+                          }
                           onKeyDown={(event) => {
                             if (event.key === 'Escape') setEditingFolder(null);
                           }}
                           aria-label={`Rename ${folder.name}`}
                           autoFocus
                         />
-                        <button type="submit" className="lb-icon-button" aria-label="Save folder name">
+                        <button
+                          type="submit"
+                          className="lb-icon-button"
+                          aria-label="Save folder name"
+                        >
                           <Icon name="check" size={18} />
                         </button>
-                        <button type="button" className="lb-icon-button" aria-label="Cancel rename" onClick={() => setEditingFolder(null)}>
+                        <button
+                          type="button"
+                          className="lb-icon-button"
+                          aria-label="Cancel rename"
+                          onClick={() => setEditingFolder(null)}
+                        >
                           <Icon name="x" size={18} />
                         </button>
                       </form>
@@ -350,8 +371,20 @@ export default function AppLayout() {
                       <div key={folder.id} className="app-nav__folder-confirm" role="alert">
                         <p>Delete “{folder.name}”? Its items move to the main vault.</p>
                         <div>
-                          <Button variant="danger" size="sm" onClick={() => void handleDeleteFolder(folder.id)}>Delete</Button>
-                          <Button variant="ghost" size="sm" onClick={() => setDeletingFolderId(null)}>Cancel</Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => void handleDeleteFolder(folder.id)}
+                          >
+                            Delete
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setDeletingFolderId(null)}
+                          >
+                            Cancel
+                          </Button>
                         </div>
                       </div>
                     );
@@ -362,7 +395,9 @@ export default function AppLayout() {
                       <button
                         type="button"
                         className="app-nav__item app-nav__folder-link"
-                        data-active={isVaultRoute && selectedFolder === folder.id ? 'true' : undefined}
+                        data-active={
+                          isVaultRoute && selectedFolder === folder.id ? 'true' : undefined
+                        }
                         onClick={() => showVault({ folder: folder.id })}
                       >
                         <Icon name="folder" size={18} />
@@ -393,8 +428,12 @@ export default function AppLayout() {
             </div>
 
             <div className="app-nav__footer">
-              {navButton('Trash', 'trash', location.pathname === '/trash', () => navigate('/trash'))}
-              {navButton('Settings', 'settings', location.pathname.startsWith('/settings'), () => navigate('/settings'))}
+              {navButton('Trash', 'trash', location.pathname === '/trash', () =>
+                navigate('/trash')
+              )}
+              {navButton('Settings', 'settings', location.pathname.startsWith('/settings'), () =>
+                navigate('/settings')
+              )}
               {navButton('Lock vault', 'lock', false, lock)}
               {navButton('Sign out', 'logout', false, () => void handleLogout(), { danger: true })}
             </div>
@@ -405,18 +444,28 @@ export default function AppLayout() {
           {isTravelMode && (
             <div className="app-travel" role="status">
               <Icon name="alert-triangle" size={20} />
-              <span><strong>Travel mode is on.</strong> Items outside your travel folders are hidden.</span>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/settings')}>Review settings</Button>
+              <span>
+                <strong>Travel mode is on.</strong> Items outside your travel folders are hidden.
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/settings')}>
+                Review settings
+              </Button>
             </div>
           )}
-          <div className="app-main__route"><Outlet /></div>
+          <div className="app-main__route">
+            <Outlet />
+          </div>
         </main>
       </div>
 
       <nav className="app-bottom-nav" aria-label="Mobile navigation">
         {navButton('Vault', 'shield-lock', isVaultRoute, () => showVault())}
-        {navButton('Generator', 'wand', location.pathname === '/generator', () => navigate('/generator'))}
-        {navButton('Security', 'shield-check', location.pathname === '/health', () => navigate('/health'))}
+        {navButton('Generator', 'wand', location.pathname === '/generator', () =>
+          navigate('/generator')
+        )}
+        {navButton('Security', 'shield-check', location.pathname === '/health', () =>
+          navigate('/health')
+        )}
         {navButton('More', 'menu-2', showNavigation, () => setShowNavigation((open) => !open))}
       </nav>
     </div>

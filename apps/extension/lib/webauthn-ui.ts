@@ -20,7 +20,7 @@ const BASE_STYLES = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
   .overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(44,40,37,0.4); display: flex; align-items: center;
+    background: rgba(16,22,47,0.4); display: flex; align-items: center;
     justify-content: center; font-family: -apple-system, BlinkMacSystemFont,
     'Segoe UI', Roboto, sans-serif; z-index: 2147483647;
     animation: fadeIn 0.15s ease-out;
@@ -31,27 +31,27 @@ const BASE_STYLES = `
     to   { opacity: 1; transform: translateY(0); }
   }
   .modal {
-    background: #FDFCFA; border-radius: 24px;
-    box-shadow: 0 12px 40px rgba(44,40,37,0.12), 0 0 0 1px #DDD6CC;
+    background: #F7F8FC; border-radius: 24px;
+    box-shadow: 0 12px 40px rgba(16,22,47,0.12), 0 0 0 1px #D8DDF0;
     max-width: 400px; width: 90%; overflow: hidden;
     animation: slideUp 0.2s ease-out;
   }
   .brandbar {
     min-height: 42px; padding: 9px 20px; display: flex; align-items: center;
-    background: #EAE6DF; border-bottom: 1px solid #DDD6CC;
+    background: #EDEFFA; border-bottom: 1px solid #D8DDF0;
   }
   .brandbar .lockbox-brand__logo { width: 92px; }
   .modal-header {
     padding: 18px 20px 14px; display: flex; align-items: center; gap: 12px;
-    border-bottom: 1px solid #DDD6CC;
+    border-bottom: 1px solid #D8DDF0;
   }
-  .modal-header svg { width: 22px; height: 22px; color: #8B7355; flex-shrink: 0; }
-  .modal-title { font-size: 15px; font-weight: 600; color: #2C2825; }
-  .modal-subtitle { font-size: 12px; color: #7A7168; margin-top: 2px; }
+  .modal-header svg { width: 22px; height: 22px; color: #635BFF; flex-shrink: 0; }
+  .modal-title { font-size: 15px; font-weight: 600; color: #10162F; }
+  .modal-subtitle { font-size: 12px; color: #4B5270; margin-top: 2px; }
   .modal-body { padding: 16px 20px; }
   .info-row {
     display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-    background: #EAE6DF; border-radius: 10px; margin-bottom: 8px;
+    background: #EDEFFA; border-radius: 10px; margin-bottom: 8px;
   }
   .info-row:last-child { margin-bottom: 0; }
   .info-icon {
@@ -59,31 +59,31 @@ const BASE_STYLES = `
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     color: #6B5640;
   }
-  .info-label { font-size: 11px; color: #7A7168; text-transform: uppercase; letter-spacing: 0.5px; }
+  .info-label { font-size: 11px; color: #4B5270; text-transform: uppercase; letter-spacing: 0.5px; }
   .info-value {
-    font-size: 14px; color: #2C2825; font-weight: 500;
+    font-size: 14px; color: #10162F; font-weight: 500;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px;
   }
   .modal-actions {
     display: flex; gap: 10px; padding: 14px 20px;
-    border-top: 1px solid #DDD6CC;
+    border-top: 1px solid #D8DDF0;
   }
   .btn {
     flex: 1; padding: 10px 16px; border-radius: 10px; font-size: 13px;
     font-weight: 600; cursor: pointer; border: none; transition: all 0.15s;
   }
   .btn-primary {
-    background: #8B7355; color: #fff;
+    background: #635BFF; color: #fff;
   }
-  .btn-primary:hover { background: #7A6348; }
+  .btn-primary:hover { background: #554DF0; }
   .btn-secondary {
-    background: #EAE6DF; color: #7A7168;
-    border: 1px solid #DDD6CC;
+    background: #EDEFFA; color: #4B5270;
+    border: 1px solid #D8DDF0;
   }
-  .btn-secondary:hover { background: #DDD6CC; color: #2C2825; }
+  .btn-secondary:hover { background: #D8DDF0; color: #10162F; }
   .btn:focus-visible, .cancel-btn:focus-visible, .toast-action:focus-visible,
   .toast-dismiss:focus-visible, .passkey-item:focus-visible {
-    outline: 2px solid #8B7355; outline-offset: 2px;
+    outline: 2px solid #635BFF; outline-offset: 2px;
   }
   .security-badge {
     display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
@@ -104,7 +104,7 @@ const PICKER_STYLES = `
   .passkey-list { max-height: 240px; overflow-y: auto; }
   .passkey-item {
     padding: 12px 20px; cursor: pointer;
-    border-bottom: 1px solid #DDD6CC;
+    border-bottom: 1px solid #D8DDF0;
     display: flex; align-items: center; gap: 12px; transition: background 0.1s;
     width: 100%; background: transparent; border-left: 0; border-right: 0;
     border-top: 0; font: inherit; text-align: left;
@@ -118,20 +118,20 @@ const PICKER_STYLES = `
   }
   .passkey-info { min-width: 0; flex: 1; }
   .passkey-name {
-    font-size: 14px; font-weight: 500; color: #2C2825;
+    font-size: 14px; font-weight: 500; color: #10162F;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .passkey-detail {
-    font-size: 12px; color: #7A7168;
+    font-size: 12px; color: #4B5270;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .cancel-btn {
     width: 100%; padding: 12px; border: none;
-    background: #EAE6DF; color: #7A7168;
+    background: #EDEFFA; color: #4B5270;
     font-size: 13px; cursor: pointer;
-    border-top: 1px solid #DDD6CC;
+    border-top: 1px solid #D8DDF0;
   }
-  .cancel-btn:hover { background: #DDD6CC; color: #2C2825; }
+  .cancel-btn:hover { background: #D8DDF0; color: #10162F; }
 `;
 
 // ─── Toast styles (non-modal notification) ──────────────────────────────────
@@ -142,10 +142,10 @@ const TOAST_STYLES = `
     position: fixed; bottom: 20px; right: 20px;
     display: flex; align-items: flex-start; gap: 12px;
     padding: 14px 18px; max-width: 360px;
-    background: #FDFCFA;
-    border: 1px solid #DDD6CC;
+    background: #F7F8FC;
+    border: 1px solid #D8DDF0;
     border-radius: 20px;
-    box-shadow: 0 8px 32px rgba(44,40,37,0.12);
+    box-shadow: 0 8px 32px rgba(16,22,47,0.12);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     animation: slideInRight 0.25s ease-out;
     z-index: 2147483647;
@@ -158,19 +158,19 @@ const TOAST_STYLES = `
   .toast-text { flex: 1; min-width: 0; }
   .toast-text .lockbox-brand { margin-bottom: 7px; }
   .toast-text .lockbox-brand__logo { width: 82px; }
-  .toast-title { font-size: 13px; font-weight: 600; color: #2C2825; margin-bottom: 3px; }
-  .toast-desc { font-size: 12px; color: #7A7168; line-height: 1.4; }
+  .toast-title { font-size: 13px; font-weight: 600; color: #10162F; margin-bottom: 3px; }
+  .toast-desc { font-size: 12px; color: #4B5270; line-height: 1.4; }
   .toast-action {
     display: inline-block; margin-top: 6px; padding: 4px 10px;
-    background: #8B7355; color: #fff; border: none; border-radius: 10px;
+    background: #635BFF; color: #fff; border: none; border-radius: 10px;
     font-size: 11px; font-weight: 600; cursor: pointer;
   }
-  .toast-action:hover { background: #7A6348; }
+  .toast-action:hover { background: #554DF0; }
   .toast-dismiss {
-    background: none; border: none; color: #A69E93;
+    background: none; border: none; color: #77809F;
     cursor: pointer; font-size: 16px; padding: 0; line-height: 1; flex-shrink: 0;
   }
-  .toast-dismiss:hover { color: #2C2825; }
+  .toast-dismiss:hover { color: #10162F; }
   @media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
 `;
 
@@ -528,11 +528,11 @@ export function showVaultLockedToast(onOpenLockbox?: () => void): void {
     <span class="toast-icon">${LOCK_ICON_SVG.replace('width="24"', 'width="20"').replace('height="24"', 'height="20"').replace('stroke="currentColor"', 'stroke="#fbbf24"')}</span>
     <div class="toast-text">
       ${lockboxBrandMarkup()}
-      <div class="toast-title">Lockbox is locked</div>
+      <div class="toast-title">Authwell is locked</div>
       <div class="toast-desc">Unlock to use passkeys on this site</div>
-      <button type="button" class="toast-action">Open Lockbox</button>
+      <button type="button" class="toast-action">Open Authwell</button>
     </div>
-    <button type="button" class="toast-dismiss" aria-label="Dismiss Lockbox notification">\u00d7</button>
+    <button type="button" class="toast-dismiss" aria-label="Dismiss Authwell notification">\u00d7</button>
   `;
 
   toast.querySelector('.toast-action')!.addEventListener('click', () => {
@@ -555,7 +555,7 @@ const UNLOCK_PROMPT_STYLES = `
   .spinner {
     display: inline-block; width: 16px; height: 16px;
     border: 2px solid rgba(139,115,85,0.2);
-    border-top-color: #8B7355;
+    border-top-color: #635BFF;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
   }
@@ -564,7 +564,7 @@ const UNLOCK_PROMPT_STYLES = `
     display: flex; align-items: center; gap: 8px;
     padding: 10px 12px; margin-top: 8px;
     background: rgba(139,115,85,0.08); border-radius: 10px;
-    font-size: 13px; color: #7A7168;
+    font-size: 13px; color: #4B5270;
   }
   .status-row.unlocked { color: #5E8A5E; }
 `;
@@ -600,7 +600,7 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
         <div class="modal-header">
           ${LOCK_ICON_SVG}
           <div>
-            <div class="modal-title" id="lockbox-unlock-title">Lockbox is locked</div>
+            <div class="modal-title" id="lockbox-unlock-title">Authwell is locked</div>
             <div class="modal-subtitle">Unlock to use passkeys on this site</div>
           </div>
         </div>
@@ -619,7 +619,7 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" data-action="cancel">Cancel</button>
-          <button type="button" class="btn btn-primary" data-action="open">Open Lockbox</button>
+          <button type="button" class="btn btn-primary" data-action="open">Open Authwell</button>
         </div>
       </div>
     `;

@@ -84,7 +84,7 @@ export default function ShareView() {
         setTotpCode('');
         setTotpRemaining(0);
         setTotpError(
-          generationError instanceof Error ? generationError.message : 'Invalid authenticator key',
+          generationError instanceof Error ? generationError.message : 'Invalid authenticator key'
         );
       }
     };
@@ -173,7 +173,9 @@ export default function ShareView() {
             />
             {!totpError && totpCode && (
               <>
-                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}>
+                <span
+                  style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}
+                >
                   {totpRemaining}s
                 </span>
                 {renderCopyButton(totpCode, 'totp', 'Copy authenticator code')}
@@ -332,7 +334,7 @@ export default function ShareView() {
             <Icon name="shield-lock" size={21} />
           </span>
           <div>
-            <strong style={{ display: 'block', color: 'var(--color-text)' }}>Lockbox</strong>
+            <strong style={{ display: 'block', color: 'var(--color-text)' }}>Authwell</strong>
             <span style={{ color: 'var(--color-text-tertiary)', fontSize: 'var(--font-size-xs)' }}>
               Encrypted share
             </span>
@@ -372,7 +374,7 @@ export default function ShareView() {
                 style={{
                   width: 64,
                   height: 64,
-                borderRadius: 'var(--radius-md)',
+                  borderRadius: 'var(--radius-md)',
                   background: 'var(--color-error-subtle)',
                   display: 'flex',
                   alignItems: 'center',
@@ -430,27 +432,27 @@ export default function ShareView() {
                     />
                   </span>
                   <div style={{ minWidth: 0 }}>
-                  <h1
-                    style={{
-                      fontSize: 'var(--font-size-xl)',
-                      fontWeight: 700,
-                      color: 'var(--color-text)',
-                      letterSpacing: '-0.02em',
-                      overflowWrap: 'anywhere',
-                    }}
-                  >
-                    {item.name}
-                  </h1>
-                  <p
-                    style={{
-                      fontSize: 'var(--font-size-sm)',
-                      color: 'var(--color-text-tertiary)',
-                      marginTop: 4,
-                      textTransform: 'capitalize',
-                    }}
-                  >
-                    {item.type} item
-                  </p>
+                    <h1
+                      style={{
+                        fontSize: 'var(--font-size-xl)',
+                        fontWeight: 700,
+                        color: 'var(--color-text)',
+                        letterSpacing: '-0.02em',
+                        overflowWrap: 'anywhere',
+                      }}
+                    >
+                      {item.name}
+                    </h1>
+                    <p
+                      style={{
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-text-tertiary)',
+                        marginTop: 4,
+                        textTransform: 'capitalize',
+                      }}
+                    >
+                      {item.type} item
+                    </p>
                   </div>
                 </div>
                 {maxViews > 0 && (
@@ -482,7 +484,11 @@ export default function ShareView() {
                     color: 'var(--color-text-tertiary)',
                   }}
                 >
-                  <Icon name="lock" size={16} style={{ color: 'var(--color-primary)', flex: '0 0 auto' }} />
+                  <Icon
+                    name="lock"
+                    size={16}
+                    style={{ color: 'var(--color-primary)', flex: '0 0 auto' }}
+                  />
                   <span>
                     This is an end-to-end encrypted share. The server never sees the decrypted
                     content.

@@ -13,7 +13,7 @@ export interface KdfParamsResponse {
 export class ApiError extends Error {
   constructor(
     public status: number,
-    message: string,
+    message: string
   ) {
     super(message);
     this.name = 'ApiError';
@@ -22,7 +22,7 @@ export class ApiError extends Error {
 
 async function request<T>(
   path: string,
-  options: RequestInit & { token?: string } = {},
+  options: RequestInit & { token?: string } = {}
 ): Promise<T> {
   const { token, ...fetchOptions } = options;
   const headers: Record<string, string> = {
@@ -39,7 +39,7 @@ async function request<T>(
     if (!res.ok) throw new ApiError(res.status, res.statusText || 'Request failed');
     throw new ApiError(
       502,
-      'The configured server did not return a Lockbox API response. Reconnect your web vault.'
+      'The configured server did not return an Authwell API response. Reconnect your web vault.'
     );
   }
 
@@ -49,7 +49,7 @@ async function request<T>(
   } catch {
     throw new ApiError(
       502,
-      'The Lockbox API returned malformed JSON. Try again or reconnect the web vault.'
+      'The Authwell API returned malformed JSON. Try again or reconnect the web vault.'
     );
   }
 
@@ -105,13 +105,13 @@ function isValidKdfConfig(value: unknown): value is KdfConfig {
 /** Validate server-controlled KDF values before any value reaches a crypto decoder. */
 export function validateKdfParams(value: unknown): KdfParamsResponse {
   if (!value || typeof value !== 'object') {
-    throw new ApiError(502, 'The Lockbox API returned invalid login parameters.');
+    throw new ApiError(502, 'The Authwell API returned invalid login parameters.');
   }
   const response = value as Record<string, unknown>;
   if (decodedBase64Length(response.salt) !== 16 || !isValidKdfConfig(response.kdfConfig)) {
     throw new ApiError(
       502,
-      'The Lockbox API returned invalid login parameters. Reconnect the web vault or update the server.'
+      'The Authwell API returned invalid login parameters. Reconnect the web vault or update the server.'
     );
   }
   return response as unknown as KdfParamsResponse;
@@ -127,15 +127,13 @@ export const api = {
       request<unknown>(`/api/auth/kdf-params?email=${encodeURIComponent(email)}`).then(
         validateKdfParams
       ),
-    logout: (token: string) =>
-      request('/api/auth/logout', { method: 'POST', token }),
+    logout: (token: string) => request('/api/auth/logout', { method: 'POST', token }),
     me: (token: string) => request('/api/auth/me', { token }),
     changePassword: (body: object, token: string) =>
       request('/api/auth/change-password', { method: 'POST', body: JSON.stringify(body), token }),
   },
   twoFactor: {
-    status: (token: string) =>
-      request<{ enabled: boolean }>('/api/auth/2fa/status', { token }),
+    status: (token: string) => request<{ enabled: boolean }>('/api/auth/2fa/status', { token }),
     setup: (token: string) =>
       request<{ secret: string; otpauthUri: string }>('/api/auth/2fa/setup', {
         method: 'POST',
@@ -171,7 +169,9 @@ export const api = {
   vault: {
     list: (token: string, params?: Record<string, string>) => {
       const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-      return request<{ items: EncryptedVaultItem[]; folders: Folder[] }>(`/api/vault${qs}`, { token });
+      return request<{ items: EncryptedVaultItem[]; folders: Folder[] }>(`/api/vault${qs}`, {
+        token,
+      });
     },
     getItem: (id: string, token: string) =>
       request<{ item: EncryptedVaultItem }>(`/api/vault/items/${id}`, { token }),
@@ -186,19 +186,31 @@ export const api = {
     permanentDelete: (id: string, token: string) =>
       request(`/api/vault/items/${id}/permanent`, { method: 'DELETE', token }),
     createFolder: (body: object, token: string) =>
-      request<{ folder: Folder }>('/api/vault/folders', { method: 'POST', body: JSON.stringify(body), token }),
+      request<{ folder: Folder }>('/api/vault/folders', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        token,
+      }),
     updateFolder: (id: string, body: object, token: string) =>
       request(`/api/vault/folders/${id}`, { method: 'PUT', body: JSON.stringify(body), token }),
     deleteFolder: (id: string, token: string) =>
       request(`/api/vault/folders/${id}`, { method: 'DELETE', token }),
     setFolderTravel: (id: string, travelSafe: boolean, token: string) =>
-      request(`/api/vault/folders/${id}/travel`, { method: 'PUT', body: JSON.stringify({ travelSafe }), token }),
+      request(`/api/vault/folders/${id}/travel`, {
+        method: 'PUT',
+        body: JSON.stringify({ travelSafe }),
+        token,
+      }),
   },
   settings: {
     getTravelMode: (token: string) =>
       request<{ enabled: boolean }>('/api/settings/travel-mode', { token }),
     setTravelMode: (enabled: boolean, token: string) =>
-      request<{ success: boolean }>('/api/settings/travel-mode', { method: 'PUT', body: JSON.stringify({ enabled }), token }),
+      request<{ success: boolean }>('/api/settings/travel-mode', {
+        method: 'PUT',
+        body: JSON.stringify({ enabled }),
+        token,
+      }),
   },
   sync: {
     pull: (token: string, since?: string) => {
@@ -212,65 +224,218 @@ export const api = {
   // ─── Key Pairs ───────────────────────────────────────────
   keypair: {
     create: (body: { publicKey: string; encryptedPrivateKey: string }, token: string) =>
-      request<{ success: boolean }>('/api/auth/keypair', { method: 'POST', body: JSON.stringify(body), token }),
+      request<{ success: boolean }>('/api/auth/keypair', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        token,
+      }),
     get: (token: string) =>
-      request<{ publicKey: string; encryptedPrivateKey: string; createdAt: string }>('/api/auth/keypair', { token }),
+      request<{ publicKey: string; encryptedPrivateKey: string; createdAt: string }>(
+        '/api/auth/keypair',
+        { token }
+      ),
     getPublicKey: (userId: string, token: string) =>
-      request<{ userId: string; publicKey: string }>(`/api/auth/keypair/public/${userId}`, { token }),
+      request<{ userId: string; publicKey: string }>(`/api/auth/keypair/public/${userId}`, {
+        token,
+      }),
   },
 
   // ─── Teams ───────────────────────────────────────────────
   teams: {
     create: (body: { name: string }, token: string) =>
-      request<{ team: { id: string; name: string; createdAt: string }; membership: { teamId: string; userId: string; email: string; role: string; createdAt: string } }>('/api/teams', { method: 'POST', body: JSON.stringify(body), token }),
+      request<{
+        team: { id: string; name: string; createdAt: string };
+        membership: {
+          teamId: string;
+          userId: string;
+          email: string;
+          role: string;
+          createdAt: string;
+        };
+      }>('/api/teams', { method: 'POST', body: JSON.stringify(body), token }),
     list: (token: string) =>
-      request<{ teams: Array<{ id: string; name: string; createdBy: string; createdAt: string; role: string }> }>('/api/teams', { token }),
+      request<{
+        teams: Array<{
+          id: string;
+          name: string;
+          createdBy: string;
+          createdAt: string;
+          role: string;
+        }>;
+      }>('/api/teams', { token }),
     get: (teamId: string, token: string) =>
-      request<{ team: { id: string; name: string; createdAt: string }; members: Array<{ teamId: string; userId: string; email: string; role: string; customPermissions?: unknown; createdAt: string }> }>(`/api/teams/${teamId}`, { token }),
+      request<{
+        team: { id: string; name: string; createdAt: string };
+        members: Array<{
+          teamId: string;
+          userId: string;
+          email: string;
+          role: string;
+          customPermissions?: unknown;
+          createdAt: string;
+        }>;
+      }>(`/api/teams/${teamId}`, { token }),
     update: (teamId: string, body: { name: string }, token: string) =>
-      request<{ team: { id: string; name: string; createdAt: string } }>(`/api/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(body), token }),
+      request<{ team: { id: string; name: string; createdAt: string } }>(`/api/teams/${teamId}`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+        token,
+      }),
     delete: (teamId: string, token: string) =>
       request<{ success: boolean }>(`/api/teams/${teamId}`, { method: 'DELETE', token }),
-    invite: (teamId: string, body: { email: string; role: string; customPermissions?: unknown }, token: string) =>
-      request<{ invite: { id: string; teamId: string; email: string; role: string; expiresAt: string; createdAt: string; token: string } }>(`/api/teams/${teamId}/invite`, { method: 'POST', body: JSON.stringify(body), token }),
+    invite: (
+      teamId: string,
+      body: { email: string; role: string; customPermissions?: unknown },
+      token: string
+    ) =>
+      request<{
+        invite: {
+          id: string;
+          teamId: string;
+          email: string;
+          role: string;
+          expiresAt: string;
+          createdAt: string;
+          token: string;
+        };
+      }>(`/api/teams/${teamId}/invite`, { method: 'POST', body: JSON.stringify(body), token }),
     acceptInvite: (body: { token: string }, authToken: string) =>
-      request<{ team: { id: string; name: string; createdAt: string }; role: string }>('/api/teams/accept-invite', { method: 'POST', body: JSON.stringify(body), token: authToken }),
+      request<{ team: { id: string; name: string; createdAt: string }; role: string }>(
+        '/api/teams/accept-invite',
+        { method: 'POST', body: JSON.stringify(body), token: authToken }
+      ),
     removeMember: (teamId: string, memberId: string, token: string) =>
-      request<{ success: boolean }>(`/api/teams/${teamId}/members/${memberId}`, { method: 'DELETE', token }),
-    updateMemberRole: (teamId: string, memberId: string, body: { role: string; customPermissions?: unknown }, token: string) =>
-      request<{ success: boolean; role: string }>(`/api/teams/${teamId}/members/${memberId}/role`, { method: 'PUT', body: JSON.stringify(body), token }),
+      request<{ success: boolean }>(`/api/teams/${teamId}/members/${memberId}`, {
+        method: 'DELETE',
+        token,
+      }),
+    updateMemberRole: (
+      teamId: string,
+      memberId: string,
+      body: { role: string; customPermissions?: unknown },
+      token: string
+    ) =>
+      request<{ success: boolean; role: string }>(`/api/teams/${teamId}/members/${memberId}/role`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+        token,
+      }),
     listInvites: (teamId: string, token: string) =>
-      request<{ invites: Array<{ id: string; teamId: string; email: string; token: string; role: string; expiresAt: string; createdAt: string; createdBy: string }> }>(`/api/teams/${teamId}/invites`, { token }),
+      request<{
+        invites: Array<{
+          id: string;
+          teamId: string;
+          email: string;
+          token: string;
+          role: string;
+          expiresAt: string;
+          createdAt: string;
+          createdBy: string;
+        }>;
+      }>(`/api/teams/${teamId}/invites`, { token }),
     cancelInvite: (teamId: string, inviteId: string, token: string) =>
-      request<{ success: boolean }>(`/api/teams/${teamId}/invites/${inviteId}`, { method: 'DELETE', token }),
+      request<{ success: boolean }>(`/api/teams/${teamId}/invites/${inviteId}`, {
+        method: 'DELETE',
+        token,
+      }),
   },
 
   // ─── Sharing ─────────────────────────────────────────────
   sharing: {
-    shareFolder: (folderId: string, body: { teamId: string; permissionLevel: string; memberKeys: Array<{ userId: string; encryptedFolderKey: string }> }, token: string) =>
-      request<{ success: boolean; folderId: string; teamId: string }>(`/api/sharing/folders/${folderId}/share`, { method: 'POST', body: JSON.stringify(body), token }),
+    shareFolder: (
+      folderId: string,
+      body: {
+        teamId: string;
+        permissionLevel: string;
+        memberKeys: Array<{ userId: string; encryptedFolderKey: string }>;
+      },
+      token: string
+    ) =>
+      request<{ success: boolean; folderId: string; teamId: string }>(
+        `/api/sharing/folders/${folderId}/share`,
+        { method: 'POST', body: JSON.stringify(body), token }
+      ),
     unshareFolder: (folderId: string, teamId: string, token: string) =>
-      request<{ success: boolean }>(`/api/sharing/folders/${folderId}/unshare?teamId=${encodeURIComponent(teamId)}`, { method: 'DELETE', token }),
+      request<{ success: boolean }>(
+        `/api/sharing/folders/${folderId}/unshare?teamId=${encodeURIComponent(teamId)}`,
+        { method: 'DELETE', token }
+      ),
     getFolderKeys: (folderId: string, token: string) =>
-      request<{ key: { folderId: string; userId: string; encryptedFolderKey: string; grantedBy: string; grantedAt: string } }>(`/api/sharing/folders/${folderId}/keys`, { token }),
-    addFolderKey: (folderId: string, body: { targetUserId: string; encryptedFolderKey: string }, token: string) =>
-      request<{ success: boolean }>(`/api/sharing/folders/${folderId}/keys`, { method: 'POST', body: JSON.stringify(body), token }),
+      request<{
+        key: {
+          folderId: string;
+          userId: string;
+          encryptedFolderKey: string;
+          grantedBy: string;
+          grantedAt: string;
+        };
+      }>(`/api/sharing/folders/${folderId}/keys`, { token }),
+    addFolderKey: (
+      folderId: string,
+      body: { targetUserId: string; encryptedFolderKey: string },
+      token: string
+    ) =>
+      request<{ success: boolean }>(`/api/sharing/folders/${folderId}/keys`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+        token,
+      }),
     removeFolderKey: (folderId: string, targetUserId: string, token: string) =>
-      request<{ success: boolean }>(`/api/sharing/folders/${folderId}/keys/${targetUserId}`, { method: 'DELETE', token }),
+      request<{ success: boolean }>(`/api/sharing/folders/${folderId}/keys/${targetUserId}`, {
+        method: 'DELETE',
+        token,
+      }),
     listSharedFolders: (token: string) =>
-      request<{ sharedFolders: Array<{ folderId: string; teamId: string; ownerUserId: string; permissionLevel: string; createdAt: string; folderName: string }> }>('/api/sharing/folders', { token }),
+      request<{
+        sharedFolders: Array<{
+          folderId: string;
+          teamId: string;
+          ownerUserId: string;
+          permissionLevel: string;
+          createdAt: string;
+          folderName: string;
+        }>;
+      }>('/api/sharing/folders', { token }),
     listSharedFolderItems: (folderId: string, token: string) =>
       request<{ items: EncryptedVaultItem[] }>(`/api/sharing/folders/${folderId}/items`, { token }),
   },
 
   // ─── Share Links ─────────────────────────────────────────
   shareLinks: {
-    create: (body: { id: string; encryptedItem: string; tokenHash: string; expiresAt: string; maxViews: number; itemName: string }, token: string) =>
-      request<{ id: string; expiresAt: string; maxViews: number }>('/api/share-links', { method: 'POST', body: JSON.stringify(body), token }),
+    create: (
+      body: {
+        id: string;
+        encryptedItem: string;
+        tokenHash: string;
+        expiresAt: string;
+        maxViews: number;
+        itemName: string;
+      },
+      token: string
+    ) =>
+      request<{ id: string; expiresAt: string; maxViews: number }>('/api/share-links', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        token,
+      }),
     redeem: (shareId: string, bearerToken: string) =>
-      request<{ encryptedItem: string; viewCount: number; maxViews: number }>(`/api/share-links/${shareId}/redeem`, { token: bearerToken }),
+      request<{ encryptedItem: string; viewCount: number; maxViews: number }>(
+        `/api/share-links/${shareId}/redeem`,
+        { token: bearerToken }
+      ),
     list: (token: string) =>
-      request<{ shareLinks: Array<{ id: string; itemName: string; expiresAt: string; maxViews: number; viewCount: number; createdAt: string; isExpired: boolean; isExhausted: boolean }> }>('/api/share-links', { token }),
+      request<{
+        shareLinks: Array<{
+          id: string;
+          itemName: string;
+          expiresAt: string;
+          maxViews: number;
+          viewCount: number;
+          createdAt: string;
+          isExpired: boolean;
+          isExhausted: boolean;
+        }>;
+      }>('/api/share-links', { token }),
     delete: (shareId: string, token: string) =>
       request<{ success: boolean }>(`/api/share-links/${shareId}`, { method: 'DELETE', token }),
   },
@@ -278,20 +443,37 @@ export const api = {
   // ─── Email Aliases ───────────────────────────────────────────
   aliases: {
     getConfig: (token: string) =>
-      request<{ provider: string; encryptedApiKey: string; baseUrl: string | null }>('/api/settings/alias', { token }),
-    saveConfig: (body: { provider: string; encryptedApiKey: string; baseUrl?: string }, token: string) =>
-      request<{ success: boolean }>('/api/settings/alias', { method: 'PUT', body: JSON.stringify(body), token }),
+      request<{ provider: string; encryptedApiKey: string; baseUrl: string | null }>(
+        '/api/settings/alias',
+        { token }
+      ),
+    saveConfig: (
+      body: { provider: string; encryptedApiKey: string; baseUrl?: string },
+      token: string
+    ) =>
+      request<{ success: boolean }>('/api/settings/alias', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+        token,
+      }),
     deleteConfig: (token: string) =>
       request<{ success: boolean }>('/api/settings/alias', { method: 'DELETE', token }),
     generate: (body: { provider: string; apiKey: string; baseUrl?: string }, token: string) =>
-      request<{ alias: { email: string } }>('/api/aliases/generate', { method: 'POST', body: JSON.stringify(body), token }),
+      request<{ alias: { email: string } }>('/api/aliases/generate', {
+        method: 'POST',
+        body: JSON.stringify(body),
+        token,
+      }),
     list: (provider: string, apiKey: string, token: string, baseUrl?: string) => {
       const headers: Record<string, string> = {
         'X-Alias-Provider': provider,
         'X-Alias-ApiKey': apiKey,
       };
       if (baseUrl) headers['X-Alias-BaseUrl'] = baseUrl;
-      return request<{ aliases: Array<{ email: string; enabled: boolean; id: string }> }>('/api/aliases', { token, headers });
+      return request<{ aliases: Array<{ email: string; enabled: boolean; id: string }> }>(
+        '/api/aliases',
+        { token, headers }
+      );
     },
   },
   // ─── Documents ────────────────────────────────────────────
@@ -324,9 +506,11 @@ export const api = {
       return res.arrayBuffer();
     },
     delete: (itemId: string, token: string) =>
-      request<{ success: boolean }>(`/api/vault/items/${itemId}/document`, { method: 'DELETE', token }),
+      request<{ success: boolean }>(`/api/vault/items/${itemId}/document`, {
+        method: 'DELETE',
+        token,
+      }),
     quota: (token: string) =>
       request<{ used: number; limit: number }>('/api/vault/documents/quota', { token }),
   },
-
 };

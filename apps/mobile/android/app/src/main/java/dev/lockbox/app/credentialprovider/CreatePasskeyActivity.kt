@@ -76,7 +76,7 @@ class CreatePasskeyActivity : FragmentActivity() {
 
         val accountId = PasskeyAccountState.get(applicationContext)
         if (accountId == null) {
-            finishWithError("Unlock Lockbox before saving a passkey")
+            finishWithError("Unlock Authwell before saving a passkey")
             return
         }
 
@@ -116,7 +116,7 @@ class CreatePasskeyActivity : FragmentActivity() {
             }
         )
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Save passkey to Lockbox")
+            .setTitle("Save passkey to Authwell")
             .setSubtitle("Verify that it's you")
             .setNegativeButtonText("Cancel")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)

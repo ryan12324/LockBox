@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'dev.lockbox.app',
-  appName: 'Lockbox',
+  appName: 'Authwell',
   webDir: '../web/dist',
   server: {
     androidScheme: 'https',

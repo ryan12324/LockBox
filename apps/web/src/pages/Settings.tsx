@@ -935,7 +935,11 @@ export default function Settings() {
                   {passwordError && (
                     <p
                       role="alert"
-                      style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-error)' }}
+                      style={{
+                        margin: 0,
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-error)',
+                      }}
                     >
                       {passwordError}
                     </p>
@@ -943,17 +947,16 @@ export default function Settings() {
                   {passwordSuccess && (
                     <p
                       role="status"
-                      style={{ margin: 0, fontSize: 'var(--font-size-sm)', color: 'var(--color-success)' }}
+                      style={{
+                        margin: 0,
+                        fontSize: 'var(--font-size-sm)',
+                        color: 'var(--color-success)',
+                      }}
                     >
                       {passwordSuccess}
                     </p>
                   )}
-                  <Button
-                    type="submit"
-                    variant="secondary"
-                    size="sm"
-                    disabled={passwordChanging}
-                  >
+                  <Button type="submit" variant="secondary" size="sm" disabled={passwordChanging}>
                     {passwordChanging ? 'Changing password...' : 'Change master password'}
                   </Button>
                 </form>
@@ -984,7 +987,10 @@ export default function Settings() {
                     onClick={() => update('theme', t)}
                     style={{ flex: 1, textTransform: 'capitalize' }}
                   >
-                    <Icon name={t === 'system' ? 'device-desktop' : t === 'light' ? 'sun' : 'moon'} size={17} />
+                    <Icon
+                      name={t === 'system' ? 'device-desktop' : t === 'light' ? 'sun' : 'moon'}
+                      size={17}
+                    />
                     {t === 'system' ? 'System' : t === 'light' ? 'Light' : 'Dark'}
                   </Button>
                 ))}
@@ -999,7 +1005,15 @@ export default function Settings() {
               borderLeft: '4px solid var(--color-warning)',
             }}
           >
-            <h2 style={{ ...sectionHeading, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <h2
+              style={{
+                ...sectionHeading,
+                marginBottom: 8,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
               <Icon name="world" size={19} />
               Travel mode
             </h2>
@@ -1101,7 +1115,10 @@ export default function Settings() {
                   }}
                 >
                   <Icon name="alert-triangle" size={17} style={{ flex: '0 0 auto' }} />
-                  <span>Travel mode will hide all non-travel-safe folders and their items from sync. Only safe folders will be accessible.</span>
+                  <span>
+                    Travel mode will hide all non-travel-safe folders and their items from sync.
+                    Only safe folders will be accessible.
+                  </span>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <Button
@@ -1147,7 +1164,15 @@ export default function Settings() {
                         borderRadius: 'var(--radius-md)',
                       }}
                     >
-                      <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <span
+                        style={{
+                          fontSize: 'var(--font-size-sm)',
+                          color: 'var(--color-text)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 7,
+                        }}
+                      >
                         <Icon name="folder" size={16} />
                         {f.name}
                       </span>
@@ -1195,9 +1220,9 @@ export default function Settings() {
             <Card variant="surface" padding="lg">
               <h2 style={{ ...sectionHeading, marginBottom: 8 }}>Android Autofill & Passkeys</h2>
               <p style={{ ...descStyle, marginBottom: 16 }}>
-                Let Android offer your Lockbox logins and synced passkeys in apps and browsers.
-                Private key material stays encrypted behind strong biometric authentication on
-                this device.
+                Let Android offer your Authwell logins and synced passkeys in apps and browsers.
+                Private key material stays encrypted behind strong biometric authentication on this
+                device.
               </p>
               <div style={{ display: 'grid', gap: 12 }}>
                 {nativeAutofill.supported && (
@@ -1277,7 +1302,7 @@ export default function Settings() {
                 color: 'var(--color-text-tertiary)',
               }}
             >
-              <p style={{ margin: 0 }}>Lockbox v1.0.0 — Self-Hosted Password Manager</p>
+              <p style={{ margin: 0 }}>Authwell v1.0.0 · Self-hosted password manager</p>
               <p style={{ margin: 0 }}>Zero-knowledge E2E encryption · Cloudflare Workers</p>
               <p style={{ margin: 0 }}>AES-256-GCM · Argon2id · HKDF-SHA-256</p>
             </div>

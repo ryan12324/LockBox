@@ -61,7 +61,7 @@ object PasskeySliceHelper {
                 pendingIntent,
                 Slice.Builder(sliceUri, android.app.slice.SliceSpec("type", 1))
                     .addText(accountName, null, listOf("title"))
-                    .addText("Save passkey to Lockbox", null, listOf("subtitle"))
+                    .addText("Save passkey to Authwell", null, listOf("subtitle"))
                     .addIcon(
                         Icon.createWithResource(context, R.mipmap.ic_launcher),
                         null,

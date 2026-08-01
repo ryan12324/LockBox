@@ -26,12 +26,16 @@ import { getTotpErrorMessage } from '../../../lib/totp-errors.js';
 import { refreshItemFromServer, sendMessage } from './shared.js';
 
 const itemTypeIcon = (type: string): IconName =>
-  ({ login: 'key', note: 'note', card: 'credit-card', identity: 'id', passkey: 'fingerprint', document: 'file-description' })[type] as IconName ?? 'file';
+  (({
+    login: 'key',
+    note: 'note',
+    card: 'credit-card',
+    identity: 'id',
+    passkey: 'fingerprint',
+    document: 'file-description',
+  })[type] as IconName) ?? 'file';
 
-async function getFreshLoginField(
-  itemId: string,
-  field: 'username' | 'password'
-): Promise<string> {
+async function getFreshLoginField(itemId: string, field: 'username' | 'password'): Promise<string> {
   const item = await refreshItemFromServer(itemId);
   if (item.type !== 'login') throw new Error('This item is no longer a login.');
   return (item as LoginItem)[field] ?? '';
@@ -72,7 +76,9 @@ export function SiteTab({
           <small>Saved for this page</small>
         </div>
         <div className="extension-empty">
-          <span><Icon name="world" size={24} /></span>
+          <span>
+            <Icon name="world" size={24} />
+          </span>
           <strong>No saved logins for this site</strong>
           <p>Browse your full vault to find another item.</p>
           <Button variant="secondary" size="sm" onClick={onOpenVault}>
@@ -88,25 +94,34 @@ export function SiteTab({
     <div className="extension-site">
       <div className="extension-section-heading">
         <span>{siteHost}</span>
-        <small>{items.length} {items.length === 1 ? 'saved item' : 'saved items'} for this page</small>
+        <small>
+          {items.length} {items.length === 1 ? 'saved item' : 'saved items'} for this page
+        </small>
       </div>
-      {useError && <p role="alert" className="px-3 text-xs text-[var(--color-error)]">{useError}</p>}
+      {useError && (
+        <p role="alert" className="px-3 text-xs text-[var(--color-error)]">
+          {useError}
+        </p>
+      )}
       <div className="extension-site__list">
-      {items.map((item) => (
-        <article key={item.id} className="extension-site__item">
-          <div className="extension-site__title">
-            <span>
-              <SiteFavicon
-                sources={getEntryFaviconSources(item)}
-                fallbackIcon={itemTypeIcon(item.type)}
-                size={20}
-                fill
-              />
-            </span>
-            <div><strong>{item.name}</strong><small>{item.type === 'login' ? (item as LoginItem).username : item.type}</small></div>
-          </div>
-          {item.type === 'login' && (
-            <div className="extension-site__actions">
+        {items.map((item) => (
+          <article key={item.id} className="extension-site__item">
+            <div className="extension-site__title">
+              <span>
+                <SiteFavicon
+                  sources={getEntryFaviconSources(item)}
+                  fallbackIcon={itemTypeIcon(item.type)}
+                  size={20}
+                  fill
+                />
+              </span>
+              <div>
+                <strong>{item.name}</strong>
+                <small>{item.type === 'login' ? (item as LoginItem).username : item.type}</small>
+              </div>
+            </div>
+            {item.type === 'login' && (
+              <div className="extension-site__actions">
                 <Button
                   variant={copied === `u-${item.id}` ? 'primary' : 'secondary'}
                   size="sm"
@@ -123,12 +138,15 @@ export function SiteTab({
                   <Icon name={copied === `p-${item.id}` ? 'check' : 'copy'} size={17} />
                   {copied === `p-${item.id}` ? 'Copied' : 'Password'}
                 </Button>
-            </div>
-          )}
-        </article>
-      ))}
+              </div>
+            )}
+          </article>
+        ))}
       </div>
-      <p className="extension-site__hint"><Icon name="info-circle" size={16} /> Use the Lockbox icon inside a form field to fill this page.</p>
+      <p className="extension-site__hint">
+        <Icon name="info-circle" size={16} /> Use the Authwell icon inside a form field to fill this
+        page.
+      </p>
     </div>
   );
 }
@@ -240,7 +258,11 @@ export function VaultTab({
             ]}
           />
         )}
-        {useError && <div role="alert" className="text-xs text-[var(--color-error)] px-1">{useError}</div>}
+        {useError && (
+          <div role="alert" className="text-xs text-[var(--color-error)] px-1">
+            {useError}
+          </div>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         {filtered.length === 0 ? (
@@ -270,7 +292,10 @@ export function VaultTab({
                         {item.name}
                       </div>
                       {(attachmentCounts.get(item.id) ?? 0) > 0 && (
-                        <Badge variant="primary"><Icon name="paperclip" size={13} />{attachmentCounts.get(item.id)}</Badge>
+                        <Badge variant="primary">
+                          <Icon name="paperclip" size={13} />
+                          {attachmentCounts.get(item.id)}
+                        </Badge>
                       )}
                       {rotationMap?.get(item.id) && (
                         <Badge variant="warning">
@@ -312,7 +337,14 @@ export function VaultTab({
                     </Button>
                   </div>
                 )}
-                {item.favorite && <Icon name="star" size={15} className="text-[var(--color-warning)]" label="Favorite" />}
+                {item.favorite && (
+                  <Icon
+                    name="star"
+                    size={15}
+                    className="text-[var(--color-warning)]"
+                    label="Favorite"
+                  />
+                )}
               </div>
             </div>
           ))
@@ -366,7 +398,7 @@ export function SharedTab({
       await openWebVault('/teams');
     } catch (error) {
       setWebVaultError(
-        error instanceof Error ? error.message : 'Lockbox could not open the web vault.'
+        error instanceof Error ? error.message : 'Authwell could not open the web vault.'
       );
     } finally {
       setOpeningWebVault(false);
@@ -429,7 +461,11 @@ export function SharedTab({
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {useError && <p role="alert" className="px-3 pt-2 text-xs text-[var(--color-error)]">{useError}</p>}
+      {useError && (
+        <p role="alert" className="px-3 pt-2 text-xs text-[var(--color-error)]">
+          {useError}
+        </p>
+      )}
       {sharedItems.map((item) => {
         const folderName = sharedFolders.find((f) => f.folderId === item.folderId)?.folderName;
         return (
@@ -453,7 +489,12 @@ export function SharedTab({
                     <div className="text-sm font-medium text-[var(--color-text)] truncate">
                       {item.name}
                     </div>
-                    {folderName && <Badge variant="default"><Icon name="folder" size={13} />{folderName}</Badge>}
+                    {folderName && (
+                      <Badge variant="default">
+                        <Icon name="folder" size={13} />
+                        {folderName}
+                      </Badge>
+                    )}
                   </div>
                   {item.type === 'login' && (
                     <div className="text-xs text-[var(--color-text-tertiary)] truncate">
@@ -488,7 +529,14 @@ export function SharedTab({
                   </Button>
                 </div>
               )}
-              {item.favorite && <Icon name="star" size={15} className="text-[var(--color-warning)]" label="Favorite" />}
+              {item.favorite && (
+                <Icon
+                  name="star"
+                  size={15}
+                  className="text-[var(--color-warning)]"
+                  label="Favorite"
+                />
+              )}
             </div>
           </div>
         );
@@ -755,7 +803,9 @@ function TotpItem({ item }: { item: LoginItem }) {
         if (cancelled) return;
         setCode('------');
         setRemaining(0);
-        setError(refreshError instanceof Error ? refreshError.message : 'Could not refresh this item.');
+        setError(
+          refreshError instanceof Error ? refreshError.message : 'Could not refresh this item.'
+        );
       }
     })();
 
@@ -787,12 +837,7 @@ function TotpItem({ item }: { item: LoginItem }) {
     <div className="p-3 border-b border-[var(--color-border)] flex justify-between items-center hover:bg-[var(--color-bg-subtle)] transition-colors">
       <div className="flex items-center gap-2 min-w-0">
         <span className="extension-type-icon">
-          <SiteFavicon
-            sources={getEntryFaviconSources(item)}
-            fallbackIcon="key"
-            size={20}
-            fill
-          />
+          <SiteFavicon sources={getEntryFaviconSources(item)} fallbackIcon="key" size={20} fill />
         </span>
         <div className="min-w-0">
           <div className="text-xs font-medium text-[var(--color-text)] truncate">{item.name}</div>
@@ -811,7 +856,12 @@ function TotpItem({ item }: { item: LoginItem }) {
         >
           {remaining}s
         </div>
-        <Button variant={copied ? 'primary' : 'secondary'} size="sm" onClick={copy} disabled={Boolean(error)}>
+        <Button
+          variant={copied ? 'primary' : 'secondary'}
+          size="sm"
+          onClick={copy}
+          disabled={Boolean(error)}
+        >
           <Icon name={copied ? 'check' : 'copy'} size={16} />
           <span className="sr-only">{copied ? 'Copied' : 'Copy code'}</span>
         </Button>
@@ -829,9 +879,7 @@ export function TotpTab({ items, onAddItem }: { items: VaultItem[]; onAddItem: (
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
         <Icon name="key" size={26} className="mb-3 text-[var(--color-primary)]" />
-        <p className="text-sm text-[var(--color-text-secondary)] mb-2">
-          No authenticator codes
-        </p>
+        <p className="text-sm text-[var(--color-text-secondary)] mb-2">No authenticator codes</p>
         <p className="text-xs text-[var(--color-text-tertiary)] mb-4 max-w-[28ch]">
           Add a TOTP secret to a login to generate codes here.
         </p>

@@ -1,6 +1,12 @@
 import { useState, type CSSProperties, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { deriveKey, generateUserKey, encryptUserKey, makeAuthHash, toBase64 } from '@lockbox/crypto';
+import {
+  deriveKey,
+  generateUserKey,
+  encryptUserKey,
+  makeAuthHash,
+  toBase64,
+} from '@lockbox/crypto';
 import { evaluateStrength } from '@lockbox/generator';
 import { Button, Icon, Input } from '@lockbox/design';
 import type { KdfConfig } from '@lockbox/types';
@@ -79,32 +85,86 @@ export default function Register() {
     <AuthShell
       eyebrow="Create your vault"
       title="Make one password count"
-      description="Your master password protects the encryption key for everything you store in Lockbox."
+      description="Your master password protects the encryption key for everything you store in Authwell."
       icon="shield-check"
-      footer={<>
-        <span>Already have a vault? <Link to="/login">Sign in</Link></span>
-        {nativeApp && <span className="auth-panel__footer-action"><Link to="/setup">Use a different Lockbox server</Link></span>}
-      </>}
+      footer={
+        <>
+          <span>
+            Already have a vault? <Link to="/login">Sign in</Link>
+          </span>
+          {nativeApp && (
+            <span className="auth-panel__footer-action">
+              <Link to="/setup">Use a different Authwell server</Link>
+            </span>
+          )}
+        </>
+      }
     >
       <form onSubmit={handleSubmit} className="auth-form">
-        <Input name="email" type="email" required autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} label="Email" placeholder="you@example.com" />
+        <Input
+          name="email"
+          type="email"
+          required
+          autoComplete="username"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          label="Email"
+          placeholder="you@example.com"
+        />
         <div>
-          <Input name="password" type="password" required autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} label="Master password" placeholder="At least 12 characters" minLength={12} />
+          <Input
+            name="password"
+            type="password"
+            required
+            autoComplete="new-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            label="Master password"
+            placeholder="At least 12 characters"
+            minLength={12}
+          />
           {strength && (
-            <div className="password-strength" style={{ '--strength-color': strengthColors[strength.score] } as CSSProperties}>
+            <div
+              className="password-strength"
+              style={{ '--strength-color': strengthColors[strength.score] } as CSSProperties}
+            >
               <div className="password-strength__track" aria-hidden="true">
-                {[0, 1, 2, 3, 4].map((index) => <span key={index} className="password-strength__segment" data-filled={index <= strength.score ? 'true' : undefined} />)}
+                {[0, 1, 2, 3, 4].map((index) => (
+                  <span
+                    key={index}
+                    className="password-strength__segment"
+                    data-filled={index <= strength.score ? 'true' : undefined}
+                  />
+                ))}
               </div>
-              <p><strong>{strengthLabels[strength.score]}.</strong>{strength.feedback[0] ? ` ${strength.feedback[0]}` : ''}</p>
+              <p>
+                <strong>{strengthLabels[strength.score]}.</strong>
+                {strength.feedback[0] ? ` ${strength.feedback[0]}` : ''}
+              </p>
             </div>
           )}
         </div>
-        <Input name="confirmPassword" type="password" required autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} label="Confirm master password" placeholder="Enter it again" minLength={12} />
+        <Input
+          name="confirmPassword"
+          type="password"
+          required
+          autoComplete="new-password"
+          value={confirm}
+          onChange={(event) => setConfirm(event.target.value)}
+          label="Confirm master password"
+          placeholder="Enter it again"
+          minLength={12}
+        />
         <div className="auth-notice">
           <Icon name="alert-triangle" size={20} />
-          <span><strong>No recovery in v1.</strong> Losing this master password means losing access to the vault. A real recovery key and emergency kit is committed for v2.</span>
+          <span>
+            <strong>No recovery in v1.</strong> Losing this master password means losing access to
+            the vault. A real recovery key and emergency kit is committed for v2.
+          </span>
         </div>
-        <Button type="submit" size="lg" loading={loading}>Create vault</Button>
+        <Button type="submit" size="lg" loading={loading}>
+          Create vault
+        </Button>
       </form>
     </AuthShell>
   );

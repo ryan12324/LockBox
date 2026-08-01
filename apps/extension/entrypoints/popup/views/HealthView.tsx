@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Button,
-  Badge,
-  Card,
-  Icon,
-  SiteFavicon,
-  getEntryFaviconSources,
-} from '@lockbox/design';
+import { Button, Badge, Card, Icon, SiteFavicon, getEntryFaviconSources } from '@lockbox/design';
 import type { VaultItem, VaultHealthSummary, PasswordHealthReport } from '@lockbox/types';
 import { sendMessage } from './shared.js';
 
@@ -139,8 +132,8 @@ export function HealthSummaryView({
         )}
 
         <p id="breach-check-privacy" className="text-[10px] text-[var(--color-text-tertiary)] m-0">
-          Breach checks are manual. Lockbox sends only the first five characters of each
-          password's SHA-1 hash to Have I Been Pwned.
+          Breach checks are manual. Authwell sends only the first five characters of each password's
+          SHA-1 hash to Have I Been Pwned.
         </p>
 
         {loading && !summary ? (
@@ -155,7 +148,11 @@ export function HealthSummaryView({
                   <Icon
                     name={summary.breached > 0 ? 'alert-circle' : 'shield-check'}
                     size={22}
-                    className={summary.breached > 0 ? 'text-[var(--color-error)]' : 'text-[var(--color-primary)]'}
+                    className={
+                      summary.breached > 0
+                        ? 'text-[var(--color-error)]'
+                        : 'text-[var(--color-primary)]'
+                    }
                   />
                   <div>
                     <div className="text-sm font-semibold text-[var(--color-text)]">
@@ -166,7 +163,8 @@ export function HealthSummaryView({
                           : 'No current password issues found'}
                     </div>
                     <p className="text-xs text-[var(--color-text-tertiary)] mt-0.5 mb-0">
-                      Reviewed {summary.totalItems} {summary.totalItems === 1 ? 'login' : 'logins'} locally.
+                      Reviewed {summary.totalItems} {summary.totalItems === 1 ? 'login' : 'logins'}{' '}
+                      locally.
                     </p>
                   </div>
                 </div>
@@ -231,7 +229,10 @@ export function HealthSummaryView({
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {report.issues.map((issue, issueIndex) => (
-                              <Badge key={issueIndex} variant={issue.type === 'breached' ? 'error' : 'warning'}>
+                              <Badge
+                                key={issueIndex}
+                                variant={issue.type === 'breached' ? 'error' : 'warning'}
+                              >
                                 {issue.type.toUpperCase()}
                               </Badge>
                             ))}

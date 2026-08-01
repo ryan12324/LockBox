@@ -4,8 +4,8 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   manifest: ({ browser }) => ({
-    name: 'Lockbox Password Manager',
-    description: 'Zero-knowledge self-hosted password manager',
+    name: 'Authwell Password Manager',
+    description: 'Trusted access for passwords, passkeys, and authenticator codes',
     version: '1.0.0',
     icons: {
       16: 'icon/16.png',
@@ -18,7 +18,7 @@ export default defineConfig({
     host_permissions: ['<all_urls>'],
     web_accessible_resources: [
       {
-        resources: ['brand/lockbox-logo-horizontal.png'],
+        resources: ['brand/authwell-logo-horizontal.png'],
         matches: ['<all_urls>'],
       },
     ],

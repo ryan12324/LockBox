@@ -20,26 +20,42 @@ export default function AuthShell({
 }: AuthShellProps) {
   return (
     <main className="auth-page">
-      <section className="auth-story" aria-label="About Lockbox">
+      <section className="auth-story" aria-label="About Authwell">
         <div className="auth-brand">
-          <img className="auth-brand__logo" src="/brand/lockbox-logo-horizontal.png" alt="Lockbox" />
+          <img
+            className="auth-brand__logo"
+            src="/brand/authwell-logo-horizontal-dark.png?v=authwell-1"
+            alt="Authwell"
+          />
         </div>
         <div className="auth-story__content">
-          <span className="auth-story__icon" aria-hidden="true"><Icon name={icon} size={28} /></span>
+          <span className="auth-story__icon" aria-hidden="true">
+            <Icon name={icon} size={28} />
+          </span>
           <p className="auth-eyebrow">{eyebrow}</p>
           <h1>{title}</h1>
           <p className="auth-description">{description}</p>
         </div>
         <ul className="auth-assurances">
-          <li><Icon name="circle-check" size={18} /> Vault contents are encrypted before sync</li>
-          <li><Icon name="circle-check" size={18} /> Decryption keys stay on your device</li>
-          <li><Icon name="circle-check" size={18} /> Your server stores encrypted vault data</li>
+          <li>
+            <Icon name="circle-check" size={18} /> Vault contents are encrypted before sync
+          </li>
+          <li>
+            <Icon name="circle-check" size={18} /> Decryption keys stay on your device
+          </li>
+          <li>
+            <Icon name="circle-check" size={18} /> Your server stores encrypted vault data
+          </li>
         </ul>
       </section>
 
       <section className="auth-panel" aria-labelledby="auth-panel-title">
         <div className="auth-panel__mobile-brand">
-          <img className="auth-brand__logo" src="/brand/lockbox-logo-horizontal.png" alt="Lockbox" />
+          <img
+            className="auth-brand__logo"
+            src="/brand/authwell-logo-horizontal-dark.png?v=authwell-1"
+            alt="Authwell"
+          />
         </div>
         <div className="auth-panel__heading">
           <p>{eyebrow}</p>

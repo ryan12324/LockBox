@@ -27,7 +27,7 @@ export function SetupView({ onComplete }: { onComplete: () => void }) {
       setError(
         reason instanceof Error
           ? reason.message
-          : 'Lockbox could not discover the server for that web vault.',
+          : 'Authwell could not discover the server for that web vault.'
       );
     } finally {
       setSaving(false);
@@ -37,10 +37,14 @@ export function SetupView({ onComplete }: { onComplete: () => void }) {
   return (
     <div className="extension-auth">
       <div className="extension-auth__heading">
-        <img className="extension-auth__logo" src="/brand/lockbox-logo-horizontal.png" alt="Lockbox" />
-        <p>Set up Lockbox</p>
+        <img
+          className="extension-auth__logo"
+          src="/brand/authwell-logo-horizontal.png"
+          alt="Authwell"
+        />
+        <p>Set up Authwell</p>
         <h1>Connect your web vault</h1>
-        <small>Lockbox will discover and verify its API automatically.</small>
+        <small>Authwell will discover and verify its API automatically.</small>
       </div>
 
       <form onSubmit={handleSubmit} className="extension-auth__form">
@@ -60,16 +64,11 @@ export function SetupView({ onComplete }: { onComplete: () => void }) {
             placeholder="https://vault.example.com"
           />
           <p className="extension-auth__hint">
-            Use the same address you open to access the Lockbox web app.
+            Use the same address you open to access the Authwell web app.
           </p>
         </div>
 
-        <Button
-          type="submit"
-          variant="primary"
-          size="sm"
-          loading={saving}
-        >
+        <Button type="submit" variant="primary" size="sm" loading={saving}>
           {saving ? 'Checking connection…' : 'Connect vault'}
         </Button>
       </form>

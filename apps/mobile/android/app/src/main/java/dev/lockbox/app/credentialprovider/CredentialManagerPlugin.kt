@@ -349,7 +349,7 @@ class CredentialManagerPlugin : Plugin() {
         pluginScope.launch {
             try {
                 val accountId = PasskeyAccountState.get(context)
-                    ?: throw SecurityException("Unlock Lockbox before syncing passkeys")
+                    ?: throw SecurityException("Unlock Authwell before syncing passkeys")
                 val metadata = VaultDatabase.getInstance(context)
                     .passkeyMetadataDao()
                     .getByCredentialIdAndAccount(credentialId, accountId)
@@ -381,7 +381,7 @@ class CredentialManagerPlugin : Plugin() {
         decryptCipher: javax.crypto.Cipher
     ) {
         val fragmentActivity = activity as? FragmentActivity
-            ?: return call.reject("Passkey sync requires an active Lockbox window")
+            ?: return call.reject("Passkey sync requires an active Authwell window")
         val prompt = BiometricPrompt(
             fragmentActivity,
             ContextCompat.getMainExecutor(fragmentActivity),
@@ -419,7 +419,7 @@ class CredentialManagerPlugin : Plugin() {
             }
         )
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Sync passkey to Lockbox")
+            .setTitle("Sync passkey to Authwell")
             .setSubtitle("${metadata.userName} · ${metadata.rpName}")
             .setNegativeButtonText("Not now")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
@@ -435,7 +435,7 @@ class CredentialManagerPlugin : Plugin() {
         pluginScope.launch {
             try {
                 val accountId = PasskeyAccountState.get(context)
-                    ?: throw SecurityException("No active Lockbox account")
+                    ?: throw SecurityException("No active Authwell account")
                 val updated = VaultDatabase.getInstance(context)
                     .passkeyMetadataDao()
                     .updateSource(
@@ -466,7 +466,7 @@ class CredentialManagerPlugin : Plugin() {
             try {
                 val db = VaultDatabase.getInstance(context)
                 val accountId = PasskeyAccountState.get(context)
-                    ?: throw SecurityException("No active Lockbox account")
+                    ?: throw SecurityException("No active Authwell account")
                 val metadata = db.passkeyMetadataDao()
                     .getByCredentialIdAndAccount(credentialId, accountId)
                     ?: throw IllegalArgumentException("Passkey not found")

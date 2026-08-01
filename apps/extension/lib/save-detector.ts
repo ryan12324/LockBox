@@ -144,9 +144,9 @@ export function injectSaveBanner(
       align-items: center;
       justify-content: space-between;
       padding: 10px 16px;
-      background: #FDFCFA;
-      color: #2C2825;
-      border-bottom: 1px solid #DDD6CC;
+      background: #F7F8FC;
+      color: #10162F;
+      border-bottom: 1px solid #D8DDF0;
       font-family: system-ui, -apple-system, sans-serif;
       font-size: 13px;
       line-height: 1.4;
@@ -162,7 +162,7 @@ export function injectSaveBanner(
     .lockbox-brand {
       padding-right: 12px;
       margin-right: 2px;
-      border-right: 1px solid #DDD6CC;
+      border-right: 1px solid #D8DDF0;
       flex-shrink: 0;
     }
     .lockbox-brand__logo { width: 88px; }
@@ -192,14 +192,14 @@ export function injectSaveBanner(
       color: #5D554D;
     }
     .btn-dismiss:hover { background: #F1EDE7; }
-    .btn:focus-visible { outline: 2px solid #8B7355; outline-offset: 2px; }
+    .btn:focus-visible { outline: 2px solid #635BFF; outline-offset: 2px; }
   `;
 
   const banner = document.createElement('div');
   banner.className = 'banner';
 
   const message =
-    type === 'new' ? 'Save this login to Lockbox?' : `Update password for ${siteName}?`;
+    type === 'new' ? 'Save this login to Authwell?' : `Update password for ${siteName}?`;
 
   const buttonLabel = type === 'new' ? 'Save' : 'Update';
 
