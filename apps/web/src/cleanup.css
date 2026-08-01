@@ -144,7 +144,8 @@
 }
 
 .cleanup-guided__form > :nth-child(4),
-.cleanup-guided__form > .cleanup-actions { grid-column: 1 / -1; }
+.cleanup-guided__form > .cleanup-actions,
+.cleanup-guided__form > .cleanup-confirm { grid-column: 1 / -1; }
 
 .cleanup-item-heading,
 .cleanup-select-row,
@@ -237,6 +238,8 @@
 .cleanup-confirm > div { min-width: 180px; display: grid; flex: 1; gap: 2px; }
 .cleanup-confirm strong { color: var(--color-text); }
 .cleanup-confirm span { color: var(--color-text-secondary); font-size: var(--font-size-xs); }
+.cleanup-guided__form > .cleanup-confirm { margin: 0; }
+.cleanup-confirm > .cleanup-confirm__actions { min-width: auto; display: flex; flex: 0 0 auto; gap: 8px; }
 
 .cleanup-toolbar {
   padding: 14px 18px;
@@ -349,6 +352,8 @@
   .cleanup-select-row { padding-inline: 12px; }
   .cleanup-select-row > .lb-badge { display: none; }
   .cleanup-confirm { margin: 12px 12px 0; align-items: stretch; flex-direction: column; }
+  .cleanup-confirm > .cleanup-confirm__actions { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cleanup-confirm__actions .lb-button { width: 100%; }
   .cleanup-footer-actions { padding: 12px; }
   .cleanup-footer-actions .lb-button { width: 100%; }
 }

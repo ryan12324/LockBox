@@ -81,6 +81,8 @@ export default function Cleanup() {
   const [fixedCount, setFixedCount] = useState(0);
   const [guidedDraft, setGuidedDraft] = useState<GuidedDraft>(EMPTY_DRAFT);
   const [savingGuided, setSavingGuided] = useState(false);
+  const [showGuidedDeleteConfirm, setShowGuidedDeleteConfirm] = useState(false);
+  const [guidedDeleting, setGuidedDeleting] = useState(false);
 
   const [bulkQuery, setBulkQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -180,6 +182,7 @@ export default function Cleanup() {
       destination: currentCandidate.item.uris[0] ?? '',
       folderId: currentCandidate.item.folderId ?? '',
     });
+    setShowGuidedDeleteConfirm(false);
   }, [currentCandidate?.item.id, currentCandidate?.item.revisionDate]);
 
   useEffect(() => {
@@ -282,6 +285,23 @@ export default function Cleanup() {
   function handleGuidedSkip() {
     if (!currentCandidate) return;
     persistSkipped(new Set([...skippedIds, currentCandidate.item.id]));
+  }
+
+  async function handleGuidedDelete() {
+    if (!session || !currentCandidate) return;
+    const id = currentCandidate.item.id;
+    setGuidedDeleting(true);
+    try {
+      await api.vault.deleteItem(id, session.token);
+      setItems((current) => current.filter((item) => item.id !== id));
+      persistSkipped(new Set([...skippedIds].filter((skippedId) => skippedId !== id)));
+      setShowGuidedDeleteConfirm(false);
+      toast('Login moved to Trash. You can restore it for 30 days.', 'success');
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'This login could not be moved to Trash.', 'error');
+    } finally {
+      setGuidedDeleting(false);
+    }
   }
 
   function toggleSelected(id: string, setter: (next: Set<string>) => void, current: Set<string>) {
@@ -536,6 +556,7 @@ export default function Cleanup() {
                   className="cleanup-guided__form"
                   onSubmit={(event) => {
                     event.preventDefault();
+                    if (showGuidedDeleteConfirm) return;
                     void handleGuidedSave();
                   }}
                 >
@@ -568,13 +589,48 @@ export default function Cleanup() {
                     value={guidedDraft.folderId}
                     onChange={(event) => setGuidedDraft({ ...guidedDraft, folderId: event.target.value })}
                   />
-                  <div className="cleanup-actions cleanup-actions--split">
-                    <Button type="button" variant="ghost" onClick={handleGuidedSkip}>Skip for now</Button>
-                    <div>
-                      <Button type="button" variant="secondary" onClick={() => navigate('/vault')}>Stop</Button>
-                      <Button type="submit" loading={savingGuided}>Save and next</Button>
+                  {showGuidedDeleteConfirm ? (
+                    <div className="cleanup-confirm" role="alert">
+                      <Icon name="trash" size={18} />
+                      <div>
+                        <strong>Move this login to Trash?</strong>
+                        <span>It remains recoverable from Trash for 30 days.</span>
+                      </div>
+                      <div className="cleanup-confirm__actions">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          disabled={guidedDeleting}
+                          onClick={() => setShowGuidedDeleteConfirm(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="danger"
+                          size="sm"
+                          loading={guidedDeleting}
+                          onClick={() => void handleGuidedDelete()}
+                        >
+                          Move to Trash
+                        </Button>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="cleanup-actions cleanup-actions--split">
+                      <div>
+                        <Button type="button" variant="ghost" onClick={handleGuidedSkip}>Skip for now</Button>
+                        <Button type="button" variant="ghost" onClick={() => setShowGuidedDeleteConfirm(true)}>
+                          <Icon name="trash" size={18} /> Move to Trash
+                        </Button>
+                      </div>
+                      <div>
+                        <Button type="button" variant="secondary" onClick={() => navigate('/vault')}>Stop</Button>
+                        <Button type="submit" loading={savingGuided}>Save and next</Button>
+                      </div>
+                    </div>
+                  )}
                 </form>
               </div>
             ) : (
