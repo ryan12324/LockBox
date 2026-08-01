@@ -11,10 +11,12 @@
  */
 
 import { iconifySvg } from './iconify.js';
+import { INJECTED_BRAND_STYLES, lockboxBrandMarkup } from './injected-brand.js';
 
 // ─── Shared styles ──────────────────────────────────────────────────────────
 
 const BASE_STYLES = `
+  ${INJECTED_BRAND_STYLES}
   * { box-sizing: border-box; margin: 0; padding: 0; }
   .overlay {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -34,6 +36,11 @@ const BASE_STYLES = `
     max-width: 400px; width: 90%; overflow: hidden;
     animation: slideUp 0.2s ease-out;
   }
+  .brandbar {
+    min-height: 42px; padding: 9px 20px; display: flex; align-items: center;
+    background: #EAE6DF; border-bottom: 1px solid #DDD6CC;
+  }
+  .brandbar .lockbox-brand__logo { width: 92px; }
   .modal-header {
     padding: 18px 20px 14px; display: flex; align-items: center; gap: 12px;
     border-bottom: 1px solid #DDD6CC;
@@ -130,6 +137,7 @@ const PICKER_STYLES = `
 // ─── Toast styles (non-modal notification) ──────────────────────────────────
 
 const TOAST_STYLES = `
+  ${INJECTED_BRAND_STYLES}
   .toast {
     position: fixed; bottom: 20px; right: 20px;
     display: flex; align-items: flex-start; gap: 12px;
@@ -148,6 +156,8 @@ const TOAST_STYLES = `
   }
   .toast-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
   .toast-text { flex: 1; min-width: 0; }
+  .toast-text .lockbox-brand { margin-bottom: 7px; }
+  .toast-text .lockbox-brand__logo { width: 82px; }
   .toast-title { font-size: 13px; font-weight: 600; color: #2C2825; margin-bottom: 3px; }
   .toast-desc { font-size: 12px; color: #7A7168; line-height: 1.4; }
   .toast-action {
@@ -222,6 +232,7 @@ export function showCreateConsent(params: CreateConsentParams): Promise<boolean>
     overlay.className = 'overlay';
     overlay.innerHTML = `
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lockbox-create-title">
+        <div class="brandbar">${lockboxBrandMarkup()}</div>
         <div class="modal-header">
           ${SHIELD_ICON_SVG}
           <div>
@@ -326,6 +337,7 @@ export function showGetConsent(params: GetConsentParams): Promise<boolean> {
     overlay.className = 'overlay';
     overlay.innerHTML = `
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lockbox-get-title">
+        <div class="brandbar">${lockboxBrandMarkup()}</div>
         <div class="modal-header">
           ${KEY_ICON_SVG}
           <div>
@@ -428,6 +440,7 @@ export function showPasskeyPicker(
     overlay.className = 'overlay';
     overlay.innerHTML = `
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lockbox-picker-title">
+        <div class="brandbar">${lockboxBrandMarkup()}</div>
         <div class="modal-header">
           ${KEY_ICON_SVG}
           <div>
@@ -514,6 +527,7 @@ export function showVaultLockedToast(onOpenLockbox?: () => void): void {
   toast.innerHTML = `
     <span class="toast-icon">${LOCK_ICON_SVG.replace('width="24"', 'width="20"').replace('height="24"', 'height="20"').replace('stroke="currentColor"', 'stroke="#fbbf24"')}</span>
     <div class="toast-text">
+      ${lockboxBrandMarkup()}
       <div class="toast-title">Lockbox is locked</div>
       <div class="toast-desc">Unlock to use passkeys on this site</div>
       <button type="button" class="toast-action">Open Lockbox</button>
@@ -582,6 +596,7 @@ export function showUnlockPrompt(params: UnlockPromptParams): Promise<boolean> {
     overlay.className = 'overlay';
     overlay.innerHTML = `
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lockbox-unlock-title">
+        <div class="brandbar">${lockboxBrandMarkup()}</div>
         <div class="modal-header">
           ${LOCK_ICON_SVG}
           <div>

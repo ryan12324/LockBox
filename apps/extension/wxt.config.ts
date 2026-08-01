@@ -16,6 +16,12 @@ export default defineConfig({
     },
     permissions: ['storage', 'activeTab', 'alarms', 'webNavigation'],
     host_permissions: ['<all_urls>'],
+    web_accessible_resources: [
+      {
+        resources: ['brand/lockbox-logo-horizontal.png'],
+        matches: ['<all_urls>'],
+      },
+    ],
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
     },

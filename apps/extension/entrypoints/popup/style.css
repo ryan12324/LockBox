@@ -93,16 +93,8 @@ textarea {
   border-bottom: 1px solid var(--color-border);
 }
 
-.extension-brand { display: flex; align-items: center; gap: 9px; }
-.extension-brand > span {
-  width: 32px;
-  height: 32px;
-  display: inline-flex;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-}
-.extension-brand img { width: 100%; height: 100%; display: block; object-fit: cover; }
-.extension-brand strong { font-size: var(--font-size-base); letter-spacing: var(--letter-spacing-tight); }
+.extension-brand { display: flex; align-items: center; }
+.extension-brand img { width: 108px; height: auto; display: block; }
 .extension-header__actions { display: flex; align-items: center; gap: 4px; }
 .extension-open-status {
   min-height: 28px;

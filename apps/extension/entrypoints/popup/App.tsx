@@ -130,8 +130,7 @@ export default function App() {
     <Shell>
       <header className="extension-header">
         <div className="extension-brand">
-          <span aria-hidden="true"><img src="/icon/48.png" alt="" /></span>
-          <strong>Lockbox</strong>
+          <img src="/brand/lockbox-logo-horizontal.png" alt="Lockbox" />
         </div>
         <div className="extension-header__actions">
           <span className="extension-open-status"><Icon name="circle-check" size={15} /> Open</span>

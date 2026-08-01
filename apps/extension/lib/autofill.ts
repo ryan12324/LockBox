@@ -7,6 +7,7 @@
 import type { DetectedForm, DetectedIdentityForm, IdentityFieldType } from './form-detector.js';
 import type { IdentityItem } from '@lockbox/types';
 import { iconifySvg } from './iconify.js';
+import { INJECTED_BRAND_STYLES, lockboxBrandMarkup } from './injected-brand.js';
 /**
  * Simulate filling a single input field with SPA-compatible events.
  * This sequence is required for React/Vue/Angular to detect the value change.
@@ -164,6 +165,7 @@ export function createSuggestionDropdown(
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
      <style>
+       ${INJECTED_BRAND_STYLES}
        .dropdown {
          background: #FDFCFA;
          border: 1px solid #DDD6CC;
@@ -174,15 +176,14 @@ export function createSuggestionDropdown(
          font-size: 13px;
        }
        .header {
-         padding: 6px 12px;
+         min-height: 34px;
+         padding: 7px 12px;
+         display: flex;
+         align-items: center;
          background: #EAE6DF;
          border-bottom: 1px solid #DDD6CC;
-         font-size: 11px;
-         color: #7A7168;
-         font-weight: 600;
-         text-transform: uppercase;
-         letter-spacing: 0.05em;
        }
+       .header .lockbox-brand__logo { width: 84px; }
        .item {
          width: 100%;
          padding: 8px 12px;
@@ -201,9 +202,9 @@ export function createSuggestionDropdown(
        .item:focus-visible { outline: 2px solid #8B7355; outline-offset: -2px; }
        .item-name { font-weight: 500; color: #2C2825; }
        .item-username { color: #7A7168; font-size: 12px; }
-     </style>
+    </style>
     <div class="dropdown">
-      <div class="header">${iconifySvg('shield-lock', { size: 14 })} Lockbox</div>
+      <div class="header">${lockboxBrandMarkup()}</div>
     </div>
   `;
 
@@ -307,6 +308,7 @@ export function createIdentitySuggestionDropdown(
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
      <style>
+       ${INJECTED_BRAND_STYLES}
        .dropdown {
          background: #FDFCFA;
          border: 1px solid #DDD6CC;
@@ -317,15 +319,14 @@ export function createIdentitySuggestionDropdown(
          font-size: 13px;
        }
        .header {
-         padding: 6px 12px;
+         min-height: 34px;
+         padding: 7px 12px;
+         display: flex;
+         align-items: center;
          background: #EAE6DF;
          border-bottom: 1px solid #DDD6CC;
-         font-size: 11px;
-         color: #7A7168;
-         font-weight: 600;
-         text-transform: uppercase;
-         letter-spacing: 0.05em;
        }
+       .header .lockbox-brand__logo { width: 84px; }
        .item {
          width: 100%;
          padding: 8px 12px;
@@ -346,7 +347,7 @@ export function createIdentitySuggestionDropdown(
        .item-detail { color: #7A7168; font-size: 12px; }
      </style>
      <div class="dropdown">
-       <div class="header">🆔 Lockbox Identity</div>
+       <div class="header">${lockboxBrandMarkup()}</div>
     </div>
   `;
 
@@ -444,6 +445,7 @@ export function createStatusDropdown(
 
   const style = document.createElement('style');
   style.textContent = `
+     ${INJECTED_BRAND_STYLES}
      .dropdown {
        background: #FDFCFA;
        border: 1px solid #DDD6CC;
@@ -454,15 +456,14 @@ export function createStatusDropdown(
        font-size: 13px;
      }
      .header {
-       padding: 6px 12px;
+       min-height: 34px;
+       padding: 7px 12px;
+       display: flex;
+       align-items: center;
        background: #EAE6DF;
        border-bottom: 1px solid #DDD6CC;
-       font-size: 11px;
-       color: #7A7168;
-       font-weight: 600;
-       text-transform: uppercase;
-       letter-spacing: 0.05em;
      }
+     .header .lockbox-brand__logo { width: 84px; }
      .body {
        padding: 12px;
        display: flex;
@@ -505,7 +506,7 @@ export function createStatusDropdown(
 
   const headerEl = document.createElement('div');
   headerEl.className = 'header';
-  headerEl.innerHTML = `${iconifySvg('shield-lock', { size: 14 })} Lockbox`;
+  headerEl.innerHTML = lockboxBrandMarkup();
   dropdown.appendChild(headerEl);
 
   const bodyEl = document.createElement('div');

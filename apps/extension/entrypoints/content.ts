@@ -26,6 +26,7 @@ import {
 } from '../lib/webauthn-ui.js';
 import type { VaultItem, LoginItem, IdentityItem } from '@lockbox/types';
 import { iconifySvg } from '../lib/iconify.js';
+import { createLockboxBrand, INJECTED_BRAND_STYLES } from '../lib/injected-brand.js';
 
 // Track injected overlays to avoid duplicates
 const injectedFields = new WeakSet<HTMLInputElement>();
@@ -253,6 +254,7 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
 
   const style = document.createElement('style');
   style.textContent = `
+     ${INJECTED_BRAND_STYLES}
      .badge {
        display: flex;
        align-items: flex-start;
@@ -269,6 +271,14 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
      }
      .icon { display: flex; flex-shrink: 0; margin-top: 1px; }
      .text { flex: 1; min-width: 0; }
+     .lockbox-brand {
+       width: max-content;
+       margin-bottom: 8px;
+       padding: 4px 6px;
+       background: #FDFCFA;
+       border-radius: 8px;
+     }
+     .lockbox-brand__logo { width: 82px; }
      .title { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
      .desc { font-size: 12px; opacity: 0.85; }
      .methods { font-size: 11px; opacity: 0.7; margin-top: 4px; }
@@ -310,13 +320,14 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
 
   const text = document.createElement('div');
   text.className = 'text';
+  const brand = createLockboxBrand();
   const title = document.createElement('div');
   title.className = 'title';
   title.textContent = `${siteLabel} supports 2FA`;
   const description = document.createElement('div');
   description.className = 'desc';
   description.textContent = 'Enable it for better security';
-  text.append(title, description);
+  text.append(brand, title, description);
   if (methodsText) {
     const methodsEl = document.createElement('div');
     methodsEl.className = 'methods';
@@ -413,6 +424,7 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
 
   const style = document.createElement('style');
   style.textContent = `
+     ${INJECTED_BRAND_STYLES}
      .banner {
        display: flex;
        align-items: center;
@@ -433,6 +445,13 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
        min-width: 0;
      }
      .icon { display: flex; flex-shrink: 0; }
+     .lockbox-brand {
+       padding: 4px 6px;
+       background: #FDFCFA;
+       border-radius: 8px;
+       flex-shrink: 0;
+     }
+     .lockbox-brand__logo { width: 82px; }
      .text strong { display: block; margin-bottom: 2px; font-size: 14px; }
      .text span { opacity: 0.9; font-size: 12px; }
      .dismiss {
@@ -449,6 +468,10 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
      }
      .dismiss:hover { background: rgba(255,255,255,0.3); }
      .dismiss:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+     @media (max-width: 640px) {
+       .icon { display: none; }
+       .lockbox-brand__logo { width: 72px; }
+     }
    `;
 
   const banner = document.createElement('div');
@@ -460,6 +483,7 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
 
   const info = document.createElement('div');
   info.className = 'info';
+  const brand = createLockboxBrand();
   const icon = document.createElement('span');
   icon.className = 'icon';
   icon.setAttribute('aria-hidden', 'true');
@@ -467,11 +491,11 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
   const text = document.createElement('div');
   text.className = 'text';
   const title = document.createElement('strong');
-  title.textContent = `Lockbox: Potential phishing site (${scorePercent}% risk)`;
+  title.textContent = `Potential phishing site (${scorePercent}% risk)`;
   const reason = document.createElement('span');
   reason.textContent = reasonText;
   text.append(title, reason);
-  info.append(icon, text);
+  info.append(brand, icon, text);
   banner.appendChild(info);
 
   const btn = document.createElement('button');

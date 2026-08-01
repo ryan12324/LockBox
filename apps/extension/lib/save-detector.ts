@@ -5,7 +5,7 @@
  */
 
 import { detectForms } from './form-detector.js';
-import { iconifySvg } from './iconify.js';
+import { createLockboxBrand, INJECTED_BRAND_STYLES } from './injected-brand.js';
 
 /** Credentials extracted from a form submission. */
 export interface ExtractedCredentials {
@@ -138,6 +138,7 @@ export function injectSaveBanner(
 
   const style = document.createElement('style');
   style.textContent = `
+    ${INJECTED_BRAND_STYLES}
     .banner {
       display: flex;
       align-items: center;
@@ -158,7 +159,13 @@ export function injectSaveBanner(
       flex: 1;
       min-width: 0;
     }
-    .icon { color: #6B5640; display: flex; flex-shrink: 0; }
+    .lockbox-brand {
+      padding-right: 12px;
+      margin-right: 2px;
+      border-right: 1px solid #DDD6CC;
+      flex-shrink: 0;
+    }
+    .lockbox-brand__logo { width: 88px; }
     .text { font-size: 13px; }
     .actions {
       display: flex;
@@ -198,13 +205,11 @@ export function injectSaveBanner(
 
   const info = document.createElement('div');
   info.className = 'info';
-  const icon = document.createElement('span');
-  icon.className = 'icon';
-  icon.innerHTML = iconifySvg('shield-lock', { size: 20 });
+  const brand = createLockboxBrand();
   const messageEl = document.createElement('span');
   messageEl.className = 'text';
   messageEl.textContent = message;
-  info.append(icon, messageEl);
+  info.append(brand, messageEl);
 
   const actionsEl = document.createElement('div');
   actionsEl.className = 'actions';

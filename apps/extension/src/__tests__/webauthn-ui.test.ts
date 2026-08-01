@@ -35,6 +35,7 @@ describe('showCreateConsent', () => {
     expect(host).not.toBeNull();
 
     const shadow = host!.shadowRoot!;
+    expect(shadow.querySelector('.lockbox-brand__logo')?.getAttribute('alt')).toBe('Lockbox');
     expect(shadow.querySelector('.modal-title')!.textContent).toBe('Create a passkey');
     expect(shadow.innerHTML).toContain('Example Corp');
     expect(shadow.innerHTML).toContain('example.com');

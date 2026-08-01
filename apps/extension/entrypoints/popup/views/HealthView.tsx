@@ -94,38 +94,44 @@ export function HealthSummaryView({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <Icon name="arrow-left" size={17} />
-            <span className="sr-only">Back</span>
-          </Button>
-          <span className="text-sm font-semibold text-[var(--color-text)]">Security review</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={checkBreaches}
-            disabled={loading || breachChecking}
-            title="Uses HIBP k-anonymity: only a five-character SHA-1 prefix leaves this device"
-          >
-            {breachChecking ? 'Checking…' : 'Check breaches'}
-          </Button>
-          <Button variant="primary" size="sm" onClick={analyze} disabled={loading}>
-            {loading ? 'Reviewing…' : 'Review again'}
-          </Button>
-        </div>
+      <div className="extension-subheader">
+        <button type="button" className="lb-icon-button" onClick={onBack} aria-label="Back">
+          <Icon name="arrow-left" size={19} />
+        </button>
+        <strong>Security review</strong>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={checkBreaches}
+            disabled={loading || breachChecking}
+            loading={breachChecking}
+            aria-describedby="breach-check-privacy"
+          >
+            {!breachChecking && <Icon name="shield-check" size={16} />}
+            {breachChecking ? 'Checking breaches…' : 'Check for breaches'}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={analyze}
+            loading={loading}
+            title="Refresh local password review"
+          >
+            {!loading && <Icon name="refresh" size={16} />}
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </div>
         {error && (
           <div className="px-3 py-2 bg-[var(--color-error-subtle)] border border-[var(--color-error)] rounded-[var(--radius-sm)] text-[var(--color-error)] text-xs">
             {error}
           </div>
         )}
 
-        <p className="text-[10px] text-[var(--color-text-tertiary)] m-0">
+        <p id="breach-check-privacy" className="text-[10px] text-[var(--color-text-tertiary)] m-0">
           Breach checks are manual. Lockbox sends only the first five characters of each
           password's SHA-1 hash to Have I Been Pwned.
         </p>
