@@ -45,7 +45,9 @@ class AutofillAuthActivity : FragmentActivity() {
                     ?: return@launch withContext(Dispatchers.Main) { cancel() }
                 val envelope = AutofillCrypto.parseEnvelope(credential.encryptedData)
                 val cipher = AutofillCrypto.createUnwrapCipher(privateKey)
-                withContext(Dispatchers.Main) { authenticate(envelope, cipher) }
+                withContext(Dispatchers.Main) {
+                    authenticate(envelope, cipher, credential.displayUsername)
+                }
             } catch (error: Exception) {
                 recordFailure("Credential authentication setup failed", error)
                 withContext(Dispatchers.Main) { cancel() }
@@ -60,7 +62,8 @@ class AutofillAuthActivity : FragmentActivity() {
 
     private fun authenticate(
         envelope: AutofillCrypto.Envelope,
-        cipher: javax.crypto.Cipher
+        cipher: javax.crypto.Cipher,
+        displayUsername: String
     ) {
         val prompt = BiometricPrompt(
             this,
@@ -97,7 +100,7 @@ class AutofillAuthActivity : FragmentActivity() {
         )
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Unlock Authwell")
-            .setSubtitle("Authenticate to fill this credential")
+            .setSubtitle(AutofillPresentation.promptSubtitle(displayUsername))
             .setNegativeButtonText("Cancel")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             .build()

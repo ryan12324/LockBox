@@ -157,6 +157,7 @@ class LockboxAutofillService : AutofillService() {
                 val indexed = AutofillCredentialEntity(
                     id = id,
                     domainHashes = domainHashes,
+                    displayUsername = AutofillPresentation.username(fields.usernameValue),
                     encryptedData = autofillEncryptedData,
                     updatedAt = now
                 )
@@ -193,8 +194,11 @@ class LockboxAutofillService : AutofillService() {
         index: Int
     ): Dataset {
         val presentation = RemoteViews(packageName, R.layout.autofill_item).apply {
-            setTextViewText(R.id.autofill_item_label, "Unlock Authwell credential")
-            setTextViewText(R.id.autofill_item_sublabel, "Authentication required")
+            setTextViewText(
+                R.id.autofill_item_label,
+                AutofillPresentation.credentialLabel(credential.displayUsername)
+            )
+            setTextViewText(R.id.autofill_item_sublabel, "Unlock with biometrics")
         }
 
         val intent = Intent(applicationContext, AutofillAuthActivity::class.java).apply {

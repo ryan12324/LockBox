@@ -133,6 +133,7 @@ class AutofillPlugin : Plugin() {
                         AutofillCredentialEntity(
                             id = id,
                             domainHashes = JSONArray(hashes.toList()).toString(),
+                            displayUsername = AutofillPresentation.username(username),
                             encryptedData = AutofillCrypto.encrypt(publicKey, plaintext),
                             updatedAt = java.time.Instant.now().toString()
                         )
@@ -149,6 +150,12 @@ class AutofillPlugin : Plugin() {
                             AutofillCredentialEntity(
                                 id = it.id,
                                 domainHashes = it.domainHashes,
+                                displayUsername = runCatching {
+                                    val payload = JSONObject(
+                                        PendingSaveCrypto.decrypt(context, it.encryptedData)
+                                    )
+                                    AutofillPresentation.username(payload.optString("username", ""))
+                                }.getOrDefault(""),
                                 encryptedData = it.autofillEncryptedData,
                                 updatedAt = it.createdAt
                             )

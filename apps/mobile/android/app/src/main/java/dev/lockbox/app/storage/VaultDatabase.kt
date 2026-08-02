@@ -19,8 +19,9 @@ import dev.lockbox.app.autofill.PendingAutofillSaveEntity
  * This database is shared between the Capacitor WebView process and
  * the AutofillService process via enableMultiInstanceInvalidation().
  *
- * SECURITY: Only encrypted blobs are stored. Room never sees plaintext vault data.
- * The encryption/decryption happens in the TypeScript layer using the user key.
+ * SECURITY: Secret vault payloads are stored only as encrypted blobs. Room also
+ * keeps the minimum non-secret metadata Android needs to present Autofill and
+ * passkey choices, including a bounded display username.
  */
 @Database(
     entities = [
@@ -29,7 +30,7 @@ import dev.lockbox.app.autofill.PendingAutofillSaveEntity
         AutofillCredentialEntity::class,
         PendingAutofillSaveEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class VaultDatabase : RoomDatabase() {
@@ -164,6 +165,16 @@ abstract class VaultDatabase : RoomDatabase() {
             }
         }
 
+        /** Add safe display metadata so matching AutoFill accounts are distinguishable. */
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE autofill_credentials " +
+                        "ADD COLUMN displayUsername TEXT NOT NULL DEFAULT ''"
+                )
+            }
+        }
+
         @Volatile
         private var instance: VaultDatabase? = null
 
@@ -196,7 +207,8 @@ abstract class VaultDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
-                    MIGRATION_7_8
+                    MIGRATION_7_8,
+                    MIGRATION_8_9
                 )
                 .build()
         }
