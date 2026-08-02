@@ -2,6 +2,7 @@ package dev.lockbox.app.biometric
 
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.biometric.BiometricManager
@@ -39,7 +40,9 @@ class BiometricPlugin : Plugin() {
         private const val PREFS_NAME = "lockbox_biometric_prefs"
         private const val PREF_ENCRYPTED_USER_KEY = "encrypted_user_key"
         private const val PREF_IV = "biometric_iv"
+        private const val PREF_SCOPE = "account_scope"
         private const val GCM_TAG_LENGTH = 128
+        private const val VAULT_KEY_BYTES = 64
     }
 
     /**
@@ -73,11 +76,23 @@ class BiometricPlugin : Plugin() {
      */
     @PluginMethod
     fun isEnrolled(call: PluginCall) {
+        val requestedScope = requireScope(call) ?: return
         val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
-        val enrolled = prefs.contains(PREF_ENCRYPTED_USER_KEY)
+        val savedScope = prefs.getString(PREF_SCOPE, null)
+        val hasEnvelope = prefs.contains(PREF_ENCRYPTED_USER_KEY) && prefs.contains(PREF_IV)
+        val hasKey = try {
+            getBiometricKey() != null
+        } catch (_: Exception) {
+            false
+        }
+        if (hasEnvelope && !hasKey) runCatching { clearEnrollment() }
 
         val result = JSObject()
-        result.put("enrolled", enrolled)
+        result.put("enrolled", hasEnvelope && hasKey && savedScope == requestedScope)
+        result.put(
+            "replacementRequired",
+            hasEnvelope && hasKey && savedScope != requestedScope
+        )
         call.resolve(result)
     }
 
@@ -87,26 +102,36 @@ class BiometricPlugin : Plugin() {
      */
     @PluginMethod
     fun enrollBiometric(call: PluginCall) {
+        val scope = requireScope(call) ?: return
         val userKeyBase64 = call.getString("userKey") ?: run {
             call.reject("userKey is required")
             return
         }
+        val userKeyBytes = decodeVaultKey(userKeyBase64) ?: run {
+            call.reject("userKey must be canonical Base64 for a 64-byte vault key")
+            return
+        }
 
         try {
+            clearEnrollment()
             // Generate a new biometric-bound key in Android Keystore
             generateBiometricKey()
 
             // Get the key and create a cipher for encryption
             val secretKey = getBiometricKey() ?: run {
+                userKeyBytes.fill(0)
                 call.reject("Failed to generate biometric key")
                 return
             }
 
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+            cipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
 
             // Show BiometricPrompt to authorize key usage
             val fragmentActivity = activity as? FragmentActivity ?: run {
+                userKeyBytes.fill(0)
+                clearEnrollment()
                 call.reject("Activity not available")
                 return
             }
@@ -118,8 +143,8 @@ class BiometricPlugin : Plugin() {
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         try {
-                            val cryptoCipher = result.cryptoObject?.cipher ?: cipher
-                            val userKeyBytes = Base64.decode(userKeyBase64, Base64.NO_WRAP)
+                            val cryptoCipher = result.cryptoObject?.cipher
+                                ?: throw SecurityException("Biometric-bound cipher was not returned")
                             val encryptedBytes = cryptoCipher.doFinal(userKeyBytes)
                             val iv = cryptoCipher.iv
 
@@ -128,18 +153,25 @@ class BiometricPlugin : Plugin() {
                                 PREFS_NAME,
                                 android.content.Context.MODE_PRIVATE
                             )
-                            prefs.edit()
+                            val stored = prefs.edit()
                                 .putString(PREF_ENCRYPTED_USER_KEY, Base64.encodeToString(encryptedBytes, Base64.NO_WRAP))
                                 .putString(PREF_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
-                                .apply()
+                                .putString(PREF_SCOPE, scope)
+                                .commit()
+                            if (!stored) throw IllegalStateException("Could not persist biometric envelope")
 
                             call.resolve()
                         } catch (e: Exception) {
+                            runCatching { clearEnrollment() }
                             call.reject("Encryption failed: ${e.message}")
+                        } finally {
+                            userKeyBytes.fill(0)
                         }
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        userKeyBytes.fill(0)
+                        runCatching { clearEnrollment() }
                         call.reject("Biometric enrollment failed: $errString")
                     }
 
@@ -161,6 +193,8 @@ class BiometricPlugin : Plugin() {
                 BiometricPrompt.CryptoObject(cipher)
             )
         } catch (e: Exception) {
+            userKeyBytes.fill(0)
+            runCatching { clearEnrollment() }
             call.reject("Enrollment setup failed: ${e.message}")
         }
     }
@@ -170,33 +204,36 @@ class BiometricPlugin : Plugin() {
      */
     @PluginMethod
     fun authenticate(call: PluginCall) {
-        val reason = call.getString("reason") ?: "Unlock Authwell"
+        val scope = requireScope(call) ?: return
+        val reason = call.getString("reason")?.take(200) ?: "Unlock Authwell"
 
         val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
         val encryptedKeyBase64 = prefs.getString(PREF_ENCRYPTED_USER_KEY, null) ?: run {
-            val result = JSObject()
-            result.put("success", false)
-            call.resolve(result)
+            resolveFailure(call, "credentialUnavailable")
             return
         }
         val ivBase64 = prefs.getString(PREF_IV, null) ?: run {
-            val result = JSObject()
-            result.put("success", false)
-            call.resolve(result)
+            runCatching { clearEnrollment() }
+            resolveFailure(call, "enrollmentInvalid")
+            return
+        }
+        if (prefs.getString(PREF_SCOPE, null) != scope) {
+            resolveFailure(call, "accountMismatch")
             return
         }
 
         try {
             val secretKey = getBiometricKey() ?: run {
-                val result = JSObject()
-                result.put("success", false)
-                call.resolve(result)
+                clearEnrollment()
+                resolveFailure(call, "credentialUnavailable")
                 return
             }
 
             val iv = Base64.decode(ivBase64, Base64.NO_WRAP)
+            if (iv.size != 12) throw IllegalStateException("Invalid biometric IV")
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_LENGTH, iv))
+            cipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
 
             val fragmentActivity = activity as? FragmentActivity ?: run {
                 call.reject("Activity not available")
@@ -210,26 +247,29 @@ class BiometricPlugin : Plugin() {
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         try {
-                            val cryptoCipher = result.cryptoObject?.cipher ?: cipher
+                            val cryptoCipher = result.cryptoObject?.cipher
+                                ?: throw SecurityException("Biometric-bound cipher was not returned")
                             val encryptedBytes = Base64.decode(encryptedKeyBase64, Base64.NO_WRAP)
                             val decryptedBytes = cryptoCipher.doFinal(encryptedBytes)
+                            if (decryptedBytes.size != VAULT_KEY_BYTES) {
+                                decryptedBytes.fill(0)
+                                throw SecurityException("Invalid vault key length")
+                            }
                             val userKeyBase64 = Base64.encodeToString(decryptedBytes, Base64.NO_WRAP)
+                            decryptedBytes.fill(0)
 
                             val resultObj = JSObject()
                             resultObj.put("success", true)
                             resultObj.put("userKey", userKeyBase64)
                             call.resolve(resultObj)
                         } catch (e: Exception) {
-                            val resultObj = JSObject()
-                            resultObj.put("success", false)
-                            call.resolve(resultObj)
+                            runCatching { clearEnrollment() }
+                            resolveFailure(call, "enrollmentInvalid")
                         }
                     }
 
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        val resultObj = JSObject()
-                        resultObj.put("success", false)
-                        call.resolve(resultObj)
+                        resolveFailure(call, "cancelled")
                     }
 
                     override fun onAuthenticationFailed() {
@@ -249,10 +289,12 @@ class BiometricPlugin : Plugin() {
                 promptInfo,
                 BiometricPrompt.CryptoObject(cipher)
             )
-        } catch (e: Exception) {
-            val resultObj = JSObject()
-            resultObj.put("success", false)
-            call.resolve(resultObj)
+        } catch (_: KeyPermanentlyInvalidatedException) {
+            runCatching { clearEnrollment() }
+            resolveFailure(call, "biometricsChanged")
+        } catch (_: Exception) {
+            runCatching { clearEnrollment() }
+            resolveFailure(call, "enrollmentInvalid")
         }
     }
 
@@ -262,20 +304,7 @@ class BiometricPlugin : Plugin() {
     @PluginMethod
     fun unenroll(call: PluginCall) {
         try {
-            // Delete key from Keystore
-            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
-            keyStore.load(null)
-            if (keyStore.containsAlias(KEYSTORE_ALIAS)) {
-                keyStore.deleteEntry(KEYSTORE_ALIAS)
-            }
-
-            // Clear encrypted user key from SharedPreferences
-            val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
-            prefs.edit()
-                .remove(PREF_ENCRYPTED_USER_KEY)
-                .remove(PREF_IV)
-                .apply()
-
+            clearEnrollment()
             call.resolve()
         } catch (e: Exception) {
             call.reject("Failed to unenroll: ${e.message}")
@@ -321,5 +350,50 @@ class BiometricPlugin : Plugin() {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
         keyStore.load(null)
         return keyStore.getKey(KEYSTORE_ALIAS, null) as? SecretKey
+    }
+
+    private fun requireScope(call: PluginCall): String? {
+        val scope = call.getString("scope")
+        if (scope.isNullOrBlank() || scope.length > 2_048 || scope.indexOf('\u0000') >= 0) {
+            call.reject("scope is required")
+            return null
+        }
+        return scope
+    }
+
+    private fun decodeVaultKey(encoded: String): ByteArray? {
+        return try {
+            val decoded = Base64.decode(encoded, Base64.NO_WRAP)
+            val valid =
+                decoded.size == VAULT_KEY_BYTES
+                && Base64.encodeToString(decoded, Base64.NO_WRAP) == encoded
+            if (valid) decoded else {
+                decoded.fill(0)
+                null
+            }
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
+    private fun resolveFailure(call: PluginCall, reason: String) {
+        val result = JSObject()
+        result.put("success", false)
+        result.put("fallbackReason", reason)
+        call.resolve(result)
+    }
+
+    private fun clearEnrollment() {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
+        keyStore.load(null)
+        if (keyStore.containsAlias(KEYSTORE_ALIAS)) keyStore.deleteEntry(KEYSTORE_ALIAS)
+
+        val prefs = context.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        val cleared = prefs.edit()
+            .remove(PREF_ENCRYPTED_USER_KEY)
+            .remove(PREF_IV)
+            .remove(PREF_SCOPE)
+            .commit()
+        check(cleared) { "Could not clear biometric enrollment" }
     }
 }

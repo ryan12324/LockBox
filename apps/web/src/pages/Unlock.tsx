@@ -13,12 +13,28 @@ import {
   type NativeBiometricStatus,
 } from '../lib/native-biometric.js';
 import { clearNativeDeviceState } from '../lib/native-device-state.js';
+import { deviceUnlockScope } from '../lib/device-unlock-scope.js';
+import {
+  getWebPrfUnlockStatus,
+  unlockWithWebPrf,
+  type WebPrfUnlockStatus,
+} from '../lib/web-prf-unlock.js';
+import {
+  DeviceUnlockSessionError,
+  validateDeviceUnlockSession,
+} from '../lib/device-unlock-session.js';
 
 const EMPTY_BIOMETRIC_STATUS: NativeBiometricStatus = {
   supported: false,
   enrolled: false,
   replacementRequired: false,
   biometryType: 'none',
+};
+
+const EMPTY_WEB_PRF_STATUS: WebPrfUnlockStatus = {
+  supported: false,
+  enrolled: false,
+  replacementRequired: false,
 };
 
 export default function Unlock() {
@@ -28,10 +44,12 @@ export default function Unlock() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [biometricStatus, setBiometricStatus] = useState(EMPTY_BIOMETRIC_STATUS);
+  const [webPrfStatus, setWebPrfStatus] = useState(EMPTY_WEB_PRF_STATUS);
 
   useEffect(() => {
     if (!session) return;
     const scope = nativeBiometricScope(session.userId);
+    setWebPrfStatus(getWebPrfUnlockStatus(scope));
     getNativeBiometricStatus(scope)
       .then(setBiometricStatus)
       .catch(() => setBiometricStatus(EMPTY_BIOMETRIC_STATUS));
@@ -55,22 +73,37 @@ export default function Unlock() {
     }
   }
 
-  async function handleBiometricUnlock() {
+  async function handleDeviceUnlock() {
     if (!session) return;
     setLoading(true);
     try {
-      const userKey = await authenticateNativeBiometric(
-        nativeBiometricScope(session.userId),
-        'Unlock your Authwell vault'
-      );
+      // A local key wrapper must never outlive server-side session revocation.
+      // Validate first so a revoked token always returns the user to full login.
+      await validateDeviceUnlockSession(session.token, session.userId);
+
+      const scope = deviceUnlockScope(session.userId);
+      const userKey = biometricStatus.enrolled
+        ? await authenticateNativeBiometric(scope, 'Unlock your Authwell vault')
+        : await unlockWithWebPrf(scope);
       if (!userKey) {
-        toast('Biometric authentication did not unlock this vault.', 'error');
+        toast('Device authentication did not unlock this vault. Enter your master password.', 'error');
         return;
       }
       unlockWithUserKey(userKey);
       navigate('/vault');
     } catch (reason) {
-      toast(reason instanceof Error ? reason.message : 'Biometric unlock failed.', 'error');
+      if (reason instanceof DeviceUnlockSessionError && reason.revoked) {
+        logout();
+        navigate('/login');
+        toast(reason.message, 'error');
+      } else {
+        toast(
+          reason instanceof Error
+            ? reason.message
+            : 'Device unlock failed. Enter your master password.',
+          'error'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -91,17 +124,19 @@ export default function Unlock() {
     : biometricStatus.biometryType === 'fingerprint'
       ? 'Touch ID or fingerprint'
       : 'biometrics';
+  const deviceUnlockEnrolled = biometricStatus.enrolled || webPrfStatus.enrolled;
+  const deviceUnlockName = biometricStatus.enrolled ? biometricName : 'your passkey';
 
   return (
     <AuthShell
       eyebrow="Vault locked"
       title="Unlock on this device"
-      description={`Signed in as ${session.email}. Unlock with ${biometricStatus.enrolled ? biometricName : 'your master password'} to restore access.`}
+      description={`Signed in as ${session.email}. Unlock with ${deviceUnlockEnrolled ? deviceUnlockName : 'your master password'} to restore access.`}
       footer={<Button type="button" variant="ghost" size="sm" onClick={() => void handleSignOut()}>Sign out and use another account</Button>}
     >
-      {biometricStatus.enrolled && (
-        <Button type="button" size="lg" loading={loading} onClick={() => void handleBiometricUnlock()}>
-          Unlock with {biometricName}
+      {deviceUnlockEnrolled && (
+        <Button type="button" size="lg" loading={loading} onClick={() => void handleDeviceUnlock()}>
+          Unlock with {deviceUnlockName}
         </Button>
       )}
       <form onSubmit={handleSubmit} className="auth-form">

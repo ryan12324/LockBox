@@ -18,11 +18,19 @@ export interface BiometricAuthResult {
   success: boolean;
   /** Base64-encoded user key — only present on successful biometric unlock */
   userKey?: string;
+  /** Why the master-password fallback is required. */
+  fallbackReason?:
+    | 'accountMismatch'
+    | 'biometricsChanged'
+    | 'cancelled'
+    | 'credentialUnavailable'
+    | 'enrollmentInvalid';
 }
 
 /** Result from checking if biometric unlock is enrolled */
 export interface BiometricEnrolledResult {
   enrolled: boolean;
+  replacementRequired?: boolean;
 }
 
 /**
@@ -30,8 +38,8 @@ export interface BiometricEnrolledResult {
  *
  * Flow:
  * 1. checkAvailability() → verify device supports biometrics
- * 2. enrollBiometric({ userKey }) → protect the key with device biometrics
- * 3. authenticate({ reason }) → native biometric prompt → release the user key
+ * 2. enrollBiometric({ userKey, scope }) → protect the scoped key with device biometrics
+ * 3. authenticate({ reason, scope }) → native biometric prompt → release the user key
  * 4. unenroll() → remove the protected native key
  */
 export interface BiometricPlugin {
@@ -39,18 +47,18 @@ export interface BiometricPlugin {
   checkAvailability(): Promise<BiometricAvailabilityResult>;
 
   /** Check if biometric unlock has been enrolled for this app */
-  isEnrolled(): Promise<BiometricEnrolledResult>;
+  isEnrolled(options: { scope: string }): Promise<BiometricEnrolledResult>;
 
   /**
    * Enroll biometric unlock with platform-protected, biometric-bound storage.
    */
-  enrollBiometric(options: { userKey: string }): Promise<void>;
+  enrollBiometric(options: { userKey: string; scope: string }): Promise<void>;
 
   /**
    * Authenticate with biometrics through the native platform prompt.
    * Returns the decrypted user key on success.
    */
-  authenticate(options: { reason: string }): Promise<BiometricAuthResult>;
+  authenticate(options: { reason: string; scope: string }): Promise<BiometricAuthResult>;
 
   /** Remove biometric enrollment and its protected native key */
   unenroll(): Promise<void>;

@@ -10,6 +10,7 @@ import {
 
 interface NativeBiometricSettingsProps {
   accountId: string;
+  passwordVerified: boolean;
   userKey: Uint8Array;
 }
 
@@ -22,6 +23,7 @@ const EMPTY_STATUS: NativeBiometricStatus = {
 
 export default function NativeBiometricSettings({
   accountId,
+  passwordVerified,
   userKey,
 }: NativeBiometricSettingsProps) {
   const scope = nativeBiometricScope(accountId);
@@ -62,6 +64,9 @@ export default function NativeBiometricSettings({
       if (status.enrolled) {
         await clearNativeBiometric();
       } else {
+        if (!passwordVerified) {
+          throw new Error('Unlock once with your master password before enabling biometric unlock.');
+        }
         await enrollNativeBiometric(userKey, scope);
       }
       setStatus(await getNativeBiometricStatus(scope));
@@ -88,11 +93,17 @@ export default function NativeBiometricSettings({
         </p>
       )}
       {error && <p role="alert" style={{ color: 'var(--color-error)' }}>{error}</p>}
+      {!status.enrolled && !passwordVerified && (
+        <p role="status" style={{ color: 'var(--color-text-tertiary)' }}>
+          Lock this vault and unlock it once with your master password before enabling biometrics.
+        </p>
+      )}
       <Button
         type="button"
         variant={status.enrolled ? 'secondary' : 'primary'}
         size="sm"
         loading={working}
+        disabled={!status.enrolled && !passwordVerified}
         onClick={() => void toggleEnrollment()}
       >
         {status.enrolled ? 'Disable biometric unlock' : `Enable ${methodName}`}

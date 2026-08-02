@@ -24,6 +24,8 @@ enum AuthwellAppGroup {
     static let indexSaltKey = "authwell.autofillIndexSalt"
     static let publicEncryptionKey = "authwell.publicEncryptionKey"
     static let biometricEnrolledKey = "authwell.biometricEnrolled"
+    static let biometricWrappedVaultKey = "authwell.biometricWrappedVaultKey.v2"
+    static let biometricScopeKey = "authwell.biometricScope.v2"
 
     static func sharedDefaults() throws -> UserDefaults {
         guard let defaults = UserDefaults(suiteName: identifier) else {

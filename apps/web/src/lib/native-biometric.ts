@@ -1,5 +1,5 @@
 import { fromBase64, toBase64 } from '@lockbox/crypto';
-import { getServerConnection } from './server-connection.js';
+import { deviceUnlockScope } from './device-unlock-scope.js';
 
 interface CapacitorBridge {
   isNativePlatform(): boolean;
@@ -27,8 +27,7 @@ function getBridge(): CapacitorBridge | null {
 }
 
 export function nativeBiometricScope(accountId: string): string {
-  const apiOrigin = getServerConnection()?.apiBaseUrl ?? window.location.origin;
-  return `${apiOrigin.replace(/\/$/, '')}#${accountId}`;
+  return deviceUnlockScope(accountId);
 }
 
 export async function getNativeBiometricStatus(
@@ -51,13 +50,15 @@ export async function getNativeBiometricStatus(
     return { supported, enrolled: false, replacementRequired: false, biometryType };
   }
 
-  const enrollment = await bridge.nativePromise('Biometric', 'isEnrolled', {});
+  const enrollment = await bridge.nativePromise('Biometric', 'isEnrolled', { scope });
   const nativeEnrolled = enrollment.enrolled === true;
+  const nativeReplacementRequired = enrollment.replacementRequired === true;
   const savedScope = localStorage.getItem(SCOPE_STORAGE_KEY);
   return {
     supported,
     enrolled: nativeEnrolled && savedScope === scope,
-    replacementRequired: nativeEnrolled && savedScope !== scope,
+    replacementRequired:
+      nativeReplacementRequired || (nativeEnrolled && savedScope !== scope),
     biometryType,
   };
 }
@@ -70,12 +71,13 @@ export async function enrollNativeBiometric(
   if (!bridge) throw new Error('Biometric unlock is not available on this device');
   if (userKey.length !== 64) throw new Error('The vault key is unavailable');
 
-  const enrollment = await bridge.nativePromise('Biometric', 'isEnrolled', {});
-  if (enrollment.enrolled === true) {
+  const enrollment = await bridge.nativePromise('Biometric', 'isEnrolled', { scope });
+  if (enrollment.enrolled === true || enrollment.replacementRequired === true) {
     await bridge.nativePromise('Biometric', 'unenroll', {});
   }
   await bridge.nativePromise('Biometric', 'enrollBiometric', {
     userKey: toBase64(userKey),
+    scope,
   });
   localStorage.setItem(SCOPE_STORAGE_KEY, scope);
 }
@@ -86,8 +88,18 @@ export async function authenticateNativeBiometric(
 ): Promise<Uint8Array | null> {
   const bridge = getBridge();
   if (!bridge || localStorage.getItem(SCOPE_STORAGE_KEY) !== scope) return null;
-  const result = await bridge.nativePromise('Biometric', 'authenticate', { reason });
-  if (result.success !== true || typeof result.userKey !== 'string') return null;
+  const result = await bridge.nativePromise('Biometric', 'authenticate', { reason, scope });
+  if (result.success !== true || typeof result.userKey !== 'string') {
+    if (
+      result.fallbackReason === 'biometricsChanged'
+      || result.fallbackReason === 'credentialUnavailable'
+      || result.fallbackReason === 'enrollmentInvalid'
+    ) {
+      localStorage.removeItem(SCOPE_STORAGE_KEY);
+      throw new Error('Biometric enrollment changed or is unavailable. Enter your master password.');
+    }
+    return null;
+  }
   const userKey = fromBase64(result.userKey);
   return userKey.length === 64 ? userKey : null;
 }

@@ -35,11 +35,12 @@ final class BiometricPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func isEnrolled(_ call: CAPPluginCall) {
+        guard let scope = validatedScope(call) else { return }
         do {
+            let status = try BiometricVault.status(scope: scope)
             call.resolve([
-                "enrolled": try AuthwellAppGroup.sharedDefaults().bool(
-                    forKey: AuthwellAppGroup.biometricEnrolledKey
-                ),
+                "enrolled": status.enrolled,
+                "replacementRequired": status.replacementRequired,
             ])
         } catch {
             call.reject(error.localizedDescription, nil, error)
@@ -47,13 +48,14 @@ final class BiometricPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func enrollBiometric(_ call: CAPPluginCall) {
+        guard let scope = validatedScope(call) else { return }
         guard
             let encoded = call.getString("userKey"),
             let userKey = Data(base64Encoded: encoded),
-            !userKey.isEmpty,
-            userKey.count <= 4_096
+            userKey.count == 64,
+            userKey.base64EncodedString() == encoded
         else {
-            call.reject("userKey must be valid Base64")
+            call.reject("userKey must be canonical Base64 for a 64-byte vault key")
             return
         }
         let context = LAContext()
@@ -67,7 +69,7 @@ final class BiometricPlugin: CAPPlugin, CAPBridgedPlugin {
                 return
             }
             do {
-                try BiometricVault.store(userKey: userKey, context: context)
+                try BiometricVault.store(userKey: userKey, scope: scope, context: context)
                 call.resolve()
             } catch {
                 call.reject(error.localizedDescription, nil, error)
@@ -76,11 +78,16 @@ final class BiometricPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func authenticate(_ call: CAPPluginCall) {
+        guard let scope = validatedScope(call) else { return }
         do {
-            guard try AuthwellAppGroup.sharedDefaults().bool(
-                forKey: AuthwellAppGroup.biometricEnrolledKey
-            ) else {
-                call.resolve(["success": false])
+            let status = try BiometricVault.status(scope: scope)
+            guard status.enrolled else {
+                call.resolve([
+                    "success": false,
+                    "fallbackReason": status.replacementRequired
+                        ? "accountMismatch"
+                        : "credentialUnavailable",
+                ])
                 return
             }
         } catch {
@@ -95,17 +102,20 @@ final class BiometricPlugin: CAPPlugin, CAPBridgedPlugin {
             localizedReason: context.localizedReason
         ) { success, _ in
             guard success else {
-                call.resolve(["success": false])
+                call.resolve(["success": false, "fallbackReason": "cancelled"])
                 return
             }
             do {
-                let userKey = try BiometricVault.load(context: context)
+                let userKey = try BiometricVault.load(scope: scope, context: context)
                 call.resolve([
                     "success": true,
                     "userKey": userKey.base64EncodedString(),
                 ])
             } catch {
-                call.resolve(["success": false])
+                call.resolve([
+                    "success": false,
+                    "fallbackReason": "biometricsChanged",
+                ])
             }
         }
     }
@@ -117,5 +127,18 @@ final class BiometricPlugin: CAPPlugin, CAPBridgedPlugin {
         } catch {
             call.reject(error.localizedDescription, nil, error)
         }
+    }
+
+    private func validatedScope(_ call: CAPPluginCall) -> String? {
+        guard
+            let scope = call.getString("scope")?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !scope.isEmpty,
+            scope.count <= 2_048,
+            !scope.contains("\0")
+        else {
+            call.reject("scope is required")
+            return nil
+        }
+        return scope
     }
 }

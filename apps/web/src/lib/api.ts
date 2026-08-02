@@ -130,7 +130,11 @@ export const api = {
         validateKdfParams
       ),
     logout: (token: string) => request('/api/auth/logout', { method: 'POST', token }),
-    me: (token: string) => request('/api/auth/me', { token }),
+    me: (token: string) =>
+      request<{ id: string; email: string; kdfConfig: KdfConfig; salt: string }>(
+        '/api/auth/me',
+        { token }
+      ),
     changePassword: (body: object, token: string) =>
       request('/api/auth/change-password', { method: 'POST', body: JSON.stringify(body), token }),
   },

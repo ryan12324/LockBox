@@ -1,5 +1,6 @@
 import { clearNativeAutofillIndex } from './native-autofill.js';
 import { clearNativeBiometric } from './native-biometric.js';
+import { clearWebPrfUnlock } from './web-prf-unlock.js';
 
 interface CapacitorBridge {
   isNativePlatform(): boolean;
@@ -12,6 +13,9 @@ interface CapacitorBridge {
 }
 
 export async function clearNativeDeviceState(): Promise<void> {
+  // The web PRF envelope is local to this browser and must be removed on
+  // explicit sign-out just like native Keystore/Keychain state.
+  clearWebPrfUnlock();
   const bridge = (window as unknown as { Capacitor?: CapacitorBridge }).Capacitor;
   const cleanup: Array<Promise<unknown>> = [
     clearNativeAutofillIndex(),

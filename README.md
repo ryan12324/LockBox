@@ -21,6 +21,7 @@ Version 1.0.0 includes a marketing site, web vault, Chrome/Firefox extension, An
 - Team membership, per-member RSA-OAEP folder-key wrapping, shared folders, and limited share links
 - Chrome/Firefox autofill, save/update prompts, TOTP, and passkey WebAuthn support with native fallback
 - Android and iOS AutoFill/Credential Provider integration with a biometric-bound local index
+- Opt-in device unlock: Face ID/Touch ID, Android BiometricPrompt + Keystore, and desktop WebAuthn PRF vault-key unwrapping
 - Delta sync, travel mode, and soft-delete cleanup
 
 The product deliberately does not expose hardware-key login, emergency-access recovery, QR secret transfer, or an AI chat assistant in v1. Those flows require complete interoperable protocols before they can be presented as security features.
@@ -36,6 +37,7 @@ The complete inventory of v1 removals, prerequisites, sequencing, and acceptance
 5. Shared folders use a random folder key wrapped separately to each member's validated RSA-OAEP public key.
 6. Share-link secrets live in the URL fragment. The server receives a derived bearer token and stores only its SHA-256 hash.
 7. HIBP checks are manual. Only the first five characters of a password's SHA-1 hash are sent to the Pwned Passwords range API.
+8. Device unlock never stores the master password. Each enabled device keeps only an account-scoped wrapped user key; a live matching session is required before biometric or WebAuthn PRF release.
 
 There is no master-password recovery in v1. Losing the master password means losing access to the vault. Two-factor backup codes recover only the second factor; they do not replace the master password.
 

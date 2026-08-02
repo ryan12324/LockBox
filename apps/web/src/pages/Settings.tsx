@@ -23,6 +23,7 @@ import {
 } from '../lib/native-autofill.js';
 import { applyThemePreference, type ThemePreference } from '../lib/theme.js';
 import NativeBiometricSettings from '../components/NativeBiometricSettings.js';
+import WebPrfUnlockSettings from '../components/WebPrfUnlockSettings.js';
 
 type AutoLockMinutes = 1 | 5 | 15 | 30 | 60;
 type ClipboardSeconds = 10 | 20 | 30 | 60;
@@ -1194,7 +1195,19 @@ export default function Settings() {
           )}
 
           {session && userKey && (
-            <NativeBiometricSettings accountId={session.userId} userKey={userKey} />
+            <>
+              <NativeBiometricSettings
+                accountId={session.userId}
+                passwordVerified={masterKey !== null}
+                userKey={userKey}
+              />
+              <WebPrfUnlockSettings
+                accountId={session.userId}
+                accountLabel={session.email}
+                passwordVerified={masterKey !== null}
+                userKey={userKey}
+              />
+            </>
           )}
 
           <Card variant="surface" padding="lg">

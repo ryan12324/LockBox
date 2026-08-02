@@ -14,6 +14,8 @@ Security fixes target the current `1.x` release line. Self-hosters are responsib
 
 Authwell is designed so the backend stores encrypted vault payloads and does not possess the master password, master key, user key, shared-folder keys, or share-link fragment secret. Client cryptography uses AES-256-GCM with contextual AAD; account secrets are derived with configured Argon2id or PBKDF2 parameters; shared-folder keys are wrapped with validated RSA-OAEP-2048/SHA-256 keys.
 
+Optional device unlock never stores the master password. Android stores an account-scoped vault-key envelope encrypted by a non-exportable, per-use biometric Keystore key. iOS stores an ECIES vault-key envelope whose unwrap key is protected by Secure Enclave/Keychain `biometryCurrentSet`. Desktop web stores a local AES-GCM envelope whose wrapping key is derived from the selected WebAuthn credential's PRF output. A live matching account session is checked before any device wrapper is released; missing credentials, changed biometric enrollment, unavailable PRF output, or revoked sessions fall back to the master-password sign-in path.
+
 The design does not protect against:
 
 - a compromised or malicious client device, browser extension, browser, keyboard, or operating system;

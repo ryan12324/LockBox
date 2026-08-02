@@ -12,6 +12,7 @@ const SCOPE_KEY = 'authwell-native-biometric-scope-v1';
 
 function installBridge(options: {
   enrolled?: boolean;
+  fallbackReason?: string;
   userKey?: Uint8Array;
 } = {}) {
   let enrolled = options.enrolled ?? false;
@@ -30,6 +31,9 @@ function installBridge(options: {
       return {};
     }
     if (plugin === 'Biometric' && method === 'authenticate') {
+      if (options.fallbackReason) {
+        return { success: false, fallbackReason: options.fallbackReason };
+      }
       return { success: true, userKey: toBase64(userKey) };
     }
     return {};
@@ -75,6 +79,7 @@ describe('native biometric integration', () => {
     expect(nativePromise).toHaveBeenCalledWith('Biometric', 'unenroll', {});
     expect(nativePromise).toHaveBeenCalledWith('Biometric', 'enrollBiometric', {
       userKey: toBase64(userKey),
+      scope: 'server#account-b',
     });
     expect(localStorage.getItem(SCOPE_KEY)).toBe('server#account-b');
   });
@@ -99,9 +104,20 @@ describe('native biometric integration', () => {
     await expect(authenticateNativeBiometric('server#account-a')).resolves.toEqual(userKey);
   });
 
+  it('requires the master password after biometric enrollment changes', async () => {
+    installBridge({ enrolled: true, fallbackReason: 'biometricsChanged' });
+    localStorage.setItem(SCOPE_KEY, 'server#account-a');
+
+    await expect(authenticateNativeBiometric('server#account-a')).rejects.toThrow(
+      'Enter your master password'
+    );
+    expect(localStorage.getItem(SCOPE_KEY)).toBeNull();
+  });
+
   it('clears biometric, AutoFill, and offline native state on logout', async () => {
     const nativePromise = installBridge({ enrolled: true });
     localStorage.setItem(SCOPE_KEY, 'server#account-a');
+    localStorage.setItem('authwell-web-prf-unlock-v1', 'wrapped-key-metadata');
 
     await clearNativeDeviceState();
 
@@ -109,6 +125,7 @@ describe('native biometric integration', () => {
     expect(nativePromise).toHaveBeenCalledWith('Biometric', 'unenroll', {});
     expect(nativePromise).toHaveBeenCalledWith('Storage', 'clearAll', {});
     expect(localStorage.getItem(SCOPE_KEY)).toBeNull();
+    expect(localStorage.getItem('authwell-web-prf-unlock-v1')).toBeNull();
   });
 
   it('clears the account scope even when native unenrollment fails', async () => {

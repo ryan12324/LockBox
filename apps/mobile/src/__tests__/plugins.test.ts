@@ -116,19 +116,25 @@ describe('BiometricPlugin interface', () => {
   });
 
   it('isEnrolled returns enrollment status', async () => {
-    const result = await Biometric.isEnrolled();
+    const result = await Biometric.isEnrolled({ scope: 'https://vault.example#account-123' });
     expect(result).toHaveProperty('enrolled');
     expect(typeof result.enrolled).toBe('boolean');
   });
 
   it('enrollBiometric accepts base64 user key', async () => {
     await expect(
-      Biometric.enrollBiometric({ userKey: 'base64-user-key-64-bytes' })
+      Biometric.enrollBiometric({
+        userKey: 'base64-user-key-64-bytes',
+        scope: 'https://vault.example#account-123',
+      })
     ).resolves.toBeUndefined();
   });
 
   it('authenticate returns success and optional user key', async () => {
-    const result = await Biometric.authenticate({ reason: 'Unlock Lockbox' });
+    const result = await Biometric.authenticate({
+      reason: 'Unlock Authwell',
+      scope: 'https://vault.example#account-123',
+    });
     expect(result).toHaveProperty('success');
     expect(typeof result.success).toBe('boolean');
     // userKey is only present on success
