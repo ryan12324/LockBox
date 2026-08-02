@@ -68,7 +68,9 @@ function lockboxDiscoveryPlugin(apiBaseUrl: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const apiBaseUrl = normalizeApiBaseUrl(env.VITE_API_URL ?? '');
+  const apiBaseUrl = normalizeApiBaseUrl(
+    env.VITE_API_URL ?? (mode === 'production' ? 'https://api.authwell.app' : '')
+  );
 
   return {
     plugins: [react(), tailwindcss(), lockboxDiscoveryPlugin(apiBaseUrl)],

@@ -83,7 +83,9 @@ class MockD1 {
  */
 
 describe('Auth API — request validation', () => {
-  const app = new Hono<{ Bindings: { DB: D1Database; AUTH_LIMITER: RateLimit } }>();
+  const app = new Hono<{
+    Bindings: { DB: D1Database; AUTH_LIMITER: RateLimit; REGISTRATION_ENABLED?: string };
+  }>();
   app.route('/api/auth', authRoutes);
 
   // Mock environment with AUTH_LIMITER
@@ -91,6 +93,38 @@ describe('Auth API — request validation', () => {
     DB: {} as D1Database,
     AUTH_LIMITER: { limit: async () => ({ success: true }) } as unknown as RateLimit,
   };
+
+  it('GET /api/auth/registration-status — defaults to enabled', async () => {
+    const res = await app.request('/api/auth/registration-status', {}, mockEnv);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ enabled: true });
+  });
+
+  it('GET /api/auth/registration-status — reports disabled configuration', async () => {
+    const res = await app.request(
+      '/api/auth/registration-status',
+      {},
+      { ...mockEnv, REGISTRATION_ENABLED: 'false' }
+    );
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ enabled: false });
+  });
+
+  it('POST /api/auth/register — rejects account creation when registration is disabled', async () => {
+    const res = await app.request(
+      '/api/auth/register',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'test@example.com' }),
+      },
+      { ...mockEnv, REGISTRATION_ENABLED: 'off' }
+    );
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Account registration is currently closed',
+    });
+  });
   it('POST /api/auth/register — returns 400 for missing fields', async () => {
     const res = await app.request('/api/auth/register', {
       method: 'POST',
@@ -141,7 +175,9 @@ describe('Auth API — request validation', () => {
 });
 
 describe('Auth API — route existence', () => {
-  const app = new Hono<{ Bindings: { DB: D1Database; AUTH_LIMITER: RateLimit } }>();
+  const app = new Hono<{
+    Bindings: { DB: D1Database; AUTH_LIMITER: RateLimit; REGISTRATION_ENABLED?: string };
+  }>();
   app.route('/api/auth', authRoutes);
 
   // Mock environment with AUTH_LIMITER
@@ -150,6 +186,7 @@ describe('Auth API — route existence', () => {
     AUTH_LIMITER: { limit: async () => ({ success: true }) } as unknown as RateLimit,
   };
   const routes = [
+    { method: 'GET', path: '/api/auth/registration-status' },
     { method: 'POST', path: '/api/auth/register' },
     { method: 'POST', path: '/api/auth/login' },
     { method: 'POST', path: '/api/auth/logout' },

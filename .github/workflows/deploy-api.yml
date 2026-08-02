@@ -97,12 +97,14 @@ jobs:
             printf 'TOTP_ENCRYPTION_KEY_PREVIOUS=%s\n' "$TOTP_ENCRYPTION_KEY_PREVIOUS" >> "$secrets_file"
           fi
 
-          cors_origins="${LOCKBOX_CORS_ORIGINS:-https://lockbox-web.pages.dev,http://localhost:5173,https://localhost}"
+          cors_origins="${LOCKBOX_CORS_ORIGINS:-https://authwell.app,https://www.authwell.app,https://vault.authwell.app,https://lockbox-web.pages.dev,http://localhost:5173,http://localhost:3000,https://localhost}"
           extension_ids="${LOCKBOX_EXTENSION_IDS:-}"
+          registration_enabled="${LOCKBOX_REGISTRATION_ENABLED:-true}"
           bunx wrangler deploy \
             --secrets-file "$secrets_file" \
             --var "CORS_ORIGINS:$cors_origins" \
-            --var "EXTENSION_IDS:$extension_ids"
+            --var "EXTENSION_IDS:$extension_ids" \
+            --var "REGISTRATION_ENABLED:$registration_enabled"
         working-directory: apps/api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -111,3 +113,4 @@ jobs:
           TOTP_ENCRYPTION_KEY_PREVIOUS: ${{ secrets.TOTP_ENCRYPTION_KEY_PREVIOUS }}
           LOCKBOX_CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
           LOCKBOX_EXTENSION_IDS: ${{ vars.EXTENSION_IDS }}
+          LOCKBOX_REGISTRATION_ENABLED: ${{ vars.REGISTRATION_ENABLED }}

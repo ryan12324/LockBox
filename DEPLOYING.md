@@ -64,6 +64,14 @@ LOCKBOX_CORS_ORIGINS=https://vault.example.com,https://localhost \
 bun run deploy:api
 ```
 
+The first-party deployment uses `https://api.authwell.app`. Its Worker custom domain is declared in `apps/api/wrangler.toml`. Control whether new hosted accounts can be created without affecting existing sign-ins:
+
+```bash
+LOCKBOX_REGISTRATION_ENABLED=false bun run deploy:api
+```
+
+Accepted disabled values are `false`, `0`, `off`, and `disabled`. Any other value, or an omitted value, leaves registration enabled.
+
 If a browser build requires explicit extension-origin CORS, pass comma-separated IDs without a URI scheme:
 
 ```bash
@@ -130,7 +138,7 @@ VITE_API_URL=https://lockbox-api.YOUR_SUBDOMAIN.workers.dev \
 bun run deploy:web
 ```
 
-After the Pages URL is known, make sure its exact origin appears in `CORS_ORIGINS` and redeploy the API. Origins are comma-separated and contain no trailing slash.
+After the Pages URL is known, make sure its exact origin appears in `CORS_ORIGINS` and redeploy the API. Origins are comma-separated and contain no trailing slash. The first-party Pages project uses `https://vault.authwell.app`; `https://authwell.app` is the separate marketing site.
 
 For a manual build:
 
@@ -245,6 +253,7 @@ The API deployment also requires these repository variables:
 | `CLOUDFLARE_D1_DATABASE_ID` | Yes         | Real UUID for `lockbox-vault`            |
 | `CORS_ORIGINS`              | Recommended | Exact comma-separated web/mobile origins |
 | `EXTENSION_IDS`             | Optional    | Comma-separated extension origin IDs     |
+| `REGISTRATION_ENABLED`      | Optional    | Set `false` to pause creation of new accounts |
 
 Web and mobile workflows require:
 

@@ -119,6 +119,8 @@ export function validateKdfParams(value: unknown): KdfParamsResponse {
 
 export const api = {
   auth: {
+    registrationStatus: () =>
+      request<{ enabled: boolean }>('/api/auth/registration-status'),
     register: (body: object, token?: string) =>
       request('/api/auth/register', { method: 'POST', body: JSON.stringify(body), token }),
     login: (body: object) =>

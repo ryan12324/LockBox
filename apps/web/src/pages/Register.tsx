@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type FormEvent } from 'react';
+import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   deriveKey,
@@ -34,8 +34,29 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registrationEnabled, setRegistrationEnabled] = useState<boolean | null>(null);
+  const [registrationError, setRegistrationError] = useState('');
   const strength = password ? evaluateStrength(password) : null;
   const nativeApp = isNativeLockboxApp();
+
+  useEffect(() => {
+    let active = true;
+    api.auth.registrationStatus()
+      .then(({ enabled }) => {
+        if (active) setRegistrationEnabled(enabled);
+      })
+      .catch(() => {
+        if (active) {
+          setRegistrationEnabled(false);
+          setRegistrationError(
+            'Authwell could not confirm whether registration is available. Try again later or sign in.'
+          );
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -79,6 +100,39 @@ export default function Register() {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (registrationEnabled === null) {
+    return (
+      <AuthShell
+        eyebrow="Create your vault"
+        title="Checking registration"
+        description="Authwell is confirming whether this server is accepting new accounts."
+        icon="shield-check"
+      >
+        <p className="auth-form__hint" role="status">Checking registration availability…</p>
+      </AuthShell>
+    );
+  }
+
+  if (!registrationEnabled) {
+    return (
+      <AuthShell
+        eyebrow="Registration closed"
+        title="New accounts are paused"
+        description={
+          registrationError ||
+          'This Authwell server is not accepting new accounts right now. Existing vaults can still sign in.'
+        }
+        icon="shield-check"
+        footer={<Link to="/login">Sign in to an existing vault</Link>}
+      >
+        <div className="auth-notice" role="status">
+          <Icon name="info-circle" size={20} />
+          <span>The server owner can reopen registration without affecting existing accounts.</span>
+        </div>
+      </AuthShell>
+    );
   }
 
   return (

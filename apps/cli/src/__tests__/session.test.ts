@@ -170,10 +170,10 @@ describe('session management', () => {
       expect(getApiUrl()).toBe('https://env.url');
     });
 
-    it('throws when no URL is configured', () => {
+    it('uses the hosted Authwell API when no override is configured', () => {
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
-      expect(() => getApiUrl()).toThrow('No API URL configured');
+      expect(getApiUrl()).toBe('https://api.authwell.app');
     });
   });
 });

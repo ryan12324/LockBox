@@ -11,7 +11,11 @@ import { createDb } from '../db/index.js';
 import { users, sessions, twoFactorChallenges, userTotpSettings } from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 
-type Bindings = { DB: D1Database; AUTH_LIMITER: RateLimit };
+type Bindings = {
+  DB: D1Database;
+  AUTH_LIMITER: RateLimit;
+  REGISTRATION_ENABLED?: string;
+};
 type Variables = { userId: string };
 
 export const authRoutes = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -31,6 +35,11 @@ function isValidEmail(email: string): boolean {
     email.length <= 254 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
   );
+}
+
+function isRegistrationEnabled(value?: string): boolean {
+  const normalized = value?.trim().toLowerCase();
+  return !normalized || !['0', 'false', 'off', 'disabled'].includes(normalized);
 }
 
 function decodeBase64(value: unknown): Uint8Array | null {
@@ -196,7 +205,15 @@ authRoutes.get('/kdf-params', async (c) => {
 
 // ─── POST /register ───────────────────────────────────────────────────────────
 
+authRoutes.get('/registration-status', (c) =>
+  c.json({ enabled: isRegistrationEnabled(c.env.REGISTRATION_ENABLED) })
+);
+
 authRoutes.post('/register', async (c) => {
+  if (!isRegistrationEnabled(c.env.REGISTRATION_ENABLED)) {
+    return c.json({ error: 'Account registration is currently closed' }, 403);
+  }
+
   const ip = c.req.header('CF-Connecting-IP') ?? c.req.header('X-Forwarded-For') ?? 'unknown';
   const { success } = await c.env.AUTH_LIMITER.limit({ key: ip });
   if (!success) return c.json({ error: 'Too many requests' }, 429);

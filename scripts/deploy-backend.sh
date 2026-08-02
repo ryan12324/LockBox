@@ -18,8 +18,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 API_DIR="$ROOT_DIR/apps/api"
 WRANGLER="bunx wrangler"
-LOCKBOX_CORS_ORIGINS="${LOCKBOX_CORS_ORIGINS:-https://lockbox-web.pages.dev,http://localhost:5173,https://localhost}"
+LOCKBOX_CORS_ORIGINS="${LOCKBOX_CORS_ORIGINS:-https://authwell.app,https://www.authwell.app,https://vault.authwell.app,https://lockbox-web.pages.dev,http://localhost:5173,http://localhost:3000,https://localhost}"
 LOCKBOX_EXTENSION_IDS="${LOCKBOX_EXTENSION_IDS:-}"
+LOCKBOX_REGISTRATION_ENABLED="${LOCKBOX_REGISTRATION_ENABLED:-true}"
 R2_BUCKET_NAME="lockbox-attachments"
 LOCKBOX_TOTP_ENCRYPTION_KEY="${LOCKBOX_TOTP_ENCRYPTION_KEY:-}"
 LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS="${LOCKBOX_TOTP_ENCRYPTION_KEY_PREVIOUS:-}"
@@ -171,6 +172,7 @@ DEPLOY_OUTPUT=$(
     "${DEPLOY_SECRET_ARGS[@]}" \
     --var "CORS_ORIGINS:${LOCKBOX_CORS_ORIGINS}" \
     --var "EXTENSION_IDS:${LOCKBOX_EXTENSION_IDS}" \
+    --var "REGISTRATION_ENABLED:${LOCKBOX_REGISTRATION_ENABLED}" \
     2>&1
 )
 echo "$DEPLOY_OUTPUT"

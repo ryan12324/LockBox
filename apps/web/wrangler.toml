@@ -2,5 +2,5 @@ name = "lockbox-web"
 compatibility_date = "2024-01-01"
 pages_build_output_dir = "dist"
 
-# Set VITE_API_URL to your Workers API URL at build time:
-# VITE_API_URL=https://lockbox-api.your-subdomain.workers.dev bun run build
+# Production defaults to the hosted API. Self-hosted builds can override it:
+# VITE_API_URL=https://api.example.com bun run build

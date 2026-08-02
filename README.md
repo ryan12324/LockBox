@@ -6,7 +6,7 @@
 
 Authwell is a self-hosted, zero-knowledge password manager for technically comfortable users who want to run their own backend. Vault plaintext and encryption keys stay on the client; the Cloudflare backend stores ciphertext and synchronization metadata.
 
-Version 1.0.0 includes a web vault, Chrome/Firefox extension, Android app, CLI, and Cloudflare Workers API.
+Version 1.0.0 includes a marketing site, web vault, Chrome/Firefox extension, Android app, CLI, and Cloudflare Workers API.
 
 > Authwell has not received an independent security audit. Review the code and threat model before trusting it with critical credentials. Self-hosting transfers operational responsibility to you, including Cloudflare access, backups, updates, and cost controls.
 
@@ -43,6 +43,7 @@ There is no master-password recovery in v1. Losing the master password means los
 
 | Component | Path             | Runtime                                 |
 | --------- | ---------------- | --------------------------------------- |
+| Marketing | `apps/marketing` | vinext on Cloudflare                    |
 | API       | `apps/api`       | Cloudflare Workers, Hono, D1, and R2    |
 | Web vault | `apps/web`       | React, Vite, Cloudflare Pages           |
 | Extension | `apps/extension` | WXT, React, Chrome/Firefox              |
@@ -50,6 +51,14 @@ There is no master-password recovery in v1. Losing the master password means los
 | CLI       | `apps/cli`       | Bun/Node-compatible command line client |
 
 Shared packages under `packages/` provide cryptography, types, TOTP, password generation, local security analysis, and design components.
+
+### Hosted Authwell domains
+
+- `https://authwell.app` is the public product and download site.
+- `https://vault.authwell.app` is the first-party web vault and extension discovery origin.
+- `https://api.authwell.app` is the first-party API used by hosted web, Android, extension, and CLI clients.
+
+Self-hosted clients can continue to override the vault and API origins. The hosted API controls new account creation with the `REGISTRATION_ENABLED` Worker variable; existing accounts can sign in while registration is closed.
 
 ### Android app URIs
 

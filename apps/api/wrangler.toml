@@ -7,8 +7,13 @@ compatibility_flags = ["nodejs_compat"]
 required = ["TOTP_ENCRYPTION_KEY"]
 
 [vars]
-CORS_ORIGINS = "https://lockbox-web.pages.dev,http://localhost:5173,https://localhost"
+CORS_ORIGINS = "https://authwell.app,https://www.authwell.app,https://vault.authwell.app,https://lockbox-web.pages.dev,http://localhost:5173,http://localhost:3000,https://localhost"
 EXTENSION_IDS = ""
+REGISTRATION_ENABLED = "true"
+
+[[routes]]
+pattern = "api.authwell.app"
+custom_domain = true
 
 [[d1_databases]]
 binding = "DB"

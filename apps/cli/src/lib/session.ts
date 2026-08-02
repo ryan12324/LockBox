@@ -17,6 +17,7 @@ export interface Session {
 
 const LOCKBOX_DIR = path.join(os.homedir(), '.lockbox');
 const SESSION_FILE = path.join(LOCKBOX_DIR, 'session.json');
+const DEFAULT_API_URL = 'https://api.authwell.app';
 
 /** Ensure the ~/.lockbox directory exists with restrictive permissions. */
 function ensureDir(): void {
@@ -66,13 +67,11 @@ export function clearSession(): void {
   }
 }
 
-/** Get the API URL from the session, CLI flag, or environment variable. */
+/** Get the API URL from an explicit override, the current session, or the hosted default. */
 export function getApiUrl(flagUrl?: string): string {
   if (flagUrl) return flagUrl;
   const session = getSession();
   if (session?.apiUrl) return session.apiUrl;
   if (process.env['LOCKBOX_API_URL']) return process.env['LOCKBOX_API_URL'];
-  throw new Error(
-    'No API URL configured. Use --api-url flag or set LOCKBOX_API_URL environment variable.'
-  );
+  return DEFAULT_API_URL;
 }

@@ -4,7 +4,7 @@ import { discoverLockboxServer } from '../../../lib/discovery.js';
 import { setServerConnection } from '../../../lib/storage.js';
 
 export function SetupView({ onComplete }: { onComplete: () => void }) {
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState('https://vault.authwell.app');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
