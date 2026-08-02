@@ -139,7 +139,7 @@ export interface SiteFaviconProps {
   style?: CSSProperties;
 }
 
-/** A decorative site favicon with an always-available local Iconify fallback. */
+/** A decorative site favicon with a local Iconify fallback while loading or unavailable. */
 export function SiteFavicon({
   sources,
   fallbackIcon = 'world',
@@ -176,7 +176,7 @@ export function SiteFavicon({
       }}
       aria-hidden="true"
     >
-      <Icon name={fallbackIcon} size={size} />
+      {imageState !== 'loaded' && <Icon name={fallbackIcon} size={size} />}
       {faviconUrl && imageState !== 'failed' && (
         <img
           src={faviconUrl}
@@ -206,6 +206,7 @@ export function SiteFavicon({
             height: '100%',
             objectFit: fill ? 'cover' : 'contain',
             borderRadius: fill ? 'inherit' : Math.max(2, Math.round(size * 0.18)),
+            background: 'var(--color-surface-raised)',
             opacity: imageState === 'loaded' ? 1 : 0,
           }}
         />

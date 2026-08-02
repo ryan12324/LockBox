@@ -140,7 +140,80 @@ div.vault-row__main { cursor: default; }
 .vault-row__preview { overflow: hidden; color: var(--color-text-secondary); font-size: var(--font-size-sm); text-overflow: ellipsis; white-space: nowrap; }
 .vault-row__preview { color: var(--color-text-tertiary); }
 .vault-row__meta { margin-top: 3px; display: flex; align-items: center; gap: 8px; color: var(--color-text-tertiary); font-size: var(--font-size-xs); }
-.vault-row__actions { padding-right: 12px; display: flex; gap: 2px; }
+.vault-row__actions {
+  padding-right: 12px;
+  display: flex;
+  gap: 2px;
+}
+
+.vault-row__action {
+  position: relative;
+}
+
+.vault-row__action[data-copied='true'] {
+  color: var(--color-success);
+}
+
+.vault-row__action:disabled {
+  cursor: wait;
+  opacity: 0.52;
+}
+
+.vault-row__action::after {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  max-width: 180px;
+  padding: 5px 8px;
+  content: attr(data-tooltip);
+  overflow: hidden;
+  color: var(--color-surface-raised);
+  background: var(--color-text);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
+  opacity: 0;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  transform: translateY(3px);
+  transition:
+    opacity var(--duration-fast) var(--ease-enter),
+    transform var(--duration-fast) var(--ease-enter);
+  white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .vault-row__actions {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(4px);
+    transition:
+      opacity var(--duration-fast) var(--ease-enter),
+      transform var(--duration-fast) var(--ease-enter);
+  }
+
+  .vault-row:hover .vault-row__actions,
+  .vault-row:has(.vault-row__main:focus-visible) .vault-row__actions,
+  .vault-row__actions:has(.vault-row__action:focus-visible) {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+
+  .vault-row__action:hover::after,
+  .vault-row__action:focus-visible::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .vault-row__action:hover::after {
+    transition-delay: 300ms;
+  }
+}
+
 .vault-row__corrupt-action { padding-right: 16px; }
 .vault-row--corrupt { background: var(--color-error-subtle); }
 .vault-row--corrupt .vault-row__icon { color: var(--color-error); background: var(--color-surface-raised); }

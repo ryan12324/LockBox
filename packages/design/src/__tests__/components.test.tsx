@@ -125,6 +125,18 @@ describe('design primitives', () => {
     expect(container.querySelector('.lb-icon')).toBeInTheDocument();
   });
 
+  it('replaces the fallback with an opaque theme surface when a favicon loads', () => {
+    const { container } = render(
+      <SiteFavicon sources={['https://example.com/login']} fallbackIcon="key" size={20} />
+    );
+    const image = screen.getByRole('presentation', { hidden: true });
+
+    fireEvent.load(image);
+
+    expect(container.querySelector('.lb-icon')).not.toBeInTheDocument();
+    expect(image).toHaveStyle({ background: 'var(--color-surface-raised)', opacity: '1' });
+  });
+
   it('associates input labels and errors with the control', () => {
     render(<Input label="Master password" type="password" error="Password is required" />);
 

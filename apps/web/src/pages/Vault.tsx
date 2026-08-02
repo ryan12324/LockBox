@@ -424,13 +424,16 @@ export default function Vault() {
                   const secondary = getSecondaryText(item);
                   const preview = getPreviewText(item);
                   const selected = panelState?.item?.id === item.id;
+                  const usernameCopied = copiedId === `${item.id}-username`;
+                  const passwordCopied = copiedId === item.id;
+                  const itemRefreshing = refreshingItemId === item.id;
                   return (
                     <article key={item.id} className="vault-row" data-selected={selected ? 'true' : undefined} role="listitem">
                       <button
                         type="button"
                         className="vault-row__main"
                         onClick={() => void openFreshItem(item.id)}
-                        disabled={refreshingItemId === item.id}
+                        disabled={itemRefreshing}
                         aria-label={`Open ${item.name}`}
                       >
                         <span className="vault-row__icon" aria-hidden="true">
@@ -459,31 +462,49 @@ export default function Vault() {
                         <div className="vault-row__actions">
                           <button
                             type="button"
-                            className="lb-icon-button"
+                            className="lb-icon-button vault-row__action"
+                            data-copied={usernameCopied}
+                            data-tooltip={
+                              itemRefreshing
+                                ? 'Refreshing login'
+                                : usernameCopied
+                                  ? 'Username copied'
+                                  : 'Copy username'
+                            }
                             onClick={(event) => void copyFreshLoginField(
                               item.id,
                               'username',
                               `${item.id}-username`,
                               event.currentTarget
                             )}
-                            disabled={refreshingItemId === item.id}
-                            aria-label={`Copy username for ${item.name}`}
+                            disabled={itemRefreshing}
+                            aria-busy={itemRefreshing}
+                            aria-label={`${usernameCopied ? 'Username copied for' : 'Copy username for'} ${item.name}`}
                           >
-                            <Icon name={copiedId === `${item.id}-username` ? 'check' : 'user'} size={18} />
+                            <Icon name={usernameCopied ? 'check' : 'user'} size={18} />
                           </button>
                           <button
                             type="button"
-                            className="lb-icon-button"
+                            className="lb-icon-button vault-row__action"
+                            data-copied={passwordCopied}
+                            data-tooltip={
+                              itemRefreshing
+                                ? 'Refreshing login'
+                                : passwordCopied
+                                  ? 'Password copied'
+                                  : 'Copy password'
+                            }
                             onClick={(event) => void copyFreshLoginField(
                               item.id,
                               'password',
                               item.id,
                               event.currentTarget
                             )}
-                            disabled={refreshingItemId === item.id}
-                            aria-label={`Copy password for ${item.name}`}
+                            disabled={itemRefreshing}
+                            aria-busy={itemRefreshing}
+                            aria-label={`${passwordCopied ? 'Password copied for' : 'Copy password for'} ${item.name}`}
                           >
-                            <Icon name={copiedId === item.id ? 'check' : 'copy'} size={18} />
+                            <Icon name={passwordCopied ? 'check' : 'copy'} size={18} />
                           </button>
                         </div>
                       )}

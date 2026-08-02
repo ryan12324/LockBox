@@ -36,7 +36,6 @@ export default function Unlock() {
       eyebrow="Vault locked"
       title="Unlock on this device"
       description={`Signed in as ${session.email}. Enter your master password to restore access.`}
-      icon="lock"
       footer={<Button type="button" variant="ghost" size="sm" onClick={logout}>Sign out and use another account</Button>}
     >
       <form onSubmit={handleSubmit} className="auth-form">
