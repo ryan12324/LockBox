@@ -1,8 +1,7 @@
 "use client";
 
 /* Local brand imagery is intentionally rendered as native assets so the same
- * files and crop behavior ship unchanged through the Cloudflare/Vinext build. */
-/* eslint-disable @next/next/no-img-element */
+ * files and crop behavior ship unchanged through the Cloudflare Pages build. */
 
 import { useEffect, useState } from "react";
 
