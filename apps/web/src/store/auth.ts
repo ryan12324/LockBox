@@ -1,12 +1,14 @@
 /**
  * Zustand auth store — manages session, keys, and lock state.
  * SECURITY: userKey and masterKey are NEVER persisted to storage.
- * Only the session token (for API calls) is persisted to sessionStorage.
+ * Native apps persist the API session across WebView process restarts so they
+ * can reach biometric unlock. Desktop web keeps the session tab-scoped.
  */
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { KdfConfig } from '@lockbox/types';
+import { isNativeLockboxApp } from '../lib/server-connection.js';
 
 export interface SessionData {
   token: string;
@@ -31,6 +33,31 @@ interface AuthState {
   logout: () => void;
   updateActivity: () => void;
 }
+
+function sessionPersistenceStorage(): Storage {
+  return isNativeLockboxApp() ? localStorage : sessionStorage;
+}
+
+const authSessionStorage = {
+  getItem: (name: string) => {
+    const storage = sessionPersistenceStorage();
+    try {
+      const value = storage.getItem(name);
+      return value ? JSON.parse(value) : null;
+    } catch {
+      storage.removeItem(name);
+      return null;
+    }
+  },
+  setItem: (name: string, value: unknown) => {
+    sessionPersistenceStorage().setItem(name, JSON.stringify(value));
+  },
+  removeItem: (name: string) => {
+    // Clear both stores so changing runtime context cannot resurrect a session.
+    sessionStorage.removeItem(name);
+    localStorage.removeItem(name);
+  },
+};
 
 export const useAuthStore = create<AuthState>()(
   persist(
@@ -58,14 +85,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'lockbox-session',
-      storage: {
-        getItem: (name) => {
-          const value = sessionStorage.getItem(name);
-          return value ? JSON.parse(value) : null;
-        },
-        setItem: (name, value) => sessionStorage.setItem(name, JSON.stringify(value)),
-        removeItem: (name) => sessionStorage.removeItem(name),
-      },
+      storage: authSessionStorage,
       // Only persist session — NEVER persist keys
       partialize: (state) => ({ session: state.session }) as AuthState,
       // Defensive merge: protect memory-only keys from rehydration race conditions.

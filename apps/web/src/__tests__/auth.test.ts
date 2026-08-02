@@ -50,6 +50,9 @@ function resetStore() {
 
 describe('useAuthStore', () => {
   beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+    delete (globalThis as typeof globalThis & { Capacitor?: unknown }).Capacitor;
     resetStore();
   });
 
@@ -85,6 +88,42 @@ describe('useAuthStore', () => {
       const { session } = useAuthStore.getState();
       expect(session?.kdfConfig.type).toBe('argon2id');
       expect(session?.kdfConfig.iterations).toBe(3);
+    });
+
+    it('keeps desktop browser sessions scoped to the current tab', () => {
+      useAuthStore.getState().setSession(TEST_SESSION);
+
+      expect(sessionStorage.getItem('lockbox-session')).toContain('test-token-abc123');
+      expect(localStorage.getItem('lockbox-session')).toBeNull();
+    });
+
+    it('persists native app sessions across WebView process restarts', async () => {
+      (globalThis as typeof globalThis & { Capacitor?: unknown }).Capacitor = {
+        isNativePlatform: () => true,
+      };
+      useAuthStore.getState().setSession(TEST_SESSION);
+      useAuthStore.getState().setKeys(
+        new Uint8Array(32).fill(0x01),
+        new Uint8Array(64).fill(0x02)
+      );
+
+      const serialized = localStorage.getItem('lockbox-session');
+      expect(serialized).toContain('test-token-abc123');
+      expect(serialized).not.toContain('userKey');
+      expect(serialized).not.toContain('masterKey');
+
+      useAuthStore.setState({
+        session: null,
+        userKey: null,
+        masterKey: null,
+        isLocked: false,
+      });
+      localStorage.setItem('lockbox-session', serialized!);
+      await useAuthStore.persist.rehydrate();
+
+      expect(useAuthStore.getState().session).toEqual(TEST_SESSION);
+      expect(useAuthStore.getState().userKey).toBeNull();
+      expect(useAuthStore.getState().masterKey).toBeNull();
     });
   });
 

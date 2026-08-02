@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { deriveKey, decryptUserKey, fromBase64 } from '@lockbox/crypto';
 import { Button, Input } from '@lockbox/design';
@@ -23,6 +23,7 @@ import {
   DeviceUnlockSessionError,
   validateDeviceUnlockSession,
 } from '../lib/device-unlock-session.js';
+import { isNativeLockboxApp } from '../lib/server-connection.js';
 
 const EMPTY_BIOMETRIC_STATUS: NativeBiometricStatus = {
   supported: false,
@@ -45,15 +46,30 @@ export default function Unlock() {
   const [loading, setLoading] = useState(false);
   const [biometricStatus, setBiometricStatus] = useState(EMPTY_BIOMETRIC_STATUS);
   const [webPrfStatus, setWebPrfStatus] = useState(EMPTY_WEB_PRF_STATUS);
+  const automaticallyPromptedScope = useRef<string | null>(null);
+  const nativeApp = isNativeLockboxApp();
 
   useEffect(() => {
     if (!session) return;
+    let active = true;
     const scope = nativeBiometricScope(session.userId);
     setWebPrfStatus(getWebPrfUnlockStatus(scope));
     getNativeBiometricStatus(scope)
-      .then(setBiometricStatus)
-      .catch(() => setBiometricStatus(EMPTY_BIOMETRIC_STATUS));
-  }, [session]);
+      .then((status) => {
+        if (!active) return;
+        setBiometricStatus(status);
+        if (nativeApp && status.enrolled && automaticallyPromptedScope.current !== scope) {
+          automaticallyPromptedScope.current = scope;
+          void handleDeviceUnlock(status);
+        }
+      })
+      .catch(() => {
+        if (active) setBiometricStatus(EMPTY_BIOMETRIC_STATUS);
+      });
+    return () => {
+      active = false;
+    };
+  }, [session, nativeApp]);
 
   if (!session) return <Navigate to="/login" replace />;
 
@@ -73,7 +89,7 @@ export default function Unlock() {
     }
   }
 
-  async function handleDeviceUnlock() {
+  async function handleDeviceUnlock(status = biometricStatus) {
     if (!session) return;
     setLoading(true);
     try {
@@ -82,7 +98,7 @@ export default function Unlock() {
       await validateDeviceUnlockSession(session.token, session.userId);
 
       const scope = deviceUnlockScope(session.userId);
-      const userKey = biometricStatus.enrolled
+      const userKey = status.enrolled
         ? await authenticateNativeBiometric(scope, 'Unlock your Authwell vault')
         : await unlockWithWebPrf(scope);
       if (!userKey) {
@@ -140,7 +156,7 @@ export default function Unlock() {
         </Button>
       )}
       <form onSubmit={handleSubmit} className="auth-form">
-        <Input name="masterPassword" type="password" required autoFocus autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} label="Master password" placeholder="Enter your master password" />
+        <Input name="masterPassword" type="password" required autoFocus={!nativeApp} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} label="Master password" placeholder="Enter your master password" />
         <Button type="submit" size="lg" loading={loading}>Unlock vault</Button>
       </form>
     </AuthShell>
