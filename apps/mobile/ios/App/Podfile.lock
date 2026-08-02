@@ -19,10 +19,10 @@ EXTERNAL SOURCES:
     :path: "../../../../node_modules/@capacitor/network"
 
 SPEC CHECKSUMS:
-  Capacitor: 1e0d0e7330dea9f983b50da737d8918abcf273f8
+  Capacitor: c95400d761e376be9da6be5a05f226c0e865cebf
   CapacitorCordova: 8d93e14982f440181be7304aa9559ca631d77fff
-  CapacitorNetwork: 6b7b0ef7fd0b1c293970720892dbfc98e64c3582
+  CapacitorNetwork: 093efa3664b692a971bdd01be70523291cd6a87f
 
 PODFILE CHECKSUM: 6e0b577d3ad7b38bd9c9bff9b48293b897daf27d
 
-COCOAPODS: 1.13.0
+COCOAPODS: 1.17.0
