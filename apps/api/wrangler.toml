@@ -11,9 +11,9 @@ CORS_ORIGINS = "https://authwell.app,https://www.authwell.app,https://vault.auth
 EXTENSION_IDS = ""
 REGISTRATION_ENABLED = "true"
 
-[[routes]]
-pattern = "api.authwell.app"
-custom_domain = true
+# api.authwell.app is attached as a one-time Cloudflare custom domain. Keeping
+# route management out of CI lets the deploy token update Worker code without
+# requiring account-wide Workers Routes permissions.
 
 [[d1_databases]]
 binding = "DB"
