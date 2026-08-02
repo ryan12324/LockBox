@@ -1,16 +1,21 @@
 package dev.lockbox.app.autofill
 
 import android.app.Activity
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
+import android.util.Base64
 import android.view.autofill.AutofillManager
+import androidx.activity.result.ActivityResult
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
-import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.ActivityCallback
-import androidx.activity.result.ActivityResult
+import com.getcapacitor.annotation.CapacitorPlugin
+import androidx.biometric.BiometricManager
+import androidx.room.withTransaction
 import dev.lockbox.app.credentialprovider.PasskeyMetadataEntity
 import dev.lockbox.app.credentialprovider.PasskeyAccountState
 import dev.lockbox.app.storage.VaultDatabase
@@ -20,7 +25,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
-import android.util.Base64
 
 /**
  * Capacitor bridge for maintaining Android's device-local autofill index.
@@ -52,15 +56,44 @@ class AutofillPlugin : Plugin() {
         }
     }
 
+    @PluginMethod
+    fun requestBiometricEnrollment(call: PluginCall) {
+        try {
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Intent(Settings.ACTION_BIOMETRIC_ENROLL).apply {
+                    putExtra(
+                        Settings.EXTRA_BIOMETRIC_AUTHENTICATORS_ALLOWED,
+                        BiometricManager.Authenticators.BIOMETRIC_STRONG
+                    )
+                }
+            } else {
+                Intent(Settings.ACTION_FINGERPRINT_ENROLL)
+            }
+            startActivityForResult(call, intent, "biometricEnrollmentResult")
+        } catch (error: Exception) {
+            call.reject("Failed to open biometric settings", error)
+        }
+    }
+
     @ActivityCallback
     fun autofillSettingsResult(call: PluginCall, result: ActivityResult) {
         resolveStatus(call, selected = result.resultCode == Activity.RESULT_OK)
+    }
+
+    @ActivityCallback
+    fun biometricEnrollmentResult(call: PluginCall, result: ActivityResult) {
+        resolveStatus(call)
     }
 
     /** Replace the complete local index after a successful vault decryption. */
     @PluginMethod
     fun replaceCredentialIndex(call: PluginCall) {
         val credentials = call.getArray("credentials") ?: return call.reject("credentials is required")
+        val accountId = call.getString("accountId")?.takeIf { it.isNotBlank() && it.length <= 100 }
+            ?: return call.reject("accountId is required")
+        val saveAuthorization = call.getString("saveAuthorization")
+            ?.let(::decodeSaveAuthorization)
+            ?: return call.reject("saveAuthorization is required")
         if (credentials.length() > MAX_CREDENTIALS) {
             call.reject("Too many credentials")
             return
@@ -68,7 +101,7 @@ class AutofillPlugin : Plugin() {
 
         pluginScope.launch {
             try {
-                val publicKey = AutofillCrypto.ensureKeyPair().public
+                val publicKey = AutofillCrypto.ensureKeyPair(context).public
                 val entities = mutableListOf<AutofillCredentialEntity>()
 
                 for (index in 0 until credentials.length()) {
@@ -106,12 +139,32 @@ class AutofillPlugin : Plugin() {
                     )
                 }
 
-                VaultDatabase.getInstance(context).autofillCredentialDao().replaceAll(entities)
-                AutofillDiagnostics.recordIndex(context, entities.size)
-                call.resolve(JSObject().put("indexed", entities.size))
+                val database = VaultDatabase.getInstance(context)
+                val indexedCount = database.withTransaction {
+                    val pending = database.pendingAutofillSaveDao().getByAccount(accountId)
+                    val vaultIds = entities.mapTo(mutableSetOf()) { it.id }
+                    val pendingIndex = pending
+                        .filterNot { it.id in vaultIds }
+                        .map {
+                            AutofillCredentialEntity(
+                                id = it.id,
+                                domainHashes = it.domainHashes,
+                                encryptedData = it.autofillEncryptedData,
+                                updatedAt = it.createdAt
+                            )
+                        }
+                    val combined = entities + pendingIndex
+                    database.autofillCredentialDao().replaceAll(combined)
+                    combined.size
+                }
+                PasskeyAccountState.set(context, accountId)
+                PendingSaveAuthorization.configure(context, accountId, saveAuthorization)
+                AutofillDiagnostics.recordIndex(context, indexedCount)
+                call.resolve(JSObject().put("indexed", indexedCount))
             } catch (error: Exception) {
-                AutofillDiagnostics.recordFailure(context, "The encrypted login index could not refresh")
-                call.reject("Failed to update autofill index", error)
+                rejectIndexFailure(call, error, "autofill")
+            } finally {
+                saveAuthorization.fill(0)
             }
         }
     }
@@ -136,7 +189,7 @@ class AutofillPlugin : Plugin() {
 
         pluginScope.launch {
             try {
-                val publicKey = AutofillCrypto.ensureKeyPair().public
+                val publicKey = AutofillCrypto.ensureKeyPair(context).public
                 val entities = mutableListOf<PasskeyMetadataEntity>()
 
                 for (index in 0 until passkeys.length()) {
@@ -187,7 +240,7 @@ class AutofillPlugin : Plugin() {
                 PasskeyAccountState.set(context, accountId)
                 call.resolve(JSObject().put("indexed", entities.size))
             } catch (error: Exception) {
-                call.reject("Failed to update passkey index", error)
+                rejectIndexFailure(call, error, "passkey")
             }
         }
     }
@@ -198,8 +251,10 @@ class AutofillPlugin : Plugin() {
             try {
                 val database = VaultDatabase.getInstance(context)
                 database.autofillCredentialDao().deleteAll()
+                database.pendingAutofillSaveDao().deleteAll()
                 database.passkeyMetadataDao().deleteBySource(PasskeyMetadataEntity.SOURCE_SYNCED)
                 PasskeyAccountState.clear(context)
+                PendingSaveAuthorization.clear(context)
                 AutofillDiagnostics.clearIndex(context)
                 call.resolve()
             } catch (error: Exception) {
@@ -238,6 +293,120 @@ class AutofillPlugin : Plugin() {
             } catch (error: Exception) {
                 call.reject("Failed to get passkeys", error)
             }
+        }
+    }
+
+    /** List encrypted Android AutoFill saves waiting for an unlocked vault import. */
+    @PluginMethod
+    fun getPendingCredentialSaves(call: PluginCall) {
+        pluginScope.launch {
+            try {
+                val accountId = PasskeyAccountState.get(context)
+                    ?: return@launch call.resolve(JSObject().put("saves", JSONArray()))
+                val pending = VaultDatabase.getInstance(context)
+                    .pendingAutofillSaveDao()
+                    .getByAccount(accountId)
+                val result = JSONArray()
+                pending.forEach { save ->
+                    result.put(
+                        JSObject()
+                            .put("id", save.id)
+                            .put("createdAt", save.createdAt)
+                    )
+                }
+                call.resolve(JSObject().put("saves", result))
+            } catch (error: Exception) {
+                call.reject("Failed to list saved Android logins", error)
+            }
+        }
+    }
+
+    /** Decrypt one accepted Android save only for a caller proving an unlocked vault. */
+    @PluginMethod
+    fun exportPendingCredentialSave(call: PluginCall) {
+        val id = call.getString("id")?.takeIf { it.matches(Regex("^[A-Za-z0-9_-]{1,100}$")) }
+            ?: return call.reject("Valid id is required")
+        val authorization = call.getString("authorization")
+            ?.let(::decodeSaveAuthorization)
+            ?: return call.reject("authorization is required")
+        pluginScope.launch {
+            try {
+                val accountId = PasskeyAccountState.get(context)
+                    ?: throw SecurityException("Unlock Authwell before importing saved logins")
+                require(PendingSaveAuthorization.verify(context, accountId, authorization)) {
+                    "Unlock Authwell before importing saved logins"
+                }
+                val pending = VaultDatabase.getInstance(context)
+                    .pendingAutofillSaveDao()
+                    .getByIdAndAccount(id, accountId)
+                    ?: throw IllegalArgumentException("Saved login no longer exists")
+                val payload = JSONObject(PendingSaveCrypto.decrypt(context, pending.encryptedData))
+                val name = payload.requireBoundedString("name", 1, 500)
+                val username = payload.optString("username", "")
+                val password = payload.requireBoundedString("password", 1, 100_000)
+                val uri = payload.requireBoundedString("uri", 1, 2_048)
+                require(username.length <= 10_000 && AutofillIdentifier.extract(uri) != null) {
+                    "Saved login is invalid"
+                }
+                call.resolve(
+                    JSObject()
+                        .put("id", pending.id)
+                        .put("name", name)
+                        .put("username", username)
+                        .put("password", password)
+                        .put("uri", uri)
+                        .put("createdAt", pending.createdAt)
+                )
+            } catch (error: Exception) {
+                call.reject(error.message ?: "Failed to prepare the saved login", error)
+            } finally {
+                authorization.fill(0)
+            }
+        }
+    }
+
+    /** Remove an outbox row only after its encrypted vault write succeeds. */
+    @PluginMethod
+    fun markCredentialSaveSynced(call: PluginCall) {
+        val id = call.getString("id")?.takeIf { it.matches(Regex("^[A-Za-z0-9_-]{1,100}$")) }
+            ?: return call.reject("Valid id is required")
+        val authorization = call.getString("authorization")
+            ?.let(::decodeSaveAuthorization)
+            ?: return call.reject("authorization is required")
+        pluginScope.launch {
+            try {
+                val accountId = PasskeyAccountState.get(context)
+                    ?: throw SecurityException("No active Authwell account")
+                require(PendingSaveAuthorization.verify(context, accountId, authorization)) {
+                    "Unlock Authwell before acknowledging saved logins"
+                }
+                val deleted = VaultDatabase.getInstance(context)
+                    .pendingAutofillSaveDao()
+                    .deleteByIdAndAccount(id, accountId)
+                require(deleted == 1) { "Saved login no longer exists" }
+                call.resolve()
+            } catch (error: Exception) {
+                call.reject("Failed to acknowledge the saved login", error)
+            } finally {
+                authorization.fill(0)
+            }
+        }
+    }
+
+    private fun decodeSaveAuthorization(value: String): ByteArray? {
+        if (!value.matches(Regex("^[A-Za-z0-9_-]{43}$"))) return null
+        return try {
+            val decoded = Base64.decode(
+                value,
+                Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
+            )
+            val canonical = Base64.encodeToString(
+                decoded,
+                Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP
+            )
+            decoded.takeIf { it.size == 32 && canonical == value }
+        } catch (_: IllegalArgumentException) {
+            null
         }
     }
 
@@ -305,6 +474,7 @@ class AutofillPlugin : Plugin() {
             JSObject()
                 .put("supported", supported)
                 .put("enabled", enabled)
+                .put("biometricsReady", AutofillCrypto.isStrongBiometricReady(context))
                 .put("selected", selected)
                 .put("indexedCredentials", health.indexedCredentials)
                 .put("indexedAt", health.indexedAt)
@@ -312,5 +482,15 @@ class AutofillPlugin : Plugin() {
                 .put("lastMatchCount", health.lastMatchCount)
                 .put("lastError", health.lastError)
         )
+    }
+
+    private fun rejectIndexFailure(call: PluginCall, error: Exception, indexName: String) {
+        val message = if (error is StrongBiometricUnavailableException) {
+            error.message ?: "Strong biometric enrollment is required"
+        } else {
+            "Failed to update $indexName index"
+        }
+        AutofillDiagnostics.recordFailure(context, message)
+        call.reject(message, error)
     }
 }

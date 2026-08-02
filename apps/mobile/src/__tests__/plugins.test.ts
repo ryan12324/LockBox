@@ -15,10 +15,14 @@ vi.mock('@capacitor/core', () => ({
       _pluginName: name,
       isEnabled: vi.fn().mockResolvedValue({ enabled: false }),
       requestEnable: vi.fn().mockResolvedValue(undefined),
+      requestBiometricEnrollment: vi.fn().mockResolvedValue(undefined),
       replaceCredentialIndex: vi.fn().mockResolvedValue({ indexed: 0 }),
       replacePasskeyIndex: vi.fn().mockResolvedValue({ indexed: 0 }),
       clearCredentialIndex: vi.fn().mockResolvedValue(undefined),
       getPasskeysForUri: vi.fn().mockResolvedValue({ passkeys: [] }),
+      getPendingCredentialSaves: vi.fn().mockResolvedValue({ saves: [] }),
+      exportPendingCredentialSave: vi.fn().mockResolvedValue({}),
+      markCredentialSaveSynced: vi.fn().mockResolvedValue(undefined),
       checkAvailability: vi
         .fn()
         .mockResolvedValue({ available: true, biometryType: 'fingerprint' }),
@@ -59,8 +63,14 @@ describe('AutofillPlugin interface', () => {
     await expect(Autofill.requestEnable()).resolves.toBeUndefined();
   });
 
+  it('requestBiometricEnrollment resolves without error', async () => {
+    await expect(Autofill.requestBiometricEnrollment()).resolves.toBeUndefined();
+  });
+
   it('replaceCredentialIndex accepts decrypted fields for immediate native encryption', async () => {
     const result = await Autofill.replaceCredentialIndex({
+      accountId: 'account-123',
+      saveAuthorization: 'A'.repeat(43),
       credentials: [{
         id: 'item-123',
         name: 'Example',
@@ -77,6 +87,15 @@ describe('AutofillPlugin interface', () => {
 
   it('clearCredentialIndex resolves', async () => {
     await expect(Autofill.clearCredentialIndex()).resolves.toBeUndefined();
+  });
+
+  it('exposes the Android saved-login outbox contract', async () => {
+    await expect(Autofill.getPendingCredentialSaves()).resolves.toEqual({ saves: [] });
+    await expect(Autofill.markCredentialSaveSynced({
+      id: 'pending-save-1',
+      authorization: 'A'.repeat(43),
+    }))
+      .resolves.toBeUndefined();
   });
 
   it('replacePasskeyIndex carries portable key material and account isolation', async () => {

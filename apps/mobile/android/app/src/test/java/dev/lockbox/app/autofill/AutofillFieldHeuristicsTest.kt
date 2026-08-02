@@ -41,6 +41,14 @@ class AutofillFieldHeuristicsTest {
             classify(htmlAutocomplete = "current-password")
         )
         assertEquals(
+            AutofillFieldKind.NEW_PASSWORD,
+            classify(htmlAutocomplete = "new-password")
+        )
+        assertEquals(
+            AutofillFieldKind.NEW_PASSWORD,
+            classify(htmlName = "confirmPassword", inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        )
+        assertEquals(
             AutofillFieldKind.USERNAME,
             classify(idEntry = "accountEmailInput")
         )
@@ -51,16 +59,28 @@ class AutofillFieldHeuristicsTest {
         assertNull(classify(idEntry = "searchQuery", hint = "Search"))
     }
 
+    @Test
+    fun `never treats one time codes as saved passwords`() {
+        assertNull(
+            classify(
+                htmlAutocomplete = "one-time-code",
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            )
+        )
+        assertNull(classify(idEntry = "totpCode", hint = "Verification code"))
+    }
+
     private fun classify(
         hints: Array<String>? = null,
         htmlAutocomplete: String? = null,
+        htmlName: String? = null,
         idEntry: String? = null,
         hint: String? = null,
         inputType: Int = InputType.TYPE_CLASS_TEXT
     ) = AutofillFieldHeuristics.classify(
         autofillHints = hints,
         htmlType = null,
-        htmlName = null,
+        htmlName = htmlName,
         htmlAutocomplete = htmlAutocomplete,
         idEntry = idEntry,
         hint = hint,

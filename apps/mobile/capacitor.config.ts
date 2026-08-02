@@ -4,6 +4,9 @@ const config: CapacitorConfig = {
   appId: 'dev.lockbox.app',
   appName: 'Authwell',
   webDir: '../web/dist',
+  // Native bridge arguments can contain decrypted vault fields during an
+  // unlocked index refresh. Never echo those payloads to device logs.
+  loggingBehavior: 'none',
   server: {
     androidScheme: 'https',
   },

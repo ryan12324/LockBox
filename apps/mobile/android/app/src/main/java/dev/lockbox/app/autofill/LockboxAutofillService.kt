@@ -3,6 +3,7 @@ package dev.lockbox.app.autofill
 import android.app.PendingIntent
 import android.app.assist.AssistStructure
 import android.content.Intent
+import android.os.Build
 import android.os.CancellationSignal
 import android.service.autofill.AutofillService
 import android.service.autofill.Dataset
@@ -10,10 +11,13 @@ import android.service.autofill.FillCallback
 import android.service.autofill.FillRequest
 import android.service.autofill.FillResponse
 import android.service.autofill.SaveCallback
+import android.service.autofill.SaveInfo
 import android.service.autofill.SaveRequest
 import android.view.autofill.AutofillId
 import android.widget.RemoteViews
+import androidx.room.withTransaction
 import dev.lockbox.app.R
+import dev.lockbox.app.credentialprovider.PasskeyAccountState
 import dev.lockbox.app.storage.VaultDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +25,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.json.JSONArray
+import org.json.JSONObject
+import java.time.Instant
+import java.util.UUID
 
 /**
  * Android Autofill Framework service backed by a biometric-gated local index.
@@ -41,7 +48,7 @@ class LockboxAutofillService : AutofillService() {
             return
         }
         val fields = parseStructure(structure)
-        if (fields.usernameId == null && fields.passwordId == null) {
+        if (fields.usernameId == null && fields.passwordId == null && fields.newPasswordId == null) {
             AutofillDiagnostics.recordRequest(applicationContext, 0)
             callback.onSuccess(null)
             return
@@ -64,7 +71,7 @@ class LockboxAutofillService : AutofillService() {
                         (0 until hashes.length()).any { hashes.optString(it) == targetHash }
                     }
 
-                if (cancellationSignal.isCanceled || credentials.isEmpty()) {
+                if (cancellationSignal.isCanceled) {
                     AutofillDiagnostics.recordRequest(applicationContext, 0)
                     callback.onSuccess(null)
                     return@launch
@@ -74,8 +81,15 @@ class LockboxAutofillService : AutofillService() {
                 credentials.forEachIndexed { index, credential ->
                     response.addDataset(buildAuthenticationDataset(credential, fields, index))
                 }
+                val saveInfo = if (PasskeyAccountState.get(applicationContext) != null) {
+                    buildSaveInfo(fields)
+                } else null
+                saveInfo?.let(response::setSaveInfo)
                 AutofillDiagnostics.recordRequest(applicationContext, credentials.size)
-                callback.onSuccess(response.build())
+                callback.onSuccess(
+                    if (credentials.isNotEmpty() || saveInfo != null) response.build()
+                    else null
+                )
             } catch (error: Exception) {
                 AutofillDiagnostics.recordFailure(
                     applicationContext,
@@ -86,9 +100,86 @@ class LockboxAutofillService : AutofillService() {
         }
     }
 
-    /** Saving is intentionally not advertised until the main vault can confirm it. */
     override fun onSaveRequest(request: SaveRequest, callback: SaveCallback) {
-        callback.onSuccess()
+        if (request.fillContexts.isEmpty()) {
+            callback.onFailure("Authwell could not read the login form")
+            return
+        }
+        val fields = parseStructures(request.fillContexts.map { it.structure })
+        val identifier = fields.webDomain ?: fields.packageName
+        val normalizedIdentifier = identifier?.let(AutofillIdentifier::extract)
+        val password = fields.newPasswordValue ?: fields.passwordValue
+        if (
+            normalizedIdentifier == null ||
+            password.isNullOrEmpty() ||
+            password.length > MAX_PASSWORD_LENGTH ||
+            fields.usernameValue.length > MAX_USERNAME_LENGTH
+        ) {
+            callback.onFailure("Authwell could not validate the login form")
+            return
+        }
+        val accountId = PasskeyAccountState.get(applicationContext) ?: run {
+            callback.onFailure("Unlock Authwell before saving a login")
+            return
+        }
+
+        serviceScope.launch {
+            try {
+                val id = UUID.randomUUID().toString()
+                val now = Instant.now().toString()
+                val uri = if (fields.webDomain != null) {
+                    "https://$normalizedIdentifier"
+                } else {
+                    "androidapp://$normalizedIdentifier"
+                }
+                val payload = JSONObject()
+                    .put("name", getCredentialName(fields, normalizedIdentifier))
+                    .put("username", fields.usernameValue)
+                    .put("password", password)
+                    .put("uri", uri)
+                    .toString()
+                val autofillEncryptedData = AutofillCrypto.encrypt(
+                    AutofillCrypto.ensureKeyPair(applicationContext).public,
+                    payload
+                )
+                val encryptedData = PendingSaveCrypto.encrypt(applicationContext, payload)
+                val domainHashes = JSONArray()
+                    .put(AutofillCrypto.hashIdentifier(applicationContext, normalizedIdentifier))
+                    .toString()
+                val pending = PendingAutofillSaveEntity(
+                    id = id,
+                    accountId = accountId,
+                    domainHashes = domainHashes,
+                    encryptedData = encryptedData,
+                    autofillEncryptedData = autofillEncryptedData,
+                    createdAt = now
+                )
+                val indexed = AutofillCredentialEntity(
+                    id = id,
+                    domainHashes = domainHashes,
+                    encryptedData = autofillEncryptedData,
+                    updatedAt = now
+                )
+                val database = VaultDatabase.getInstance(applicationContext)
+                database.withTransaction {
+                    val pendingDao = database.pendingAutofillSaveDao()
+                    val credentialDao = database.autofillCredentialDao()
+                    val existing = pendingDao.getByAccount(accountId)
+                    val overflow = existing.take(
+                        (existing.size - MAX_PENDING_SAVES + 1).coerceAtLeast(0)
+                    )
+                    overflow.forEach { expired ->
+                        pendingDao.deleteByIdAndAccount(expired.id, accountId)
+                        credentialDao.deleteById(expired.id)
+                    }
+                    pendingDao.insert(pending)
+                    credentialDao.insertAll(listOf(indexed))
+                }
+                callback.onSuccess()
+            } catch (_: Exception) {
+                callback.onFailure("Authwell could not protect the saved login")
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -125,10 +216,56 @@ class LockboxAutofillService : AutofillService() {
         }.build()
     }
 
+    private fun buildSaveInfo(fields: ParsedAutofillFields): SaveInfo? {
+        val passwordId = fields.newPasswordId ?: fields.passwordId
+        if (passwordId == null) {
+            val usernameId = fields.usernameId ?: return null
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+            return SaveInfo.Builder(
+                SaveInfo.SAVE_DATA_TYPE_USERNAME,
+                arrayOf(usernameId)
+            ).apply {
+                setFlags(SaveInfo.FLAG_DELAY_SAVE)
+                setDescription("Continue signing in to save this login to Authwell")
+            }.build()
+        }
+
+        val saveType = SaveInfo.SAVE_DATA_TYPE_PASSWORD or
+            if (fields.usernameId != null) SaveInfo.SAVE_DATA_TYPE_USERNAME else 0
+        return SaveInfo.Builder(
+            saveType,
+            arrayOf(passwordId)
+        ).apply {
+            fields.usernameId?.let { setOptionalIds(arrayOf(it)) }
+            setDescription("Save this login to Authwell")
+        }.build()
+    }
+
+    private fun getCredentialName(
+        fields: ParsedAutofillFields,
+        normalizedIdentifier: String
+    ): String {
+        if (fields.webDomain != null) return normalizedIdentifier
+        val targetPackage = fields.packageName ?: return normalizedIdentifier
+        return runCatching {
+            val info = packageManager.getApplicationInfo(targetPackage, 0)
+            packageManager.getApplicationLabel(info).toString()
+        }.getOrDefault(normalizedIdentifier).take(MAX_NAME_LENGTH)
+    }
+
     private fun parseStructure(structure: AssistStructure): ParsedAutofillFields {
+        return parseStructures(listOf(structure))
+    }
+
+    private fun parseStructures(structures: List<AssistStructure>): ParsedAutofillFields {
         val result = ParsedAutofillFields()
-        for (windowIndex in 0 until structure.windowNodeCount) {
-            traverseNode(structure.getWindowNodeAt(windowIndex).rootViewNode, result)
+        structures.forEach { structure ->
+            if (result.packageName == null) {
+                result.packageName = structure.activityComponent?.packageName
+            }
+            for (windowIndex in 0 until structure.windowNodeCount) {
+                traverseNode(structure.getWindowNodeAt(windowIndex).rootViewNode, result)
+            }
         }
         return result
     }
@@ -158,9 +295,15 @@ class LockboxAutofillService : AutofillService() {
             ) {
                 AutofillFieldKind.USERNAME -> if (result.usernameId == null) {
                     result.usernameId = autofillId
+                    result.usernameValue = node.textValue()
                 }
                 AutofillFieldKind.PASSWORD -> if (result.passwordId == null) {
                     result.passwordId = autofillId
+                    result.passwordValue = node.textValue()
+                }
+                AutofillFieldKind.NEW_PASSWORD -> if (result.newPasswordId == null) {
+                    result.newPasswordId = autofillId
+                    result.newPasswordValue = node.textValue()
                 }
                 null -> Unit
             }
@@ -173,12 +316,25 @@ class LockboxAutofillService : AutofillService() {
 
     companion object {
         private const val AUTH_REQUEST_CODE_BASE = 4_000
+        private const val MAX_PENDING_SAVES = 50
+        private const val MAX_NAME_LENGTH = 500
+        private const val MAX_USERNAME_LENGTH = 10_000
+        private const val MAX_PASSWORD_LENGTH = 100_000
     }
+
+    private fun AssistStructure.ViewNode.textValue(): String =
+        autofillValue?.takeIf { it.isText }?.textValue?.toString()
+            ?: text?.toString()
+            ?: ""
 }
 
 data class ParsedAutofillFields(
     var usernameId: AutofillId? = null,
     var passwordId: AutofillId? = null,
+    var newPasswordId: AutofillId? = null,
+    var usernameValue: String = "",
+    var passwordValue: String? = null,
+    var newPasswordValue: String? = null,
     var webDomain: String? = null,
     var packageName: String? = null
 )

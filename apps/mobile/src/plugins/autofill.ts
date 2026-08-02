@@ -20,6 +20,7 @@ export interface AutofillIndexCredential {
 export interface AutofillEnabledResult {
   supported?: boolean;
   enabled: boolean;
+  biometricsReady?: boolean;
   indexedCredentials?: number;
   indexedAt?: number | null;
   lastRequestAt?: number | null;
@@ -54,12 +55,27 @@ export interface AutofillPasskeyIndexEntry extends AutofillPasskeyEntry {
   createdAt: string;
 }
 
+/** Metadata for an Android AutoFill save waiting for encrypted-vault import. */
+export interface PendingAutofillCredentialSave {
+  id: string;
+  createdAt: string;
+}
+
+/** Biometrically decrypted fields from an Android AutoFill save request. */
+export interface ExportedAutofillCredentialSave extends PendingAutofillCredentialSave {
+  name: string;
+  username: string;
+  password: string;
+  uri: string;
+}
+
 /**
  * AutofillPlugin interface — defines the contract between TypeScript and native code.
  *
  * Methods:
  * - isEnabled: Checks if Authwell is enabled as a platform autofill provider
  * - requestEnable: Opens the platform credential-provider settings
+ * - requestBiometricEnrollment: Opens Android's biometric enrollment settings
  * - replaceCredentialIndex: Atomically rebuilds the biometric-gated local index
  * - clearCredentialIndex: Clears account data on logout
  */
@@ -70,9 +86,14 @@ export interface AutofillPlugin {
   /** Open platform settings so the user can enable Authwell AutoFill */
   requestEnable(): Promise<void>;
 
+  /** Open device settings so Android can enroll a strong biometric. */
+  requestBiometricEnrollment(): Promise<void>;
+
   /** Rebuild the native index. Native code encrypts every credential immediately. */
   replaceCredentialIndex(options: {
     credentials: AutofillIndexCredential[];
+    accountId: string;
+    saveAuthorization: string;
   }): Promise<AutofillIndexResult>;
 
   /** Rebuild the biometric-gated passkey index from encrypted vault items. */
@@ -86,6 +107,18 @@ export interface AutofillPlugin {
 
   /** Find matching passkeys for a website URI in native encrypted storage */
   getPasskeysForUri(options: { uri: string }): Promise<AutofillPasskeysResult>;
+
+  /** List Android-accepted password saves awaiting encrypted-vault import. */
+  getPendingCredentialSaves(): Promise<{ saves: PendingAutofillCredentialSave[] }>;
+
+  /** Export one pending password save after biometric approval. */
+  exportPendingCredentialSave(options: {
+    id: string;
+    authorization: string;
+  }): Promise<ExportedAutofillCredentialSave>;
+
+  /** Acknowledge a pending password save after its encrypted vault write succeeds. */
+  markCredentialSaveSynced(options: { id: string; authorization: string }): Promise<void>;
 }
 
 const Autofill = registerPlugin<AutofillPlugin>('Autofill');

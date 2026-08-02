@@ -8,6 +8,8 @@ export type {
   AutofillIndexCredential,
   AutofillEnabledResult,
   AutofillIndexResult,
+  PendingAutofillCredentialSave,
+  ExportedAutofillCredentialSave,
 } from './autofill';
 
 export { Biometric } from './biometric';

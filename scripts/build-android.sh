@@ -50,7 +50,10 @@ command -v bun >/dev/null 2>&1 || fail "bun not found. Install: https://bun.sh"
 # we try common JDK install locations to find a 17-24 JDK automatically.
 
 get_java_major() {
-  "$1" -version 2>&1 | head -1 | grep -oP '"(\d+)' | tr -d '"'
+  local version
+  version="$("$1" -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')"
+  [ -n "$version" ] || return 1
+  echo "$version"
 }
 
 find_compatible_jdk() {
@@ -153,7 +156,7 @@ ok "Web vault built → apps/web/dist/"
 # ── Step 3: Capacitor sync ────────────────────────────────────────────
 
 info "Syncing Capacitor → Android..."
-(cd "$MOBILE_DIR" && npx cap sync android)
+(cd "$MOBILE_DIR" && bunx cap sync android)
 ok "Capacitor synced"
 
 # ── Step 4: Gradle build ─────────────────────────────────────────────

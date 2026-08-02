@@ -2,7 +2,7 @@ package dev.lockbox.app.autofill
 
 import android.text.InputType
 
-internal enum class AutofillFieldKind { USERNAME, PASSWORD }
+internal enum class AutofillFieldKind { USERNAME, PASSWORD, NEW_PASSWORD }
 
 /** Conservative fallback field detection for apps that omit Android AutoFill hints. */
 internal object AutofillFieldHeuristics {
@@ -23,6 +23,21 @@ internal object AutofillFieldHeuristics {
             idEntry,
             hint
         ).joinToString(" ").lowercase()
+
+        if (
+            declaredHints.any(::isOneTimeCodeToken) ||
+            ONE_TIME_CODE_TOKENS.any(semanticText::contains)
+        ) {
+            return null
+        }
+
+        if (
+            declaredHints.any(::isNewPasswordToken) ||
+            NEW_PASSWORD_TOKENS.any(semanticText::contains) ||
+            NEW_PASSWORD_COMPACT_TOKENS.any(semanticText.compactToken()::contains)
+        ) {
+            return AutofillFieldKind.NEW_PASSWORD
+        }
 
         if (
             declaredHints.any(::isPasswordToken) ||
@@ -46,6 +61,15 @@ internal object AutofillFieldHeuristics {
     private fun isPasswordToken(value: String): Boolean =
         PASSWORD_TOKENS.any(value::contains)
 
+    private fun isNewPasswordToken(value: String): Boolean {
+        val compact = value.compactToken()
+        return NEW_PASSWORD_TOKENS.any(value::contains) ||
+            NEW_PASSWORD_COMPACT_TOKENS.any(compact::contains)
+    }
+
+    private fun isOneTimeCodeToken(value: String): Boolean =
+        ONE_TIME_CODE_TOKENS.any(value::contains) || value.compactToken().contains("onetimecode")
+
     private fun isUsernameToken(value: String): Boolean =
         USERNAME_TOKENS.any(value::contains)
 
@@ -63,12 +87,33 @@ internal object AutofillFieldHeuristics {
         inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_CLASS_TEXT &&
             inputType and InputType.TYPE_MASK_VARIATION == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
 
+    private fun String.compactToken(): String = filter(Char::isLetterOrDigit)
+
     private val PASSWORD_TOKENS = listOf(
         "current-password",
-        "new-password",
         "password",
         "passwd",
         "passcode"
+    )
+    private val NEW_PASSWORD_TOKENS = listOf(
+        "new-password",
+        "confirm-password",
+        "password-confirmation",
+        "repeat-password"
+    )
+    private val NEW_PASSWORD_COMPACT_TOKENS = listOf(
+        "newpassword",
+        "confirmpassword",
+        "passwordconfirmation",
+        "repeatpassword"
+    )
+    private val ONE_TIME_CODE_TOKENS = listOf(
+        "one-time-code",
+        "one_time_code",
+        "verification-code",
+        "verification_code",
+        "totp",
+        "otp"
     )
     private val USERNAME_TOKENS = listOf(
         "username",

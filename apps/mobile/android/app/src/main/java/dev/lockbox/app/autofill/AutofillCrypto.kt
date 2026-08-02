@@ -6,7 +6,9 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import androidx.biometric.BiometricManager
 import org.json.JSONObject
+import java.security.GeneralSecurityException
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyStore
@@ -32,7 +34,16 @@ object AutofillCrypto {
         val ciphertext: ByteArray
     )
 
-    fun ensureKeyPair(): KeyPair {
+    fun isStrongBiometricReady(context: Context): Boolean =
+        BiometricManager.from(context).canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
+        ) == BiometricManager.BIOMETRIC_SUCCESS
+
+    @Synchronized
+    fun ensureKeyPair(context: Context): KeyPair {
+        if (!isStrongBiometricReady(context)) {
+            throw StrongBiometricUnavailableException()
+        }
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         val existingPrivate = keyStore.getKey(KEY_ALIAS, null) as? PrivateKey
         val existingPublic = keyStore.getCertificate(KEY_ALIAS)?.publicKey
@@ -150,3 +161,7 @@ object AutofillCrypto {
     private fun decode(value: String): ByteArray =
         Base64.decode(value, Base64.NO_WRAP)
 }
+
+internal class StrongBiometricUnavailableException : GeneralSecurityException(
+    "Set up fingerprint or face unlock in Android Settings, then refresh the encrypted index."
+)

@@ -1,8 +1,10 @@
 import type { LoginItem, PasskeyItem, VaultItem } from '@lockbox/types';
+import { toBase64, toUtf8 } from '@lockbox/crypto';
 
 interface CapacitorBridge {
   isNativePlatform(): boolean;
   isPluginAvailable(name: string): boolean;
+  getPlatform?(): string;
   nativePromise(
     plugin: string,
     method: string,
@@ -22,9 +24,16 @@ function getCredentialManager(): CapacitorBridge | null {
   return bridge;
 }
 
+function getAndroidAutofill(): CapacitorBridge | null {
+  const bridge = getCapacitor();
+  if (!bridge) return null;
+  return bridge.getPlatform?.() && bridge.getPlatform() !== 'android' ? null : bridge;
+}
+
 export interface NativeAutofillStatus {
   supported: boolean;
   enabled: boolean;
+  biometricsReady?: boolean;
   indexedCredentials?: number;
   indexedAt?: number;
   lastRequestAt?: number;
@@ -53,6 +62,18 @@ export interface ExportedNativePasskey extends PendingNativePasskey {
   createdAt: string;
 }
 
+export interface PendingNativeCredentialSave {
+  id: string;
+  createdAt: string;
+}
+
+export interface ExportedNativeCredentialSave extends PendingNativeCredentialSave {
+  name: string;
+  username: string;
+  password: string;
+  uri: string;
+}
+
 export async function getNativeAutofillStatus(): Promise<NativeAutofillStatus> {
   const bridge = getCapacitor();
   if (!bridge) return { supported: false, enabled: false };
@@ -60,6 +81,8 @@ export async function getNativeAutofillStatus(): Promise<NativeAutofillStatus> {
   return {
     supported: result.supported !== false,
     enabled: result.enabled === true,
+    biometricsReady:
+      typeof result.biometricsReady === 'boolean' ? result.biometricsReady : undefined,
     indexedCredentials: optionalNumber(result.indexedCredentials),
     indexedAt: optionalNumber(result.indexedAt),
     lastRequestAt: optionalNumber(result.lastRequestAt),
@@ -72,6 +95,12 @@ export async function openNativeAutofillSettings(): Promise<void> {
   const bridge = getCapacitor();
   if (!bridge) throw new Error('Native autofill is not available on this device');
   await bridge.nativePromise('Autofill', 'requestEnable', {});
+}
+
+export async function openNativeBiometricEnrollment(): Promise<void> {
+  const bridge = getCapacitor();
+  if (!bridge) throw new Error('Native biometric settings are not available on this device');
+  await bridge.nativePromise('Autofill', 'requestBiometricEnrollment', {});
 }
 
 export async function getNativePasskeyStatus(): Promise<NativePasskeyStatus> {
@@ -94,7 +123,8 @@ export interface NativeAutofillIndexResult {
 
 export async function syncNativeAutofillIndex(
   items: VaultItem[],
-  accountId: string
+  accountId: string,
+  userKey: Uint8Array
 ): Promise<NativeAutofillIndexResult> {
   const bridge = getCapacitor();
   if (!bridge) return { passwords: 0, passkeys: 0 };
@@ -126,10 +156,20 @@ export async function syncNativeAutofillIndex(
       createdAt: item.createdAt,
     }));
 
-  const [passwordResult, passkeyResult] = await Promise.all([
-    bridge.nativePromise('Autofill', 'replaceCredentialIndex', { credentials }),
-    bridge.nativePromise('Autofill', 'replacePasskeyIndex', { passkeys, accountId }),
-  ]);
+  const saveAuthorization = await deriveNativeCredentialSaveAuthorization(userKey, accountId);
+
+  // Both indexes share one biometric-bound Keystore key. Serialize their first
+  // refresh so concurrent calls cannot race while creating that key.
+  const passwordResult = await bridge.nativePromise(
+    'Autofill',
+    'replaceCredentialIndex',
+    { credentials, accountId, saveAuthorization }
+  );
+  const passkeyResult = await bridge.nativePromise(
+    'Autofill',
+    'replacePasskeyIndex',
+    { passkeys, accountId }
+  );
   const result = {
     passwords: optionalNumber(passwordResult.indexed) ?? 0,
     passkeys: optionalNumber(passkeyResult.indexed) ?? 0,
@@ -165,6 +205,66 @@ export async function markNativePasskeySynced(
     credentialId,
     vaultItemId,
   });
+}
+
+export async function getPendingNativeCredentialSaves(): Promise<PendingNativeCredentialSave[]> {
+  const bridge = getAndroidAutofill();
+  if (!bridge) return [];
+  const result = await bridge.nativePromise('Autofill', 'getPendingCredentialSaves', {});
+  return Array.isArray(result.saves) ? (result.saves as PendingNativeCredentialSave[]) : [];
+}
+
+export async function exportPendingNativeCredentialSave(
+  id: string,
+  authorization: string
+): Promise<ExportedNativeCredentialSave> {
+  const bridge = getAndroidAutofill();
+  if (!bridge) throw new Error('Native saved-login import is not available on this device');
+  return bridge.nativePromise('Autofill', 'exportPendingCredentialSave', {
+    id,
+    authorization,
+  }) as unknown as Promise<ExportedNativeCredentialSave>;
+}
+
+export async function markNativeCredentialSaveSynced(
+  id: string,
+  authorization: string
+): Promise<void> {
+  const bridge = getAndroidAutofill();
+  if (!bridge) return;
+  await bridge.nativePromise('Autofill', 'markCredentialSaveSynced', { id, authorization });
+}
+
+/** Derive an account-scoped proof without exposing or persisting the vault key. */
+export async function deriveNativeCredentialSaveAuthorization(
+  userKey: Uint8Array,
+  accountId: string
+): Promise<string> {
+  const keyBytes = new Uint8Array(userKey.byteLength);
+  keyBytes.set(userKey);
+  const hmacKey = await crypto.subtle.importKey(
+    'raw',
+    keyBytes.buffer,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  keyBytes.fill(0);
+  const messageBytes = toUtf8(`authwell:android-pending-save:v1\u0000${accountId}`);
+  const message = new Uint8Array(messageBytes.byteLength);
+  message.set(messageBytes);
+  const proof = new Uint8Array(
+    await crypto.subtle.sign(
+      'HMAC',
+      hmacKey,
+      message.buffer
+    )
+  );
+  message.fill(0);
+  return toBase64(proof)
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replace(/=+$/, '');
 }
 
 export async function clearNativeAutofillIndex(): Promise<void> {

@@ -1095,11 +1095,10 @@ export default function Settings() {
             )}
           </section>
 
-          {(nativeAutofill.supported || nativePasskeys.supported) && (
-            <Card variant="surface" padding="lg">
+          <Card variant="surface" padding="lg">
               <h2 style={{ ...sectionHeading, marginBottom: 8 }}>Device Autofill & Passkeys</h2>
               <p style={{ ...descStyle, marginBottom: 16 }}>
-                Let your device offer Authwell logins and synced passkeys in apps and browsers.
+                Let your device offer and save Authwell logins, plus synced passkeys, in apps and browsers.
                 Private key material stays encrypted behind strong biometric authentication on this
                 device.
               </p>
@@ -1191,8 +1190,17 @@ export default function Settings() {
               <p className="settings-autofill__hint">
                 Add the website domain to its login item. Android apps can also use an explicit app target.
               </p>
+              <div className="settings-autofill__lab">
+                <div>
+                  <strong>Autofill test lab</strong>
+                  <span>Run 12 realistic login patterns without sending the dummy credentials anywhere.</span>
+                </div>
+                <Button type="button" variant="secondary" size="sm" onClick={() => navigate('/test')}>
+                  <Icon name="external-link" size={16} />
+                  Open test lab
+                </Button>
+              </div>
             </Card>
-          )}
 
           {session && userKey && (
             <>

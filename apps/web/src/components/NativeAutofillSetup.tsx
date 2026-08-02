@@ -5,6 +5,7 @@ import {
   getNativeAutofillStatus,
   getNativePasskeyStatus,
   openNativeAutofillSettings,
+  openNativeBiometricEnrollment,
   openNativePasskeySettings,
   syncNativeAutofillIndex,
   type NativeAutofillStatus,
@@ -14,12 +15,13 @@ import {
 interface NativeAutofillSetupProps {
   accountId: string;
   items: VaultItem[];
+  userKey: Uint8Array;
 }
 
 const EMPTY_AUTOFILL: NativeAutofillStatus = { supported: false, enabled: false };
 const EMPTY_PASSKEYS: NativePasskeyStatus = { supported: false, enabled: false };
 
-export default function NativeAutofillSetup({ accountId, items }: NativeAutofillSetupProps) {
+export default function NativeAutofillSetup({ accountId, items, userKey }: NativeAutofillSetupProps) {
   const [autofill, setAutofill] = useState<NativeAutofillStatus>(EMPTY_AUTOFILL);
   const [passkeys, setPasskeys] = useState<NativePasskeyStatus>(EMPTY_PASSKEYS);
   const [indexReadyThisSession, setIndexReadyThisSession] = useState(false);
@@ -66,8 +68,9 @@ export default function NativeAutofillSetup({ accountId, items }: NativeAutofill
     [items]
   );
   const indexReady = indexReadyThisSession || autofill.indexedAt !== undefined;
+  const biometricsReady = autofill.biometricsReady !== false;
   const passkeyReady = !passkeys.supported || passkeys.enabled;
-  const complete = autofill.enabled && passkeyReady && indexReady;
+  const complete = autofill.enabled && biometricsReady && passkeyReady && indexReady;
 
   if (checking || hidden || (!autofill.supported && !passkeys.supported) || complete) return null;
 
@@ -77,10 +80,12 @@ export default function NativeAutofillSetup({ accountId, items }: NativeAutofill
     try {
       if (!autofill.enabled) {
         await openNativeAutofillSettings();
+      } else if (!biometricsReady) {
+        await openNativeBiometricEnrollment();
       } else if (!passkeyReady) {
         await openNativePasskeySettings();
       } else {
-        await syncNativeAutofillIndex(items, accountId);
+        await syncNativeAutofillIndex(items, accountId, userKey);
         setIndexReadyThisSession(true);
       }
       await refresh();
@@ -98,9 +103,11 @@ export default function NativeAutofillSetup({ accountId, items }: NativeAutofill
 
   const actionLabel = !autofill.enabled
     ? 'Choose Authwell for passwords'
-    : !passkeyReady
-      ? 'Enable Authwell passkeys'
-      : 'Refresh encrypted index';
+    : !biometricsReady
+      ? 'Set up device biometrics'
+      : !passkeyReady
+        ? 'Enable Authwell passkeys'
+        : 'Refresh encrypted index';
 
   return (
     <section className="native-autofill-setup" aria-labelledby="native-autofill-setup-title">
@@ -114,6 +121,9 @@ export default function NativeAutofillSetup({ accountId, items }: NativeAutofill
         </div>
         <ul className="native-autofill-setup__checks" aria-label="Device AutoFill setup status">
           <SetupCheck complete={autofill.enabled} label="Password provider" />
+          {autofill.biometricsReady !== undefined && (
+            <SetupCheck complete={biometricsReady} label="Device biometrics" />
+          )}
           {passkeys.supported && <SetupCheck complete={passkeys.enabled} label="Passkey provider" />}
           <SetupCheck
             complete={indexReady}

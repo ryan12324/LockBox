@@ -138,6 +138,8 @@ describe('Autofill passkey integration', () => {
     it('passkey lookup remains separate from password index writes', async () => {
       const indexResult = await Autofill.replaceCredentialIndex({
         credentials: [],
+        accountId: 'test-account',
+        saveAuthorization: 'A'.repeat(43),
       });
       const passkeyResult = await Autofill.getPasskeysForUri({
         uri: 'https://example.com',
@@ -167,7 +169,11 @@ describe('Autofill passkey integration', () => {
     });
 
     it('replaceCredentialIndex resolves', async () => {
-      await expect(Autofill.replaceCredentialIndex({ credentials: [] })).resolves.toEqual({
+      await expect(Autofill.replaceCredentialIndex({
+        credentials: [],
+        accountId: 'test-account',
+        saveAuthorization: 'A'.repeat(43),
+      })).resolves.toEqual({
         indexed: 0,
       });
     });

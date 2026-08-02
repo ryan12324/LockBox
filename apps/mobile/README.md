@@ -29,6 +29,14 @@ open apps/mobile/ios/App/App.xcworkspace
 
 Use the workspace for all signed builds. Select the same Apple development team for `App` and `CredentialProvider`, and enable the AutoFill Credential Provider capability plus `group.dev.lockbox.app` on both App IDs. The committed project already contains the extension; the idempotent Ruby configurator can restore its target membership if the Capacitor project is manually regenerated.
 
+Build and launch Authwell in an iOS Simulator from the repository root:
+
+```bash
+bun run ios:simulator
+```
+
+The command prefers a booted simulator, or selects an iPhone from the newest installed iOS runtime. Use `bun run ios:simulator -- --list` to list targets, or pass a simulator UDID after `--` to choose one explicitly.
+
 The provider must be enabled on a device under **Settings → General → AutoFill & Passwords**. Unlock Authwell once to seed its encrypted local indexes. Test both password and passkey flows on physical hardware because the Simulator uses a Data Protection Keychain fallback in place of Secure Enclave.
 
 Biometric vault unlock is opt-in under **Authwell Settings → Biometric unlock**. Enrollment stores only an account-scoped wrapped 64-byte vault key: iOS keeps ECIES ciphertext in App Group preferences while the unwrap private key is protected by Secure Enclave/Keychain `biometryCurrentSet`. Face ID or Touch ID changes invalidate that private key and force the master-password fallback. Switching accounts or servers cannot reuse the prior envelope. Signing out clears the native AutoFill index, biometric enrollment, and offline database before ending the local session.
@@ -53,7 +61,17 @@ The release command rejects archives missing compiled assets, arm64 binaries, th
 
 See the root `AGENTS.md` and `DEPLOYING.md` for the required JDK/SDK combination and signed release commands.
 
-Android exposes two complementary password-manager paths. The Autofill Framework service supports Android 8+ and apps with standard AutoFill fields. On Android 14+, the Credential Manager provider advertises both password and public-key credential capabilities. After the first vault unlock, the in-app setup checklist reports whether each system provider is enabled, how many encrypted logins were indexed, and whether Android has queried Authwell.
+Build and launch Authwell on Android from the repository root:
+
+```bash
+bun run android:run
+```
+
+The command prefers an authorized physical device connected over USB or Wi-Fi, then falls back to a running emulator or an AVD using the newest installed Android SDK. Use `bun run android:run -- --list` to list every target, or pass a device serial or AVD ID after `--` to choose one explicitly. `bun run android:device` and `bun run android:emulator` force one target type.
+
+The encrypted AutoFill index requires a screen lock and an enrolled strong biometric. On a new emulator, use Authwell's **Set up device biometrics** action before refreshing the index, then complete fingerprint enrollment in Android Settings.
+
+Android exposes two complementary password-manager paths. The Autofill Framework service supports Android 8+ and apps with standard AutoFill fields, including Android's system **Save to Authwell?** prompt after a new or changed login is submitted. Accepted saves are immediately protected by a separate device-bound operations key and become locally fillable; the next normal Authwell unlock silently authorizes their import into the end-to-end encrypted vault with an account-scoped proof derived from the in-memory vault key. Neither the master password nor vault key is persisted or given to the AutofillService. On Android 14+, the Credential Manager provider advertises both password and public-key credential capabilities. After the first vault unlock, the in-app setup checklist reports whether each system provider is enabled, how many encrypted logins were indexed, and whether Android has queried Authwell.
 
 Vault unlock uses `BiometricPrompt` with a per-use AES-256-GCM `CryptoObject`. The non-exportable Android Keystore key is invalidated by biometric enrollment changes, and the server/account scope is authenticated as AES-GCM additional data. SharedPreferences contains only the IV, scope, and wrapped vault key. Missing or invalidated Keystore material forces master-password unlock.
 

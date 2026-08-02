@@ -22,6 +22,7 @@ const AppLayout = lazy(() => import('./components/AppLayout.js'));
 const Teams = lazy(() => import('./pages/Teams.js'));
 const TeamDetail = lazy(() => import('./pages/TeamDetail.js'));
 const ServerSetup = lazy(() => import('./pages/ServerSetup.js'));
+const AutofillTest = lazy(() => import('./pages/AutofillTest.js'));
 const AUTO_LOCK_MS = 15 * 60 * 1000; // 15 minutes
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -104,6 +105,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/unlock" element={<Unlock />} />
               <Route path="/share/:shareId" element={<ShareView />} />
+              <Route path="/test" element={<AutofillTest />} />
 
               <Route
                 element={

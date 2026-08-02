@@ -20,6 +20,9 @@ interface AutofillCredentialDao {
     @Query("DELETE FROM autofill_credentials")
     suspend fun deleteAll()
 
+    @Query("DELETE FROM autofill_credentials WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Transaction
     suspend fun replaceAll(items: List<AutofillCredentialEntity>) {
         deleteAll()

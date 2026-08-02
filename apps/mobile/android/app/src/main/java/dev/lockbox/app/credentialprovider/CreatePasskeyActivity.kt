@@ -202,7 +202,7 @@ class CreatePasskeyActivity : FragmentActivity() {
         // Build COSE public key (77 bytes)
         val coseKey = buildCoseKey(x, y)
         val protectedPrivateKey = AutofillCrypto.encrypt(
-            AutofillCrypto.ensureKeyPair().public,
+            AutofillCrypto.ensureKeyPair(applicationContext).public,
             JSONObject()
                 .put("privateKey", base64urlEncode(keyPair.private.encoded))
                 .toString()

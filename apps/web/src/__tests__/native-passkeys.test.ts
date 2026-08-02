@@ -3,6 +3,7 @@ import type { LoginItem, PasskeyItem, VaultItem } from '@lockbox/types';
 import {
   getNativeAutofillStatus,
   getNativePasskeyStatus,
+  openNativeBiometricEnrollment,
   openNativePasskeySettings,
   syncNativeAutofillIndex,
 } from '../lib/native-autofill.js';
@@ -22,6 +23,7 @@ function installNativeBridge() {
       return {
         supported: true,
         enabled: true,
+        biometricsReady: true,
         indexedCredentials: 4,
         indexedAt: 1_775_257_600_000,
         lastRequestAt: 1_775_257_660_000,
@@ -47,6 +49,7 @@ describe('Android passkey bridge', () => {
     await expect(getNativeAutofillStatus()).resolves.toEqual({
       supported: true,
       enabled: true,
+      biometricsReady: true,
       indexedCredentials: 4,
       indexedAt: 1_775_257_600_000,
       lastRequestAt: 1_775_257_660_000,
@@ -76,7 +79,11 @@ describe('Android passkey bridge', () => {
 
     const updated = vi.fn();
     window.addEventListener('authwell:native-autofill-updated', updated, { once: true });
-    await expect(syncNativeAutofillIndex([login], 'lockbox-user-1')).resolves.toEqual({
+    await expect(syncNativeAutofillIndex(
+      [login],
+      'lockbox-user-1',
+      new Uint8Array(32).fill(1)
+    )).resolves.toEqual({
       passwords: 1,
       passkeys: 1,
     });
@@ -85,10 +92,42 @@ describe('Android passkey bridge', () => {
       'Autofill',
       'replaceCredentialIndex',
       expect.objectContaining({
+        accountId: 'lockbox-user-1',
+        saveAuthorization: expect.any(String),
         credentials: [expect.objectContaining({ id: login.id, uris: login.uris })],
       }),
     );
     expect(updated).toHaveBeenCalledOnce();
+  });
+
+  it('serializes password and passkey refreshes that share the Android Keystore key', async () => {
+    let passwordRefreshFinished = false;
+    const nativePromise = vi.fn(async (_plugin: string, method: string) => {
+      if (method === 'replaceCredentialIndex') {
+        await Promise.resolve();
+        passwordRefreshFinished = true;
+        return { indexed: 1 };
+      }
+      if (method === 'replacePasskeyIndex') {
+        expect(passwordRefreshFinished).toBe(true);
+        return { indexed: 0 };
+      }
+      return {};
+    });
+    (window as unknown as { Capacitor: unknown }).Capacitor = {
+      isNativePlatform: () => true,
+      isPluginAvailable: () => true,
+      nativePromise,
+    };
+
+    await expect(syncNativeAutofillIndex(
+      [],
+      'lockbox-user-1',
+      new Uint8Array(32).fill(2)
+    )).resolves.toEqual({
+      passwords: 1,
+      passkeys: 0,
+    });
   });
 
   it('protects and indexes decrypted vault passkeys through the native plugin', async () => {
@@ -113,7 +152,11 @@ describe('Android passkey bridge', () => {
       revisionDate: '2026-08-01T00:00:00.000Z',
     };
 
-    await syncNativeAutofillIndex([passkey] as VaultItem[], 'lockbox-user-1');
+    await syncNativeAutofillIndex(
+      [passkey] as VaultItem[],
+      'lockbox-user-1',
+      new Uint8Array(32).fill(3)
+    );
 
     expect(nativePromise).toHaveBeenCalledWith(
       'Autofill',
@@ -144,6 +187,16 @@ describe('Android passkey bridge', () => {
     expect(nativePromise).toHaveBeenCalledWith(
       'CredentialManager',
       'requestEnableProvider',
+      {}
+    );
+  });
+
+  it('opens Android biometric enrollment when the encrypted index requires it', async () => {
+    const nativePromise = installNativeBridge();
+    await openNativeBiometricEnrollment();
+    expect(nativePromise).toHaveBeenCalledWith(
+      'Autofill',
+      'requestBiometricEnrollment',
       {}
     );
   });

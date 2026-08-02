@@ -10,6 +10,8 @@ import dev.lockbox.app.credentialprovider.PasskeyMetadataDao
 import dev.lockbox.app.credentialprovider.PasskeyMetadataEntity
 import dev.lockbox.app.autofill.AutofillCredentialDao
 import dev.lockbox.app.autofill.AutofillCredentialEntity
+import dev.lockbox.app.autofill.PendingAutofillSaveDao
+import dev.lockbox.app.autofill.PendingAutofillSaveEntity
 
 /**
  * VaultDatabase — Room database for encrypted vault item storage.
@@ -21,8 +23,13 @@ import dev.lockbox.app.autofill.AutofillCredentialEntity
  * The encryption/decryption happens in the TypeScript layer using the user key.
  */
 @Database(
-    entities = [VaultItemEntity::class, PasskeyMetadataEntity::class, AutofillCredentialEntity::class],
-    version = 7,
+    entities = [
+        VaultItemEntity::class,
+        PasskeyMetadataEntity::class,
+        AutofillCredentialEntity::class,
+        PendingAutofillSaveEntity::class
+    ],
+    version = 8,
     exportSchema = true
 )
 abstract class VaultDatabase : RoomDatabase() {
@@ -30,6 +37,7 @@ abstract class VaultDatabase : RoomDatabase() {
     abstract fun vaultItemDao(): VaultItemDao
     abstract fun passkeyMetadataDao(): PasskeyMetadataDao
     abstract fun autofillCredentialDao(): AutofillCredentialDao
+    abstract fun pendingAutofillSaveDao(): PendingAutofillSaveDao
 
     companion object {
         private const val DATABASE_NAME = "lockbox_vault.db"
@@ -134,6 +142,28 @@ abstract class VaultDatabase : RoomDatabase() {
             }
         }
 
+        /** Add the biometric-gated outbox used by Android's AutoFill save flow. */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS pending_autofill_saves (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        accountId TEXT NOT NULL,
+                        domainHashes TEXT NOT NULL,
+                        encryptedData TEXT NOT NULL,
+                        autofillEncryptedData TEXT NOT NULL,
+                        createdAt TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """CREATE INDEX IF NOT EXISTS index_pending_autofill_saves_accountId
+                       ON pending_autofill_saves (accountId)""".trimIndent()
+                )
+            }
+        }
+
         @Volatile
         private var instance: VaultDatabase? = null
 
@@ -165,7 +195,8 @@ abstract class VaultDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
-                    MIGRATION_6_7
+                    MIGRATION_6_7,
+                    MIGRATION_7_8
                 )
                 .build()
         }

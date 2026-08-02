@@ -27,6 +27,7 @@ import { api } from '../lib/api.js';
 import { decryptVaultItem } from '../lib/crypto.js';
 import { copyWithFeedback } from '../lib/copy-utils.js';
 import { syncNativeAutofillIndex } from '../lib/native-autofill.js';
+import { syncPendingNativeCredentialSaves } from '../lib/native-credential-save-sync.js';
 import { syncPendingNativePasskeys } from '../lib/native-passkey-sync.js';
 import { fetchFreshVaultItem } from '../lib/vault-freshness.js';
 import ItemPanel from '../components/ItemPanel.js';
@@ -159,23 +160,63 @@ export default function Vault() {
       setCorruptItems(corrupt);
       void indexItems(decrypted);
       void (async () => {
+        let nativeItems = decrypted;
+        const existingItemIds = response.items
+          .filter((item) => !item.deletedAt)
+          .map((item) => item.id);
+
         try {
-          await syncNativeAutofillIndex(decrypted, session.userId);
+          const saveResult = await syncPendingNativeCredentialSaves({
+            items: nativeItems,
+            existingItemIds,
+            accountId: session.userId,
+            token: session.token,
+            userKey,
+          });
+          if (saveResult.changedItems.length > 0) {
+            const changedById = new Map(
+              saveResult.changedItems.map((item) => [item.id, item] as const)
+            );
+            nativeItems = [
+              ...nativeItems.map((item) => changedById.get(item.id) ?? item),
+              ...saveResult.changedItems.filter(
+                (item) => !nativeItems.some((candidate) => candidate.id === item.id)
+              ),
+            ].sort((a, b) => a.name.localeCompare(b.name));
+            setItems(nativeItems);
+            void indexItems(nativeItems);
+          }
+          if (saveResult.syncedCount > 0) {
+            toast(
+              `${saveResult.syncedCount} Android ${saveResult.syncedCount === 1 ? 'login was' : 'logins were'} saved to your encrypted vault.`,
+              'success'
+            );
+          }
+          if (saveResult.remainingCount > 0) {
+            toast('An Android-saved login is still protected on this device and will retry.', 'warning');
+          }
+        } catch {
+          toast('Android-saved login import will retry the next time you unlock.', 'warning');
+        }
+
+        try {
+          await syncNativeAutofillIndex(nativeItems, session.userId, userKey);
         } catch {
           toast('Vault loaded, but device autofill and passkeys could not refresh yet.', 'warning');
         }
 
         try {
           const syncResult = await syncPendingNativePasskeys({
-            items: decrypted,
-            existingItemIds: response.items
-              .filter((item) => !item.deletedAt)
-              .map((item) => item.id),
+            items: nativeItems,
+            existingItemIds: [
+              ...existingItemIds,
+              ...nativeItems.map((item) => item.id),
+            ],
             token: session.token,
             userKey,
           });
           if (syncResult.addedItems.length > 0) {
-            const merged = [...decrypted, ...syncResult.addedItems]
+            const merged = [...nativeItems, ...syncResult.addedItems]
               .sort((a, b) => a.name.localeCompare(b.name));
             setItems(merged);
             void indexItems(merged);
@@ -204,6 +245,14 @@ export default function Vault() {
   useEffect(() => {
     void loadVault();
   }, [loadVault, lastUpdated]);
+
+  useEffect(() => {
+    const refreshPendingAndroidSaves = () => {
+      if (document.visibilityState === 'visible') void loadVault();
+    };
+    document.addEventListener('visibilitychange', refreshPendingAndroidSaves);
+    return () => document.removeEventListener('visibilitychange', refreshPendingAndroidSaves);
+  }, [loadVault]);
 
   useEffect(() => {
     if (search.trim()) window.dispatchEvent(new CustomEvent('lockbox:search'));
@@ -375,8 +424,8 @@ export default function Vault() {
           <Icon name={indexed ? 'circle-check' : 'search'} size={16} />
           {indexed ? 'Local search ready' : 'Name search'}
         </span>
-        {session && !loading && (
-          <NativeAutofillSetup accountId={session.userId} items={items} />
+        {session && userKey && !loading && (
+          <NativeAutofillSetup accountId={session.userId} items={items} userKey={userKey} />
         )}
       </div>
 
