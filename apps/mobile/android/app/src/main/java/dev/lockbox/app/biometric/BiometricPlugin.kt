@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.util.Log
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -43,6 +44,7 @@ class BiometricPlugin : Plugin() {
         private const val PREF_SCOPE = "account_scope"
         private const val GCM_TAG_LENGTH = 128
         private const val VAULT_KEY_BYTES = 64
+        private const val TAG = "AuthwellBiometric"
     }
 
     /**
@@ -126,13 +128,13 @@ class BiometricPlugin : Plugin() {
 
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
-            cipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
 
             showEnrollmentPrompt(call, scope, userKeyBytes, cipher)
         } catch (e: Exception) {
             userKeyBytes.fill(0)
             runCatching { clearEnrollment() }
-            call.reject("Enrollment setup failed: ${e.message}")
+            Log.e(TAG, "Enrollment setup failed", e)
+            call.reject("Enrollment setup failed: ${failureDetail(e)}", e)
         }
     }
 
@@ -170,9 +172,8 @@ class BiometricPlugin : Plugin() {
             if (iv.size != 12) throw IllegalStateException("Invalid biometric IV")
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_LENGTH, iv))
-            cipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
 
-            showAuthenticationPrompt(call, reason, encryptedKeyBase64, cipher)
+            showAuthenticationPrompt(call, scope, reason, encryptedKeyBase64, cipher)
         } catch (_: KeyPermanentlyInvalidatedException) {
             runCatching { clearEnrollment() }
             resolveFailure(call, "biometricsChanged")
@@ -230,6 +231,7 @@ class BiometricPlugin : Plugin() {
                             try {
                                 val cryptoCipher = result.cryptoObject?.cipher
                                     ?: throw SecurityException("Biometric-bound cipher was not returned")
+                                cryptoCipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
                                 val encryptedBytes = cryptoCipher.doFinal(userKeyBytes)
                                 val iv = cryptoCipher.iv
 
@@ -252,7 +254,8 @@ class BiometricPlugin : Plugin() {
                                 call.resolve()
                             } catch (error: Exception) {
                                 runCatching { clearEnrollment() }
-                                call.reject("Encryption failed: ${error.message}")
+                                Log.e(TAG, "Biometric envelope encryption failed", error)
+                                call.reject("Encryption failed: ${failureDetail(error)}", error)
                             } finally {
                                 userKeyBytes.fill(0)
                             }
@@ -286,13 +289,15 @@ class BiometricPlugin : Plugin() {
             } catch (error: Exception) {
                 userKeyBytes.fill(0)
                 runCatching { clearEnrollment() }
-                call.reject("Enrollment setup failed: ${error.message}")
+                Log.e(TAG, "Biometric prompt setup failed", error)
+                call.reject("Enrollment setup failed: ${failureDetail(error)}", error)
             }
         }
     }
 
     private fun showAuthenticationPrompt(
         call: PluginCall,
+        scope: String,
         reason: String,
         encryptedKeyBase64: String,
         cipher: Cipher
@@ -317,6 +322,7 @@ class BiometricPlugin : Plugin() {
                             try {
                                 val cryptoCipher = result.cryptoObject?.cipher
                                     ?: throw SecurityException("Biometric-bound cipher was not returned")
+                                cryptoCipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
                                 val encryptedBytes = Base64.decode(encryptedKeyBase64, Base64.NO_WRAP)
                                 val decryptedBytes = cryptoCipher.doFinal(encryptedBytes)
                                 if (decryptedBytes.size != VAULT_KEY_BYTES) {
@@ -333,7 +339,8 @@ class BiometricPlugin : Plugin() {
                                 resultObj.put("success", true)
                                 resultObj.put("userKey", userKeyBase64)
                                 call.resolve(resultObj)
-                            } catch (_: Exception) {
+                            } catch (error: Exception) {
+                                Log.e(TAG, "Biometric envelope decryption failed", error)
                                 runCatching { clearEnrollment() }
                                 resolveFailure(call, "enrollmentInvalid")
                             }
@@ -362,7 +369,8 @@ class BiometricPlugin : Plugin() {
                     promptInfo,
                     BiometricPrompt.CryptoObject(cipher)
                 )
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                Log.e(TAG, "Biometric unlock prompt setup failed", error)
                 runCatching { clearEnrollment() }
                 resolveFailure(call, "enrollmentInvalid")
             }
@@ -440,6 +448,9 @@ class BiometricPlugin : Plugin() {
         result.put("fallbackReason", reason)
         call.resolve(result)
     }
+
+    private fun failureDetail(error: Exception): String =
+        error.message?.takeIf(String::isNotBlank) ?: error.javaClass.simpleName
 
     private fun clearEnrollment() {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
