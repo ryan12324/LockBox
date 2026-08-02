@@ -91,6 +91,7 @@ export default function Cleanup() {
 
   const [keeperId, setKeeperId] = useState('');
   const [mergeSelections, setMergeSelections] = useState<MergeSelections>({});
+  const [dismissedDuplicateIds, setDismissedDuplicateIds] = useState<Set<string>>(new Set());
   const [showMergeConfirm, setShowMergeConfirm] = useState(false);
   const [merging, setMerging] = useState(false);
   const [mergeError, setMergeError] = useState('');
@@ -100,6 +101,9 @@ export default function Cleanup() {
   const [sortingApplying, setSortingApplying] = useState(false);
 
   const skippedStorageKey = session ? `authwell-cleanup-skipped:${session.userId}` : '';
+  const dismissedDuplicatesStorageKey = session
+    ? `authwell-cleanup-not-duplicates:${session.userId}`
+    : '';
 
   const loadVault = useCallback(async () => {
     if (!session || !userKey) return;
@@ -142,13 +146,31 @@ export default function Cleanup() {
     }
   }, [skippedStorageKey]);
 
+  useEffect(() => {
+    if (!dismissedDuplicatesStorageKey) {
+      setDismissedDuplicateIds(new Set());
+      return;
+    }
+    try {
+      const stored = JSON.parse(localStorage.getItem(dismissedDuplicatesStorageKey) ?? '[]') as unknown;
+      setDismissedDuplicateIds(
+        new Set(Array.isArray(stored) ? stored.filter((value): value is string => typeof value === 'string') : [])
+      );
+    } catch {
+      setDismissedDuplicateIds(new Set());
+    }
+  }, [dismissedDuplicatesStorageKey]);
+
   const cleanupCandidates = useMemo(() => findCleanupCandidates(items), [items]);
   const visibleCleanupCandidates = cleanupCandidates.filter(
     (candidate) => !skippedIds.has(candidate.item.id)
   );
   const currentCandidate = visibleCleanupCandidates[0] ?? null;
   const duplicateGroups = useMemo(() => findDuplicateLoginGroups(items), [items]);
-  const currentDuplicateGroup = duplicateGroups[0] ?? null;
+  const visibleDuplicateGroups = duplicateGroups.filter(
+    (group) => !dismissedDuplicateIds.has(group.id)
+  );
+  const currentDuplicateGroup = visibleDuplicateGroups[0] ?? null;
   const loginItems = useMemo(
     () => items.filter((item): item is LoginItem => item.type === 'login'),
     [items]
@@ -211,6 +233,19 @@ export default function Cleanup() {
   function persistSkipped(next: Set<string>) {
     setSkippedIds(next);
     if (skippedStorageKey) localStorage.setItem(skippedStorageKey, JSON.stringify([...next]));
+  }
+
+  function persistDismissedDuplicates(next: Set<string>) {
+    setDismissedDuplicateIds(next);
+    if (dismissedDuplicatesStorageKey) {
+      localStorage.setItem(dismissedDuplicatesStorageKey, JSON.stringify([...next]));
+    }
+  }
+
+  function handleNotDuplicate() {
+    if (!currentDuplicateGroup) return;
+    persistDismissedDuplicates(new Set([...dismissedDuplicateIds, currentDuplicateGroup.id]));
+    toast('Marked as not a duplicate on this device.', 'success');
   }
 
   function updateLocalItem(updated: VaultItem) {
@@ -456,7 +491,7 @@ export default function Cleanup() {
   ];
   const tabs: Array<{ id: CleanupView; label: string; count: number }> = [
     { id: 'guided', label: 'Simple cleanup', count: visibleCleanupCandidates.length },
-    { id: 'duplicates', label: 'Duplicates', count: duplicateGroups.length },
+    { id: 'duplicates', label: 'Duplicates', count: visibleDuplicateGroups.length },
     { id: 'bulk', label: 'Bulk cleanup', count: selectedIds.size },
     { id: 'sorting', label: 'Local sorting', count: sortingSuggestions.length },
   ];
@@ -719,7 +754,7 @@ export default function Cleanup() {
           <section className="cleanup-process" aria-labelledby="duplicates-title">
             <div className="cleanup-process__heading">
               <div><p>Reviewed merging</p><h2 id="duplicates-title">Duplicate logins</h2></div>
-              <span>{duplicateGroups.length} groups</span>
+              <span>{visibleDuplicateGroups.length} groups</span>
             </div>
             {currentDuplicateGroup ? (
               <div className="cleanup-merge">
@@ -765,12 +800,28 @@ export default function Cleanup() {
                       <Button size="sm" variant="ghost" onClick={() => setShowMergeConfirm(false)}>Cancel</Button>
                     </div>
                   ) : (
-                    <div className="cleanup-footer-actions"><Button onClick={() => setShowMergeConfirm(true)}><Icon name="copy" size={18} /> Review and merge</Button></div>
+                    <div className="cleanup-footer-actions cleanup-footer-actions--decision">
+                      <Button onClick={() => setShowMergeConfirm(true)}><Icon name="copy" size={18} /> Review and merge</Button>
+                      <Button variant="secondary" onClick={handleNotDuplicate}><Icon name="x" size={18} /> Not a duplicate</Button>
+                    </div>
                   )}
                 </div>
               </div>
             ) : (
-              <div className="cleanup-state cleanup-state--compact"><Icon name="circle-check" size={34} /><strong>No likely duplicates</strong><span>Matching is performed locally using destinations, usernames, names, and passwords.</span></div>
+              <div className="cleanup-state cleanup-state--compact">
+                <Icon name="circle-check" size={34} />
+                <strong>{duplicateGroups.length === 0 ? 'No likely duplicates' : 'No duplicate reviews queued'}</strong>
+                <span>
+                  {duplicateGroups.length === 0
+                    ? 'Matching is performed locally using destinations, usernames, names, and passwords.'
+                    : 'You marked every suggested group as not duplicate on this device.'}
+                </span>
+                {duplicateGroups.length > 0 && (
+                  <Button variant="secondary" onClick={() => persistDismissedDuplicates(new Set())}>
+                    Review dismissed groups
+                  </Button>
+                )}
+              </div>
             )}
           </section>
         ) : (

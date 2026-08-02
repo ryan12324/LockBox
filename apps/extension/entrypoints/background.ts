@@ -64,6 +64,11 @@ import {
   setSessionToken,
   clearSession,
   setStoredEmail,
+  getInlineAutofillPreferences,
+  inlineAutofillEnabledForHost,
+  normalizeAutofillHost,
+  setInlineAutofillEnabled,
+  setInlineAutofillForHost,
 } from '../lib/storage.js';
 import { urlMatchesUri } from '../lib/form-detector.js';
 
@@ -471,6 +476,7 @@ type Message =
   | { type: 'get-totp'; secret: string }
   | { type: 'get-item-totp'; itemId: string }
   | { type: 'refresh-item'; itemId: string }
+  | { type: 'refresh-matching-login'; itemId: string }
   | { type: 'generate-password'; opts: Parameters<typeof generatePassword>[0] }
   | { type: 'generate-passphrase'; opts: Parameters<typeof generatePassphrase>[0] }
   | { type: 'activity' }
@@ -529,7 +535,10 @@ type Message =
   | { type: 'disable-2fa'; code: string }
   | { type: 'open-popup' }
   | { type: 'get-lock-timeout' }
-  | { type: 'set-lock-timeout'; minutes: number };
+  | { type: 'set-lock-timeout'; minutes: number }
+  | { type: 'get-inline-autofill-settings'; url?: string }
+  | { type: 'set-inline-autofill-enabled'; enabled: boolean }
+  | { type: 'set-site-inline-autofill'; url: string; enabled: boolean };
 
 /** Sign a passkey assertion for a specific credentialId. Shared by WEBAUTHN_GET and WEBAUTHN_GET_SELECTED. */
 async function signPasskeyAssertion(
@@ -626,7 +635,11 @@ async function signPasskeyAssertion(
   };
 }
 
-async function handleMessage(message: Message, senderUrl?: string): Promise<unknown> {
+async function handleMessage(
+  message: Message,
+  senderUrl?: string,
+  senderTabUrl?: string,
+): Promise<unknown> {
   switch (message.type) {
     case 'unlock': {
       const { email, password } = message;
@@ -770,6 +783,25 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
       }
     }
 
+    case 'refresh-matching-login': {
+      if (!senderUrl) return { success: false, error: 'The requesting page is unavailable.' };
+      try {
+        const item = await refreshVaultItem(message.itemId);
+        if (
+          item.type !== 'login' ||
+          !(item as LoginItem).uris.some((uri) => urlMatchesUri(senderUrl, uri))
+        ) {
+          return { success: false, error: 'This saved login does not match this frame.' };
+        }
+        return { success: true, item };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Could not refresh this login.',
+        };
+      }
+    }
+
     case 'generate-password': {
       const password = generatePassword(message.opts);
       return { password };
@@ -816,6 +848,31 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
       chrome.alarms.clear(LOCK_ALARM);
       if (userKey) await scheduleAutoLock();
       return { success: true, minutes };
+    }
+
+    case 'get-inline-autofill-settings': {
+      const preferences = await getInlineAutofillPreferences();
+      // Content scripts in embedded frames should inherit the top-level site's
+      // choice rather than treating every third-party iframe as a separate site.
+      const host = normalizeAutofillHost(message.url ?? senderTabUrl ?? senderUrl ?? '');
+      return {
+        enabled: preferences.enabled,
+        siteEnabled: host ? inlineAutofillEnabledForHost(preferences, host) : preferences.enabled,
+        hostEnabled: host ? !preferences.disabledHosts.includes(host) : true,
+        host,
+      };
+    }
+
+    case 'set-inline-autofill-enabled': {
+      await setInlineAutofillEnabled(message.enabled);
+      return { success: true, enabled: message.enabled };
+    }
+
+    case 'set-site-inline-autofill': {
+      const host = normalizeAutofillHost(message.url);
+      if (!host) return { success: false, error: 'A valid web page is required.' };
+      await setInlineAutofillForHost(host, message.enabled);
+      return { success: true, enabled: message.enabled, host };
     }
 
     // ─── Vault item CRUD ───────────────────────────────────────────────────
@@ -1868,7 +1925,7 @@ async function handleMessage(message: Message, senderUrl?: string): Promise<unkn
 
 export default defineBackground(() => {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    handleMessage(message as Message, sender.url)
+    handleMessage(message as Message, sender.url, sender.tab?.url)
       .then(sendResponse)
       .catch((err) => sendResponse({ error: err.message }));
     return true; // Keep message channel open for async response

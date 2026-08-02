@@ -27,6 +27,9 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
   const [aliasResult, setAliasResult] = useState<{ success: boolean; error?: string } | null>(null);
   const [lockTimeout, setLockTimeout] = useState(30);
   const [lockTimeoutSaving, setLockTimeoutSaving] = useState(false);
+  const [inlineAutofillEnabled, setInlineAutofillEnabled] = useState(true);
+  const [inlineAutofillSaving, setInlineAutofillSaving] = useState(false);
+  const [inlineAutofillError, setInlineAutofillError] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -38,9 +41,11 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
         configured?: boolean;
         provider?: string;
       }>({ type: 'get-alias-config' }),
+      sendMessage<{ enabled: boolean }>({ type: 'get-inline-autofill-settings' }),
     ])
-      .then(([timeout, twoFactor, travel, alias]) => {
+      .then(([timeout, twoFactor, travel, alias, inlineAutofill]) => {
         setLockTimeout(timeout.minutes);
+        setInlineAutofillEnabled(inlineAutofill.enabled);
         if (twoFactor.success) setTwoFaEnabled(Boolean(twoFactor.enabled));
         if (travel.success) setTravelMode(Boolean(travel.enabled));
         if (alias.success && alias.configured && alias.provider) {
@@ -63,6 +68,26 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
         .catch(() => {});
     } finally {
       setLockTimeoutSaving(false);
+    }
+  }
+
+  async function handleInlineAutofillToggle() {
+    const nextEnabled = !inlineAutofillEnabled;
+    setInlineAutofillSaving(true);
+    setInlineAutofillError('');
+    try {
+      const response = await sendMessage<{ success: boolean; enabled?: boolean; error?: string }>({
+        type: 'set-inline-autofill-enabled',
+        enabled: nextEnabled,
+      });
+      if (!response.success) throw new Error(response.error ?? 'The setting was not saved.');
+      setInlineAutofillEnabled(response.enabled ?? nextEnabled);
+    } catch (error) {
+      setInlineAutofillError(
+        error instanceof Error ? error.message : 'Authwell could not update web autofill.',
+      );
+    } finally {
+      setInlineAutofillSaving(false);
     }
   }
   async function handleSetup2FA() {
@@ -237,6 +262,42 @@ export function SettingsView({ onBack }: { onBack: () => void }) {
         </span>
       </div>
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5">
+        <div>
+          <h3 className="text-xs font-semibold text-[var(--color-text)] mb-2 flex items-center gap-1.5">
+            <Icon name="password" size={15} />
+            Web autofill
+          </h3>
+          <Card variant="surface" padding="sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-[var(--color-text)] font-medium">
+                  Show controls in form fields
+                </div>
+                <div className="text-[10px] text-[var(--color-text-tertiary)] mt-0.5 leading-relaxed">
+                  {inlineAutofillEnabled
+                    ? 'Authwell shows a fill button beside compatible fields.'
+                    : 'Field buttons are hidden. You can still fill from Current site.'}
+                </div>
+              </div>
+              <Button
+                variant={inlineAutofillEnabled ? 'primary' : 'secondary'}
+                size="sm"
+                className="min-h-11"
+                loading={inlineAutofillSaving}
+                aria-pressed={inlineAutofillEnabled}
+                onClick={() => void handleInlineAutofillToggle()}
+              >
+                {inlineAutofillEnabled ? 'On' : 'Off'}
+              </Button>
+            </div>
+          </Card>
+          {inlineAutofillError && (
+            <p role="alert" className="mt-2 text-xs text-[var(--color-error)]">
+              {inlineAutofillError}
+            </p>
+          )}
+        </div>
+
         <div>
           <h3 className="text-xs font-semibold text-[var(--color-text)] mb-2 flex items-center gap-1.5">
             <Icon name="clock" size={15} />

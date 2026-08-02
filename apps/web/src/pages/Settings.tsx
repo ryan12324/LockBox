@@ -468,6 +468,8 @@ export default function Settings() {
     marginBottom: 16,
   };
 
+  const travelSafeFolderCount = travelFolders.filter((folder) => folder.travelSafe).length;
+
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: 16, background: 'var(--color-bg)' }}>
       <div style={{ maxWidth: 680, margin: '0 auto' }}>
@@ -998,141 +1000,58 @@ export default function Settings() {
             </div>
           </Card>
 
-          <Card
-            variant="surface"
-            padding="lg"
-            style={{
-              borderLeft: '4px solid var(--color-warning)',
-            }}
-          >
-            <h2
-              style={{
-                ...sectionHeading,
-                marginBottom: 8,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <Icon name="world" size={19} />
-              Travel mode
-            </h2>
-            <p
-              style={{
-                fontSize: 'var(--font-size-sm)',
-                color: 'var(--color-text-secondary)',
-                marginBottom: 16,
-              }}
-            >
-              When enabled, only folders marked as travel-safe will sync. Non-safe folders and their
-              items are hidden.
-            </p>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 16,
-                padding: 14,
-                background: 'var(--color-bg-subtle)',
-                borderRadius: 'var(--radius-md)',
-              }}
-            >
-              <div>
-                <span style={valueStyle}>Enable Travel Mode</span>
-                <p
-                  style={{
-                    fontSize: 'var(--font-size-sm)',
-                    color: 'var(--color-text-tertiary)',
-                    marginTop: 2,
-                    margin: 0,
-                    marginBlockStart: 2,
-                  }}
-                >
-                  Hide sensitive folders when traveling
+          <section className="settings-travel" aria-labelledby="travel-mode-heading">
+            <header className="settings-travel__header">
+              <div className="settings-travel__heading">
+                <h2 id="travel-mode-heading">Travel mode</h2>
+                <p>
+                  Keep only selected folders available while traveling. Everything else stays
+                  hidden until you turn Travel mode off.
                 </p>
               </div>
-              <Button
-                variant="ghost"
-                aria-label={`${travelEnabled ? 'Disable' : 'Enable'} travel mode`}
-                aria-pressed={travelEnabled}
-                onClick={() => {
-                  if (!travelEnabled) {
-                    setShowTravelConfirm(true);
-                  } else {
-                    handleTravelToggle(false);
-                  }
-                }}
-                disabled={travelLoading}
-                style={{
-                  position: 'relative',
-                  width: 48,
-                  height: 24,
-                  padding: 0,
-                  minHeight: 'auto',
-                  borderRadius: 'var(--radius-full)',
-                  background: travelEnabled
-                    ? 'var(--color-primary)'
-                    : 'var(--color-surface-raised)',
-                  border: 'none',
-                  boxShadow: 'none',
-                }}
-              >
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: 2,
-                    left: 2,
-                    width: 20,
-                    height: 20,
-                    background: 'white',
-                    borderRadius: 'var(--radius-full)',
-                    transition: 'transform 150ms ease',
-                    transform: travelEnabled ? 'translateX(24px)' : 'translateX(0)',
+              <div className="settings-travel__control">
+                <span className="settings-travel__state" role="status">
+                  {travelEnabled ? 'On' : 'Off'}
+                </span>
+                <button
+                  type="button"
+                  className="settings-travel__switch"
+                  data-on={travelEnabled}
+                  aria-label={`${travelEnabled ? 'Disable' : 'Enable'} travel mode`}
+                  aria-pressed={travelEnabled}
+                  onClick={() => {
+                    if (!travelEnabled) setShowTravelConfirm(true);
+                    else void handleTravelToggle(false);
                   }}
+                  disabled={travelLoading}
                 />
-              </Button>
-            </div>
+              </div>
+            </header>
 
             {showTravelConfirm && (
-              <div
-                style={{
-                  marginBottom: 16,
-                  padding: 16,
-                  background: 'var(--color-warning-subtle)',
-                  borderRadius: 'var(--radius-md)',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 8,
-                    fontSize: 'var(--font-size-sm)',
-                    color: 'var(--color-warning)',
-                    marginBottom: 12,
-                  }}
-                >
-                  <Icon name="alert-triangle" size={17} style={{ flex: '0 0 auto' }} />
-                  <span>
-                    Travel mode will hide all non-travel-safe folders and their items from sync.
-                    Only safe folders will be accessible.
-                  </span>
+              <div className="settings-travel__confirmation" role="alert">
+                <div className="settings-travel__confirmation-copy">
+                  <Icon name="alert-triangle" size={17} />
+                  <p>Only included folders will remain visible until Travel mode is turned off.</p>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div className="settings-travel__confirmation-actions">
                   <Button
                     variant="primary"
                     size="sm"
+                    loading={travelLoading}
                     onClick={() => {
                       setShowTravelConfirm(false);
-                      handleTravelToggle(true);
+                      void handleTravelToggle(true);
                     }}
-                    style={{ background: 'var(--color-warning)' }}
                   >
-                    Enable
+                    Turn on
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setShowTravelConfirm(false)}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={travelLoading}
+                    onClick={() => setShowTravelConfirm(false)}
+                  >
                     Cancel
                   </Button>
                 </div>
@@ -1140,81 +1059,37 @@ export default function Settings() {
             )}
 
             {travelFolders.length > 0 && (
-              <div>
-                <h3
-                  style={{
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 500,
-                    color: 'var(--color-text-secondary)',
-                    marginBottom: 10,
-                  }}
-                >
-                  Folder Settings
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {travelFolders.map((f) => (
-                    <div
-                      key={f.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '8px 12px',
-                        background: 'var(--color-bg-subtle)',
-                        borderRadius: 'var(--radius-md)',
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 'var(--font-size-sm)',
-                          color: 'var(--color-text)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 7,
-                        }}
-                      >
-                        <Icon name="folder" size={16} />
-                        {f.name}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        onClick={() => handleFolderTravel(f.id, !f.travelSafe)}
-                        aria-label={`${f.travelSafe ? 'Exclude' : 'Include'} ${f.name} in travel mode`}
-                        aria-pressed={f.travelSafe}
-                        style={{
-                          position: 'relative',
-                          width: 40,
-                          height: 20,
-                          padding: 0,
-                          minHeight: 'auto',
-                          borderRadius: 'var(--radius-full)',
-                          background: f.travelSafe
-                            ? 'var(--color-success)'
-                            : 'var(--color-surface-raised)',
-                          border: 'none',
-                          boxShadow: 'none',
-                        }}
-                      >
-                        <span
-                          style={{
-                            position: 'absolute',
-                            top: 2,
-                            left: 2,
-                            width: 16,
-                            height: 16,
-                            background: 'white',
-                            borderRadius: 'var(--radius-full)',
-                            transition: 'transform 150ms ease',
-                            transform: f.travelSafe ? 'translateX(20px)' : 'translateX(0)',
-                          }}
-                        />
-                      </Button>
-                    </div>
-                  ))}
+              <div className="settings-travel__folders">
+                <div className="settings-travel__folders-header">
+                  <h3>Available folders</h3>
+                  <span className="settings-travel__count">
+                    {travelSafeFolderCount} of {travelFolders.length} included
+                  </span>
                 </div>
+                <ul className="settings-travel__folder-list">
+                  {travelFolders.map((folder) => (
+                    <li className="settings-travel__folder" key={folder.id}>
+                      <div className="settings-travel__folder-name">
+                        <Icon name="folder" size={16} />
+                        <span title={folder.name}>{folder.name}</span>
+                      </div>
+                      <span className="settings-travel__folder-state">
+                        {folder.travelSafe ? 'Included' : 'Hidden'}
+                      </span>
+                      <button
+                        type="button"
+                        className="settings-travel__switch"
+                        data-on={folder.travelSafe}
+                        onClick={() => void handleFolderTravel(folder.id, !folder.travelSafe)}
+                        aria-label={`${folder.travelSafe ? 'Exclude' : 'Include'} ${folder.name} in travel mode`}
+                        aria-pressed={folder.travelSafe}
+                      />
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-          </Card>
+          </section>
 
           {(nativeAutofill.supported || nativePasskeys.supported) && (
             <Card variant="surface" padding="lg">

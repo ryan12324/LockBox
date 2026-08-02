@@ -105,7 +105,6 @@ export default function Login() {
           ? 'Confirm the code from your second factor to open this vault.'
           : 'Sign in to decrypt and manage your vault on this device.'
       }
-      icon={verifying ? 'shield-check' : 'key'}
       footer={
         !verifying ? (
           <>

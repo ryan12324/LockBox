@@ -7,16 +7,17 @@
  * Proxies crypto operations through the background service worker.
  */
 
-import { detectForms, detectIdentityForms, detectOtpFields } from '../lib/form-detector.js';
+import { detectForms } from '../lib/form-detector.js';
+import type { DetectedForm } from '../lib/form-detector.js';
 import {
   fillForm,
   fillIdentityForm,
   simulateFill,
-  createLockIconOverlay,
   createSuggestionDropdown,
   createIdentitySuggestionDropdown,
   createStatusDropdown,
 } from '../lib/autofill.js';
+import { AutofillOverlayController } from '../lib/autofill-controller.js';
 import { initSaveDetector } from '../lib/save-detector.js';
 import {
   showCreateConsent,
@@ -28,9 +29,10 @@ import {
 import type { VaultItem, LoginItem, IdentityItem } from '@lockbox/types';
 import { iconifySvg } from '../lib/iconify.js';
 import { createLockboxBrand, INJECTED_BRAND_STYLES } from '../lib/injected-brand.js';
-
-// Track injected overlays to avoid duplicates
-const injectedFields = new WeakSet<HTMLInputElement>();
+import {
+  INLINE_AUTOFILL_DISABLED_HOSTS_KEY,
+  INLINE_AUTOFILL_ENABLED_KEY,
+} from '../lib/storage.js';
 
 /** Send a message to the background service worker. */
 async function sendMessage<T>(message: object): Promise<T> {
@@ -97,13 +99,34 @@ async function refreshItemForUse(
   return result.item as LoginItem | IdentityItem;
 }
 
+async function refreshMatchingLoginForUse(itemId: string): Promise<LoginItem> {
+  const result = await sendMessage<{
+    success: boolean;
+    item?: VaultItem;
+    error?: string;
+  }>({ type: 'refresh-matching-login', itemId });
+  if (!result.success || result.item?.type !== 'login') {
+    throw new Error(result.error || 'This login cannot be used on this page.');
+  }
+  return result.item as LoginItem;
+}
+
 /** Handle autofill for a detected form. */
-async function handleAutofill(
-  passwordField: HTMLInputElement,
-  usernameField: HTMLInputElement | null
-): Promise<void> {
+function resolveLiveLoginForm(passwordField: HTMLInputElement): DetectedForm | null {
+  return (
+    detectForms(document).find(
+      (form) => form.passwordField === passwordField && form.passwordPurpose !== 'new',
+    ) ?? null
+  );
+}
+
+async function handleAutofill(form: DetectedForm): Promise<void> {
+  const passwordField = form.passwordField;
+  if (!resolveLiveLoginForm(passwordField)) return;
+
   // 1. Check if vault is unlocked
   const unlocked = await isVaultUnlocked();
+  if (!resolveLiveLoginForm(passwordField)) return;
   if (!unlocked) {
     createStatusDropdown(passwordField, 'locked', [
       { label: 'Open Authwell', onClick: () => openExtensionPopup() },
@@ -120,12 +143,14 @@ async function handleAutofill(
       {
         label: 'Retry',
         onClick: () => {
-          handleAutofill(passwordField, usernameField).catch(() => {});
+          handleAutofill(form).catch(() => {});
         },
       },
     ]);
     return;
   }
+
+  if (!resolveLiveLoginForm(passwordField)) return;
 
   // 3. No matches — show status dropdown
   if (items.length === 0) {
@@ -151,15 +176,12 @@ async function handleAutofill(
     // Single match — fill immediately
     try {
       const freshItem = await refreshItemForUse(loginItems[0].id, 'login');
-      fillForm(
-        { formElement: null, usernameField, passwordField, submitButton: null },
-        freshItem.username,
-        freshItem.password
-      );
+      const liveForm = resolveLiveLoginForm(passwordField);
+      if (!liveForm || !fillForm(liveForm, freshItem.username, freshItem.password)) return;
       filledItem = freshItem;
     } catch {
       createStatusDropdown(passwordField, 'error', [
-        { label: 'Retry', onClick: () => void handleAutofill(passwordField, usernameField) },
+        { label: 'Retry', onClick: () => void handleAutofill(form) },
       ]);
       return;
     }
@@ -179,17 +201,14 @@ async function handleAutofill(
           void (async () => {
             try {
               const freshItem = await refreshItemForUse(item.id, 'login');
-              fillForm(
-                { formElement: null, usernameField, passwordField, submitButton: null },
-                freshItem.username,
-                freshItem.password
-              );
+              const liveForm = resolveLiveLoginForm(passwordField);
+              if (!liveForm || !fillForm(liveForm, freshItem.username, freshItem.password)) return;
               checkTwoFaAfterAutofill(freshItem).catch(() => {});
             } catch {
               createStatusDropdown(passwordField, 'error', [
                 {
                   label: 'Retry',
-                  onClick: () => void handleAutofill(passwordField, usernameField),
+                  onClick: () => void handleAutofill(form),
                 },
               ]);
             }
@@ -205,6 +224,34 @@ async function handleAutofill(
   }
 }
 
+async function fillLoginFromPopup(itemId: string): Promise<{ success: boolean; error?: string }> {
+  const forms = detectForms(document).filter((form) => form.passwordPurpose !== 'new');
+  if (forms.length === 0) {
+    return { success: false, error: 'No compatible login form is visible on this page.' };
+  }
+
+  const focused = document.activeElement;
+  const preferred =
+    forms.find(
+      (form) => form.passwordField === focused || form.usernameField === focused,
+    ) ?? forms[0];
+
+  try {
+    const item = await refreshMatchingLoginForUse(itemId);
+    const liveForm = resolveLiveLoginForm(preferred.passwordField);
+    if (!liveForm || !fillForm(liveForm, item.username, item.password)) {
+      return { success: false, error: 'The login form changed before Authwell could fill it.' };
+    }
+    checkTwoFaAfterAutofill(item).catch(() => {});
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Authwell could not fill this login.',
+    };
+  }
+}
+
 type TotpGenerationResult = {
   code: string | null;
   remaining: number;
@@ -212,10 +259,14 @@ type TotpGenerationResult = {
 };
 
 async function fillTotp(field: HTMLInputElement, item: LoginItem): Promise<void> {
+  if (!field.isConnected) return;
+
   const result = await sendMessage<TotpGenerationResult>({
     type: 'get-item-totp',
     itemId: item.id,
   });
+  if (!field.isConnected) return;
+
   if (!result.code) {
     createStatusDropdown(field, 'error', [
       { label: 'Edit in Authwell', onClick: () => openExtensionPopup() },
@@ -227,7 +278,10 @@ async function fillTotp(field: HTMLInputElement, item: LoginItem): Promise<void>
 
 /** Fill a standalone second-factor field from logins matching this site. */
 async function handleTotpAutofill(field: HTMLInputElement): Promise<void> {
+  if (!field.isConnected) return;
+
   if (!(await isVaultUnlocked())) {
+    if (!field.isConnected) return;
     createStatusDropdown(field, 'locked', [
       { label: 'Open Authwell', onClick: () => openExtensionPopup() },
     ]);
@@ -240,11 +294,14 @@ async function handleTotpAutofill(field: HTMLInputElement): Promise<void> {
       (item): item is LoginItem => item.type === 'login' && Boolean((item as LoginItem).totp)
     );
   } catch {
+    if (!field.isConnected) return;
     createStatusDropdown(field, 'error', [
       { label: 'Retry', onClick: () => void handleTotpAutofill(field) },
     ]);
     return;
   }
+
+  if (!field.isConnected) return;
 
   if (items.length === 0) {
     createStatusDropdown(field, 'no-matches', [
@@ -278,10 +335,11 @@ async function handleIdentityAutofill(
   identityForm: import('../lib/form-detector.js').DetectedIdentityForm
 ): Promise<void> {
   const firstField = Object.values(identityForm.fields)[0];
-  if (!firstField) return;
+  if (!firstField?.isConnected) return;
 
   // Check if vault is unlocked
   const unlocked = await isVaultUnlocked();
+  if (!firstField.isConnected) return;
   if (!unlocked) {
     createStatusDropdown(firstField, 'locked', [
       { label: 'Open Authwell', onClick: () => openExtensionPopup() },
@@ -293,6 +351,7 @@ async function handleIdentityAutofill(
   try {
     identityItems = await getIdentityItems();
   } catch {
+    if (!firstField.isConnected) return;
     createStatusDropdown(firstField, 'error', [
       {
         label: 'Retry',
@@ -304,6 +363,8 @@ async function handleIdentityAutofill(
     return;
   }
 
+  if (!firstField.isConnected) return;
+
   if (identityItems.length === 0) {
     createStatusDropdown(firstField, 'no-matches', [
       { label: 'Open Authwell', onClick: () => openExtensionPopup() },
@@ -314,7 +375,9 @@ async function handleIdentityAutofill(
   if (identityItems.length === 1) {
     // Single identity — fill immediately
     try {
-      fillIdentityForm(identityForm, await refreshItemForUse(identityItems[0].id, 'identity'));
+      const item = await refreshItemForUse(identityItems[0].id, 'identity');
+      if (!firstField.isConnected) return;
+      fillIdentityForm(identityForm, item);
     } catch {
       createStatusDropdown(firstField, 'error', [
         { label: 'Retry', onClick: () => void handleIdentityAutofill(identityForm) },
@@ -333,8 +396,12 @@ async function handleIdentityAutofill(
         const item = identityItems.find((i) => i.id === selected.id);
         if (item) {
           void refreshItemForUse(item.id, 'identity')
-            .then((freshItem) => fillIdentityForm(identityForm, freshItem))
+            .then((freshItem) => {
+              if (!firstField.isConnected) return;
+              fillIdentityForm(identityForm, freshItem);
+            })
             .catch(() => {
+              if (!firstField.isConnected) return;
               createStatusDropdown(firstField, 'error', [
                 { label: 'Retry', onClick: () => void handleIdentityAutofill(identityForm) },
               ]);
@@ -498,56 +565,6 @@ function inject2faBadge(methods: string[], documentation?: string, siteName?: st
   }, 15_000);
 }
 
-/** Inject lock icon overlays into detected password fields and identity fields. */
-function injectOverlays(): void {
-  // Login forms
-  const forms = detectForms(document);
-
-  for (const form of forms) {
-    const { passwordField, usernameField } = form;
-
-    // Inject lock icon on the password field
-    if (!injectedFields.has(passwordField)) {
-      injectedFields.add(passwordField);
-      createLockIconOverlay(passwordField, () => {
-        handleAutofill(passwordField, usernameField).catch(console.error);
-      });
-    }
-
-    // Also inject lock icon on the username field so clicking it triggers autofill too
-    if (usernameField && !injectedFields.has(usernameField)) {
-      injectedFields.add(usernameField);
-      createLockIconOverlay(usernameField, () => {
-        handleAutofill(passwordField, usernameField).catch(console.error);
-      });
-    }
-  }
-
-  // Identity forms
-  const identityForms = detectIdentityForms(document);
-
-  for (const identityForm of identityForms) {
-    // Find the first identity field to anchor the lock icon
-    const firstField = Object.values(identityForm.fields)[0];
-    if (!firstField || injectedFields.has(firstField)) continue;
-    injectedFields.add(firstField);
-
-    createLockIconOverlay(firstField, () => {
-      handleIdentityAutofill(identityForm).catch(console.error);
-    });
-  }
-
-  // Standalone OTP steps often appear after the password form has navigated
-  // away, so they need their own detector and explicit user-triggered fill.
-  for (const otpField of detectOtpFields(document)) {
-    if (injectedFields.has(otpField)) continue;
-    injectedFields.add(otpField);
-    createLockIconOverlay(otpField, () => {
-      handleTotpAutofill(otpField).catch(console.error);
-    });
-  }
-}
-
 /** Inject a phishing warning banner using Shadow DOM. */
 function injectPhishingWarning(message: { url: string; score: number; reasons: string[] }): void {
   // Prevent duplicate banners
@@ -652,12 +669,48 @@ function injectPhishingWarning(message: { url: string; score: number; reasons: s
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_start',
+  allFrames: true,
 
   main(ctx) {
+    let overlayController: AutofillOverlayController | null = null;
+
+    const applyInlineAutofillPreferences = async () => {
+      try {
+        const settings = await sendMessage<{ siteEnabled: boolean }>({
+          type: 'get-inline-autofill-settings',
+        });
+        overlayController?.setEnabled(settings.siteEnabled);
+      } catch {
+        overlayController?.setEnabled(false);
+      }
+    };
+
+    const storageChangeListener = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      areaName: string,
+    ) => {
+      if (
+        areaName === 'local' &&
+        (changes[INLINE_AUTOFILL_ENABLED_KEY] || changes[INLINE_AUTOFILL_DISABLED_HOSTS_KEY])
+      ) {
+        void applyInlineAutofillPreferences();
+      }
+    };
+    chrome.storage.onChanged.addListener(storageChangeListener);
+
     // ─── DOM-dependent features (deferred until DOM is ready) ─────────────────
     function initDomFeatures() {
-      // Initial scan for login + identity forms
-      injectOverlays();
+      overlayController = new AutofillOverlayController(
+        document,
+        {
+          onLogin: (form) => handleAutofill(form),
+          onIdentity: (form) => handleIdentityAutofill(form),
+          onOtp: (field) => handleTotpAutofill(field),
+        },
+        { enabled: false },
+      );
+      overlayController.start();
+      void applyInlineAutofillPreferences();
       // Initialize save-on-submit detection
       initSaveDetector(ctx.signal);
     }
@@ -927,10 +980,22 @@ export default defineContentScript({
           .catch(() => sendResponse({ unlocked: false }));
         return true;
       } else if (message.type === 'phishing-warning') {
-        injectPhishingWarning(message);
+        if (window === window.top) injectPhishingWarning(message);
+      } else if (message.type === 'fill-login') {
+        if (typeof message.itemId !== 'string' || message.itemId.length > 128) {
+          sendResponse({ success: false, error: 'A valid login is required.' });
+          return false;
+        }
+        fillLoginFromPopup(message.itemId)
+          .then(sendResponse)
+          .catch(() =>
+            sendResponse({ success: false, error: 'Authwell could not fill this login.' }),
+          );
+        return true;
       } else if (message.type === 'get-password-field-metadata') {
-        // Extract metadata from the first password field on the page
-        const pwField = document.querySelector('input[type="password"]') as HTMLInputElement | null;
+        // Extract metadata from the first password field on the page, including
+        // open shadow roots and temporarily revealed password inputs.
+        const pwField = detectForms(document)[0]?.passwordField ?? null;
         if (pwField) {
           // Gather nearby text (labels, descriptions) for rule detection
           const label =
@@ -961,28 +1026,6 @@ export default defineContentScript({
       }
     });
 
-    // Watch for dynamically added forms (SPA navigation)
-    const observer = new MutationObserver(() => {
-      if (!chrome.runtime?.id) {
-        observer.disconnect();
-        return;
-      }
-      injectOverlays();
-    });
-
-    const startObserver = () => {
-      observer.observe(document.body, { childList: true, subtree: true });
-    };
-    if (document.body) {
-      startObserver();
-    } else {
-      document.addEventListener('DOMContentLoaded', startObserver, {
-        once: true,
-        signal: ctx.signal,
-      });
-    }
-    ctx.onInvalidated(() => observer.disconnect());
-
     // Track user activity for auto-lock
     const activityEvents = ['click', 'keydown', 'mousemove'];
     let activityThrottle: ReturnType<typeof setTimeout> | null = null;
@@ -1001,6 +1044,8 @@ export default defineContentScript({
     });
     ctx.onInvalidated(() => {
       if (activityThrottle) clearTimeout(activityThrottle);
+      overlayController?.destroy();
+      chrome.storage.onChanged.removeListener(storageChangeListener);
     });
   },
 });

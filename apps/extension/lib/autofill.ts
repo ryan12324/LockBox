@@ -1,9 +1,9 @@
 /**
  * Autofill engine for the content script.
- * Simulates real user events for SPA framework compatibility.
- * React/Vue/Angular require the full click→focus→input→change sequence.
+ * Simulates native value changes and real input events for SPA framework compatibility.
  */
 
+import { isEligibleField } from './form-detector.js';
 import type { DetectedForm, DetectedIdentityForm, IdentityFieldType } from './form-detector.js';
 import type { IdentityItem } from '@lockbox/types';
 import {
@@ -13,43 +13,299 @@ import {
 } from '@lockbox/design';
 import { iconifySvg } from './iconify.js';
 import { INJECTED_BRAND_STYLES, lockboxBrandMarkup } from './injected-brand.js';
+
+const INJECTED_THEME_STYLES = `
+  :host {
+    color-scheme: light;
+    --aw-bg: oklch(0.972 0.009 278);
+    --aw-bg-subtle: oklch(0.944 0.017 278);
+    --aw-surface: oklch(0.986 0.006 278);
+    --aw-surface-raised: oklch(0.995 0.004 278);
+    --aw-line: oklch(0.86 0.022 278);
+    --aw-line-strong: oklch(0.7 0.045 278);
+    --aw-text: oklch(0.24 0.055 274);
+    --aw-text-secondary: oklch(0.43 0.045 274);
+    --aw-primary: oklch(0.5 0.24 282);
+    --aw-primary-hover: oklch(0.44 0.23 282);
+    --aw-primary-fg: oklch(0.985 0.006 278);
+    --aw-danger: oklch(0.64 0.2 25);
+    --aw-brand-surface: oklch(0.986 0.006 278);
+    --aw-shadow: 0 8px 22px oklch(0.24 0.055 274 / 0.18);
+  }
+  .lockbox-brand {
+    width: max-content;
+    padding: 3px 5px;
+    background: var(--aw-brand-surface);
+    border-radius: 6px;
+    forced-color-adjust: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    :host {
+      color-scheme: dark;
+      --aw-bg: oklch(0.18 0.04 274);
+      --aw-bg-subtle: oklch(0.215 0.045 274);
+      --aw-surface: oklch(0.235 0.045 274);
+      --aw-surface-raised: oklch(0.27 0.045 274);
+      --aw-line: oklch(0.34 0.045 274);
+      --aw-line-strong: oklch(0.48 0.06 274);
+      --aw-text: oklch(0.94 0.01 278);
+      --aw-text-secondary: oklch(0.77 0.025 278);
+      --aw-primary: oklch(0.72 0.2 282);
+      --aw-primary-hover: oklch(0.77 0.18 282);
+      --aw-primary-fg: oklch(0.16 0.04 274);
+      --aw-danger: oklch(0.74 0.16 25);
+      --aw-shadow: 0 8px 22px oklch(0.05 0.008 274 / 0.38);
+    }
+  }
+  @media (forced-colors: active) {
+    :host {
+      --aw-bg: Canvas;
+      --aw-bg-subtle: Canvas;
+      --aw-surface: Canvas;
+      --aw-surface-raised: Canvas;
+      --aw-line: CanvasText;
+      --aw-line-strong: CanvasText;
+      --aw-text: CanvasText;
+      --aw-text-secondary: CanvasText;
+      --aw-primary: Highlight;
+      --aw-primary-hover: Highlight;
+      --aw-primary-fg: HighlightText;
+    }
+  }
+`;
+
+function removeExistingFloatingUi(ownerDocument: Document): void {
+  ownerDocument
+    .querySelectorAll<HTMLElement>(
+      '[data-authwell-ui="login-menu"], [data-authwell-ui="identity-menu"], [data-authwell-ui="status-menu"]',
+    )
+    .forEach((existing) => existing.remove());
+}
+
+function positionFloatingHost(
+  host: HTMLElement,
+  anchorField: HTMLInputElement,
+  minimumWidth = 240,
+): void {
+  if (!anchorField.isConnected || !isEligibleField(anchorField)) {
+    host.remove();
+    return;
+  }
+
+  const view = anchorField.ownerDocument.defaultView ?? window;
+  const rect = anchorField.getBoundingClientRect();
+  const viewportWidth = view.innerWidth || anchorField.ownerDocument.documentElement.clientWidth;
+  const viewportHeight = view.innerHeight || anchorField.ownerDocument.documentElement.clientHeight;
+  const gutter = 8;
+  const width = Math.min(Math.max(rect.width, minimumWidth), Math.max(0, viewportWidth - gutter * 2));
+
+  host.style.width = `${width}px`;
+  host.style.maxWidth = `calc(100vw - ${gutter * 2}px)`;
+  host.style.maxHeight = `calc(100vh - ${gutter * 2}px)`;
+  const measuredHeight = host.getBoundingClientRect().height;
+  const estimatedHeight = measuredHeight || 220;
+  const roomBelow = viewportHeight - rect.bottom - gutter;
+  const placeAbove = roomBelow < estimatedHeight && rect.top > roomBelow;
+  const top = placeAbove
+    ? Math.max(gutter, rect.top - estimatedHeight - 2)
+    : Math.min(rect.bottom + 2, Math.max(gutter, viewportHeight - estimatedHeight - gutter));
+  const left = Math.min(
+    Math.max(rect.left, gutter),
+    Math.max(gutter, viewportWidth - width - gutter),
+  );
+
+  host.style.position = 'fixed';
+  host.style.left = `${left}px`;
+  host.style.top = `${top}px`;
+  host.style.zIndex = '2147483647';
+}
+
+function installFloatingLifecycle(
+  host: HTMLElement,
+  anchorField: HTMLInputElement,
+  shadow: ShadowRoot,
+  focusSelector: string,
+): void {
+  const ownerDocument = anchorField.ownerDocument;
+  const view = ownerDocument.defaultView ?? window;
+  const originalRemove = host.remove.bind(host);
+  let removed = false;
+  let positionFrame: number | null = null;
+
+  const reposition = () => {
+    if (removed || positionFrame !== null) return;
+    const update = () => {
+      positionFrame = null;
+      if (!removed) positionFloatingHost(host, anchorField);
+    };
+    positionFrame =
+      typeof view.requestAnimationFrame === 'function'
+        ? view.requestAnimationFrame(update)
+        : view.setTimeout(update, 16);
+  };
+  const close = (restoreFocus = false) => {
+    if (removed) return;
+    removed = true;
+    ownerDocument.removeEventListener('pointerdown', outsideHandler, true);
+    ownerDocument.removeEventListener('focusin', focusHandler, true);
+    view.removeEventListener('resize', reposition);
+    view.removeEventListener('scroll', reposition, true);
+    resizeObserver?.disconnect();
+    mutationObserver.disconnect();
+    if (positionFrame !== null) {
+      if (typeof view.cancelAnimationFrame === 'function') view.cancelAnimationFrame(positionFrame);
+      else view.clearTimeout(positionFrame);
+      positionFrame = null;
+    }
+    originalRemove();
+    if (restoreFocus && anchorField.isConnected) anchorField.focus({ preventScroll: true });
+  };
+
+  const outsideHandler = (event: Event) => {
+    const target = event.target;
+    if (target instanceof Node && !host.contains(target) && target !== anchorField) close();
+  };
+  const focusHandler = (event: FocusEvent) => {
+    const target = event.target;
+    if (target instanceof Node && !host.contains(target) && target !== anchorField) close();
+  };
+  const resizeObserver =
+    typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reposition);
+  const mutationObserver = new MutationObserver((records) => {
+    if (records.every((record) => record.target === host || host.contains(record.target))) return;
+    if (!host.isConnected || !anchorField.isConnected || !isEligibleField(anchorField)) close();
+    else reposition();
+  });
+
+  host.remove = () => close();
+  ownerDocument.addEventListener('pointerdown', outsideHandler, true);
+  ownerDocument.addEventListener('focusin', focusHandler, true);
+  view.addEventListener('resize', reposition, { passive: true });
+  view.addEventListener('scroll', reposition, { capture: true, passive: true });
+  resizeObserver?.observe(anchorField);
+  resizeObserver?.observe(host);
+  if (ownerDocument.body) {
+    mutationObserver.observe(ownerDocument.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-hidden', 'class', 'disabled', 'hidden', 'inert', 'readonly', 'style'],
+    });
+  }
+
+  shadow.addEventListener('keydown', (event) => {
+    if (!(event instanceof KeyboardEvent)) return;
+    const controls = Array.from(shadow.querySelectorAll<HTMLElement>(focusSelector));
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      close(true);
+      return;
+    }
+    if (controls.length === 0 || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    const currentIndex = controls.indexOf(shadow.activeElement as HTMLElement);
+    const nextIndex =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? controls.length - 1
+          : event.key === 'ArrowUp'
+            ? (currentIndex - 1 + controls.length) % controls.length
+            : (currentIndex + 1) % controls.length;
+    controls[nextIndex]?.focus();
+  });
+
+  queueMicrotask(() => {
+    if (!removed) shadow.querySelector<HTMLElement>(focusSelector)?.focus();
+  });
+}
 /**
  * Simulate filling a single input field with SPA-compatible events.
  * This sequence is required for React/Vue/Angular to detect the value change.
  */
-export function simulateFill(field: HTMLInputElement, value: string): void {
-  // 1. Click to focus
-  field.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+export function simulateFill(field: HTMLInputElement, value: string): boolean {
+  if (!field.isConnected || !isEligibleField(field)) return false;
 
-  // 2. Focus
-  field.focus();
-  field.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+  const view = field.ownerDocument.defaultView;
+  const inputPrototype = view?.HTMLInputElement?.prototype ?? HTMLInputElement.prototype;
+  const valueSetter = Object.getOwnPropertyDescriptor(inputPrototype, 'value')?.set;
 
-  // 3. Clear existing value
-  field.value = '';
-  field.dispatchEvent(new Event('input', { bubbles: true }));
+  field.focus({ preventScroll: true });
 
-  // 4. Set new value
-  field.value = value;
+  if (valueSetter) valueSetter.call(field, value);
+  else field.value = value;
 
-  // 5. Dispatch input event (React/Vue listen to this)
-  field.dispatchEvent(new Event('input', { bubbles: true }));
+  const InputEventConstructor = view?.InputEvent;
+  const EventConstructor = view?.Event ?? Event;
+  const inputEvent = InputEventConstructor
+    ? new InputEventConstructor('input', {
+        bubbles: true,
+        composed: true,
+        data: value,
+        inputType: 'insertReplacementText',
+      })
+    : new EventConstructor('input', { bubbles: true, composed: true });
 
-  // 6. Dispatch change event
-  field.dispatchEvent(new Event('change', { bubbles: true }));
-
-  // 7. Blur
-  field.dispatchEvent(new FocusEvent('blur', { bubbles: true }));
+  field.dispatchEvent(inputEvent);
+  field.dispatchEvent(new EventConstructor('change', { bubbles: true, composed: true }));
+  return true;
 }
 
 /**
  * Fill a detected login form with username and password.
  */
-export function fillForm(form: DetectedForm, username: string, password: string): void {
+export function fillForm(form: DetectedForm, username: string, password: string): boolean {
+  if (!form.passwordField.isConnected) return false;
   if (form.usernameField) {
     simulateFill(form.usernameField, username);
   }
-  simulateFill(form.passwordField, password);
+  return simulateFill(form.passwordField, password);
+}
+
+export interface LockIconOverlayHandle {
+  host: HTMLElement;
+  field: HTMLInputElement;
+  reposition: () => void;
+  destroy: () => void;
+}
+
+function getFieldAccessibleName(field: HTMLInputElement): string {
+  const explicitLabel = field.labels?.[0]?.textContent?.trim();
+  const ariaLabel = field.getAttribute('aria-label')?.trim();
+  const placeholder = field.placeholder.trim();
+  return explicitLabel || ariaLabel || placeholder || 'this field';
+}
+
+function findEndAddonInset(field: HTMLInputElement, rect: DOMRect): number {
+  const container = field.parentElement;
+  if (!container || rect.width <= 0 || rect.height <= 0) return 0;
+
+  const direction = (field.ownerDocument.defaultView ?? window).getComputedStyle(field).direction;
+  let inset = 0;
+  const controls = container.querySelectorAll<HTMLElement>(
+    'button, [role="button"], input[type="button"], input[type="checkbox"]',
+  );
+
+  for (const control of controls) {
+    const label = `${control.getAttribute('aria-label') ?? ''} ${control.title} ${control.textContent ?? ''}`;
+    if (!/(show|hide|reveal|visibility|password|passcode|eye)/i.test(label)) continue;
+
+    const controlRect = control.getBoundingClientRect();
+    const overlapsVertically = controlRect.bottom > rect.top && controlRect.top < rect.bottom;
+    const overlapsField = controlRect.right > rect.left && controlRect.left < rect.right;
+    if (!overlapsVertically || !overlapsField) continue;
+
+    const candidate =
+      direction === 'rtl'
+        ? controlRect.right - rect.left + 6
+        : rect.right - controlRect.left + 6;
+    inset = Math.max(inset, candidate);
+  }
+
+  return inset;
 }
 
 /**
@@ -57,59 +313,130 @@ export function fillForm(form: DetectedForm, username: string, password: string)
  * Uses position:fixed to avoid stacking-context issues with the input.
  * Shadow DOM isolates styles from the page.
  */
-export function createLockIconOverlay(field: HTMLInputElement, onClick: () => void): HTMLElement {
-  const host = document.createElement('div');
+export function createLockIconOverlay(
+  field: HTMLInputElement,
+  onClick: () => void,
+): LockIconOverlayHandle {
+  const ownerDocument = field.ownerDocument;
+  const view = ownerDocument.defaultView ?? window;
+  const host = ownerDocument.createElement('div');
   host.className = 'lockbox-lock-overlay';
+  host.dataset.authwellUi = 'field-control';
 
-  // Position the icon inside the right edge of the input using fixed positioning.
-  // This avoids stacking context / overflow:hidden issues with the parent.
+  const size = 44;
   const positionIcon = () => {
+    if (!field.isConnected || !isEligibleField(field)) {
+      host.style.display = 'none';
+      btn.tabIndex = -1;
+      return;
+    }
+
     const rect = field.getBoundingClientRect();
-    const size = 24;
+    if (rect.width <= 0 || rect.height <= 0) {
+      host.style.display = 'none';
+      btn.tabIndex = -1;
+      return;
+    }
+
+    const direction = view.getComputedStyle(field).direction;
+    const addonInset = findEndAddonInset(field, rect);
+    const viewportWidth = view.innerWidth || ownerDocument.documentElement.clientWidth;
+    const viewportHeight = view.innerHeight || ownerDocument.documentElement.clientHeight;
+    let left =
+      direction === 'rtl'
+        ? rect.left + 4 + addonInset
+        : rect.right - size - 4 - addonInset;
+
+    if (left < rect.left || left + size > rect.right) {
+      const outsideEnd = direction === 'rtl' ? rect.left - size - 4 : rect.right + 4;
+      const outsideStart = direction === 'rtl' ? rect.right + 4 : rect.left - size - 4;
+      left =
+        outsideEnd >= 4 && outsideEnd + size <= viewportWidth - 4 ? outsideEnd : outsideStart;
+    }
+
+    left = Math.min(Math.max(left, 4), Math.max(4, viewportWidth - size - 4));
+    const top = Math.min(
+      Math.max(rect.top + (rect.height - size) / 2, 4),
+      Math.max(4, viewportHeight - size - 4),
+    );
+
+    const outsideViewport = rect.bottom < 0 || rect.top > viewportHeight || rect.right < 0 || rect.left > viewportWidth;
+    host.style.display = outsideViewport ? 'none' : 'flex';
+    btn.tabIndex = outsideViewport ? -1 : 0;
     host.style.cssText = `
       position: fixed;
-      left: ${rect.right - size - 6}px;
-      top: ${rect.top + (rect.height - size) / 2}px;
+      left: ${left}px;
+      top: ${top}px;
       width: ${size}px;
       height: ${size}px;
-      z-index: 2147483647;
+      z-index: 2147483646;
       cursor: pointer;
       pointer-events: auto;
-      display: flex;
+      display: ${outsideViewport ? 'none' : 'flex'};
       align-items: center;
       justify-content: center;
     `;
   };
 
-  positionIcon();
-
   const shadow = host.attachShadow({ mode: 'closed' });
 
-  const style = document.createElement('style');
+  const style = ownerDocument.createElement('style');
   style.textContent = `
-    :host { display: flex; align-items: center; justify-content: center; }
-    button {
-      all: unset;
-      cursor: pointer;
-      line-height: 1;
-      opacity: 0.5;
-      transition: opacity 0.15s;
+    :host {
       display: flex;
       align-items: center;
       justify-content: center;
-      width: 100%;
-      height: 100%;
+      color-scheme: light;
+      --aw-control: oklch(0.986 0.006 278 / 0.96);
+      --aw-line: oklch(0.78 0.035 278);
+      --aw-ink: oklch(0.43 0.045 274);
+      --aw-focus: oklch(0.62 0.24 282);
+      --aw-shadow: 0 2px 8px oklch(0.24 0.055 274 / 0.18);
     }
-    button svg { display: block; color: #6B5640; }
-    button:hover { opacity: 1; }
-    button:focus-visible { opacity: 1; outline: 2px solid #635BFF; outline-offset: 2px; border-radius: 4px; }
+    button {
+      all: unset;
+      box-sizing: border-box;
+      cursor: pointer;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      color: var(--aw-ink);
+      background: var(--aw-control);
+      border: 1px solid var(--aw-line);
+      border-radius: 10px;
+      box-shadow: var(--aw-shadow);
+      opacity: 0.9;
+      transition: opacity 160ms cubic-bezier(0.22, 1, 0.36, 1), background 160ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    button svg { display: block; color: currentColor; }
+    button:hover, button:active { opacity: 1; }
+    button:focus-visible { opacity: 1; outline: 3px solid var(--aw-focus); outline-offset: 2px; }
+    @media (prefers-color-scheme: dark) {
+      :host {
+        color-scheme: dark;
+        --aw-control: oklch(0.235 0.045 274 / 0.97);
+        --aw-line: oklch(0.48 0.06 274);
+        --aw-ink: oklch(0.94 0.01 278);
+        --aw-focus: oklch(0.72 0.2 282);
+        --aw-shadow: 0 2px 8px oklch(0.05 0.008 274 / 0.34);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      button { transition-duration: 0.01ms; }
+    }
+    @media (forced-colors: active) {
+      button { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
+    }
   `;
 
-  const btn = document.createElement('button');
+  const btn = ownerDocument.createElement('button');
   btn.type = 'button';
   btn.title = 'Autofill with Authwell';
-  btn.setAttribute('aria-label', 'Autofill with Authwell');
-  btn.innerHTML = iconifySvg('lock', { size: 16 });
+  btn.setAttribute('aria-label', `Autofill ${getFieldAccessibleName(field)} with Authwell`);
+  btn.innerHTML = iconifySvg('lock', { size: 18 });
 
   shadow.appendChild(style);
   shadow.appendChild(btn);
@@ -121,31 +448,15 @@ export function createLockIconOverlay(field: HTMLInputElement, onClick: () => vo
     onClick();
   });
 
-  // Fallback: also handle click on the host itself
-  host.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onClick();
-  });
+  ownerDocument.body.appendChild(host);
+  positionIcon();
 
-  // Reposition on scroll and resize
-  const reposition = () => positionIcon();
-  window.addEventListener('scroll', reposition, { passive: true });
-  window.addEventListener('resize', reposition, { passive: true });
-
-  // Remove listeners when the host is removed from the DOM
-  const observer = new MutationObserver(() => {
-    if (!host.isConnected) {
-      window.removeEventListener('scroll', reposition);
-      window.removeEventListener('resize', reposition);
-      observer.disconnect();
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-
-  document.body.appendChild(host);
-
-  return host;
+  return {
+    host,
+    field,
+    reposition: positionIcon,
+    destroy: () => host.remove(),
+  };
 }
 
 /**
@@ -156,27 +467,23 @@ export function createSuggestionDropdown(
   items: Array<{ id: string; name: string; username: string; uris?: string[] }>,
   onSelect: (item: { id: string; name: string; username: string; uris?: string[] }) => void
 ): HTMLElement {
-  const host = document.createElement('div');
-
-  const rect = anchorField.getBoundingClientRect();
-  host.style.cssText = `
-    position: fixed;
-    left: ${rect.left}px;
-    top: ${rect.bottom + 2}px;
-    z-index: 2147483647;
-    min-width: ${rect.width}px;
-  `;
+  const ownerDocument = anchorField.ownerDocument;
+  removeExistingFloatingUi(ownerDocument);
+  const host = ownerDocument.createElement('div');
+  host.dataset.authwellUi = 'login-menu';
 
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
      <style>
+       ${INJECTED_THEME_STYLES}
        ${INJECTED_BRAND_STYLES}
        .dropdown {
-         background: #F7F8FC;
-         border: 1px solid #D8DDF0;
+         max-height: min(360px, calc(100vh - 16px));
+         overflow: auto;
+         background: var(--aw-surface);
+         border: 1px solid var(--aw-line);
          border-radius: 10px;
-         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-         overflow: hidden;
+         box-shadow: var(--aw-shadow);
          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
          font-size: 13px;
        }
@@ -185,8 +492,8 @@ export function createSuggestionDropdown(
          padding: 7px 12px;
          display: flex;
          align-items: center;
-         background: #EDEFFA;
-         border-bottom: 1px solid #D8DDF0;
+         background: var(--aw-bg-subtle);
+         border-bottom: 1px solid var(--aw-line);
        }
        .header .lockbox-brand__logo { width: 84px; }
        .item {
@@ -199,13 +506,14 @@ export function createSuggestionDropdown(
          gap: 9px;
          background: transparent;
          border: 0;
-         border-bottom: 1px solid #D8DDF0;
+         color: var(--aw-text);
+         border-bottom: 1px solid var(--aw-line);
          font: inherit;
          text-align: left;
        }
        .item:last-child { border-bottom: none; }
-       .item:hover { background: rgba(196,168,130,0.1); }
-       .item:focus-visible { outline: 2px solid #635BFF; outline-offset: -2px; }
+       .item:hover, .item:focus-visible { background: var(--aw-bg-subtle); }
+       .item:focus-visible { outline: 3px solid var(--aw-primary); outline-offset: -3px; }
        .item-icon {
          width: 28px;
          height: 28px;
@@ -213,9 +521,9 @@ export function createSuggestionDropdown(
          display: inline-flex;
          align-items: center;
          justify-content: center;
-         color: #635BFF;
-         background: #F3F0EB;
-         border: 1px solid #D8DDF0;
+         color: var(--aw-primary);
+         background: var(--aw-bg-subtle);
+         border: 1px solid var(--aw-line);
          border-radius: 7px;
          overflow: hidden;
        }
@@ -231,34 +539,35 @@ export function createSuggestionDropdown(
        .item-icon[data-loaded="true"] img { opacity: 1; }
        .item-icon[data-loaded="true"] svg { visibility: hidden; }
        .item-copy { min-width: 0; display: grid; gap: 2px; }
-       .item-name { font-weight: 500; color: #10162F; }
+       .item-name { font-weight: 500; color: var(--aw-text); }
        .item-name, .item-username { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-       .item-username { color: #4B5270; font-size: 12px; }
-    </style>
-    <div class="dropdown">
+       .item-username { color: var(--aw-text-secondary); font-size: 12px; }
+     </style>
+    <div class="dropdown" role="menu" aria-label="Authwell saved logins">
       <div class="header">${lockboxBrandMarkup()}</div>
     </div>
   `;
 
   const dropdown = shadow.querySelector('.dropdown')!;
   for (const item of items) {
-    const button = document.createElement('button');
+    const button = ownerDocument.createElement('button');
     button.type = 'button';
     button.className = 'item';
+    button.setAttribute('role', 'menuitem');
 
-    const name = document.createElement('span');
+    const name = ownerDocument.createElement('span');
     name.className = 'item-name';
     name.textContent = item.name;
-    const username = document.createElement('span');
+    const username = ownerDocument.createElement('span');
     username.className = 'item-username';
     username.textContent = item.username;
-    const icon = document.createElement('span');
+    const icon = ownerDocument.createElement('span');
     icon.className = 'item-icon';
     icon.setAttribute('aria-hidden', 'true');
     icon.innerHTML = iconifySvg('world', { size: 16 });
     const siteIconUrls = getCachedSiteIconUrls(item.uris);
     if (siteIconUrls.length > 0) {
-      const image = document.createElement('img');
+      const image = ownerDocument.createElement('img');
       image.alt = '';
       image.width = 28;
       image.height = 28;
@@ -280,7 +589,7 @@ export function createSuggestionDropdown(
       });
       icon.appendChild(image);
     }
-    const copy = document.createElement('span');
+    const copy = ownerDocument.createElement('span');
     copy.className = 'item-copy';
     copy.append(name, username);
     button.append(icon, copy);
@@ -291,16 +600,9 @@ export function createSuggestionDropdown(
     dropdown.appendChild(button);
   }
 
-  document.body.appendChild(host);
-
-  // Close on outside click
-  const closeHandler = (e: MouseEvent) => {
-    if (!host.contains(e.target as Node)) {
-      host.remove();
-      document.removeEventListener('click', closeHandler);
-    }
-  };
-  setTimeout(() => document.addEventListener('click', closeHandler), 0);
+  ownerDocument.body.appendChild(host);
+  positionFloatingHost(host, anchorField);
+  installFloatingLifecycle(host, anchorField, shadow, '.item');
 
   return host;
 }
@@ -357,27 +659,23 @@ export function createIdentitySuggestionDropdown(
   items: Array<{ id: string; name: string; detail: string }>,
   onSelect: (item: { id: string; name: string; detail: string }) => void
 ): HTMLElement {
-  const host = document.createElement('div');
-
-  const rect = anchorField.getBoundingClientRect();
-  host.style.cssText = `
-    position: fixed;
-    left: ${rect.left}px;
-    top: ${rect.bottom + 2}px;
-    z-index: 2147483647;
-    min-width: ${rect.width}px;
-  `;
+  const ownerDocument = anchorField.ownerDocument;
+  removeExistingFloatingUi(ownerDocument);
+  const host = ownerDocument.createElement('div');
+  host.dataset.authwellUi = 'identity-menu';
 
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `
      <style>
+       ${INJECTED_THEME_STYLES}
        ${INJECTED_BRAND_STYLES}
        .dropdown {
-         background: #F7F8FC;
-         border: 1px solid #D8DDF0;
+         max-height: min(360px, calc(100vh - 16px));
+         overflow: auto;
+         background: var(--aw-surface);
+         border: 1px solid var(--aw-line);
          border-radius: 10px;
-         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-         overflow: hidden;
+         box-shadow: var(--aw-shadow);
          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
          font-size: 13px;
        }
@@ -386,8 +684,8 @@ export function createIdentitySuggestionDropdown(
          padding: 7px 12px;
          display: flex;
          align-items: center;
-         background: #EDEFFA;
-         border-bottom: 1px solid #D8DDF0;
+         background: var(--aw-bg-subtle);
+         border-bottom: 1px solid var(--aw-line);
        }
        .header .lockbox-brand__logo { width: 84px; }
        .item {
@@ -399,31 +697,33 @@ export function createIdentitySuggestionDropdown(
          gap: 2px;
          background: transparent;
          border: 0;
-         border-bottom: 1px solid #D8DDF0;
+         color: var(--aw-text);
+         border-bottom: 1px solid var(--aw-line);
          font: inherit;
          text-align: left;
        }
        .item:last-child { border-bottom: none; }
-       .item:hover { background: rgba(196,168,130,0.1); }
-       .item:focus-visible { outline: 2px solid #635BFF; outline-offset: -2px; }
-       .item-name { font-weight: 500; color: #10162F; }
-       .item-detail { color: #4B5270; font-size: 12px; }
+       .item:hover, .item:focus-visible { background: var(--aw-bg-subtle); }
+       .item:focus-visible { outline: 3px solid var(--aw-primary); outline-offset: -3px; }
+       .item-name { font-weight: 500; color: var(--aw-text); }
+       .item-detail { color: var(--aw-text-secondary); font-size: 12px; }
      </style>
-     <div class="dropdown">
+     <div class="dropdown" role="menu" aria-label="Authwell identities">
        <div class="header">${lockboxBrandMarkup()}</div>
     </div>
   `;
 
   const dropdown = shadow.querySelector('.dropdown')!;
   for (const item of items) {
-    const button = document.createElement('button');
+    const button = ownerDocument.createElement('button');
     button.type = 'button';
     button.className = 'item';
+    button.setAttribute('role', 'menuitem');
 
-    const name = document.createElement('span');
+    const name = ownerDocument.createElement('span');
     name.className = 'item-name';
     name.textContent = item.name;
-    const detail = document.createElement('span');
+    const detail = ownerDocument.createElement('span');
     detail.className = 'item-detail';
     detail.textContent = item.detail;
     button.append(name, detail);
@@ -434,16 +734,9 @@ export function createIdentitySuggestionDropdown(
     dropdown.appendChild(button);
   }
 
-  document.body.appendChild(host);
-
-  // Close on outside click
-  const closeHandler = (e: MouseEvent) => {
-    if (!host.contains(e.target as Node)) {
-      host.remove();
-      document.removeEventListener('click', closeHandler);
-    }
-  };
-  setTimeout(() => document.addEventListener('click', closeHandler), 0);
+  ownerDocument.body.appendChild(host);
+  positionFloatingHost(host, anchorField);
+  installFloatingLifecycle(host, anchorField, shadow, '.item');
 
   return host;
 }
@@ -467,20 +760,12 @@ export function createStatusDropdown(
   type: StatusDropdownType,
   actions: StatusDropdownAction[]
 ): HTMLElement {
-  // Remove any existing status dropdown
-  document.getElementById('lockbox-status-dropdown')?.remove();
+  const ownerDocument = anchorField.ownerDocument;
+  removeExistingFloatingUi(ownerDocument);
 
-  const host = document.createElement('div');
+  const host = ownerDocument.createElement('div');
   host.id = 'lockbox-status-dropdown';
-
-  const rect = anchorField.getBoundingClientRect();
-  host.style.cssText = `
-    position: fixed;
-    left: ${rect.left}px;
-    top: ${rect.bottom + 2}px;
-    z-index: 2147483647;
-    min-width: ${Math.max(rect.width, 240)}px;
-  `;
+  host.dataset.authwellUi = 'status-menu';
 
   const shadow = host.attachShadow({ mode: 'open' });
 
@@ -506,14 +791,15 @@ export function createStatusDropdown(
   const title = titleMap[type];
   const desc = descMap[type];
 
-  const style = document.createElement('style');
+  const style = ownerDocument.createElement('style');
   style.textContent = `
+     ${INJECTED_THEME_STYLES}
      ${INJECTED_BRAND_STYLES}
      .dropdown {
-       background: #F7F8FC;
-       border: 1px solid #D8DDF0;
+       background: var(--aw-surface);
+       border: 1px solid var(--aw-line);
        border-radius: 10px;
-       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+       box-shadow: var(--aw-shadow);
        overflow: hidden;
        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
        font-size: 13px;
@@ -523,8 +809,8 @@ export function createStatusDropdown(
        padding: 7px 12px;
        display: flex;
        align-items: center;
-       background: #EDEFFA;
-       border-bottom: 1px solid #D8DDF0;
+       background: var(--aw-bg-subtle);
+       border-bottom: 1px solid var(--aw-line);
      }
      .header .lockbox-brand__logo { width: 84px; }
      .body {
@@ -533,46 +819,53 @@ export function createStatusDropdown(
        align-items: flex-start;
        gap: 10px;
      }
-     .icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+     .icon { color: var(--aw-primary); font-size: 20px; line-height: 1; flex-shrink: 0; }
      .text { flex: 1; min-width: 0; }
-     .title { font-weight: 600; color: #10162F; margin-bottom: 2px; }
-     .desc { color: #4B5270; font-size: 12px; line-height: 1.4; }
+     .title { font-weight: 600; color: var(--aw-text); margin-bottom: 2px; }
+     .desc { color: var(--aw-text-secondary); font-size: 12px; line-height: 1.4; }
      .actions {
        padding: 8px 12px;
-       border-top: 1px solid #D8DDF0;
+       border-top: 1px solid var(--aw-line);
        display: flex;
        gap: 8px;
        justify-content: flex-end;
      }
      .btn {
-       padding: 5px 12px;
+       min-height: 36px;
+       padding: 7px 12px;
        border-radius: 10px;
        font-size: 12px;
        font-weight: 500;
        cursor: pointer;
-       border: 1px solid #D8DDF0;
-       background: #F7F8FC;
-       color: #4B5270;
-       transition: background 0.15s;
+       border: 1px solid var(--aw-line);
+       background: var(--aw-surface);
+       color: var(--aw-text-secondary);
+       transition: background 160ms cubic-bezier(0.22, 1, 0.36, 1);
      }
-     .btn:hover { background: #EDEFFA; }
+     .btn:hover { background: var(--aw-bg-subtle); }
+     .btn:focus-visible { outline: 3px solid var(--aw-primary); outline-offset: 2px; }
      .btn-primary {
-       background: #635BFF;
-       color: white;
-       border-color: #635BFF;
+       background: var(--aw-primary);
+       color: var(--aw-primary-fg);
+       border-color: var(--aw-primary);
      }
-     .btn-primary:hover { background: #554DF0; }
+     .btn-primary:hover { background: var(--aw-primary-hover); }
+     @media (pointer: coarse) { .btn { min-height: 44px; } }
+     @media (prefers-reduced-motion: reduce) { .btn { transition-duration: 0.01ms; } }
    `;
 
-  const dropdown = document.createElement('div');
+  const dropdown = ownerDocument.createElement('div');
   dropdown.className = 'dropdown';
+  dropdown.setAttribute('role', actions.length > 0 ? 'dialog' : 'status');
+  dropdown.setAttribute('aria-label', title);
+  if (actions.length === 0) dropdown.setAttribute('aria-live', 'polite');
 
-  const headerEl = document.createElement('div');
+  const headerEl = ownerDocument.createElement('div');
   headerEl.className = 'header';
   headerEl.innerHTML = lockboxBrandMarkup();
   dropdown.appendChild(headerEl);
 
-  const bodyEl = document.createElement('div');
+  const bodyEl = ownerDocument.createElement('div');
   bodyEl.className = 'body';
   bodyEl.innerHTML = `
     <span class="icon">${iconifySvg(icon, { size: 20 })}</span>
@@ -584,11 +877,12 @@ export function createStatusDropdown(
   dropdown.appendChild(bodyEl);
 
   if (actions.length > 0) {
-    const actionsEl = document.createElement('div');
+    const actionsEl = ownerDocument.createElement('div');
     actionsEl.className = 'actions';
 
     actions.forEach((action, i) => {
-      const btn = document.createElement('button');
+      const btn = ownerDocument.createElement('button');
+      btn.type = 'button';
       btn.className = i === actions.length - 1 ? 'btn btn-primary' : 'btn';
       btn.textContent = action.label;
       btn.addEventListener('click', (e) => {
@@ -604,16 +898,9 @@ export function createStatusDropdown(
 
   shadow.appendChild(style);
   shadow.appendChild(dropdown);
-  document.body.appendChild(host);
-
-  // Close on outside click
-  const closeHandler = (e: MouseEvent) => {
-    if (!host.contains(e.target as Node)) {
-      host.remove();
-      document.removeEventListener('click', closeHandler);
-    }
-  };
-  setTimeout(() => document.addEventListener('click', closeHandler), 0);
+  ownerDocument.body.appendChild(host);
+  positionFloatingHost(host, anchorField);
+  installFloatingLifecycle(host, anchorField, shadow, '.btn');
 
   // Auto-dismiss after 10 seconds
   setTimeout(() => {

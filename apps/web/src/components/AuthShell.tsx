@@ -14,7 +14,7 @@ export default function AuthShell({
   eyebrow,
   title,
   description,
-  icon = 'shield-lock',
+  icon,
   children,
   footer,
 }: AuthShellProps) {
@@ -29,9 +29,11 @@ export default function AuthShell({
           />
         </div>
         <div className="auth-story__content">
-          <span className="auth-story__icon" aria-hidden="true">
-            <Icon name={icon} size={28} />
-          </span>
+          {icon && (
+            <span className="auth-story__icon" aria-hidden="true">
+              <Icon name={icon} size={28} />
+            </span>
+          )}
           <p className="auth-eyebrow">{eyebrow}</p>
           <h1>{title}</h1>
           <p className="auth-description">{description}</p>

@@ -41,6 +41,66 @@ async function getFreshLoginField(itemId: string, field: 'username' | 'password'
   return (item as LoginItem)[field] ?? '';
 }
 
+async function getTabFrameIds(tabId: number): Promise<number[]> {
+  try {
+    const frames = await chrome.webNavigation.getAllFrames({ tabId });
+    const frameIds = (frames ?? []).map((frame) => frame.frameId);
+    return Array.from(new Set([0, ...frameIds])).sort((left, right) => left - right);
+  } catch {
+    return [0];
+  }
+}
+
+async function fillLoginInTab(
+  tabId: number,
+  itemId: string,
+): Promise<{ success: boolean; error?: string }> {
+  let usefulError = '';
+  let reachedContentScript = false;
+  for (const frameId of await getTabFrameIds(tabId)) {
+    try {
+      const response = (await chrome.tabs.sendMessage(
+        tabId,
+        { type: 'fill-login', itemId },
+        { frameId },
+      )) as { success: boolean; error?: string };
+      reachedContentScript = true;
+      if (response?.success) return response;
+      if (response?.error && !/no compatible login form/i.test(response.error)) {
+        usefulError = response.error;
+      }
+    } catch {
+      // A frame can disappear during SPA navigation; continue with live frames.
+    }
+  }
+  return {
+    success: false,
+    error:
+      usefulError ||
+      (reachedContentScript
+        ? 'No compatible login form is visible on this page.'
+        : 'Authwell cannot fill this browser page. Copy the fields instead.'),
+  };
+}
+
+async function getPasswordMetadataFromTab(
+  tabId: number,
+): Promise<PasswordFieldMetadata | null> {
+  for (const frameId of await getTabFrameIds(tabId)) {
+    try {
+      const metadata = (await chrome.tabs.sendMessage(
+        tabId,
+        { type: 'get-password-field-metadata' },
+        { frameId },
+      )) as PasswordFieldMetadata | null;
+      if (metadata) return metadata;
+    } catch {
+      // Ignore inaccessible or detached frames and inspect the next one.
+    }
+  }
+  return null;
+}
+
 export function SiteTab({
   items,
   siteHost,
@@ -52,6 +112,40 @@ export function SiteTab({
 }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [useError, setUseError] = useState('');
+  const [fillingId, setFillingId] = useState<string | null>(null);
+  const [filledId, setFilledId] = useState<string | null>(null);
+  const [globalInlineAutofillEnabled, setGlobalInlineAutofillEnabled] = useState(true);
+  const [siteInlineAutofillEnabled, setSiteInlineAutofillEnabled] = useState(true);
+  const [siteSettingLoading, setSiteSettingLoading] = useState(false);
+
+  const getActiveTab = useCallback(
+    async (): Promise<chrome.tabs.Tab & { id: number; url: string }> => {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.id === undefined || !tab.url) {
+        throw new Error('Open a web page before using autofill.');
+      }
+      return tab as chrome.tabs.Tab & { id: number; url: string };
+    },
+    [],
+  );
+
+  const refreshInlineAutofillStatus = useCallback(async () => {
+    try {
+      const tab = await getActiveTab();
+      const status = await sendMessage<{
+        enabled: boolean;
+        hostEnabled: boolean;
+      }>({ type: 'get-inline-autofill-settings', url: tab.url });
+      setGlobalInlineAutofillEnabled(status.enabled);
+      setSiteInlineAutofillEnabled(status.hostEnabled);
+    } catch {
+      // Restricted browser pages do not have a site-level autofill status.
+    }
+  }, [getActiveTab]);
+
+  useEffect(() => {
+    void refreshInlineAutofillStatus();
+  }, [refreshInlineAutofillStatus, siteHost]);
 
   async function copyToClipboard(text: string, id: string) {
     await navigator.clipboard.writeText(text);
@@ -68,6 +162,74 @@ export function SiteTab({
     }
   }
 
+  async function fillLogin(itemId: string) {
+    setUseError('');
+    setFilledId(null);
+    setFillingId(itemId);
+    try {
+      const tab = await getActiveTab();
+      const response = await fillLoginInTab(tab.id, itemId);
+      if (!response?.success) {
+        throw new Error(response?.error ?? 'Authwell could not fill this login.');
+      }
+      setFilledId(itemId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Authwell could not fill this login.';
+      setUseError(
+        /receiving end|could not establish connection/i.test(message)
+          ? 'Authwell cannot fill this browser page. Copy the fields instead.'
+          : message,
+      );
+    } finally {
+      setFillingId(null);
+    }
+  }
+
+  async function toggleSiteInlineAutofill() {
+    setUseError('');
+    setSiteSettingLoading(true);
+    try {
+      const tab = await getActiveTab();
+      const nextEnabled = !siteInlineAutofillEnabled;
+      const response = await sendMessage<{ success: boolean; error?: string }>({
+        type: 'set-site-inline-autofill',
+        url: tab.url,
+        enabled: nextEnabled,
+      });
+      if (!response.success) throw new Error(response.error ?? 'The site setting was not saved.');
+      setSiteInlineAutofillEnabled(nextEnabled);
+    } catch (error) {
+      setUseError(error instanceof Error ? error.message : 'Authwell could not update this site.');
+    } finally {
+      setSiteSettingLoading(false);
+    }
+  }
+
+  const siteControls = (
+    <div className="extension-site__preference">
+      <div>
+        <strong>Field controls</strong>
+        <small>
+          {!globalInlineAutofillEnabled
+            ? 'Hidden globally in Settings'
+            : siteInlineAutofillEnabled
+              ? 'Shown on this site'
+              : 'Hidden on this site'}
+        </small>
+      </div>
+      <Button
+        variant={siteInlineAutofillEnabled ? 'secondary' : 'primary'}
+        size="sm"
+        loading={siteSettingLoading}
+        disabled={!globalInlineAutofillEnabled}
+        aria-pressed={siteInlineAutofillEnabled}
+        onClick={() => void toggleSiteInlineAutofill()}
+      >
+        {!globalInlineAutofillEnabled ? 'Global off' : siteInlineAutofillEnabled ? 'Hide' : 'Show'}
+      </Button>
+    </div>
+  );
+
   if (items.length === 0) {
     return (
       <div className="extension-site">
@@ -75,6 +237,12 @@ export function SiteTab({
           <span>{siteHost}</span>
           <small>Saved for this page</small>
         </div>
+        {siteControls}
+        {useError && (
+          <p role="alert" className="px-3 text-xs text-[var(--color-error)]">
+            {useError}
+          </p>
+        )}
         <div className="extension-empty">
           <span>
             <Icon name="world" size={24} />
@@ -98,6 +266,7 @@ export function SiteTab({
           {items.length} {items.length === 1 ? 'saved item' : 'saved items'} for this page
         </small>
       </div>
+      {siteControls}
       {useError && (
         <p role="alert" className="px-3 text-xs text-[var(--color-error)]">
           {useError}
@@ -123,6 +292,17 @@ export function SiteTab({
             {item.type === 'login' && (
               <div className="extension-site__actions">
                 <Button
+                  variant={filledId === item.id ? 'secondary' : 'primary'}
+                  size="sm"
+                  loading={fillingId === item.id}
+                  onClick={() => void fillLogin(item.id)}
+                >
+                  {fillingId !== item.id && (
+                    <Icon name={filledId === item.id ? 'check' : 'password'} size={17} />
+                  )}
+                  {filledId === item.id ? 'Filled' : 'Fill'}
+                </Button>
+                <Button
                   variant={copied === `u-${item.id}` ? 'primary' : 'secondary'}
                   size="sm"
                   onClick={() => void copyFreshField(item.id, 'username', `u-${item.id}`)}
@@ -144,8 +324,8 @@ export function SiteTab({
         ))}
       </div>
       <p className="extension-site__hint">
-        <Icon name="info-circle" size={16} /> Use the Authwell icon inside a form field to fill this
-        page.
+        <Icon name="info-circle" size={16} /> Fill here, or use the Authwell button beside a form
+        field.
       </p>
     </div>
   );
@@ -677,9 +857,7 @@ export function GeneratorTab() {
               try {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (tab?.id) {
-                  const results = await chrome.tabs.sendMessage(tab.id, {
-                    type: 'get-password-field-metadata',
-                  });
+                  const results = await getPasswordMetadataFromTab(tab.id);
                   if (results) {
                     const metadata: PasswordFieldMetadata = {
                       minLength: results.minLength,

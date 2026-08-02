@@ -9,6 +9,7 @@
 @import './item-panel.css';
 @import './auth.css';
 @import './cleanup.css';
+@import './settings.css';
 
 :root {
   --safe-area-top: env(safe-area-inset-top, 0px);

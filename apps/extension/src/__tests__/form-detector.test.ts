@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { detectFieldType, detectForms, detectOtpFields, urlMatchesUri, detectIdentityForms, isIdentityForm, isIdentityFieldType } from '../../lib/form-detector.js';
+import { detectFieldType, detectForms, detectOtpFields, getPasswordPurpose, urlMatchesUri, detectIdentityForms, isIdentityForm, isIdentityFieldType } from '../../lib/form-detector.js';
 
 // ─── detectFieldType ──────────────────────────────────────────────────────────
 
@@ -55,6 +55,13 @@ describe('detectFieldType', () => {
   it('detects username fields by autocomplete', () => {
     const input = makeInput({ type: 'text', autocomplete: 'username' });
     expect(detectFieldType(input)).toBe('username');
+  });
+
+  it('supports section-prefixed autocomplete tokens', () => {
+    const username = makeInput({ type: 'text', autocomplete: 'section-login username' });
+    const password = makeInput({ type: 'text', autocomplete: 'section-login current-password' });
+    expect(detectFieldType(username)).toBe('username');
+    expect(detectFieldType(password)).toBe('password');
   });
 
   it('detects username fields by aria-label', () => {
@@ -120,6 +127,7 @@ describe('detectForms', () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
+    document.body.replaceChildren();
     container = document.createElement('div');
     document.body.appendChild(container);
   });
@@ -231,6 +239,98 @@ describe('detectForms', () => {
 
     const forms = detectForms(container);
     expect(forms[0].submitButton).toBeNull();
+    cleanup();
+  });
+
+  it('distinguishes current and new password purposes', () => {
+    container.innerHTML = `
+      <form>
+        <input name="username" autocomplete="username" />
+        <input type="password" autocomplete="current-password" />
+        <input type="password" autocomplete="new-password" />
+      </form>
+    `;
+
+    const forms = detectForms(container);
+    expect(forms.map((form) => form.passwordPurpose)).toEqual(['current', 'new']);
+    expect(getPasswordPurpose(forms[0].passwordField)).toBe('current');
+    cleanup();
+  });
+
+  it('keeps detecting a password while a reveal control changes its type to text', () => {
+    container.innerHTML = `
+      <form>
+        <input name="username" />
+        <span>
+          <input type="password" name="password" />
+          <button type="button" aria-label="Show password">Show</button>
+        </span>
+      </form>
+    `;
+    const password = container.querySelector<HTMLInputElement>('input[type="password"]')!;
+    expect(detectForms(container)).toHaveLength(1);
+
+    password.type = 'text';
+    container.querySelector('button')!.setAttribute('aria-label', 'Hide password');
+    const revealedForms = detectForms(container);
+    expect(revealedForms).toHaveLength(1);
+    expect(revealedForms[0].passwordField).toBe(password);
+    cleanup();
+  });
+
+  it('ignores hidden, disabled, and read-only password fields', () => {
+    container.innerHTML = `
+      <form aria-hidden="true"><input type="password" /></form>
+      <form><input type="password" disabled /></form>
+      <form><input type="password" readonly /></form>
+      <form style="display: none"><input type="password" /></form>
+    `;
+    expect(detectForms(container)).toHaveLength(0);
+    cleanup();
+  });
+
+  it('does not associate a checkbox as the username field', () => {
+    container.innerHTML = `
+      <form>
+        <input name="username" />
+        <input type="checkbox" name="remember" />
+        <input type="password" name="password" />
+      </form>
+    `;
+    expect(detectForms(container)[0].usernameField?.name).toBe('username');
+    cleanup();
+  });
+
+  it('detects login fields inside open shadow roots', () => {
+    const host = document.createElement('div');
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = `
+      <form>
+        <input autocomplete="username" />
+        <input type="password" autocomplete="current-password" />
+      </form>
+    `;
+    container.appendChild(host);
+
+    const forms = detectForms(container);
+    expect(forms).toHaveLength(1);
+    expect(forms[0].usernameField?.getRootNode()).toBe(shadow);
+    cleanup();
+  });
+
+  it('associates a light-DOM username with a password inside an open shadow root', () => {
+    const form = document.createElement('form');
+    const username = document.createElement('input');
+    username.autocomplete = 'username';
+    const host = document.createElement('div');
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = '<input type="password" autocomplete="current-password" />';
+    form.append(username, host);
+    container.appendChild(form);
+
+    const forms = detectForms(container);
+    expect(forms).toHaveLength(1);
+    expect(forms[0].usernameField).toBe(username);
     cleanup();
   });
 });

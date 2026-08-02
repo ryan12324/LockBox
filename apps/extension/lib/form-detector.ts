@@ -10,6 +10,142 @@ export interface DetectedForm {
   usernameField: HTMLInputElement | null;
   passwordField: HTMLInputElement;
   submitButton: HTMLButtonElement | null;
+  passwordPurpose: 'current' | 'new' | 'unknown';
+}
+
+const knownPasswordFields = new WeakSet<HTMLInputElement>();
+
+export type FormSearchRoot = Document | Element | ShadowRoot;
+
+function isShadowRoot(value: unknown): value is ShadowRoot {
+  return typeof ShadowRoot !== 'undefined' && value instanceof ShadowRoot;
+}
+
+/** Query a document, element, and every reachable open shadow root. */
+export function querySelectorAllDeep<T extends Element>(
+  root: FormSearchRoot,
+  selector: string,
+): T[] {
+  const matches = new Set<T>();
+  const visited = new Set<ParentNode>();
+
+  const visit = (scope: ParentNode) => {
+    if (visited.has(scope)) return;
+    visited.add(scope);
+
+    for (const match of scope.querySelectorAll<T>(selector)) matches.add(match);
+    for (const element of scope.querySelectorAll<HTMLElement>('*')) {
+      if (element.shadowRoot) visit(element.shadowRoot);
+    }
+  };
+
+  visit(root);
+  return Array.from(matches);
+}
+
+/** Return every reachable open shadow root so lifecycle observers can follow it. */
+export function getOpenShadowRoots(root: FormSearchRoot): ShadowRoot[] {
+  const roots: ShadowRoot[] = [];
+  const visited = new Set<ParentNode>();
+
+  const visit = (scope: ParentNode) => {
+    if (visited.has(scope)) return;
+    visited.add(scope);
+    for (const element of scope.querySelectorAll<HTMLElement>('*')) {
+      if (!element.shadowRoot) continue;
+      roots.push(element.shadowRoot);
+      visit(element.shadowRoot);
+    }
+  };
+
+  visit(root);
+  return roots;
+}
+
+function autocompleteTokens(input: HTMLInputElement): string[] {
+  return (input.getAttribute('autocomplete') ?? '')
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function composedParent(element: Element): Element | null {
+  if (element.parentElement) return element.parentElement;
+  const root = element.getRootNode();
+  return isShadowRoot(root) ? root.host : null;
+}
+
+/** Reject fields that are disabled, read-only, or hidden by themselves or an ancestor. */
+export function isEligibleField(input: HTMLInputElement): boolean {
+  if (input.disabled || input.readOnly || input.hidden || input.type === 'hidden') return false;
+
+  let current: Element | null = input;
+  while (current) {
+    if (
+      current.hasAttribute('hidden') ||
+      current.hasAttribute('inert') ||
+      current.getAttribute('aria-hidden') === 'true'
+    ) {
+      return false;
+    }
+
+    const style = getComputedStyle(current);
+    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') {
+      return false;
+    }
+    current = composedParent(current);
+  }
+
+  return true;
+}
+
+/** Distinguish login passwords from account-creation and rotation passwords. */
+export function getPasswordPurpose(input: HTMLInputElement): 'current' | 'new' | 'unknown' {
+  const tokens = autocompleteTokens(input);
+  if (tokens.includes('current-password')) return 'current';
+  if (tokens.includes('new-password')) return 'new';
+
+  const hint = `${input.name} ${input.id} ${input.getAttribute('aria-label') ?? ''}`.toLowerCase();
+  if (/\b(new|confirm|repeat|verify)[-_ ]?(password|pass|pwd)\b/.test(hint)) return 'new';
+  if (/\b(current|existing|old)[-_ ]?(password|pass|pwd)\b/.test(hint)) return 'current';
+  return 'unknown';
+}
+
+function isPasswordLikeField(input: HTMLInputElement): boolean {
+  if (input.type === 'password') {
+    knownPasswordFields.add(input);
+    return true;
+  }
+
+  const tokens = autocompleteTokens(input);
+  if (tokens.includes('current-password') || tokens.includes('new-password')) {
+    knownPasswordFields.add(input);
+    return true;
+  }
+
+  if (input.type !== 'text' && input.type !== 'search') return false;
+  const hint = `${input.name} ${input.id} ${input.getAttribute('aria-label') ?? ''}`.toLowerCase();
+  const hasPasswordHint = /(^|[-_ ])(password|passwd|passcode|pwd)([-_ ]|$)/.test(hint);
+  const parent = input.parentElement;
+  const siblingInputCount = parent?.querySelectorAll('input').length ?? 0;
+  const hasRevealControl = Array.from(
+    parent?.querySelectorAll<HTMLElement>('button, [role="button"]') ?? [],
+  ).some((control) => {
+    const label = `${control.getAttribute('aria-label') ?? ''} ${control.title} ${control.textContent ?? ''}`;
+    const describesReveal =
+      /(show|hide|reveal).*(password|passcode)|(password|passcode).*(show|hide|reveal)/i.test(label);
+    const explicitlyTargetsField =
+      Boolean(input.id) && control.getAttribute('aria-controls') === input.id;
+    const isAdjacent =
+      control.previousElementSibling === input || control.nextElementSibling === input;
+    return describesReveal && (siblingInputCount === 1 || explicitlyTargetsField || isAdjacent);
+  });
+
+  if (hasPasswordHint || hasRevealControl) {
+    knownPasswordFields.add(input);
+    return true;
+  }
+  return knownPasswordFields.has(input);
 }
 
 /** All recognized field types. */
@@ -48,15 +184,21 @@ export function detectFieldType(
   const type = input.type?.toLowerCase();
   const name = (input.name ?? '').toLowerCase();
   const id = (input.id ?? '').toLowerCase();
-  const autocomplete = (input.autocomplete ?? '').toLowerCase();
+  const autocompleteValues = autocompleteTokens(input);
   const placeholder = (input.placeholder ?? '').toLowerCase();
   const ariaLabel = (input.getAttribute('aria-label') ?? '').toLowerCase();
 
   // The autocomplete hint is the strongest OTP signal and is commonly used
   // on text, tel, and number inputs.
-  if (autocomplete === 'one-time-code') return 'otp';
+  if (autocompleteValues.includes('one-time-code')) return 'otp';
 
-  if (type === 'password') return 'password';
+  if (
+    type === 'password' ||
+    autocompleteValues.includes('current-password') ||
+    autocompleteValues.includes('new-password')
+  ) {
+    return 'password';
+  }
   if (type === 'email') return 'email';
   if (type === 'tel') return 'phone';
 
@@ -80,8 +222,8 @@ export function detectFieldType(
     'email': 'email',
   };
 
-  if (autocomplete && autocompleteMap[autocomplete]) {
-    return autocompleteMap[autocomplete];
+  for (const value of autocompleteValues) {
+    if (autocompleteMap[value]) return autocompleteMap[value];
   }
 
   // Heuristic pattern matching on name/id/placeholder/aria-label
@@ -158,10 +300,12 @@ function findUsernameField(
   passwordField: HTMLInputElement,
   container: HTMLElement,
 ): HTMLInputElement | null {
-  // Get all text/email inputs in the container
-  const inputs = Array.from(
-    container.querySelectorAll<HTMLInputElement>('input:not([type="password"]):not([type="hidden"])'),
-  );
+  // Limit candidates to text-like fields. Checkboxes and buttons otherwise
+  // become "unknown" candidates and can steal the username association.
+  const inputs = querySelectorAllDeep<HTMLInputElement>(container, 'input').filter((input) => {
+    const type = input.getAttribute('type')?.toLowerCase() ?? 'text';
+    return ['text', 'email', 'tel', 'search', 'url'].includes(type) && isEligibleField(input);
+  });
 
   // Find inputs that look like username/email fields
   const candidates = inputs.filter((input) => {
@@ -172,7 +316,7 @@ function findUsernameField(
   if (candidates.length === 0) return null;
 
   // Prefer the one closest to (and before) the password field in DOM order
-  const allInputs = Array.from(container.querySelectorAll<HTMLInputElement>('input'));
+  const allInputs = querySelectorAllDeep<HTMLInputElement>(container, 'input');
   const passwordIndex = allInputs.indexOf(passwordField);
 
   // Find the last candidate that appears before the password field
@@ -188,21 +332,24 @@ function findUsernameField(
 }
 
 /** Detect all login forms on a page or within a container. */
-export function detectForms(root: Document | Element): DetectedForm[] {
+export function detectForms(root: FormSearchRoot): DetectedForm[] {
   const forms: DetectedForm[] = [];
 
-  // Find all password fields
-  const passwordFields = Array.from(
-    root.querySelectorAll<HTMLInputElement>('input[type="password"]'),
+  // Include password fields that a site's show-password control temporarily
+  // changes to text while retaining password semantics.
+  const passwordFields = querySelectorAllDeep<HTMLInputElement>(root, 'input').filter(
+    (input) => isPasswordLikeField(input) && isEligibleField(input),
   );
 
   for (const passwordField of passwordFields) {
-    // Skip hidden fields
-    if (passwordField.offsetParent === null && passwordField.type !== 'password') continue;
-
     // Find the containing form or nearest ancestor
+    const passwordRoot = passwordField.getRootNode();
+    const shadowHost = isShadowRoot(passwordRoot) ? passwordRoot.host : null;
     const formElement =
+      passwordField.form ??
       passwordField.closest('form') ??
+      shadowHost?.closest('form') ??
+      shadowHost?.parentElement ??
       (passwordField.parentElement as HTMLElement | null);
 
     const container = formElement ?? (root instanceof Document ? root.body : root as HTMLElement);
@@ -215,6 +362,7 @@ export function detectForms(root: Document | Element): DetectedForm[] {
       usernameField,
       passwordField,
       submitButton,
+      passwordPurpose: getPasswordPurpose(passwordField),
     });
   }
 
@@ -222,13 +370,9 @@ export function detectForms(root: Document | Element): DetectedForm[] {
 }
 
 /** Detect visible one-time-code fields, including form-less verification steps. */
-export function detectOtpFields(root: Document | Element): HTMLInputElement[] {
-  return Array.from(
-    root.querySelectorAll<HTMLInputElement>(
-      'input:not([type="hidden"]):not([type="password"]):not([type="submit"])',
-    ),
-  ).filter(
-    (input) => !input.disabled && !input.readOnly && detectFieldType(input) === 'otp',
+export function detectOtpFields(root: FormSearchRoot): HTMLInputElement[] {
+  return querySelectorAllDeep<HTMLInputElement>(root, 'input').filter(
+    (input) => isEligibleField(input) && detectFieldType(input) === 'otp',
   );
 }
 
@@ -276,9 +420,7 @@ export function isIdentityFieldType(fieldType: FieldType): fieldType is Identity
  * qualifying it as an identity form.
  */
 export function isIdentityForm(container: HTMLElement): boolean {
-  const inputs = Array.from(
-    container.querySelectorAll<HTMLInputElement>('input:not([type="hidden"]):not([type="password"]):not([type="submit"])'),
-  );
+  const inputs = querySelectorAllDeep<HTMLInputElement>(container, 'input').filter(isEligibleField);
   let identityFieldCount = 0;
   for (const input of inputs) {
     const ft = detectFieldType(input);
@@ -291,11 +433,11 @@ export function isIdentityForm(container: HTMLElement): boolean {
 }
 
 /** Detect all identity forms on a page or within a container. */
-export function detectIdentityForms(root: Document | Element): DetectedIdentityForm[] {
+export function detectIdentityForms(root: FormSearchRoot): DetectedIdentityForm[] {
   const results: DetectedIdentityForm[] = [];
 
   // Check explicit <form> elements
-  const formElements = Array.from(root.querySelectorAll<HTMLFormElement>('form'));
+  const formElements = querySelectorAllDeep<HTMLFormElement>(root, 'form');
 
   // Also check the root body for form-less inputs
   const containers: HTMLElement[] = [...formElements];
@@ -314,9 +456,7 @@ export function detectIdentityForms(root: Document | Element): DetectedIdentityF
 
     processedForms.add(container);
 
-    const inputs = Array.from(
-      container.querySelectorAll<HTMLInputElement>('input:not([type="hidden"]):not([type="password"]):not([type="submit"])'),
-    );
+    const inputs = querySelectorAllDeep<HTMLInputElement>(container, 'input').filter(isEligibleField);
 
     const fields: DetectedIdentityForm['fields'] = {};
 
