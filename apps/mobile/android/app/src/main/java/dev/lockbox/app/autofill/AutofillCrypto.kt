@@ -15,8 +15,11 @@ import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.PrivateKey
 import java.security.PublicKey
+import java.security.spec.MGF1ParameterSpec
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
+import javax.crypto.spec.OAEPParameterSpec
+import javax.crypto.spec.PSource
 import javax.crypto.spec.GCMParameterSpec
 
 object AutofillCrypto {
@@ -24,9 +27,16 @@ object AutofillCrypto {
     private const val KEY_ALIAS = "lockbox_autofill_rsa_v1"
     private const val PREFS_NAME = "lockbox_autofill_index"
     private const val PREF_INDEX_SALT = "index_salt"
-    private const val RSA_TRANSFORMATION = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding"
+    private const val RSA_TRANSFORMATION = "RSA/ECB/OAEPPadding"
     private const val AES_TRANSFORMATION = "AES/GCM/NoPadding"
     private const val GCM_TAG_LENGTH = 128
+    private const val ENVELOPE_VERSION = 2
+    private val RSA_OAEP_PARAMETERS = OAEPParameterSpec(
+        "SHA-256",
+        "MGF1",
+        MGF1ParameterSpec.SHA1,
+        PSource.PSpecified.DEFAULT
+    )
 
     data class Envelope(
         val wrappedKey: ByteArray,
@@ -62,6 +72,9 @@ object AutofillCrypto {
             .setUserAuthenticationRequired(true)
             .setInvalidatedByBiometricEnrollment(true)
             .apply {
+                if (Build.VERSION.SDK_INT >= 35) {
+                    setMgf1Digests(KeyProperties.DIGEST_SHA1)
+                }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     setUserAuthenticationParameters(0, KeyProperties.AUTH_BIOMETRIC_STRONG)
                 } else {
@@ -89,10 +102,14 @@ object AutofillCrypto {
         val ciphertext = aesCipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
 
         val rsaCipher = Cipher.getInstance(RSA_TRANSFORMATION)
-        rsaCipher.init(Cipher.ENCRYPT_MODE, publicKey)
+        // Android Keystore defaults MGF1 to SHA-1 while non-Keystore providers
+        // default it to the OAEP message digest. Set both sides explicitly so
+        // envelopes created with a public key unwrap on Samsung/KeyMint devices.
+        rsaCipher.init(Cipher.ENCRYPT_MODE, publicKey, RSA_OAEP_PARAMETERS)
         val wrappedKey = rsaCipher.doFinal(aesKey.encoded)
 
         return JSONObject()
+            .put("version", ENVELOPE_VERSION)
             .put("wrappedKey", encode(wrappedKey))
             .put("iv", encode(aesCipher.iv))
             .put("ciphertext", encode(ciphertext))
@@ -110,9 +127,11 @@ object AutofillCrypto {
 
     fun createUnwrapCipher(privateKey: PrivateKey): Cipher {
         return Cipher.getInstance(RSA_TRANSFORMATION).apply {
-            init(Cipher.DECRYPT_MODE, privateKey)
+            init(Cipher.DECRYPT_MODE, privateKey, RSA_OAEP_PARAMETERS)
         }
     }
+
+    internal fun oaepParameters(): OAEPParameterSpec = RSA_OAEP_PARAMETERS
 
     fun decryptPayload(envelope: Envelope, authenticatedCipher: Cipher): String {
         val rawAesKey = authenticatedCipher.doFinal(envelope.wrappedKey)

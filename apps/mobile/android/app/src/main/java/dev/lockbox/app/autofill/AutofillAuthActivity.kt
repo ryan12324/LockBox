@@ -4,11 +4,13 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.service.autofill.Dataset
+import android.util.Log
 import android.view.WindowManager
 import android.view.autofill.AutofillId
 import android.view.autofill.AutofillManager
 import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
+import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
@@ -22,6 +24,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import javax.crypto.IllegalBlockSizeException
 
 /** Authenticates and returns one decrypted Dataset to Android Autofill. */
 class AutofillAuthActivity : FragmentActivity() {
@@ -43,7 +46,8 @@ class AutofillAuthActivity : FragmentActivity() {
                 val envelope = AutofillCrypto.parseEnvelope(credential.encryptedData)
                 val cipher = AutofillCrypto.createUnwrapCipher(privateKey)
                 withContext(Dispatchers.Main) { authenticate(envelope, cipher) }
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                recordFailure("Credential authentication setup failed", error)
                 withContext(Dispatchers.Main) { cancel() }
             }
         }
@@ -73,7 +77,15 @@ class AutofillAuthActivity : FragmentActivity() {
                             payload.optString("username", ""),
                             payload.getString("password")
                         )
-                    } catch (_: Exception) {
+                    } catch (error: Exception) {
+                        recordFailure("Credential decryption or dataset creation failed", error)
+                        if (error is IllegalBlockSizeException) {
+                            Toast.makeText(
+                                applicationContext,
+                                "Open Authwell to refresh this encrypted login, then try again.",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
                         cancel()
                     }
                 }
@@ -97,11 +109,16 @@ class AutofillAuthActivity : FragmentActivity() {
             setTextViewText(R.id.autofill_item_label, name)
             setTextViewText(R.id.autofill_item_sublabel, username)
         }
+        val usernameId = intent.parcelableAutofillId(EXTRA_USERNAME_ID)
+        val passwordId = intent.parcelableAutofillId(EXTRA_PASSWORD_ID)
+        check(usernameId != null || passwordId != null) {
+            "The authenticated dataset has no target fields"
+        }
         val dataset = Dataset.Builder(presentation).apply {
-            intent.parcelableAutofillId(EXTRA_USERNAME_ID)?.let {
+            usernameId?.let {
                 setValue(it, AutofillValue.forText(username), presentation)
             }
-            intent.parcelableAutofillId(EXTRA_PASSWORD_ID)?.let {
+            passwordId?.let {
                 setValue(it, AutofillValue.forText(password), presentation)
             }
         }.build()
@@ -110,6 +127,11 @@ class AutofillAuthActivity : FragmentActivity() {
             Intent().putExtra(AutofillManager.EXTRA_AUTHENTICATION_RESULT, dataset)
         )
         finish()
+    }
+
+    private fun recordFailure(message: String, error: Exception) {
+        Log.e(TAG, "$message: ${error.javaClass.simpleName}", error)
+        AutofillDiagnostics.recordFailure(applicationContext, message)
     }
 
     private fun Intent.parcelableAutofillId(key: String): AutofillId? {
@@ -123,6 +145,7 @@ class AutofillAuthActivity : FragmentActivity() {
     }
 
     companion object {
+        private const val TAG = "AuthwellAutofillAuth"
         const val EXTRA_CREDENTIAL_ID = "credentialId"
         const val EXTRA_USERNAME_ID = "usernameAutofillId"
         const val EXTRA_PASSWORD_ID = "passwordAutofillId"
