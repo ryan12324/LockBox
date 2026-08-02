@@ -128,70 +128,7 @@ class BiometricPlugin : Plugin() {
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
             cipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
 
-            // Show BiometricPrompt to authorize key usage
-            val fragmentActivity = activity as? FragmentActivity ?: run {
-                userKeyBytes.fill(0)
-                clearEnrollment()
-                call.reject("Activity not available")
-                return
-            }
-
-            val executor = ContextCompat.getMainExecutor(context)
-            val biometricPrompt = BiometricPrompt(
-                fragmentActivity,
-                executor,
-                object : BiometricPrompt.AuthenticationCallback() {
-                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                        try {
-                            val cryptoCipher = result.cryptoObject?.cipher
-                                ?: throw SecurityException("Biometric-bound cipher was not returned")
-                            val encryptedBytes = cryptoCipher.doFinal(userKeyBytes)
-                            val iv = cryptoCipher.iv
-
-                            // Store encrypted user key and IV in SharedPreferences
-                            val prefs = context.getSharedPreferences(
-                                PREFS_NAME,
-                                android.content.Context.MODE_PRIVATE
-                            )
-                            val stored = prefs.edit()
-                                .putString(PREF_ENCRYPTED_USER_KEY, Base64.encodeToString(encryptedBytes, Base64.NO_WRAP))
-                                .putString(PREF_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
-                                .putString(PREF_SCOPE, scope)
-                                .commit()
-                            if (!stored) throw IllegalStateException("Could not persist biometric envelope")
-
-                            call.resolve()
-                        } catch (e: Exception) {
-                            runCatching { clearEnrollment() }
-                            call.reject("Encryption failed: ${e.message}")
-                        } finally {
-                            userKeyBytes.fill(0)
-                        }
-                    }
-
-                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        userKeyBytes.fill(0)
-                        runCatching { clearEnrollment() }
-                        call.reject("Biometric enrollment failed: $errString")
-                    }
-
-                    override fun onAuthenticationFailed() {
-                        // Authentication attempt failed, but more attempts may follow
-                    }
-                }
-            )
-
-            val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Enable Biometric Unlock")
-                .setSubtitle("Authenticate to enable biometric unlock for Authwell")
-                .setNegativeButtonText("Cancel")
-                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                .build()
-
-            biometricPrompt.authenticate(
-                promptInfo,
-                BiometricPrompt.CryptoObject(cipher)
-            )
+            showEnrollmentPrompt(call, scope, userKeyBytes, cipher)
         } catch (e: Exception) {
             userKeyBytes.fill(0)
             runCatching { clearEnrollment() }
@@ -235,60 +172,7 @@ class BiometricPlugin : Plugin() {
             cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_LENGTH, iv))
             cipher.updateAAD(scope.toByteArray(Charsets.UTF_8))
 
-            val fragmentActivity = activity as? FragmentActivity ?: run {
-                call.reject("Activity not available")
-                return
-            }
-
-            val executor = ContextCompat.getMainExecutor(context)
-            val biometricPrompt = BiometricPrompt(
-                fragmentActivity,
-                executor,
-                object : BiometricPrompt.AuthenticationCallback() {
-                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                        try {
-                            val cryptoCipher = result.cryptoObject?.cipher
-                                ?: throw SecurityException("Biometric-bound cipher was not returned")
-                            val encryptedBytes = Base64.decode(encryptedKeyBase64, Base64.NO_WRAP)
-                            val decryptedBytes = cryptoCipher.doFinal(encryptedBytes)
-                            if (decryptedBytes.size != VAULT_KEY_BYTES) {
-                                decryptedBytes.fill(0)
-                                throw SecurityException("Invalid vault key length")
-                            }
-                            val userKeyBase64 = Base64.encodeToString(decryptedBytes, Base64.NO_WRAP)
-                            decryptedBytes.fill(0)
-
-                            val resultObj = JSObject()
-                            resultObj.put("success", true)
-                            resultObj.put("userKey", userKeyBase64)
-                            call.resolve(resultObj)
-                        } catch (e: Exception) {
-                            runCatching { clearEnrollment() }
-                            resolveFailure(call, "enrollmentInvalid")
-                        }
-                    }
-
-                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                        resolveFailure(call, "cancelled")
-                    }
-
-                    override fun onAuthenticationFailed() {
-                        // Authentication attempt failed, but more attempts may follow
-                    }
-                }
-            )
-
-            val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Unlock Authwell")
-                .setSubtitle(reason)
-                .setNegativeButtonText("Cancel")
-                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
-                .build()
-
-            biometricPrompt.authenticate(
-                promptInfo,
-                BiometricPrompt.CryptoObject(cipher)
-            )
+            showAuthenticationPrompt(call, reason, encryptedKeyBase64, cipher)
         } catch (_: KeyPermanentlyInvalidatedException) {
             runCatching { clearEnrollment() }
             resolveFailure(call, "biometricsChanged")
@@ -308,6 +192,180 @@ class BiometricPlugin : Plugin() {
             call.resolve()
         } catch (e: Exception) {
             call.reject("Failed to unenroll: ${e.message}")
+        }
+    }
+
+    /**
+     * AndroidX attaches BiometricPrompt to the FragmentActivity immediately,
+     * so construction and authenticate() must both run on the fragment host's
+     * main thread. Capacitor plugin methods may arrive on its task executor.
+     */
+    private fun showEnrollmentPrompt(
+        call: PluginCall,
+        scope: String,
+        userKeyBytes: ByteArray,
+        cipher: Cipher
+    ) {
+        val fragmentActivity = activity as? FragmentActivity ?: run {
+            userKeyBytes.fill(0)
+            runCatching { clearEnrollment() }
+            call.reject("Activity not available")
+            return
+        }
+
+        bridge.executeOnMainThread {
+            if (fragmentActivity.isFinishing || fragmentActivity.isDestroyed) {
+                userKeyBytes.fill(0)
+                runCatching { clearEnrollment() }
+                call.reject("Activity not available")
+                return@executeOnMainThread
+            }
+
+            try {
+                val biometricPrompt = BiometricPrompt(
+                    fragmentActivity,
+                    ContextCompat.getMainExecutor(fragmentActivity),
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                            try {
+                                val cryptoCipher = result.cryptoObject?.cipher
+                                    ?: throw SecurityException("Biometric-bound cipher was not returned")
+                                val encryptedBytes = cryptoCipher.doFinal(userKeyBytes)
+                                val iv = cryptoCipher.iv
+
+                                val prefs = context.getSharedPreferences(
+                                    PREFS_NAME,
+                                    android.content.Context.MODE_PRIVATE
+                                )
+                                val stored = prefs.edit()
+                                    .putString(
+                                        PREF_ENCRYPTED_USER_KEY,
+                                        Base64.encodeToString(encryptedBytes, Base64.NO_WRAP)
+                                    )
+                                    .putString(PREF_IV, Base64.encodeToString(iv, Base64.NO_WRAP))
+                                    .putString(PREF_SCOPE, scope)
+                                    .commit()
+                                if (!stored) {
+                                    throw IllegalStateException("Could not persist biometric envelope")
+                                }
+
+                                call.resolve()
+                            } catch (error: Exception) {
+                                runCatching { clearEnrollment() }
+                                call.reject("Encryption failed: ${error.message}")
+                            } finally {
+                                userKeyBytes.fill(0)
+                            }
+                        }
+
+                        override fun onAuthenticationError(
+                            errorCode: Int,
+                            errString: CharSequence
+                        ) {
+                            userKeyBytes.fill(0)
+                            runCatching { clearEnrollment() }
+                            call.reject("Biometric enrollment failed: $errString")
+                        }
+
+                        override fun onAuthenticationFailed() {
+                            // Authentication attempt failed, but more attempts may follow.
+                        }
+                    }
+                )
+                val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("Enable Biometric Unlock")
+                    .setSubtitle("Authenticate to enable biometric unlock for Authwell")
+                    .setNegativeButtonText("Cancel")
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                    .build()
+
+                biometricPrompt.authenticate(
+                    promptInfo,
+                    BiometricPrompt.CryptoObject(cipher)
+                )
+            } catch (error: Exception) {
+                userKeyBytes.fill(0)
+                runCatching { clearEnrollment() }
+                call.reject("Enrollment setup failed: ${error.message}")
+            }
+        }
+    }
+
+    private fun showAuthenticationPrompt(
+        call: PluginCall,
+        reason: String,
+        encryptedKeyBase64: String,
+        cipher: Cipher
+    ) {
+        val fragmentActivity = activity as? FragmentActivity ?: run {
+            call.reject("Activity not available")
+            return
+        }
+
+        bridge.executeOnMainThread {
+            if (fragmentActivity.isFinishing || fragmentActivity.isDestroyed) {
+                call.reject("Activity not available")
+                return@executeOnMainThread
+            }
+
+            try {
+                val biometricPrompt = BiometricPrompt(
+                    fragmentActivity,
+                    ContextCompat.getMainExecutor(fragmentActivity),
+                    object : BiometricPrompt.AuthenticationCallback() {
+                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                            try {
+                                val cryptoCipher = result.cryptoObject?.cipher
+                                    ?: throw SecurityException("Biometric-bound cipher was not returned")
+                                val encryptedBytes = Base64.decode(encryptedKeyBase64, Base64.NO_WRAP)
+                                val decryptedBytes = cryptoCipher.doFinal(encryptedBytes)
+                                if (decryptedBytes.size != VAULT_KEY_BYTES) {
+                                    decryptedBytes.fill(0)
+                                    throw SecurityException("Invalid vault key length")
+                                }
+                                val userKeyBase64 = Base64.encodeToString(
+                                    decryptedBytes,
+                                    Base64.NO_WRAP
+                                )
+                                decryptedBytes.fill(0)
+
+                                val resultObj = JSObject()
+                                resultObj.put("success", true)
+                                resultObj.put("userKey", userKeyBase64)
+                                call.resolve(resultObj)
+                            } catch (_: Exception) {
+                                runCatching { clearEnrollment() }
+                                resolveFailure(call, "enrollmentInvalid")
+                            }
+                        }
+
+                        override fun onAuthenticationError(
+                            errorCode: Int,
+                            errString: CharSequence
+                        ) {
+                            resolveFailure(call, "cancelled")
+                        }
+
+                        override fun onAuthenticationFailed() {
+                            // Authentication attempt failed, but more attempts may follow.
+                        }
+                    }
+                )
+                val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                    .setTitle("Unlock Authwell")
+                    .setSubtitle(reason)
+                    .setNegativeButtonText("Cancel")
+                    .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                    .build()
+
+                biometricPrompt.authenticate(
+                    promptInfo,
+                    BiometricPrompt.CryptoObject(cipher)
+                )
+            } catch (_: Exception) {
+                runCatching { clearEnrollment() }
+                resolveFailure(call, "enrollmentInvalid")
+            }
         }
     }
 
