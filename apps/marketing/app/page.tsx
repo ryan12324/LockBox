@@ -127,11 +127,11 @@ export default function Home() {
     <main>
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-pattern" aria-hidden="true" />
-        <img className="hero-mark" src="/brand/authwell-mark.png" alt="" />
+        <img className="hero-mark" src="/brand/authwell-mark.png?v=authwell-2" alt="" />
 
         <header className="site-header shell">
           <a className="brand" href="#top" aria-label="Authwell home">
-            <img src="/brand/authwell-logo-horizontal-dark.png" alt="Authwell" />
+            <img src="/brand/authwell-logo-horizontal-dark.png?v=authwell-2" alt="Authwell" />
           </a>
 
           <nav className="desktop-nav" aria-label="Primary navigation">
@@ -198,7 +198,7 @@ export default function Home() {
 
           <div className="access-map" aria-label="Authwell platform connections">
             <div className="access-core">
-              <img src="/brand/authwell-app-icon.png" alt="" />
+              <img src="/brand/authwell-app-icon.png?v=authwell-2" alt="" />
               <span>Authwell vault</span>
             </div>
             {platforms.map((platform, index) => (
@@ -317,7 +317,7 @@ export default function Home() {
       </section>
 
       <section className="final-cta" aria-labelledby="final-title">
-        <img src="/brand/authwell-mark.png" alt="" />
+        <img src="/brand/authwell-mark.png?v=authwell-2" alt="" />
         <div className="shell final-cta-inner">
           <p className="eyebrow eyebrow-indigo">Ready when you are</p>
           <h2 id="final-title">Open the vault. Keep the choice.</h2>
@@ -331,7 +331,7 @@ export default function Home() {
       <footer className="site-footer">
         <div className="shell footer-inner">
           <a className="brand footer-brand" href="#top" aria-label="Authwell home">
-            <img src="/brand/authwell-logo-horizontal.png" alt="Authwell" />
+            <img src="/brand/authwell-logo-horizontal.png?v=authwell-2" alt="Authwell" />
           </a>
           <p>Private access, on infrastructure you choose.</p>
           <nav aria-label="Footer navigation">

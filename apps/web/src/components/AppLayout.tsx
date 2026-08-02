@@ -201,8 +201,8 @@ export default function AppLayout() {
       <header className="app-header">
         <div className="app-header__brand">
           <span className="app-brandmark" aria-hidden="true">
-            <img className="app-brandmark__tile" src="/brand/authwell-app-icon.png" alt="" />
-            <img className="app-brandmark__mark" src="/brand/authwell-mark.png" alt="" />
+            <img className="app-brandmark__tile" src="/brand/authwell-app-icon.png?v=authwell-2" alt="" />
+            <img className="app-brandmark__mark" src="/brand/authwell-mark.png?v=authwell-2" alt="" />
           </span>
           <span className="app-header__wordmark">Authwell</span>
         </div>

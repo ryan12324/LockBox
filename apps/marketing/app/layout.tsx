@@ -19,8 +19,8 @@ export const metadata: Metadata = {
   applicationName: "Authwell",
   alternates: { canonical: "/" },
   icons: {
-    icon: "/brand/authwell-app-icon.png",
-    apple: "/brand/authwell-app-icon.png",
+    icon: "/brand/authwell-app-icon.png?v=authwell-2",
+    apple: "/brand/authwell-app-icon.png?v=authwell-2",
   },
   openGraph: {
     type: "website",
@@ -29,14 +29,14 @@ export const metadata: Metadata = {
       "A private vault for every device, with a hosted option when you want it and self-hosting when you do not.",
     siteName: "Authwell",
     url: "/",
-    images: [{ url: "/og.png", width: 1732, height: 906, alt: "Authwell. Your passwords. Your infrastructure. Your control." }],
+    images: [{ url: "/og.png?v=authwell-2", width: 1732, height: 906, alt: "Authwell. Your passwords. Your infrastructure. Your control." }],
   },
   twitter: {
     card: "summary_large_image",
     title,
     description:
       "A private vault for every device, with a hosted option when you want it and self-hosting when you do not.",
-    images: ["/og.png"],
+    images: ["/og.png?v=authwell-2"],
   },
 };
 

@@ -24,7 +24,7 @@ export default function AuthShell({
         <div className="auth-brand">
           <img
             className="auth-brand__logo"
-            src="/brand/authwell-logo-horizontal-dark.png?v=authwell-1"
+            src="/brand/authwell-logo-horizontal-dark.png?v=authwell-2"
             alt="Authwell"
           />
         </div>
@@ -53,7 +53,7 @@ export default function AuthShell({
         <div className="auth-panel__mobile-brand">
           <img
             className="auth-brand__logo"
-            src="/brand/authwell-logo-horizontal-dark.png?v=authwell-1"
+            src="/brand/authwell-logo-horizontal-dark.png?v=authwell-2"
             alt="Authwell"
           />
         </div>

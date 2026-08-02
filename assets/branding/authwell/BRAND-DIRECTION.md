@@ -20,9 +20,9 @@ Avoid literal padlocks, keys, shields, fingerprints, flames, and hacker imagery.
 | Role                      | Colour          | Hex       |
 | ------------------------- | --------------- | --------- |
 | Foundation                | Deep Ink        | `#10162F` |
-| Primary                   | Electric Indigo | `#635BFF` |
-| Passkeys / success        | Vivid Aqua      | `#20D7C5` |
-| Recovery / attention      | Coral           | `#FF6B6B` |
+| Primary                   | Electric Indigo | `#5A54FC` |
+| Passkeys / success        | Vivid Aqua      | `#1DD2C7` |
+| Recovery / attention      | Coral           | `#FE5D5A` |
 | Authenticator / highlight | Warm Yellow     | `#F5C84C` |
 | Canvas                    | Soft White      | `#F7F8FC` |
 
@@ -51,8 +51,16 @@ and compact rather than futuristic or monospaced.
 Clear, calm, direct, and reassuring. Explain what Authwell did and what the user
 should do next. Avoid alarmist security copy, military metaphors, and jargon.
 
-## Current concept artifact
+## Production masters
 
-`authwell-brand-concept-v1.png` is an exploratory direction, not a production
-logo master. The final mark and wordmark should be redrawn as precise SVG assets
-before they are shipped.
+The precise production artwork is stored in:
+
+- `authwell-logo-horizontal.svg`
+- `authwell-logo-horizontal-dark.svg`
+- `authwell-mark.svg`
+- `authwell-app-icon.svg`
+
+Run `bun run brand:authwell` to rebuild every derived raster asset. A replacement
+source can be imported with `bun run brand:authwell --source /path/to/logo.svg`.
+`authwell-brand-concept-v1.png` remains an archived exploratory board and must not
+be used as production artwork.
