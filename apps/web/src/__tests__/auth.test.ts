@@ -124,6 +124,20 @@ describe('useAuthStore', () => {
     });
   });
 
+  describe('unlockWithUserKey', () => {
+    it('unlocks with a memory-only user key and no reconstructed master key', () => {
+      useAuthStore.setState({ isLocked: true });
+      const userKey = new Uint8Array(64).fill(0x03);
+
+      useAuthStore.getState().unlockWithUserKey(userKey);
+
+      const state = useAuthStore.getState();
+      expect(state.userKey).toEqual(userKey);
+      expect(state.masterKey).toBeNull();
+      expect(state.isLocked).toBe(false);
+    });
+  });
+
   describe('lock', () => {
     it('clears keys from memory', () => {
       const masterKey = new Uint8Array(32).fill(0x01);

@@ -21,7 +21,7 @@ interface NativePasskeySyncOptions {
 }
 
 /**
- * Drain Android's biometric-gated passkey outbox into the encrypted vault.
+ * Drain the native app's biometric-gated passkey outbox into the encrypted vault.
  * The native row is acknowledged only after upload, or after its stable item ID
  * is confirmed to already exist. Failures remain locally usable and retryable.
  */

@@ -244,6 +244,7 @@ await renderWidth(logoSvg, resolve(webBrandDir, 'authwell-logo-horizontal.png'),
 await renderWidth(darkLogoSvg, resolve(webBrandDir, 'authwell-logo-horizontal-dark.png'), 560);
 
 const marketingBrandDir = resolve(root, 'apps/marketing/public/brand');
+await write(resolve(marketingBrandDir, 'authwell-mark.svg'), markSvg);
 await render(iconSvg, resolve(marketingBrandDir, 'authwell-app-icon.png'), 512);
 await render(markSvg, resolve(marketingBrandDir, 'authwell-mark.png'), 256);
 await renderWidth(logoSvg, resolve(marketingBrandDir, 'authwell-logo-horizontal.png'), 560);

@@ -185,7 +185,7 @@ async function readDiscoveryDocument(
   if (body.protocolVersion !== LOCKBOX_PROTOCOL_VERSION) {
     throw new LockboxDiscoveryError(
       'unsupported-protocol',
-      'This Authwell web vault uses an unsupported app protocol. Update the web vault and Android app together.'
+      'This Authwell web vault uses an unsupported app protocol. Update the web vault and mobile app together.'
     );
   }
   return body as unknown as LockboxDiscoveryDocument;

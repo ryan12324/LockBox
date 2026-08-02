@@ -1,8 +1,8 @@
 /**
- * Autofill Plugin — TypeScript bridge for native Android AutofillService.
+ * Autofill Plugin — TypeScript bridge for Android AutofillService and the iOS AutoFill credential provider.
  *
- * The native AutofillService runs in a separate process from the Capacitor WebView.
- * Communication goes through the Room DB as a shared bridge.
+ * The native credential provider runs outside the Capacitor WebView process.
+ * Communication goes through platform-shared encrypted storage.
  */
 
 import { registerPlugin } from '@capacitor/core';
@@ -18,7 +18,13 @@ export interface AutofillIndexCredential {
 
 /** Result from checking if autofill service is enabled */
 export interface AutofillEnabledResult {
+  supported?: boolean;
   enabled: boolean;
+  indexedCredentials?: number;
+  indexedAt?: number | null;
+  lastRequestAt?: number | null;
+  lastMatchCount?: number | null;
+  lastError?: string | null;
 }
 
 export interface AutofillIndexResult {
@@ -41,25 +47,27 @@ export interface AutofillPasskeysResult {
 
 /** Decrypted passkey material accepted only during an unlocked vault refresh. */
 export interface AutofillPasskeyIndexEntry extends AutofillPasskeyEntry {
+  id: string;
   userId: string;
+  publicKey: string;
   privateKey: string;
   createdAt: string;
 }
 
 /**
- * AutofillPlugin interface — defines the contract between TypeScript and native Kotlin.
+ * AutofillPlugin interface — defines the contract between TypeScript and native code.
  *
  * Methods:
- * - isEnabled: Checks if LockboxAutofillService is the active autofill provider
- * - requestEnable: Opens Android Settings to let user enable LockboxAutofillService
+ * - isEnabled: Checks if Authwell is enabled as a platform autofill provider
+ * - requestEnable: Opens the platform credential-provider settings
  * - replaceCredentialIndex: Atomically rebuilds the biometric-gated local index
  * - clearCredentialIndex: Clears account data on logout
  */
 export interface AutofillPlugin {
-  /** Check if LockboxAutofillService is the active autofill provider */
+  /** Check if Authwell is enabled as the platform autofill provider */
   isEnabled(): Promise<AutofillEnabledResult>;
 
-  /** Open Android Settings to enable LockboxAutofillService */
+  /** Open platform settings so the user can enable Authwell AutoFill */
   requestEnable(): Promise<void>;
 
   /** Rebuild the native index. Native code encrypts every credential immediately. */
@@ -70,12 +78,13 @@ export interface AutofillPlugin {
   /** Rebuild the biometric-gated passkey index from encrypted vault items. */
   replacePasskeyIndex(options: {
     passkeys: AutofillPasskeyIndexEntry[];
+    accountId: string;
   }): Promise<AutofillIndexResult>;
 
   /** Remove every indexed credential, used when logging out. */
   clearCredentialIndex(): Promise<void>;
 
-  /** Find matching passkeys for a website URI (queries Room DB by rpId) */
+  /** Find matching passkeys for a website URI in native encrypted storage */
   getPasskeysForUri(options: { uri: string }): Promise<AutofillPasskeysResult>;
 }
 

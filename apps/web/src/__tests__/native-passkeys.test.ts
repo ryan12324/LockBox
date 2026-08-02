@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LoginItem, PasskeyItem, VaultItem } from '@lockbox/types';
 import {
+  getNativeAutofillStatus,
   getNativePasskeyStatus,
   openNativePasskeySettings,
   syncNativeAutofillIndex,
@@ -17,6 +18,16 @@ afterEach(() => {
 
 function installNativeBridge() {
   const nativePromise = vi.fn(async (plugin: string, method: string) => {
+    if (plugin === 'Autofill' && method === 'isEnabled') {
+      return {
+        supported: true,
+        enabled: true,
+        indexedCredentials: 4,
+        indexedAt: 1_775_257_600_000,
+        lastRequestAt: 1_775_257_660_000,
+        lastMatchCount: 2,
+      };
+    }
     if (plugin === 'CredentialManager' && method === 'isProviderEnabled') {
       return { available: true, enabled: true };
     }
@@ -31,6 +42,19 @@ function installNativeBridge() {
 }
 
 describe('Android passkey bridge', () => {
+  it('reports system selection and encrypted index health', async () => {
+    installNativeBridge();
+    await expect(getNativeAutofillStatus()).resolves.toEqual({
+      supported: true,
+      enabled: true,
+      indexedCredentials: 4,
+      indexedAt: 1_775_257_600_000,
+      lastRequestAt: 1_775_257_660_000,
+      lastMatchCount: 2,
+      lastError: undefined,
+    });
+  });
+
   it('indexes canonical and HTTPS-shaped Android application URIs for native autofill', async () => {
     const nativePromise = installNativeBridge();
     const login: LoginItem = {
@@ -50,7 +74,12 @@ describe('Android passkey bridge', () => {
       revisionDate: '2026-08-01T00:00:00.000Z',
     };
 
-    await syncNativeAutofillIndex([login], 'lockbox-user-1');
+    const updated = vi.fn();
+    window.addEventListener('authwell:native-autofill-updated', updated, { once: true });
+    await expect(syncNativeAutofillIndex([login], 'lockbox-user-1')).resolves.toEqual({
+      passwords: 1,
+      passkeys: 1,
+    });
 
     expect(nativePromise).toHaveBeenCalledWith(
       'Autofill',
@@ -59,6 +88,7 @@ describe('Android passkey bridge', () => {
         credentials: [expect.objectContaining({ id: login.id, uris: login.uris })],
       }),
     );
+    expect(updated).toHaveBeenCalledOnce();
   });
 
   it('protects and indexes decrypted vault passkeys through the native plugin', async () => {

@@ -52,6 +52,55 @@
   font-size: var(--font-size-sm);
 }
 
+.native-autofill-setup {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  background: var(--color-info-subtle);
+  border: 1px solid color-mix(in oklch, var(--color-info) 28%, var(--color-border));
+  border-radius: var(--radius-md);
+}
+
+.native-autofill-setup__mark {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-info);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.native-autofill-setup__body,
+.native-autofill-setup__copy { min-width: 0; display: grid; gap: 4px; }
+.native-autofill-setup__copy strong { color: var(--color-text); font-size: var(--font-size-sm); }
+.native-autofill-setup__copy > span { max-width: 68ch; color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.native-autofill-setup__checks {
+  margin: 7px 0 0;
+  padding: 0;
+  display: flex;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  list-style: none;
+}
+.native-autofill-setup__checks li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+.native-autofill-setup__checks li[data-complete='true'] .lb-icon { color: var(--color-success); }
+.native-autofill-setup__checks li[data-complete='false'] .lb-icon { color: var(--color-warning); }
+.native-autofill-setup__error { margin: 7px 0 0; color: var(--color-error); font-size: var(--font-size-xs); }
+.native-autofill-setup__actions { display: flex; align-items: center; gap: 4px; }
+
 .vault-workspace {
   min-height: 0;
   display: grid;
@@ -365,6 +414,15 @@ div.vault-row__main { cursor: default; }
   .vault-row__preview { display: none; }
   .vault-row__corrupt-action { padding-right: 8px; }
   .vault-state { min-height: 280px; padding: 24px; }
+  .native-autofill-setup {
+    padding: 12px;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .native-autofill-setup__actions {
+    grid-column: 1 / -1;
+    padding-left: 48px;
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 380px) {

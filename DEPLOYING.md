@@ -1,14 +1,16 @@
 # Deploying Lockbox v1
 
-This guide covers a self-hosted production deployment of the API, web vault, browser extension, and Android app. Cloudflare and app-store limits, pricing, and review rules can change; verify them with each provider before release.
+This guide covers a self-hosted production deployment of the API, web vault, browser extension, and Android/iOS apps. Cloudflare and app-store limits, pricing, and review rules can change; verify them with each provider before release.
 
 ## Prerequisites
 
 - Bun 1.3.10 or newer
 - A Cloudflare account with Wrangler authenticated
 - JDK 17 and Android SDK 36 for Android builds
+- macOS, Xcode 15 or newer, and CocoaPods for iOS builds
 - Chrome/Firefox developer accounts only if publishing to their stores
 - A Google Play developer account and signing key only if publishing Android
+- An Apple Developer account only if installing on devices or publishing iOS
 
 Install the repository dependencies with the committed Bun lockfile:
 
@@ -187,7 +189,9 @@ The extension requests broad host access because password-field discovery, save 
 
 The Firefox add-on ID is fixed in the manifest as `lockbox-password-manager@ryan12324.github.io`; register the AMO listing with that same ID. The workflow uploads a `git archive` of the tagged source alongside the bundled extension for AMO review. The manifest and package version must match the release tag. v1 uses `1.0.0`.
 
-## 4. Build Android
+## 4. Build mobile clients
+
+### Android
 
 The Android app wraps the production web vault and adds native Autofill and Credential Provider services. Build the web assets with the API URL before syncing Capacitor:
 
@@ -235,6 +239,45 @@ Never commit the keystore or its passwords. Back up the signing key independentl
 | `PLAY_SERVICE_ACCOUNT_JSON` | Base64-encoded Play service-account JSON    |
 | `vars.VITE_API_URL`         | API URL compiled into the mobile web assets |
 
+### iOS
+
+The iOS app packages the same web vault and adds native encrypted offline storage, Face ID/Touch ID unlock, password AutoFill, and an iOS 17 passkey credential-provider extension. Build the production web assets before syncing Capacitor:
+
+```bash
+VITE_API_URL=https://lockbox-api.YOUR_SUBDOMAIN.workers.dev \
+bun run --filter @lockbox/web build
+
+bun run --filter @lockbox/mobile build:ios
+```
+
+Open the CocoaPods workspace and select an Apple development team for both `App` and `CredentialProvider`:
+
+```bash
+open apps/mobile/ios/App/App.xcworkspace
+```
+
+The committed targets use these identifiers:
+
+| Target or capability | Identifier |
+| -------------------- | ---------- |
+| App | `dev.lockbox.app` |
+| AutoFill extension | `dev.lockbox.app.autofill` |
+| Shared App Group | `group.dev.lockbox.app` |
+
+Enable the AutoFill Credential Provider capability and App Group for both App IDs in the Apple Developer portal. The shared Keychain group in the committed entitlements is expanded with your team prefix at signing time. If these identifiers belong to another team, replace them consistently in the Xcode project, both entitlement files, both Info plists, `AuthwellShared.swift`, and `scripts/configure-ios-project.rb`.
+
+For a local signed and structurally verified archive, run:
+
+```bash
+IOS_DEVELOPMENT_TEAM=YOUR_TEAM_ID \
+IOS_ALLOW_PROVISIONING_UPDATES=1 \
+bun run build:ios:release
+```
+
+Alternatively, choose a Generic iOS Device in Xcode and use **Product → Archive**. Before App Store submission, verify password AutoFill, passkey registration/assertion, biometric cancellation, offline edits, relaunch persistence, logout index clearing, and pending-passkey upload on a physical iOS 17+ device. Simulator builds do not exercise Secure Enclave behavior.
+
+Authwell implements and uses encryption, so the App Store Connect account owner must complete Apple's export-compliance determination before TestFlight or App Store distribution. The repository intentionally does not guess `ITSAppUsesNonExemptEncryption` or commit an `ITSEncryptionExportComplianceCode`: answer the App Store Connect questions for the intended distribution regions, upload any required documentation, then add the values Apple provides to the app Info plist. Do not mark the app exempt without that determination.
+
 ## 5. Configure GitHub Actions
 
 The required Cloudflare repository secrets are:
@@ -270,7 +313,7 @@ Before upgrading a production instance:
 1. export or back up D1 and R2 using your Cloudflare account tooling;
 2. run the full local/CI release gates;
 3. apply migrations before deploying clients that depend on them;
-4. deploy the API, then web, extension, and Android clients;
+4. deploy the API, then web, extension, and Android/iOS clients;
 5. verify registration, login with and without 2FA, vault CRUD, sync, attachment upload/download, share redemption, and logout;
 6. retain the previous client artifacts until the new release is verified.
 
@@ -289,11 +332,13 @@ bun run --filter @lockbox/extension build:firefox
 
 Also verify:
 
-- all package, extension, CLI, and Android `versionName` values match;
+- all package, extension, CLI, Android `versionName`, and iOS marketing versions match;
 - Android `versionCode` is higher than the last published bundle;
+- iOS `CURRENT_PROJECT_VERSION` is higher than the last published build;
 - the D1 migration journal includes every numbered migration;
 - `CORS_ORIGINS` contains the production Pages/custom-domain and Android origins;
 - production builds contain the intended `VITE_API_URL`;
+- both signed iOS targets carry the same App Group and Keychain access groups;
 - no decrypted exports, API tokens, store credentials, or keystores are tracked;
 - the no-recovery warning and 2FA backup-code flow have been tested;
 - deferred v1 features are absent from normal navigation.
@@ -331,6 +376,10 @@ Confirm `VITE_API_URL` was present during the web build that Capacitor copied, t
 ### Android release is unsigned
 
 All four `LOCKBOX_*` signing variables must be present. The keystore path is resolved from `apps/mobile/android/app`; use an absolute path locally if in doubt.
+
+### iOS AutoFill extension shows no credentials
+
+Enable Authwell under **Settings → General → AutoFill & Passwords**, then unlock the vault once so the app can publish its biometric-gated index. Confirm that both signed targets use the same `group.dev.lockbox.app` App Group and shared Keychain access group. A provisioning-profile mismatch prevents the extension from reading the shared encrypted database.
 
 ### Share links open but do not decrypt
 

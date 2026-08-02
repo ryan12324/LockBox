@@ -1,13 +1,16 @@
 package dev.lockbox.app.autofill
 
-import android.content.ComponentName
+import android.app.Activity
 import android.net.Uri
 import android.provider.Settings
+import android.view.autofill.AutofillManager
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.getcapacitor.annotation.ActivityCallback
+import androidx.activity.result.ActivityResult
 import dev.lockbox.app.credentialprovider.PasskeyMetadataEntity
 import dev.lockbox.app.credentialprovider.PasskeyAccountState
 import dev.lockbox.app.storage.VaultDatabase
@@ -34,16 +37,7 @@ class AutofillPlugin : Plugin() {
 
     @PluginMethod
     fun isEnabled(call: PluginCall) {
-        val configured = Settings.Secure.getString(
-            context.contentResolver,
-            "autofill_service"
-        )
-        val expected = ComponentName(context, LockboxAutofillService::class.java)
-        val enabled = configured
-            ?.split(':')
-            ?.mapNotNull(ComponentName::unflattenFromString)
-            ?.any { it == expected } == true
-        call.resolve(JSObject().put("enabled", enabled))
+        resolveStatus(call)
     }
 
     @PluginMethod
@@ -52,11 +46,15 @@ class AutofillPlugin : Plugin() {
             val intent = android.content.Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE).apply {
                 data = Uri.parse("package:${context.packageName}")
             }
-            activity.startActivity(intent)
-            call.resolve()
+            startActivityForResult(call, intent, "autofillSettingsResult")
         } catch (error: Exception) {
             call.reject("Failed to open autofill settings", error)
         }
+    }
+
+    @ActivityCallback
+    fun autofillSettingsResult(call: PluginCall, result: ActivityResult) {
+        resolveStatus(call, selected = result.resultCode == Activity.RESULT_OK)
     }
 
     /** Replace the complete local index after a successful vault decryption. */
@@ -109,8 +107,10 @@ class AutofillPlugin : Plugin() {
                 }
 
                 VaultDatabase.getInstance(context).autofillCredentialDao().replaceAll(entities)
+                AutofillDiagnostics.recordIndex(context, entities.size)
                 call.resolve(JSObject().put("indexed", entities.size))
             } catch (error: Exception) {
+                AutofillDiagnostics.recordFailure(context, "The encrypted login index could not refresh")
                 call.reject("Failed to update autofill index", error)
             }
         }
@@ -200,6 +200,7 @@ class AutofillPlugin : Plugin() {
                 database.autofillCredentialDao().deleteAll()
                 database.passkeyMetadataDao().deleteBySource(PasskeyMetadataEntity.SOURCE_SYNCED)
                 PasskeyAccountState.clear(context)
+                AutofillDiagnostics.clearIndex(context)
                 call.resolve()
             } catch (error: Exception) {
                 call.reject("Failed to clear autofill index", error)
@@ -293,5 +294,23 @@ class AutofillPlugin : Plugin() {
         private const val MAX_CREDENTIALS = 5_000
         private const val MAX_URIS_PER_CREDENTIAL = 50
         private const val MAX_PASSKEYS = 5_000
+    }
+
+    private fun resolveStatus(call: PluginCall, selected: Boolean? = null) {
+        val manager = context.getSystemService(AutofillManager::class.java)
+        val supported = manager?.isAutofillSupported == true
+        val enabled = supported && manager?.hasEnabledAutofillServices() == true
+        val health = AutofillDiagnostics.snapshot(context)
+        call.resolve(
+            JSObject()
+                .put("supported", supported)
+                .put("enabled", enabled)
+                .put("selected", selected)
+                .put("indexedCredentials", health.indexedCredentials)
+                .put("indexedAt", health.indexedAt)
+                .put("lastRequestAt", health.lastRequestAt)
+                .put("lastMatchCount", health.lastMatchCount)
+                .put("lastError", health.lastError)
+        )
     }
 }

@@ -25,6 +25,11 @@ function getCredentialManager(): CapacitorBridge | null {
 export interface NativeAutofillStatus {
   supported: boolean;
   enabled: boolean;
+  indexedCredentials?: number;
+  indexedAt?: number;
+  lastRequestAt?: number;
+  lastMatchCount?: number;
+  lastError?: string;
 }
 
 export interface NativePasskeyStatus {
@@ -52,12 +57,20 @@ export async function getNativeAutofillStatus(): Promise<NativeAutofillStatus> {
   const bridge = getCapacitor();
   if (!bridge) return { supported: false, enabled: false };
   const result = await bridge.nativePromise('Autofill', 'isEnabled', {});
-  return { supported: true, enabled: result.enabled === true };
+  return {
+    supported: result.supported !== false,
+    enabled: result.enabled === true,
+    indexedCredentials: optionalNumber(result.indexedCredentials),
+    indexedAt: optionalNumber(result.indexedAt),
+    lastRequestAt: optionalNumber(result.lastRequestAt),
+    lastMatchCount: optionalNumber(result.lastMatchCount),
+    lastError: typeof result.lastError === 'string' ? result.lastError : undefined,
+  };
 }
 
 export async function openNativeAutofillSettings(): Promise<void> {
   const bridge = getCapacitor();
-  if (!bridge) throw new Error('Android autofill is not available on this device');
+  if (!bridge) throw new Error('Native autofill is not available on this device');
   await bridge.nativePromise('Autofill', 'requestEnable', {});
 }
 
@@ -70,13 +83,21 @@ export async function getNativePasskeyStatus(): Promise<NativePasskeyStatus> {
 
 export async function openNativePasskeySettings(): Promise<void> {
   const bridge = getCredentialManager();
-  if (!bridge) throw new Error('Android passkeys require Android 14 or later');
+  if (!bridge) throw new Error('Native passkeys are not available on this device');
   await bridge.nativePromise('CredentialManager', 'requestEnableProvider', {});
 }
 
-export async function syncNativeAutofillIndex(items: VaultItem[], accountId: string): Promise<void> {
+export interface NativeAutofillIndexResult {
+  passwords: number;
+  passkeys: number;
+}
+
+export async function syncNativeAutofillIndex(
+  items: VaultItem[],
+  accountId: string
+): Promise<NativeAutofillIndexResult> {
   const bridge = getCapacitor();
-  if (!bridge) return;
+  if (!bridge) return { passwords: 0, passkeys: 0 };
 
   const credentials = items
     .filter((item): item is LoginItem => item.type === 'login')
@@ -105,10 +126,16 @@ export async function syncNativeAutofillIndex(items: VaultItem[], accountId: str
       createdAt: item.createdAt,
     }));
 
-  await Promise.all([
+  const [passwordResult, passkeyResult] = await Promise.all([
     bridge.nativePromise('Autofill', 'replaceCredentialIndex', { credentials }),
     bridge.nativePromise('Autofill', 'replacePasskeyIndex', { passkeys, accountId }),
   ]);
+  const result = {
+    passwords: optionalNumber(passwordResult.indexed) ?? 0,
+    passkeys: optionalNumber(passkeyResult.indexed) ?? 0,
+  };
+  window.dispatchEvent(new CustomEvent('authwell:native-autofill-updated', { detail: result }));
+  return result;
 }
 
 export async function getPendingNativePasskeys(): Promise<PendingNativePasskey[]> {
@@ -122,7 +149,7 @@ export async function exportPendingNativePasskey(
   credentialId: string
 ): Promise<ExportedNativePasskey> {
   const bridge = getCredentialManager();
-  if (!bridge) throw new Error('Android passkey sync is not available on this device');
+  if (!bridge) throw new Error('Native passkey sync is not available on this device');
   return bridge.nativePromise('CredentialManager', 'exportPendingPasskey', {
     credentialId,
   }) as unknown as Promise<ExportedNativePasskey>;
@@ -144,4 +171,8 @@ export async function clearNativeAutofillIndex(): Promise<void> {
   const bridge = getCapacitor();
   if (!bridge) return;
   await bridge.nativePromise('Autofill', 'clearCredentialIndex', {});
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }

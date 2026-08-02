@@ -198,6 +198,31 @@
   font-size: var(--font-size-xs);
 }
 
+.settings-autofill__diagnostics {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+}
+
+.settings-autofill__diagnostics span,
+.settings-autofill__error {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.settings-autofill__diagnostics .lb-icon { color: var(--color-primary); }
+.settings-autofill__error { margin: 12px 0 0; color: var(--color-error); }
+.settings-autofill__hint {
+  max-width: 68ch;
+  margin: 14px 0 0;
+  color: var(--color-text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
 @media (max-width: 520px) {
   .settings-travel {
     padding-inline: 0;

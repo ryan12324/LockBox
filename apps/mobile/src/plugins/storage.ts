@@ -1,8 +1,8 @@
 /**
- * Storage Plugin — TypeScript bridge for native Android Room DB encrypted storage.
+ * Storage Plugin — TypeScript bridge for native Android/iOS encrypted storage.
  *
  * Stores ONLY encrypted blobs — never decrypted vault data.
- * The Room database is shared with AutofillService (separate process).
+ * Native storage is shared with the platform credential-provider process.
  * Each item tracks syncStatus for offline-first operation.
  */
 
@@ -50,9 +50,9 @@ export interface StorageTimestampResult {
 }
 
 /**
- * StoragePlugin interface — defines the contract between TypeScript and native Kotlin.
+ * StoragePlugin interface — defines the contract between TypeScript and native code.
  *
- * All data stored is encrypted. The Room DB stores opaque encrypted blobs.
+ * All data stored is encrypted. The native database stores opaque encrypted blobs.
  * syncStatus field enables offline-first: items can be created/updated/deleted
  * while offline, then synced when connectivity returns.
  */

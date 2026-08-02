@@ -83,6 +83,14 @@
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             tools:targetApi="34" />
 
+        <!-- Password retrieval activity launched by Credential Manager. -->
+        <activity
+            android:name="dev.lockbox.app.credentialprovider.GetPasswordActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            tools:targetApi="34" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

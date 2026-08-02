@@ -18,8 +18,11 @@ import {
   getNativePasskeyStatus,
   openNativeAutofillSettings,
   openNativePasskeySettings,
+  type NativeAutofillStatus,
+  type NativePasskeyStatus,
 } from '../lib/native-autofill.js';
 import { applyThemePreference, type ThemePreference } from '../lib/theme.js';
+import NativeBiometricSettings from '../components/NativeBiometricSettings.js';
 
 type AutoLockMinutes = 1 | 5 | 15 | 30 | 60;
 type ClipboardSeconds = 10 | 20 | 30 | 60;
@@ -95,14 +98,14 @@ export default function Settings() {
     Array<{ id: string; name: string; travelSafe: boolean }>
   >([]);
   const [showTravelConfirm, setShowTravelConfirm] = useState(false);
-  const [nativeAutofill, setNativeAutofill] = useState<{
-    supported: boolean;
-    enabled: boolean;
-  }>({ supported: false, enabled: false });
-  const [nativePasskeys, setNativePasskeys] = useState<{
-    supported: boolean;
-    enabled: boolean;
-  }>({ supported: false, enabled: false });
+  const [nativeAutofill, setNativeAutofill] = useState<NativeAutofillStatus>({
+    supported: false,
+    enabled: false,
+  });
+  const [nativePasskeys, setNativePasskeys] = useState<NativePasskeyStatus>({
+    supported: false,
+    enabled: false,
+  });
   const [nativeAutofillLoading, setNativeAutofillLoading] = useState(false);
   const [nativeAutofillError, setNativeAutofillError] = useState('');
 
@@ -200,7 +203,7 @@ export default function Settings() {
       await openNativeAutofillSettings();
     } catch (error) {
       setNativeAutofillError(
-        error instanceof Error ? error.message : 'Could not open Android autofill settings'
+        error instanceof Error ? error.message : 'Could not open native autofill settings'
       );
     } finally {
       setNativeAutofillLoading(false);
@@ -214,7 +217,7 @@ export default function Settings() {
       await openNativePasskeySettings();
     } catch (error) {
       setNativeAutofillError(
-        error instanceof Error ? error.message : 'Could not open Android passkey settings'
+        error instanceof Error ? error.message : 'Could not open native passkey settings'
       );
     } finally {
       setNativeAutofillLoading(false);
@@ -1093,9 +1096,9 @@ export default function Settings() {
 
           {(nativeAutofill.supported || nativePasskeys.supported) && (
             <Card variant="surface" padding="lg">
-              <h2 style={{ ...sectionHeading, marginBottom: 8 }}>Android Autofill & Passkeys</h2>
+              <h2 style={{ ...sectionHeading, marginBottom: 8 }}>Device Autofill & Passkeys</h2>
               <p style={{ ...descStyle, marginBottom: 16 }}>
-                Let Android offer your Authwell logins and synced passkeys in apps and browsers.
+                Let your device offer Authwell logins and synced passkeys in apps and browsers.
                 Private key material stays encrypted behind strong biometric authentication on this
                 device.
               </p>
@@ -1123,6 +1126,21 @@ export default function Settings() {
                     >
                       {nativeAutofill.enabled ? 'Open autofill settings' : 'Enable autofill'}
                     </Button>
+                    <div className="settings-autofill__diagnostics">
+                      {nativeAutofill.indexedCredentials !== undefined && (
+                        <span>
+                          <Icon name="shield-check" size={15} />
+                          {nativeAutofill.indexedCredentials}{' '}
+                          {nativeAutofill.indexedCredentials === 1 ? 'login' : 'logins'} protected
+                        </span>
+                      )}
+                      {nativeAutofill.lastRequestAt !== undefined && (
+                        <span>
+                          <Icon name="history" size={15} />
+                          Last system request matched {nativeAutofill.lastMatchCount ?? 0}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
                 {nativePasskeys.supported && (
@@ -1163,7 +1181,20 @@ export default function Settings() {
                   {nativeAutofillError}
                 </p>
               )}
+              {nativeAutofill.lastError && (
+                <p className="settings-autofill__error" role="alert">
+                  <Icon name="alert-circle" size={16} />
+                  {nativeAutofill.lastError}
+                </p>
+              )}
+              <p className="settings-autofill__hint">
+                Add the website domain to its login item. Android apps can also use an explicit app target.
+              </p>
             </Card>
+          )}
+
+          {session && userKey && (
+            <NativeBiometricSettings accountId={session.userId} userKey={userKey} />
           )}
 
           <Card variant="surface" padding="lg">

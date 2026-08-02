@@ -9,9 +9,9 @@ const config: CapacitorConfig = {
   },
   plugins: {
     CapacitorHttp: {
-      // Native networking lets a self-hosted Android app connect to its chosen
+      // Native networking lets a self-hosted mobile app connect to its chosen
       // Lockbox origin without requiring every API deployment to allow the
-      // WebView's synthetic https://localhost origin in CORS.
+      // WebView's synthetic local origin in CORS.
       enabled: true,
     },
     Network: {

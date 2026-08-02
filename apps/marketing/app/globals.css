@@ -480,19 +480,22 @@ summary {
   transform: translateY(-3px);
 }
 
-.platform-code {
+.platform-icon {
   min-width: 3.25rem;
-  min-height: 2.15rem;
-  padding: 0.4rem;
+  width: 3.25rem;
+  height: 2.75rem;
   display: inline-grid;
   place-items: center;
+  flex: 0 0 auto;
   color: var(--indigo);
   background: var(--canvas-subtle);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
+}
+
+.platform-icon svg {
+  width: 1.45rem;
+  height: 1.45rem;
 }
 
 .access-point strong {

@@ -1,11 +1,11 @@
 /**
- * Credential Manager Plugin — TypeScript bridge for Android Credential Manager API.
+ * Credential Manager Plugin — TypeScript bridge for Android Credential Manager and iOS AuthenticationServices.
  *
  * Provides passkey (WebAuthn/FIDO2) creation and authentication via
- * Android 14+ Credential Manager. The actual native implementation
- * is in Kotlin; this module defines the TS interface and utility helpers.
+ * Android 14+ and iOS 17+ passkey provider APIs. This module defines
+ * the shared TypeScript interface and utility helpers.
  *
- * Falls back gracefully on non-Android environments.
+ * Falls back gracefully outside supported native mobile environments.
  */
 
 import { registerPlugin } from '@capacitor/core';
@@ -87,8 +87,7 @@ export interface CredentialManagerPlugin {
 const CredentialManager = registerPlugin<CredentialManagerPlugin>('CredentialManager');
 
 /**
- * Check if Android Credential Manager is available on this device.
- * Returns false on non-Android environments.
+ * Check if the native platform passkey manager is available on this device.
  */
 export async function isCredentialManagerAvailable(): Promise<boolean> {
   try {
@@ -101,7 +100,7 @@ export async function isCredentialManagerAvailable(): Promise<boolean> {
 }
 
 /**
- * Create a new passkey using Android Credential Manager.
+ * Create a new passkey using the platform credential manager.
  * Throws if Credential Manager is unavailable.
  */
 export async function createPasskey(
@@ -120,7 +119,7 @@ export async function createPasskey(
 }
 
 /**
- * Authenticate with a passkey via Android Credential Manager.
+ * Authenticate with a passkey via the platform credential manager.
  * Throws if Credential Manager is unavailable.
  */
 export async function authenticateWithPasskey(

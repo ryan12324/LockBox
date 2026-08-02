@@ -28,6 +28,8 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "test:ios-native": "./scripts/test-ios-native.sh",
+    "build:ios:release": "./scripts/build-ios-release.sh",
     "brand:authwell": "node scripts/generate-authwell-assets.mjs",
     "deploy:api": "./scripts/deploy-backend.sh",
     "deploy:web": "./scripts/deploy-web.sh"

@@ -5,7 +5,7 @@
 - `apps/api` — Hono on Cloudflare Workers (D1 SQLite)
 - `apps/web` — React 19 + Vite + Tailwind v4 + Zustand
 - `apps/extension` — WXT browser extension (Chrome/Firefox)
-- `apps/mobile` — Capacitor Android (Kotlin native plugins + TS offline sync)
+- `apps/mobile` — Capacitor Android/iOS (Kotlin/Swift native plugins + TS offline sync)
 - `packages/crypto` — AES-256-GCM + Argon2id
 - `packages/generator` — Password/passphrase generation + zxcvbn
 - `packages/totp` — TOTP generation
@@ -59,9 +59,24 @@ JAVA_HOME="/private/tmp/lockbox-jdk17/jdk-17.0.20+8/Contents/Home" \
   testDebugUnitTest lintDebug assembleDebug
 ```
 
+## iOS Build Environment
+
+- Build `apps/web` before Capacitor sync; iOS packages `apps/web/dist`.
+- iOS 17 is the minimum deployment target because third-party passkey providers require the iOS 17 AuthenticationServices APIs.
+- Install Xcode 15 or newer and CocoaPods. Open `apps/mobile/ios/App/App.xcworkspace`, not the `.xcodeproj`, for signed device and archive builds.
+- Both the `App` and `CredentialProvider` targets require the AutoFill Credential Provider capability, the `group.dev.lockbox.app` App Group, and the shared Keychain group from their committed entitlements.
+- `scripts/configure-ios-project.rb` idempotently restores native source membership and the embedded credential-provider target after recreating the Capacitor project.
+
+```bash
+cd apps/web && bun run build
+cd ../mobile && bun run build:ios
+cd ../..
+open apps/mobile/ios/App/App.xcworkspace
+```
+
 ## Deployment
 
 - API → `bun run deploy:api` (Cloudflare Workers)
 - Web → `bun run deploy:web` (Cloudflare Pages)
 - Extension → manual build + Chrome Web Store / Firefox AMO
-- Mobile → Capacitor build → Google Play Store
+- Mobile → Capacitor build → Google Play Store / Apple App Store

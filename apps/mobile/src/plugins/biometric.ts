@@ -1,9 +1,8 @@
 /**
- * Biometric Plugin — TypeScript bridge for Android BiometricPrompt + Keystore.
+ * Biometric Plugin — TypeScript bridge for Android BiometricPrompt/Keystore and iOS LocalAuthentication/Keychain.
  *
- * Uses Android Keystore to wrap the user key with a biometric-bound key.
- * BiometricPrompt (NOT deprecated FingerprintManager) handles authentication.
- * The encrypted user key is stored in SharedPreferences; only biometric auth can decrypt it.
+ * Uses Android Keystore or iOS Keychain access control to protect the user key.
+ * Platform-native biometric UI authorizes access to the protected user key.
  */
 
 import { registerPlugin } from '@capacitor/core';
@@ -27,13 +26,13 @@ export interface BiometricEnrolledResult {
 }
 
 /**
- * BiometricPlugin interface — defines the contract between TypeScript and native Kotlin.
+ * BiometricPlugin interface — defines the contract between TypeScript and native code.
  *
  * Flow:
  * 1. checkAvailability() → verify device supports biometrics
- * 2. enrollBiometric({ userKey }) → wrap user key with Keystore biometric key
- * 3. authenticate({ reason }) → BiometricPrompt → unwrap user key
- * 4. unenroll() → remove biometric key from Keystore
+ * 2. enrollBiometric({ userKey }) → protect the key with device biometrics
+ * 3. authenticate({ reason }) → native biometric prompt → release the user key
+ * 4. unenroll() → remove the protected native key
  */
 export interface BiometricPlugin {
   /** Check if device supports biometric authentication */
@@ -43,18 +42,17 @@ export interface BiometricPlugin {
   isEnrolled(): Promise<BiometricEnrolledResult>;
 
   /**
-   * Enroll biometric unlock — wraps user key with a Keystore-backed
-   * biometric-bound key. Triggers BiometricPrompt for initial enrollment.
+   * Enroll biometric unlock with platform-protected, biometric-bound storage.
    */
   enrollBiometric(options: { userKey: string }): Promise<void>;
 
   /**
-   * Authenticate with biometrics — unwraps user key using BiometricPrompt.
+   * Authenticate with biometrics through the native platform prompt.
    * Returns the decrypted user key on success.
    */
   authenticate(options: { reason: string }): Promise<BiometricAuthResult>;
 
-  /** Remove biometric enrollment — deletes key from Android Keystore */
+  /** Remove biometric enrollment and its protected native key */
   unenroll(): Promise<void>;
 }
 

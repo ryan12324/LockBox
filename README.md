@@ -6,7 +6,7 @@
 
 Authwell is a self-hosted, zero-knowledge password manager for technically comfortable users who want to run their own backend. Vault plaintext and encryption keys stay on the client; the Cloudflare backend stores ciphertext and synchronization metadata.
 
-Version 1.0.0 includes a marketing site, web vault, Chrome/Firefox extension, Android app, CLI, and Cloudflare Workers API.
+Version 1.0.0 includes a marketing site, web vault, Chrome/Firefox extension, Android and iOS apps, CLI, and Cloudflare Workers API.
 
 > Authwell has not received an independent security audit. Review the code and threat model before trusting it with critical credentials. Self-hosting transfers operational responsibility to you, including Cloudflare access, backups, updates, and cost controls.
 
@@ -20,7 +20,7 @@ Version 1.0.0 includes a marketing site, web vault, Chrome/Firefox extension, An
 - Encrypted attachments and document blobs in Cloudflare R2
 - Team membership, per-member RSA-OAEP folder-key wrapping, shared folders, and limited share links
 - Chrome/Firefox autofill, save/update prompts, TOTP, and passkey WebAuthn support with native fallback
-- Android Autofill and Credential Provider integration with a biometric-bound local index
+- Android and iOS AutoFill/Credential Provider integration with a biometric-bound local index
 - Delta sync, travel mode, and soft-delete cleanup
 
 The product deliberately does not expose hardware-key login, emergency-access recovery, QR secret transfer, or an AI chat assistant in v1. Those flows require complete interoperable protocols before they can be presented as security features.
@@ -47,7 +47,7 @@ There is no master-password recovery in v1. Losing the master password means los
 | API       | `apps/api`       | Cloudflare Workers, Hono, D1, and R2    |
 | Web vault | `apps/web`       | React, Vite, Cloudflare Pages           |
 | Extension | `apps/extension` | WXT, React, Chrome/Firefox              |
-| Android   | `apps/mobile`    | Capacitor plus native Kotlin services   |
+| Mobile    | `apps/mobile`    | Capacitor plus native Kotlin/Swift services |
 | CLI       | `apps/cli`       | Bun/Node-compatible command line client |
 
 Shared packages under `packages/` provide cryptography, types, TOTP, password generation, local security analysis, and design components.
@@ -56,7 +56,7 @@ Shared packages under `packages/` provide cryptography, types, TOTP, password ge
 
 - `https://authwell.app` is the public product and download site.
 - `https://vault.authwell.app` is the first-party web vault and extension discovery origin.
-- `https://api.authwell.app` is the first-party API used by hosted web, Android, extension, and CLI clients.
+- `https://api.authwell.app` is the first-party API used by hosted web, mobile, extension, and CLI clients.
 
 Self-hosted clients can continue to override the vault and API origins. The hosted API controls new account creation with the `REGISTRATION_ENABLED` Worker variable; existing accounts can sign in while registration is closed.
 
@@ -104,7 +104,7 @@ VITE_API_URL=https://lockbox-api.YOUR_SUBDOMAIN.workers.dev \
 bun run deploy:web
 ```
 
-After deployment, configure the API's `CORS_ORIGINS` for the exact web origin and `EXTENSION_IDS` for any installed browser-extension IDs, then redeploy. The default configuration includes the default Pages URL, Vite development, and the Android WebView origin. See [DEPLOYING.md](DEPLOYING.md) for CI, extension, Android signing, CORS, and store-release instructions.
+After deployment, configure the API's `CORS_ORIGINS` for the exact web origin and `EXTENSION_IDS` for any installed browser-extension IDs, then redeploy. The default configuration includes the default Pages URL, Vite development, and the Android WebView origin. See [DEPLOYING.md](DEPLOYING.md) for CI, extension, Android/iOS signing, CORS, and store-release instructions.
 
 On first run, give the extension the web-vault URL. The web deployment publishes
 versioned discovery metadata so the extension can locate and verify the Worker
@@ -134,9 +134,10 @@ Build release clients:
 bun run --filter @lockbox/extension build
 bun run --filter @lockbox/extension build:firefox
 bun run --filter @lockbox/mobile build:android
+bun run --filter @lockbox/mobile build:ios
 ```
 
-The Android build additionally requires JDK 17 and Android SDK 36. Release signing uses the `LOCKBOX_KEYSTORE_FILE`, `LOCKBOX_KEYSTORE_PASSWORD`, `LOCKBOX_KEY_ALIAS`, and `LOCKBOX_KEY_PASSWORD` environment variables.
+The Android build additionally requires JDK 17 and Android SDK 36. Release signing uses the `LOCKBOX_KEYSTORE_FILE`, `LOCKBOX_KEYSTORE_PASSWORD`, `LOCKBOX_KEY_ALIAS`, and `LOCKBOX_KEY_PASSWORD` environment variables. The iOS build requires macOS, Xcode 15 or newer, CocoaPods, and an Apple development team configured for the app and AutoFill extension targets.
 
 ## Deployment configuration
 
@@ -149,7 +150,7 @@ Do not commit account credentials, API tokens, extension-store credentials, sign
 
 ## Release gates
 
-CI runs lint, TypeScript checks, Vitest suites, production builds, Chrome/Firefox extension builds, Android debug compilation, an unsigned release bundle, and Android release lint. Before publishing, build the signed Android bundle as described in [DEPLOYING.md](DEPLOYING.md).
+CI runs lint, TypeScript checks, Vitest and Swift contract suites, production builds, Chrome/Firefox extension builds, Android debug/release gates, and an unsigned iOS archive. Before publishing either mobile client, run the signed Android or iOS release checks described in [DEPLOYING.md](DEPLOYING.md).
 
 ## License
 

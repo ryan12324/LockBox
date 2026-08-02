@@ -1,7 +1,7 @@
 /**
  * Tests for TypeScript plugin bridge interfaces.
  * Tests the interface contracts and type definitions for native Capacitor plugins.
- * The actual native implementations are in Kotlin and tested via Android instrumentation tests.
+ * Native implementations live in Kotlin and Swift and are verified in their platform builds.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -16,6 +16,7 @@ vi.mock('@capacitor/core', () => ({
       isEnabled: vi.fn().mockResolvedValue({ enabled: false }),
       requestEnable: vi.fn().mockResolvedValue(undefined),
       replaceCredentialIndex: vi.fn().mockResolvedValue({ indexed: 0 }),
+      replacePasskeyIndex: vi.fn().mockResolvedValue({ indexed: 0 }),
       clearCredentialIndex: vi.fn().mockResolvedValue(undefined),
       getPasskeysForUri: vi.fn().mockResolvedValue({ passkeys: [] }),
       checkAvailability: vi
@@ -76,6 +77,25 @@ describe('AutofillPlugin interface', () => {
 
   it('clearCredentialIndex resolves', async () => {
     await expect(Autofill.clearCredentialIndex()).resolves.toBeUndefined();
+  });
+
+  it('replacePasskeyIndex carries portable key material and account isolation', async () => {
+    const result = await Autofill.replacePasskeyIndex({
+      accountId: 'account-123',
+      passkeys: [{
+        id: 'vault-item-123',
+        credentialId: 'Y3JlZGVudGlhbC1pZC0xMjM',
+        rpId: 'example.com',
+        rpName: 'Example',
+        userName: 'alice@example.com',
+        userDisplayName: 'Alice',
+        userId: 'dXNlci0xMjM',
+        publicKey: 'cHVibGljLWtleS1jb3NlLWVjMi1wMjU2',
+        privateKey: 'cGtjczgtcHJpdmF0ZS1rZXktbWF0ZXJpYWw',
+        createdAt: '2026-08-02T00:00:00.000Z',
+      }],
+    });
+    expect(result).toEqual({ indexed: 0 });
   });
 });
 

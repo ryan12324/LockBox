@@ -6,7 +6,7 @@ import { useVaultFilterStore } from '../store/vault.js';
 import { useToast } from '../providers/ToastProvider.js';
 import { api } from '../lib/api.js';
 import { decryptVaultItem, encryptVaultItem } from '../lib/crypto.js';
-import { clearNativeAutofillIndex } from '../lib/native-autofill.js';
+import { clearNativeDeviceState } from '../lib/native-device-state.js';
 import type { Folder, VaultItem } from '@lockbox/types';
 
 const vaultTypes: Array<{ type: string; label: string; icon: IconName }> = [
@@ -58,7 +58,11 @@ export default function AppLayout() {
 
   async function handleLogout() {
     if (session) await api.auth.logout(session.token).catch(() => {});
-    await clearNativeAutofillIndex().catch(() => {});
+    try {
+      await clearNativeDeviceState();
+    } catch {
+      toast('Signed out, but some protected device data could not be cleared.', 'warning');
+    }
     logout();
     navigate('/login');
   }

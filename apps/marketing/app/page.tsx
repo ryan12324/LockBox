@@ -11,33 +11,76 @@ const GITHUB_URL = "https://github.com/ryan12324/LockBox";
 const RELEASES_URL = `${GITHUB_URL}/releases/latest`;
 
 type RegistrationState = "checking" | "open" | "closed" | "unavailable";
+type PlatformIconName = "web" | "extension" | "android" | "cli";
+
+function PlatformIcon({ name }: { name: PlatformIconName }) {
+  return (
+    <span className="platform-icon" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        focusable="false"
+      >
+        {name === "web" && (
+          <path d="M4 8h16M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2zm4-2v4" />
+        )}
+        {name === "extension" && (
+          <path d="M4 7h3a1 1 0 0 0 1-1V5a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0-1 1v3a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1v-1a2 2 0 0 0-4 0v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a2 2 0 0 0 0-4H4a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1" />
+        )}
+        {name === "android" && (
+          <path d="M4 10v6m16-6v6M7 9h10v8a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1za5 5 0 0 1 10 0M8 3l1 2m7-2l-1 2M9 18v3m6-3v3" />
+        )}
+        {name === "cli" && (
+          <>
+            <path d="m8 9 3 3-3 3m5 0h3" />
+            <path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          </>
+        )}
+      </svg>
+    </span>
+  );
+}
 
 const platforms = [
   {
     code: "WEB",
+    icon: "web",
     name: "Web vault",
     detail: "Manage every vault item from the browser.",
     href: `${VAULT_URL}/login`,
   },
   {
     code: "EXT",
+    icon: "extension",
     name: "Browser extensions",
     detail: "Fill, save, and use passkeys in Chrome and Firefox.",
     href: RELEASES_URL,
   },
   {
     code: "AND",
+    icon: "android",
     name: "Android",
     detail: "Autofill and Credential Provider support across apps.",
     href: RELEASES_URL,
   },
   {
     code: "CLI",
+    icon: "cli",
     name: "Command line",
     detail: "Unlock, search, create, export, and sync from a terminal.",
     href: `${GITHUB_URL}/tree/main/apps/cli`,
   },
-];
+] satisfies ReadonlyArray<{
+  code: string;
+  icon: PlatformIconName;
+  name: string;
+  detail: string;
+  href: string;
+}>;
 
 const securityFacts = [
   {
@@ -127,7 +170,7 @@ export default function Home() {
     <main>
       <section className="hero" aria-labelledby="hero-title">
         <div className="hero-pattern" aria-hidden="true" />
-        <img className="hero-mark" src="/brand/authwell-mark.png?v=authwell-2" alt="" />
+        <img className="hero-mark" src="/brand/authwell-mark.svg" alt="" />
 
         <header className="site-header shell">
           <a className="brand" href="#top" aria-label="Authwell home">
@@ -207,7 +250,7 @@ export default function Home() {
                 href={platform.href}
                 key={platform.code}
               >
-                <span className="platform-code">{platform.code}</span>
+                <PlatformIcon name={platform.icon} />
                 <strong>{platform.name}</strong>
               </a>
             ))}
@@ -284,7 +327,7 @@ export default function Home() {
           <div className="platform-list">
             {platforms.map((platform) => (
               <a href={platform.href} key={platform.code}>
-                <span className="platform-code">{platform.code}</span>
+                <PlatformIcon name={platform.icon} />
                 <div><strong>{platform.name}</strong><p>{platform.detail}</p></div>
                 <span className="platform-arrow" aria-hidden="true">↗</span>
               </a>
@@ -317,7 +360,7 @@ export default function Home() {
       </section>
 
       <section className="final-cta" aria-labelledby="final-title">
-        <img src="/brand/authwell-mark.png?v=authwell-2" alt="" />
+        <img src="/brand/authwell-mark.svg" alt="" />
         <div className="shell final-cta-inner">
           <p className="eyebrow eyebrow-indigo">Ready when you are</p>
           <h2 id="final-title">Open the vault. Keep the choice.</h2>

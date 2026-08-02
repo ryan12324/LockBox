@@ -6,7 +6,7 @@ Product application. Authwell is a security-sensitive, multi-surface password ma
 
 ## Product Purpose
 
-Authwell gives people a self-hosted vault they can operate on infrastructure they control. It combines a web vault, browser extension, Android client, command-line client, and Cloudflare backend while keeping vault contents end-to-end encrypted. The v1 promise is dependable password storage, retrieval, autofill, sync, import/export, TOTP, attachments/documents, and carefully bounded sharing—not a collection of experimental security claims.
+Authwell gives people a self-hosted vault they can operate on infrastructure they control. It combines a web vault, browser extension, Android/iOS clients, command-line client, and Cloudflare backend while keeping vault contents end-to-end encrypted. The v1 promise is dependable password storage, retrieval, autofill, sync, import/export, TOTP, attachments/documents, and carefully bounded sharing—not a collection of experimental security claims.
 
 ## Users
 
@@ -25,7 +25,7 @@ The voice is direct, human, and reassuring without being cute. Prefer “Your va
 ## Strategic Design Principles
 
 1. Security state must be understandable without relying on color. Pair icons, labels, and concise explanations with every important state.
-2. The main task on each surface wins. The extension prioritizes unlock, search, fill, and save; the web app prioritizes vault management; Android prioritizes unlock, sync, autofill, and credential-provider flows.
+2. The main task on each surface wins. The extension prioritizes unlock, search, fill, and save; the web app prioritizes vault management; mobile prioritizes unlock, sync, autofill, and credential-provider flows.
 3. Fail closed while remaining actionable. When a feature is unavailable or intentionally deferred, remove it from primary navigation instead of exposing a dead control.
 4. Destructive and cryptographic transitions need explicit scope and recovery consequences. Never imply that deleting ciphertext, rotating keys, or changing a master password is trivially reversible.
 5. Accessibility is a release requirement: WCAG 2.2 AA contrast, keyboard-visible focus, semantic controls, reduced-motion support, practical touch targets, and screen-reader labels.

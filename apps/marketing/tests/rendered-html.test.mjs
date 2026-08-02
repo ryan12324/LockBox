@@ -14,6 +14,7 @@ test("exports the Authwell marketing page", async () => {
   assert.match(html, /Your control/);
   assert.match(html, /Checking registration/);
   assert.match(html, /One vault\. Every way in\./);
+  assert.equal((html.match(/class="platform-icon"/g) ?? []).length, 8);
   assert.match(html, /Security explained without theatre\./);
   assert.match(html, /Use our server, or bring your own\./);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
@@ -25,11 +26,13 @@ test("ships product metadata and brand assets", async () => {
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     access(new URL("../out/brand/authwell-portal-pattern.webp", import.meta.url)),
-    access(new URL("../out/brand/authwell-mark.png", import.meta.url)),
+    access(new URL("../out/brand/authwell-mark.svg", import.meta.url)),
   ]);
 
   assert.match(page, /https:\/\/vault\.authwell\.app/);
   assert.match(page, /https:\/\/api\.authwell\.app/);
+  assert.match(page, /authwell-mark\.svg/);
+  assert.doesNotMatch(page, /authwell-mark\.png/);
   assert.match(layout, /export const metadata: Metadata/);
   assert.match(layout, /metadataBase: new URL\("https:\/\/authwell\.app"\)/);
   assert.match(layout, /viewportFit:\s*"cover"/);

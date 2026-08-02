@@ -26,6 +26,7 @@ interface AuthState {
 
   setSession: (session: SessionData) => void;
   setKeys: (masterKey: Uint8Array, userKey: Uint8Array) => void;
+  unlockWithUserKey: (userKey: Uint8Array) => void;
   lock: () => void;
   logout: () => void;
   updateActivity: () => void;
@@ -44,6 +45,9 @@ export const useAuthStore = create<AuthState>()(
 
       setKeys: (masterKey, userKey) =>
         set({ masterKey, userKey, isLocked: false, lastActivity: Date.now() }),
+
+      unlockWithUserKey: (userKey) =>
+        set({ masterKey: null, userKey, isLocked: false, lastActivity: Date.now() }),
 
       lock: () => set({ userKey: null, masterKey: null, isLocked: true }),
 

@@ -5,7 +5,11 @@ import AuthShell from '../components/AuthShell.js';
 import { discoverLockboxServer } from '../lib/discovery.js';
 import { getServerConnection, setServerConnection } from '../lib/server-connection.js';
 
-export default function ServerSetup({ onComplete }: { onComplete: () => void }) {
+export default function ServerSetup({
+  onComplete,
+}: {
+  onComplete: () => void | Promise<void>;
+}) {
   const navigate = useNavigate();
   const currentConnection = getServerConnection();
   const [url, setUrl] = useState(currentConnection?.webBaseUrl ?? '');
@@ -24,7 +28,7 @@ export default function ServerSetup({ onComplete }: { onComplete: () => void }) 
     try {
       const connection = await discoverLockboxServer(url.trim());
       setServerConnection(connection);
-      onComplete();
+      await onComplete();
       navigate('/login', { replace: true });
     } catch (reason) {
       setError(

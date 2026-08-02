@@ -5,6 +5,7 @@ import { ToastProvider } from './providers/ToastProvider.js';
 import { startFoldableLayout } from './lib/foldable-layout.js';
 import { getServerConnection, isNativeLockboxApp } from './lib/server-connection.js';
 import { startThemeSync } from './lib/theme.js';
+import { clearNativeDeviceState } from './lib/native-device-state.js';
 
 const Register = lazy(() => import('./pages/Register.js'));
 const Login = lazy(() => import('./pages/Login.js'));
@@ -38,7 +39,9 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (nativeApp && !serverConfigured && session) logout();
+    if (nativeApp && !serverConfigured && session) {
+      void clearNativeDeviceState().finally(logout);
+    }
   }, [nativeApp, serverConfigured, session, logout]);
 
   // Auto-lock after inactivity
@@ -83,7 +86,8 @@ export default function App() {
               path="/setup"
               element={
                 <ServerSetup
-                  onComplete={() => {
+                  onComplete={async () => {
+                    await clearNativeDeviceState().catch(() => {});
                     logout();
                     setServerConfigured(true);
                   }}

@@ -30,6 +30,7 @@ import { syncNativeAutofillIndex } from '../lib/native-autofill.js';
 import { syncPendingNativePasskeys } from '../lib/native-passkey-sync.js';
 import { fetchFreshVaultItem } from '../lib/vault-freshness.js';
 import ItemPanel from '../components/ItemPanel.js';
+import NativeAutofillSetup from '../components/NativeAutofillSetup.js';
 
 const typeLabels: Record<string, string> = {
   login: 'Login',
@@ -161,7 +162,7 @@ export default function Vault() {
         try {
           await syncNativeAutofillIndex(decrypted, session.userId);
         } catch {
-          toast('Vault loaded, but Android autofill and passkeys could not refresh yet.', 'warning');
+          toast('Vault loaded, but device autofill and passkeys could not refresh yet.', 'warning');
         }
 
         try {
@@ -181,7 +182,7 @@ export default function Vault() {
           }
           if (syncResult.syncedCount > 0) {
             toast(
-              `${syncResult.syncedCount} Android ${syncResult.syncedCount === 1 ? 'passkey' : 'passkeys'} synced to your encrypted vault.`,
+              `${syncResult.syncedCount} device ${syncResult.syncedCount === 1 ? 'passkey' : 'passkeys'} synced to your encrypted vault.`,
               'success'
             );
           }
@@ -189,7 +190,7 @@ export default function Vault() {
             toast('Your passkey is still safe on this device and will sync after biometric approval.', 'warning');
           }
         } catch {
-          toast('Android passkey sync will retry the next time you unlock your vault.', 'warning');
+          toast('Device passkey sync will retry the next time you unlock your vault.', 'warning');
         }
       })();
     } catch {
@@ -374,6 +375,9 @@ export default function Vault() {
           <Icon name={indexed ? 'circle-check' : 'search'} size={16} />
           {indexed ? 'Local search ready' : 'Name search'}
         </span>
+        {session && !loading && (
+          <NativeAutofillSetup accountId={session.userId} items={items} />
+        )}
       </div>
 
       <div className="vault-workspace">

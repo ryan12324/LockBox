@@ -42,11 +42,13 @@ class LockboxAutofillService : AutofillService() {
         }
         val fields = parseStructure(structure)
         if (fields.usernameId == null && fields.passwordId == null) {
+            AutofillDiagnostics.recordRequest(applicationContext, 0)
             callback.onSuccess(null)
             return
         }
 
         val identifier = fields.webDomain ?: fields.packageName ?: run {
+            AutofillDiagnostics.recordRequest(applicationContext, 0)
             callback.onSuccess(null)
             return
         }
@@ -63,6 +65,7 @@ class LockboxAutofillService : AutofillService() {
                     }
 
                 if (cancellationSignal.isCanceled || credentials.isEmpty()) {
+                    AutofillDiagnostics.recordRequest(applicationContext, 0)
                     callback.onSuccess(null)
                     return@launch
                 }
@@ -71,8 +74,13 @@ class LockboxAutofillService : AutofillService() {
                 credentials.forEachIndexed { index, credential ->
                     response.addDataset(buildAuthenticationDataset(credential, fields, index))
                 }
+                AutofillDiagnostics.recordRequest(applicationContext, credentials.size)
                 callback.onSuccess(response.build())
             } catch (error: Exception) {
+                AutofillDiagnostics.recordFailure(
+                    applicationContext,
+                    "Android could not read the encrypted login index"
+                )
                 callback.onFailure("Authwell could not load autofill credentials")
             }
         }
@@ -131,28 +139,30 @@ class LockboxAutofillService : AutofillService() {
 
         val autofillId = node.autofillId
         if (autofillId != null) {
-            node.autofillHints?.forEach { hint ->
-                when {
-                    result.usernameId == null &&
-                        (hint.contains("username", true) || hint.contains("email", true)) ->
-                        result.usernameId = autofillId
-                    result.passwordId == null && hint.contains("password", true) ->
-                        result.passwordId = autofillId
-                }
-            }
-
             val attributes = node.htmlInfo?.attributes
             val inputType = attributes?.find { it.first.equals("type", true) }?.second
             val name = attributes?.find { it.first.equals("name", true) }?.second.orEmpty()
-            if (
-                result.usernameId == null &&
-                (inputType == "email" || inputType == "text") &&
-                listOf("user", "email", "login").any { name.contains(it, true) }
+            val autocomplete = attributes
+                ?.find { it.first.equals("autocomplete", true) }
+                ?.second
+            when (
+                AutofillFieldHeuristics.classify(
+                    autofillHints = node.autofillHints,
+                    htmlType = inputType,
+                    htmlName = name,
+                    htmlAutocomplete = autocomplete,
+                    idEntry = node.idEntry,
+                    hint = node.hint?.toString(),
+                    inputType = node.inputType
+                )
             ) {
-                result.usernameId = autofillId
-            }
-            if (result.passwordId == null && inputType == "password") {
-                result.passwordId = autofillId
+                AutofillFieldKind.USERNAME -> if (result.usernameId == null) {
+                    result.usernameId = autofillId
+                }
+                AutofillFieldKind.PASSWORD -> if (result.passwordId == null) {
+                    result.passwordId = autofillId
+                }
+                null -> Unit
             }
         }
 
