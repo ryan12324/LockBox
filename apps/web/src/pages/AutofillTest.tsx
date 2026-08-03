@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Icon } from '@lockbox/design';
-import { commitNativeAutofillSession } from '../lib/native-autofill.js';
+import {
+  commitNativeAutofillSession,
+  runIOSAutofillAcceptanceCase,
+  type IOSAutofillAcceptanceResult,
+  type IOSAutofillAcceptanceSubmission,
+} from '../lib/native-autofill.js';
 
 export type AutofillTestExpectation = 'fill-and-save' | 'save-only' | 'code-only' | 'ignore';
 
@@ -150,6 +155,48 @@ export function buildAutofillCompletionUrl(
   return url.toString();
 }
 
+/** Select exactly the credential fields iOS should save for each test case. */
+export function buildIOSAutofillAcceptanceSubmission(
+  scenarioId: string,
+  form?: HTMLFormElement
+): IOSAutofillAcceptanceSubmission {
+  if (scenarioId === 'one-time-code' || scenarioId === 'sso-only') {
+    return { scenarioId };
+  }
+  if (!form) throw new Error('The credential form was not submitted');
+  const data = new FormData(form);
+  const value = (name: string): string => {
+    const candidate = data.get(name);
+    return typeof candidate === 'string' ? candidate : '';
+  };
+  const fields: Record<string, [string | null, string]> = {
+    standard: ['username', 'password'],
+    email: ['email', 'password'],
+    signup: ['username', 'new-password'],
+    'password-change': ['username', 'new-password'],
+    'password-only': [null, 'password'],
+    'multi-step': ['username', 'password'],
+    dynamic: ['late-username', 'late-password'],
+    phone: ['mobile', 'password'],
+    pin: ['username', 'pin'],
+    fallback: ['accountEmailInput', 'passwd'],
+  };
+  const selected = fields[scenarioId];
+  if (!selected) throw new Error(`Unknown iOS AutoFill test case: ${scenarioId}`);
+  const username = selected[0] === null
+    ? 'demo.account@example.test'
+    : value(selected[0]);
+  const password = value(selected[1]);
+  if (!username || !password) throw new Error('The test login is incomplete');
+  if (scenarioId === 'signup' && password !== value('confirm-password')) {
+    throw new Error('The test account passwords do not match');
+  }
+  if (scenarioId === 'password-change' && password !== value('confirm-password')) {
+    throw new Error('The test replacement passwords do not match');
+  }
+  return { scenarioId, username, password };
+}
+
 function LabField({
   label,
   hint,
@@ -206,10 +253,12 @@ function ScenarioForm({
   submitting: boolean;
 }) {
   const [multiStep, setMultiStep] = useState<1 | 2>(1);
+  const [multiStepUsername, setMultiStepUsername] = useState('');
   const [dynamicVisible, setDynamicVisible] = useState(false);
 
   useEffect(() => {
     setMultiStep(1);
+    setMultiStepUsername('');
     setDynamicVisible(false);
   }, [scenarioId]);
 
@@ -326,6 +375,8 @@ function ScenarioForm({
             autoComplete="on"
             onSubmit={(event) => {
               event.preventDefault();
+              const data = new FormData(event.currentTarget);
+              setMultiStepUsername(String(data.get('username') ?? ''));
               setMultiStep(2);
             }}
           >
@@ -346,6 +397,12 @@ function ScenarioForm({
       }
       return (
         <TestForm {...common}>
+          <input
+            type="hidden"
+            name="username"
+            autoComplete="username"
+            value={multiStepUsername}
+          />
           <div className="autofill-test__step">
             <span>Step 2 of 2</span>
             <strong>Enter password</strong>
@@ -505,6 +562,8 @@ function ExpectationBadge({ expectation }: { expectation: AutofillTestExpectatio
 export default function AutofillTest() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [submitting, setSubmitting] = useState(false);
+  const [iosAcceptance, setIOSAcceptance] = useState<IOSAutofillAcceptanceResult | null>(null);
+  const [iosAcceptanceError, setIOSAcceptanceError] = useState('');
   const requestedId = searchParams.get('case');
   const active = useMemo(
     () =>
@@ -512,9 +571,14 @@ export default function AutofillTest() {
     [requestedId]
   );
   const completed = searchParams.get('completed') === active.id;
-  const automationDelay = searchParams.get('automation') === 'autofill' ? 1_000 : 180;
+  const automationMode = searchParams.get('automation');
+  const automationDelay = automationMode === 'autofill' ? 1_000 : 180;
 
-  useEffect(() => setSubmitting(false), [active.id]);
+  useEffect(() => {
+    setSubmitting(false);
+    setIOSAcceptance(null);
+    setIOSAcceptanceError('');
+  }, [active.id]);
 
   function selectScenario(id: string) {
     setSearchParams({ case: id }, { replace: true });
@@ -524,6 +588,33 @@ export default function AutofillTest() {
     event?.preventDefault();
     if (submitting) return;
     setSubmitting(true);
+
+    if (automationMode === 'ios-native') {
+      let submission: IOSAutofillAcceptanceSubmission;
+      try {
+        submission = buildIOSAutofillAcceptanceSubmission(active.id, event?.currentTarget);
+      } catch (reason) {
+        setIOSAcceptanceError(reason instanceof Error ? reason.message : 'Invalid test submission');
+        setSubmitting(false);
+        return;
+      }
+      void runIOSAutofillAcceptanceCase(submission)
+        .then((result) => {
+          setIOSAcceptance(result);
+          setSearchParams({
+            case: active.id,
+            completed: active.id,
+            automation: 'ios-native',
+          }, { replace: true });
+        })
+        .catch((reason) => {
+          setIOSAcceptanceError(
+            reason instanceof Error ? reason.message : 'iOS secure-save verification failed'
+          );
+        })
+        .finally(() => setSubmitting(false));
+      return;
+    }
 
     // Keep values in the document until navigation so the platform can inspect
     // the completed form. Credentials are never serialized into the URL or sent.
@@ -601,6 +692,36 @@ export default function AutofillTest() {
               >
                 Run again
               </Button>
+            </div>
+          )}
+
+          {iosAcceptance && (
+            <div className="autofill-test__completed" role="status">
+              <Icon name="shield-check" size={20} />
+              <div>
+                <strong>
+                  {iosAcceptance.outcome === 'ignored'
+                    ? 'iOS no-save behavior verified'
+                    : iosAcceptance.outcome === 'updated'
+                      ? 'iOS secure login update verified'
+                      : 'iOS secure login save verified'}
+                </strong>
+                <span>
+                  {iosAcceptance.outcome === 'ignored'
+                    ? 'Authwell did not create a password record for this case.'
+                    : 'Authwell encrypted the login and added it to the device AutoFill index.'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {iosAcceptanceError && (
+            <div className="autofill-test__completed autofill-test__completed--error" role="alert">
+              <Icon name="alert-triangle" size={20} />
+              <div>
+                <strong>iOS AutoFill acceptance failed</strong>
+                <span>{iosAcceptanceError}</span>
+              </div>
             </div>
           )}
 

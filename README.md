@@ -138,8 +138,10 @@ bun run ios:test:autofill
 The AutoFill matrix lives at `/test` and covers 12 login shapes. The web command
 builds a loopback-only Chrome-for-Testing extension and drives its actual content
 script, fill controls, and save banner. The Android command drives the native
-picker on an emulator. The iOS command launches the real Capacitor app in a
-Simulator and verifies the same form contracts through XCUITest. Use
+picker on an emulator. The iOS command launches the real Capacitor app on iOS
+26.2+, submits every form through XCUITest, and verifies that save/update cases
+are device-encrypted in the native outbox and AutoFill index while code/SSO
+cases create no password record. Use
 `-- --case multi-step` with any matrix command while iterating on one scenario.
 
 Build release clients:

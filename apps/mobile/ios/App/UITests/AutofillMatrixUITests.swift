@@ -2,6 +2,9 @@ import XCTest
 
 final class AutofillMatrixUITests: XCTestCase {
     private var app: XCUIApplication!
+    private let username = "autofill.e2e@example.test"
+    private let currentPassword = "Authwell-Current-Password-42!"
+    private let replacementPassword = "Authwell-Replacement-Password-84!"
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -13,71 +16,112 @@ final class AutofillMatrixUITests: XCTestCase {
         app = nil
     }
 
-    func testStandard() { launch("standard"); requireText("Username"); requireSecure("Password") }
-    func testEmail() { launch("email"); requireText("Email address"); requireSecure("Password") }
+    func testStandard() {
+        launch("standard")
+        enterText("Username", username)
+        enterSecure("Password", currentPassword)
+        submit("Complete test sign-in")
+        requireSaveVerified()
+    }
+
+    func testEmail() {
+        launch("email")
+        enterText("Email address", username)
+        enterSecure("Password", currentPassword)
+        submit("Complete test sign-in")
+        requireSaveVerified()
+    }
 
     func testSignup() {
         launch("signup")
-        requireText("Email address")
-        requireSecure("Create password")
-        requireSecure("Confirm password")
+        enterText("Email address", "new.\(username)")
+        enterSecure("Create password", replacementPassword)
+        enterSecure("Confirm password", replacementPassword)
+        submit("Create test account")
+        requireSaveVerified()
     }
 
     func testPasswordChange() {
         launch("password-change")
-        requireText("Username")
-        requireSecure("Current password")
-        requireSecure("New password")
-        requireSecure("Confirm new password")
+        enterText("Username", username)
+        enterSecure("Current password", currentPassword)
+        enterSecure("New password", replacementPassword)
+        enterSecure("Confirm new password", replacementPassword)
+        submit("Update test password")
+        XCTAssertTrue(
+            app.staticTexts["iOS secure login update verified"].waitForExistence(timeout: 20),
+            "Authwell did not verify the encrypted password update"
+        )
     }
 
     func testPasswordOnly() {
         launch("password-only")
         XCTAssertTrue(app.staticTexts["demo.account@example.test"].exists)
-        requireSecure("Password")
+        enterSecure("Password", currentPassword)
+        submit("Complete test sign-in")
+        requireSaveVerified()
     }
 
     func testMultiStep() {
         launch("multi-step")
-        let username = requireText("Email or username")
-        username.tap()
-        username.typeText("autofill.e2e@example.test")
-        app.buttons["Continue"].tap()
-        requireSecure("Password")
-        XCTAssertTrue(app.staticTexts["Step 2 of 2"].exists)
+        enterText("Email or username", username)
+        submit("Continue")
+        XCTAssertTrue(app.staticTexts["Step 2 of 2"].waitForExistence(timeout: 5))
+        enterSecure("Password", currentPassword)
+        submit("Complete test sign-in")
+        requireSaveVerified()
     }
 
     func testDynamic() {
         launch("dynamic")
         XCTAssertFalse(app.textFields["Account"].exists)
         app.buttons["Insert login form"].tap()
-        requireText("Account")
-        requireSecure("Password")
+        enterText("Account", username)
+        enterSecure("Password", currentPassword)
+        submit("Complete test sign-in")
+        requireSaveVerified()
     }
 
-    func testPhone() { launch("phone"); requireText("Mobile number"); requireSecure("Password") }
-    func testPin() { launch("pin"); requireText("Account ID"); requireSecure("PIN") }
+    func testPhone() {
+        launch("phone")
+        enterText("Mobile number", "+447700900000")
+        enterSecure("Password", currentPassword)
+        submit("Complete test sign-in")
+        requireSaveVerified()
+    }
+
+    func testPin() {
+        launch("pin")
+        enterText("Account ID", "authwell-pin-account")
+        enterSecure("PIN", "739184")
+        submit("Complete test sign-in")
+        requireSaveVerified()
+    }
 
     func testFallback() {
         launch("fallback")
-        requireText("Account email")
-        requireSecure("Password")
-        requireText("Search reference")
+        enterText("Account email", username)
+        enterSecure("Password", currentPassword)
+        XCTAssertTrue(app.textFields["Search reference"].exists)
+        submit("Complete test sign-in")
+        requireSaveVerified()
     }
 
     func testOneTimeCode() {
         launch("one-time-code")
-        requireText("Account")
-        requireText("One-time code")
-        XCTAssertTrue(app.staticTexts["Expect verification code only"].exists)
+        enterText("Account", username)
+        enterText("One-time code", "739184")
         XCTAssertEqual(app.secureTextFields.count, 0)
+        submit("Verify test code")
+        requireNoSaveVerified()
     }
 
     func testSsoOnly() {
         launch("sso-only")
-        XCTAssertTrue(app.buttons["Continue with test identity provider"].exists)
         XCTAssertEqual(app.textFields.count, 0)
         XCTAssertEqual(app.secureTextFields.count, 0)
+        app.buttons["Continue with test identity provider"].tap()
+        requireNoSaveVerified()
     }
 
     private func launch(_ testCase: String) {
@@ -86,6 +130,42 @@ final class AutofillMatrixUITests: XCTestCase {
         XCTAssertTrue(
             app.staticTexts["Autofill test lab"].waitForExistence(timeout: 15),
             "The AutoFill test lab did not load for \(testCase)"
+        )
+    }
+
+    private func enterText(_ label: String, _ value: String) {
+        let field = requireText(label)
+        field.tap()
+        field.typeText(value)
+    }
+
+    private func enterSecure(_ label: String, _ value: String) {
+        let field = requireSecure(label)
+        field.tap()
+        field.typeText(value)
+    }
+
+    private func submit(_ label: String) {
+        let button = app.buttons[label]
+        XCTAssertTrue(button.waitForExistence(timeout: 5), "Missing action: \(label)")
+        for _ in 0..<5 where !button.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(button.isHittable, "Action is not reachable: \(label)")
+        button.tap()
+    }
+
+    private func requireSaveVerified() {
+        XCTAssertTrue(
+            app.staticTexts["iOS secure login save verified"].waitForExistence(timeout: 20),
+            "Authwell did not verify the encrypted login save"
+        )
+    }
+
+    private func requireNoSaveVerified() {
+        XCTAssertTrue(
+            app.staticTexts["iOS no-save behavior verified"].waitForExistence(timeout: 20),
+            "Authwell created or attempted to create an unexpected password record"
         )
     }
 

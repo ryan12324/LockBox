@@ -5,6 +5,9 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 test_root="$(mktemp -d /private/tmp/authwell-ios-native-tests.XXXXXX)"
 trap 'rm -rf "$test_root"' EXIT
 app_scheme="$repository_root/apps/mobile/ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme"
+ui_test_scheme="$repository_root/apps/mobile/ios/App/App.xcodeproj/xcshareddata/xcschemes/AuthwellAutofillUITests.xcscheme"
+project_file="$repository_root/apps/mobile/ios/App/App.xcodeproj/project.pbxproj"
+provider_source="$repository_root/apps/mobile/ios/App/CredentialProvider/CredentialProviderViewController.swift"
 
 [[ -f "$app_scheme" ]] || {
   echo "Missing shared iOS App scheme: $app_scheme" >&2
@@ -16,6 +19,30 @@ grep -q 'BuildableName = "App.app"' "$app_scheme" || {
 }
 grep -q 'BlueprintName = "App"' "$app_scheme" || {
   echo "Shared iOS App scheme does not target App" >&2
+  exit 1
+}
+[[ -f "$ui_test_scheme" ]] || {
+  echo "Missing shared iOS AutoFill UI-test scheme: $ui_test_scheme" >&2
+  exit 1
+}
+grep -q 'BuildableName = "AuthwellUITests.xctest"' "$ui_test_scheme" || {
+  echo "iOS AutoFill UI-test scheme does not build AuthwellUITests.xctest" >&2
+  exit 1
+}
+[[ "$(grep -c 'PRODUCT_NAME = "$(TARGET_NAME)";' "$project_file")" -ge 4 ]] || {
+  echo "iOS AutoFill UI-test target is missing PRODUCT_NAME" >&2
+  exit 1
+}
+grep -q 'performWithoutUserInteractionIfPossible' "$provider_source" || {
+  echo "iOS provider is missing the AuthenticationServices background save callback" >&2
+  exit 1
+}
+grep -q 'prepareInterface(for savePasswordRequest: ASSavePasswordRequest)' "$provider_source" || {
+  echo "iOS provider is missing the AuthenticationServices interactive save callback" >&2
+  exit 1
+}
+grep -q 'NativeCredentialCapture.savePassword' "$provider_source" || {
+  echo "iOS provider save callbacks are not connected to secure native capture" >&2
   exit 1
 }
 

@@ -66,6 +66,7 @@ JAVA_HOME="/private/tmp/lockbox-jdk17/jdk-17.0.20+8/Contents/Home" \
 - Install Xcode 26.2 or newer and CocoaPods. The newer SDK compiles password-save requests while the deployment target remains iOS 17. Open `apps/mobile/ios/App/App.xcworkspace`, not the `.xcodeproj`, for signed device and archive builds.
 - Both the `App` and `CredentialProvider` targets require the AutoFill Credential Provider capability, the `group.dev.lockbox.app` App Group, and the shared Keychain group from their committed entitlements.
 - `scripts/configure-ios-project.rb` idempotently restores native source membership and the embedded credential-provider target after recreating the Capacitor project.
+- `bun run ios:test:autofill` requires iOS 26.2+, submits all 12 `/test` cases, and fails unless expected logins are encrypted into both the native save outbox and AutoFill index. Its native acceptance method is DEBUG-only.
 
 ```bash
 cd apps/web && bun run build

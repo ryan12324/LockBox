@@ -123,6 +123,7 @@ ui_test_target.build_configurations.each do |configuration|
   settings['GENERATE_INFOPLIST_FILE'] = 'YES'
   settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
   settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'dev.lockbox.app.uitests'
+  settings['PRODUCT_NAME'] = '$(TARGET_NAME)'
   settings['SWIFT_VERSION'] = '5.0'
   settings['TARGETED_DEVICE_FAMILY'] = '1,2'
   settings['TEST_TARGET_NAME'] = 'App'

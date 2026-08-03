@@ -190,6 +190,15 @@
   font-size: var(--font-size-sm);
 }
 
+.autofill-test__completed--error {
+  background: color-mix(in oklch, var(--color-error) 9%, var(--color-surface));
+  border-color: color-mix(in oklch, var(--color-error) 45%, var(--color-border));
+}
+
+.autofill-test__completed--error > .lb-icon {
+  color: var(--color-error);
+}
+
 .autofill-test__scenario-heading {
   min-height: 108px;
   display: flex;

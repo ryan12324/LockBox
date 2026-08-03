@@ -17,9 +17,10 @@ Usage:
   bun run ios:test:autofill -- --udid <simulator-udid>
   bun run ios:test:autofill -- --list
 
-The suite launches the real Capacitor/WKWebView app and verifies every form
-contract. AuthenticationServices provider selection still uses the Simulator's
-normal Password AutoFill setting; the test build does not bypass that boundary.
+The suite launches the real Capacitor/WKWebView app, submits all 12 forms, and
+verifies that every applicable login is device-encrypted and added to Authwell's
+native AutoFill index. The DEBUG harness calls the same secure capture routine
+used by the iOS 26.2 AuthenticationServices password-save callbacks.
 EOF
 }
 
@@ -101,12 +102,24 @@ selection="$(bun -e '
     : devices.find((device) => device.state === "Booted") ??
       devices.find((device) => device.name.startsWith("iPhone")) ?? devices[0];
   if (!selected) process.exit(2);
-  process.stdout.write(`${selected.udid}\t${selected.name}`);
+  process.stdout.write(
+    `${selected.udid}\t${selected.name}\t${selected.runtimeVersion.join(".")}`,
+  );
 ' "$requested_target" <<<"$simulator_catalog")" || fail "no matching iOS Simulator is available"
 
-simulator_udid="${selection%%$'\t'*}"
-simulator_name="${selection#*$'\t'}"
-echo "Using iOS Simulator: $simulator_name ($simulator_udid)"
+IFS=$'\t' read -r simulator_udid simulator_name simulator_version <<<"$selection"
+bun -e '
+  const version = process.argv[1].split(".").map(Number);
+  if ((version[0] ?? 0) < 26 || ((version[0] ?? 0) === 26 && (version[1] ?? 0) < 2)) {
+    process.exit(1);
+  }
+' "$simulator_version" || fail "iOS 26.2 or newer is required to accept password-save callbacks"
+echo "Using iOS Simulator: $simulator_name, iOS $simulator_version ($simulator_udid)"
+
+xcrun simctl boot "$simulator_udid" >/dev/null 2>&1 || true
+xcrun simctl bootstatus "$simulator_udid" -b
+xcrun simctl biometric "$simulator_udid" enroll >/dev/null ||
+  fail "unable to enroll simulated biometrics for device-bound credential encryption"
 
 if [[ "$skip_build" != true ]]; then
   echo "Building web vault and syncing iOS..."

@@ -262,9 +262,13 @@ Run the iOS Simulator AutoFill form matrix before archiving:
 bun run ios:test:autofill
 ```
 
-The suite covers all 12 `/test` form contracts in the real Capacitor app. The
-AuthenticationServices provider still uses the Simulator's normal Password
-AutoFill enablement setting; no release code or test bypass enables it silently.
+The suite requires an iOS 26.2-or-newer Simulator, submits all 12 `/test` forms
+in the real Capacitor app, and verifies each expected save/update in the
+device-encrypted native outbox and AutoFill index. Code-only and SSO cases must
+create no password record. Its native acceptance method is DEBUG-only and calls
+the same capture routine as the AuthenticationServices save callbacks; Release
+builds do not register it. Manual system-picker testing still uses the
+Simulator's normal Password AutoFill enablement setting.
 
 The committed targets use these identifiers:
 

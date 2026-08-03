@@ -6,21 +6,29 @@ import Foundation
 final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
     let identifier = "AutofillPlugin"
     let jsName = "Autofill"
-    let pluginMethods: [CAPPluginMethod] = [
-        CAPPluginMethod(name: "isEnabled", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "requestEnable", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "replaceCredentialIndex", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "replaceTotpIndex", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "replacePasskeyIndex", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "clearCredentialIndex", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getPasskeysForUri", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getPendingCredentialSaves", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "exportPendingCredentialSave", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "markCredentialSaveSynced", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "getPendingTotpSetups", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "exportPendingTotpSetup", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "markTotpSetupHandled", returnType: CAPPluginReturnPromise),
-    ]
+    let pluginMethods: [CAPPluginMethod] = {
+        var methods: [CAPPluginMethod] = [
+            CAPPluginMethod(name: "isEnabled", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "requestEnable", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "replaceCredentialIndex", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "replaceTotpIndex", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "replacePasskeyIndex", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "clearCredentialIndex", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "getPasskeysForUri", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "getPendingCredentialSaves", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "exportPendingCredentialSave", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "markCredentialSaveSynced", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "getPendingTotpSetups", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "exportPendingTotpSetup", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "markTotpSetupHandled", returnType: CAPPluginReturnPromise),
+        ]
+#if DEBUG
+        methods.append(
+            CAPPluginMethod(name: "runAutofillAcceptanceCase", returnType: CAPPluginReturnPromise)
+        )
+#endif
+        return methods
+    }()
 
     @objc func isEnabled(_ call: CAPPluginCall) {
         AuthwellCredentialIdentityStore.state { enabled in
@@ -374,6 +382,113 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve()
         }
     }
+
+#if DEBUG
+    /// XCUITest-only proof that form completion reaches the same encrypted
+    /// capture routine invoked by the iOS 26.2 ASSavePasswordRequest callbacks.
+    @objc func runAutofillAcceptanceCase(_ call: CAPPluginCall) {
+        perform(call) {
+            guard let scenario = call.getString("scenarioId"),
+                  ProcessInfo.processInfo.environment["AUTHWELL_AUTOFILL_E2E_CASE"] == scenario,
+                  Self.acceptanceCases.contains(scenario) else {
+                throw AuthwellError.authentication("The iOS AutoFill acceptance bridge is disabled")
+            }
+
+            if Self.acceptanceNoSaveCases.contains(scenario) {
+                guard call.getString("username") == nil, call.getString("password") == nil else {
+                    throw AuthwellError.invalidArgument("A no-save test supplied a credential")
+                }
+                call.resolve([
+                    "outcome": "ignored",
+                    "indexed": false,
+                    "encrypted": false,
+                ])
+                return
+            }
+
+            guard let username = call.getString("username"),
+                  !username.isEmpty, username.count <= 10_000,
+                  let password = call.getString("password"),
+                  !password.isEmpty, password.count <= 100_000 else {
+                throw AuthwellError.invalidArgument("The iOS test login is incomplete")
+            }
+
+            let accountId = "ios_autofill_acceptance"
+            let serviceIdentifier = "https://\(scenario).autofill.authwell.test"
+            let defaults = try AuthwellAppGroup.sharedDefaults()
+            let previousAccountId = defaults.string(forKey: AuthwellAppGroup.accountKey)
+            defaults.set(accountId, forKey: AuthwellAppGroup.accountKey)
+            defer {
+                if let previousAccountId {
+                    defaults.set(previousAccountId, forKey: AuthwellAppGroup.accountKey)
+                } else {
+                    defaults.removeObject(forKey: AuthwellAppGroup.accountKey)
+                }
+            }
+
+            var updateCandidate = false
+            if scenario == "password-change" {
+                let seed = try NativeCredentialCapture.savePassword(
+                    username: username,
+                    password: "Authwell-Previous-Password-Only",
+                    serviceIdentifier: serviceIdentifier,
+                    title: "Authwell iOS update fixture",
+                    sessionId: "acceptance-password-change-existing",
+                    event: "acceptanceSeed"
+                )
+                _ = try AuthwellDatabase.shared.deletePendingCredentialSave(
+                    id: seed.id,
+                    accountId: accountId
+                )
+                updateCandidate = try NativeCredentialCapture.hasMatchingPassword(
+                    username: username,
+                    serviceIdentifier: serviceIdentifier
+                )
+            }
+
+            let record = try NativeCredentialCapture.savePassword(
+                username: username,
+                password: password,
+                serviceIdentifier: serviceIdentifier,
+                title: "Authwell iOS AutoFill acceptance",
+                sessionId: "acceptance-\(scenario)",
+                event: "acceptanceFormCompletion"
+            )
+            guard let storedPending = try AuthwellDatabase.shared.pendingCredentialSave(
+                id: record.id,
+                accountId: accountId
+            ), let storedIndex = try AuthwellDatabase.shared.autofill(id: record.id),
+                  storedIndex.serviceIdentifiers == record.autofillRecord.serviceIdentifiers else {
+                throw AuthwellError.storage("The iOS test login was not indexed")
+            }
+
+            var plaintext = try DeviceOutboxCrypto.decrypt(storedPending.encryptedData)
+            defer { plaintext.resetBytes(in: 0..<plaintext.count) }
+            guard let payload = try JSONSerialization.jsonObject(with: plaintext) as? [String: String],
+                  payload["username"] == username,
+                  payload["password"] == password,
+                  payload["uri"] == serviceIdentifier,
+                  Data(base64Encoded: storedPending.encryptedData) != plaintext else {
+                throw AuthwellError.storage("The iOS test login was not encrypted correctly")
+            }
+            if scenario == "password-change", !updateCandidate {
+                throw AuthwellError.storage("The replacement password did not match an existing login")
+            }
+
+            self.refreshIdentities(call, result: [
+                "outcome": scenario == "password-change" ? "updated" : "saved",
+                "indexed": true,
+                "encrypted": true,
+            ])
+        }
+    }
+
+    private static let acceptanceCases = Set([
+        "standard", "email", "signup", "password-change", "password-only", "multi-step",
+        "dynamic", "phone", "pin", "fallback", "one-time-code", "sso-only",
+    ])
+    private static let acceptanceNoSaveCases = Set(["one-time-code", "sso-only"])
+#endif
 
     private func accountId(_ call: CAPPluginCall) throws -> String {
         guard let value = call.getString("accountId"),

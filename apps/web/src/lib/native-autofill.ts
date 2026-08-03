@@ -135,6 +135,40 @@ export interface NativeAutofillIndexResult {
   oneTimeCodes?: number;
 }
 
+export interface IOSAutofillAcceptanceSubmission {
+  scenarioId: string;
+  username?: string;
+  password?: string;
+}
+
+export interface IOSAutofillAcceptanceResult {
+  outcome: 'saved' | 'updated' | 'ignored';
+  indexed: boolean;
+  encrypted: boolean;
+}
+
+/**
+ * Exercise the real iOS secure-save core from the DEBUG-only XCUITest harness.
+ * Release builds do not register this native method.
+ */
+export async function runIOSAutofillAcceptanceCase(
+  submission: IOSAutofillAcceptanceSubmission
+): Promise<IOSAutofillAcceptanceResult> {
+  const bridge = getCapacitor();
+  if (!bridge || bridge.getPlatform?.() !== 'ios') {
+    throw new Error('The iOS AutoFill acceptance bridge is unavailable');
+  }
+  return bridge.nativePromise(
+    'Autofill',
+    'runAutofillAcceptanceCase',
+    {
+      scenarioId: submission.scenarioId,
+      ...(submission.username === undefined ? {} : { username: submission.username }),
+      ...(submission.password === undefined ? {} : { password: submission.password }),
+    }
+  ) as unknown as Promise<IOSAutofillAcceptanceResult>;
+}
+
 export async function syncNativeAutofillIndex(
   items: VaultItem[],
   accountId: string,

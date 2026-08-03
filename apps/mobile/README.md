@@ -47,11 +47,16 @@ bun run ios:test:autofill
 
 Use `-- --case password-change` for one case, `-- --udid <id>` to choose a
 Simulator, or `--skip-build` after the web assets and iOS project are current.
-The XCUITest target is debug-only in effect: its launch environment can route a
-debug build to `/test`, while Release builds compile out that route hook. Apple
-does not expose a supported command-line switch for enabling a third-party
-credential provider, so enable Authwell once in the Simulator's Password
-AutoFill settings before doing manual provider-selection checks.
+Use an iOS 26.2-or-newer Simulator. The suite enrolls simulated biometrics,
+submits all 12 forms, and requires every applicable username/password to pass
+through the same device-encrypted capture routine used by
+`ASSavePasswordRequest`. It verifies the pending outbox and AutoFill index before
+showing a passing result; the one-time-code and SSO cases must prove that no
+password is captured. The acceptance bridge and `/test` launch hook compile only
+in Debug builds. Release builds cannot invoke them. Apple does not expose a
+supported command-line switch for enabling a third-party credential provider,
+so enable Authwell once in the Simulator's Password AutoFill settings for manual
+system-picker checks.
 
 The provider must be enabled on a device under **Settings → General → AutoFill & Passwords**. Unlock Authwell once to seed its encrypted local indexes. Test both password and passkey flows on physical hardware because the Simulator uses a Data Protection Keychain fallback in place of Secure Enclave.
 

@@ -3,6 +3,17 @@ import Foundation
 import LocalAuthentication
 import Security
 
+private let authwellDeviceKeyAccessibility: CFString = {
+#if targetEnvironment(simulator)
+    // Simulator biometric automation has no supported passcode-enrollment API.
+    // Keep the key device-only and biometric-gated while real devices retain
+    // the stronger passcode-required accessibility class below.
+    return kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+#else
+    return kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly
+#endif
+}()
+
 enum DeviceIndexCrypto {
     private static let keyTag = Data("dev.lockbox.app.autofill-ecies-v1".utf8)
     private static let algorithm: SecKeyAlgorithm = .eciesEncryptionCofactorX963SHA256AESGCM
@@ -68,7 +79,7 @@ enum DeviceIndexCrypto {
         var accessError: Unmanaged<CFError>?
         guard let access = SecAccessControlCreateWithFlags(
             nil,
-            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            authwellDeviceKeyAccessibility,
             [.privateKeyUsage, .biometryCurrentSet],
             &accessError
         ) else {
@@ -228,7 +239,7 @@ enum DeviceOutboxCrypto {
         var accessError: Unmanaged<CFError>?
         guard let access = SecAccessControlCreateWithFlags(
             nil,
-            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            authwellDeviceKeyAccessibility,
             [.privateKeyUsage],
             &accessError
         ) else {
@@ -444,7 +455,7 @@ enum BiometricVault {
         var accessError: Unmanaged<CFError>?
         guard let access = SecAccessControlCreateWithFlags(
             nil,
-            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            authwellDeviceKeyAccessibility,
             [.privateKeyUsage, .biometryCurrentSet],
             &accessError
         ) else {

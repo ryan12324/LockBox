@@ -52,7 +52,7 @@ final class AuthwellBridgeViewController: CAPBridgeViewController {
             let source = """
             window.setTimeout(() => {
               const testCase = \(caseLiteral);
-              history.replaceState({}, '', `/test?case=${encodeURIComponent(testCase)}&automation=autofill`);
+              history.replaceState({}, '', `/test?case=${encodeURIComponent(testCase)}&automation=ios-native`);
               window.dispatchEvent(new PopStateEvent('popstate'));
             }, 250);
             """
