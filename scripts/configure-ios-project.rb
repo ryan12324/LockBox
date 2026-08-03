@@ -151,6 +151,10 @@ end
 
 project.save
 
+app_scheme = Xcodeproj::XCScheme.new
+app_scheme.configure_with_targets(app_target, nil, launch_target: true)
+app_scheme.save_as(project_path, 'App', true)
+
 scheme = Xcodeproj::XCScheme.new
 scheme.configure_with_targets(app_target, ui_test_target, launch_target: app_target)
 scheme.save_as(project_path, 'AuthwellAutofillUITests', true)
