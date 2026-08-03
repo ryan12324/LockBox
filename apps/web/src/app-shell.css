@@ -486,6 +486,38 @@
   }
 }
 
+/* Short compact windows include foldable cover displays at default display zoom. */
+@media (max-width: 599px) and (max-height: 760px) {
+  .app-shell {
+    grid-template-rows:
+      calc(52px + var(--safe-area-top))
+      minmax(0, 1fr)
+      calc(56px + var(--safe-area-bottom));
+  }
+
+  .app-header__brand { width: 48px; padding-inline: 7px; }
+  .app-brandmark { width: 34px; height: 34px; }
+  .app-header__title { padding-inline: 4px; }
+  .app-header__account { padding-right: 6px; }
+
+  .app-sidebar {
+    top: calc(52px + var(--safe-area-top));
+    bottom: calc(56px + var(--safe-area-bottom));
+  }
+
+  .app-nav__scrim {
+    inset: calc(52px + var(--safe-area-top)) 0 calc(56px + var(--safe-area-bottom));
+  }
+
+  .app-bottom-nav { padding: 2px 4px var(--safe-area-bottom); }
+  .app-bottom-nav .app-nav__item {
+    min-height: 52px;
+    padding-block: 2px;
+    gap: 1px;
+  }
+  .app-bottom-nav .app-nav__item .lb-icon { width: 20px; height: 20px; }
+}
+
 @media (max-width: 380px) {
   .app-bottom-nav .app-nav__item {
     font-size: 0.625rem;

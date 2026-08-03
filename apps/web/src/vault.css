@@ -2,9 +2,14 @@
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   background: var(--color-bg);
 }
+
+.vault-page > .vault-toolbar { grid-row: 1; }
+.vault-page > .vault-filters { grid-row: 2; }
+.vault-page > .native-totp-review { grid-row: 3; }
+.vault-page > .vault-workspace { grid-row: 4; }
 
 .vault-toolbar {
   padding: 16px 20px 12px;
@@ -427,6 +432,7 @@ div.vault-row__main { cursor: default; }
   .vault-filters { padding: 0 12px 12px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .vault-filters__favorite,
   .vault-filters__clear { width: 100%; }
+  .vault-filters__clear { grid-column: auto; }
   .vault-filters__status { grid-column: 1 / -1; min-height: 28px; justify-content: flex-start; }
   .vault-list__header { padding: 0 12px; }
   .vault-list__header span { display: none; }
@@ -447,10 +453,53 @@ div.vault-row__main { cursor: default; }
   }
 }
 
+/* Keep the high-value vault content visible on short foldable cover windows. */
+@media (max-width: 599px) and (max-height: 760px) {
+  .vault-toolbar { padding: 8px 12px; gap: 8px; }
+  .vault-filters { padding: 0 12px 8px; gap: 6px 8px; }
+  .vault-filters__status { display: none; }
+
+  .vault-list-pane { grid-template-rows: 36px minmax(0, 1fr); }
+  .vault-list__header { min-height: 36px; }
+  .vault-row__main { min-height: 72px; padding-block: 8px; }
+  .vault-state { min-height: 220px; padding: 16px; }
+
+  .native-autofill-setup {
+    margin-top: 2px;
+    padding: 9px 10px;
+    gap: 8px;
+  }
+  .native-autofill-setup__mark { width: 32px; height: 32px; }
+  .native-autofill-setup__copy > span,
+  .native-autofill-setup__checks { display: none; }
+  .native-autofill-setup__actions { padding-left: 40px; }
+
+  .native-totp-review {
+    margin: 0;
+    padding: 9px 12px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+  }
+  .native-totp-review__accounts {
+    max-height: 56px;
+    margin-block: 4px;
+    overflow-y: auto;
+  }
+  .native-totp-review p:not(.native-autofill-setup__error) { display: none; }
+  .native-totp-review .native-autofill-setup__actions {
+    grid-column: 1 / -1;
+    margin-left: 40px;
+  }
+}
+
 @media (max-width: 380px) {
   .vault-toolbar { grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; }
-  .vault-filters { grid-template-columns: minmax(0, 1fr); }
-  .vault-filters__status { grid-column: 1; }
   .vault-row__secondary { max-width: 130px; }
   .vault-row__actions .lb-icon-button { width: 40px; }
+}
+
+@media (max-width: 339px) {
+  .vault-filters { grid-template-columns: minmax(0, 1fr); }
+  .vault-filters__status { grid-column: 1; }
 }

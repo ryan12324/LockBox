@@ -198,7 +198,7 @@ Authwell is flat by default. Depth comes from lighter surfaces, hairline borders
 
 - **Style:** Always labeled Iconify Tabler icons. Active items use weight, icon, and a restrained tonal background—not a colored side stripe.
 - **Responsive treatment:** Compact windows use bottom navigation for the three highest-value destinations; medium windows use a rail only when it improves content width; expanded windows use a labeled sidebar. At 840px and above, vault list and detail may coexist. Below 840px, show one pane at a time and preserve the selected item when the window expands again.
-- **Foldable treatment:** Android's native Jetpack WindowManager bridge supplies the separating feature's bounds, orientation, and posture to the web shell. Those hinge or fold bounds are exclusion zones. In book posture, place the vault list and detail on separate regions; in tabletop posture, keep content above and actions below when useful. Cover-display mode retains unlock, search, item view, copy, and fill without horizontal scrolling.
+- **Foldable treatment:** Android's native Jetpack WindowManager bridge supplies the separating feature's bounds, orientation, and posture to the web shell. Those hinge or fold bounds are exclusion zones. In book posture, place the vault list and detail on separate regions; in tabletop posture, keep content above and actions below when useful. Cover-display mode retains unlock, search, item view, copy, and fill without horizontal scrolling. Treat `360 × 568` CSS pixels as the compact, short cover-display regression baseline and `480 × 752` as the increased-display-area check; capability breakpoints remain authoritative because system display zoom changes the logical window.
 
 ## Do's and Don'ts
 

@@ -180,6 +180,15 @@
   }
 }
 
+@media (max-width: 599px) and (max-height: 760px) {
+  .item-panel__header {
+    min-height: calc(60px + var(--safe-area-top));
+    padding-top: calc(6px + var(--safe-area-top));
+    padding-bottom: 6px;
+  }
+  .item-panel__body { gap: 12px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .item-panel,
   .item-panel__scrim { animation: none; }
