@@ -11,6 +11,7 @@ function createController(enabled = true): AutofillOverlayController {
       onUsername: vi.fn(),
       onIdentity: vi.fn(),
       onOtp: vi.fn(),
+      onGeneratePassword: vi.fn(),
     },
     { enabled }
   );
@@ -129,16 +130,21 @@ describe('AutofillOverlayController', () => {
     expect(controller.overlayCount).toBe(0);
   });
 
-  it('does not place inline login controls on new-password fields', () => {
+  it('places one generation control on the primary new-password field', () => {
     document.body.innerHTML = `
       <form>
         <input autocomplete="username" />
-        <input type="password" autocomplete="new-password" />
+        <input name="new-password" type="password" autocomplete="new-password" />
+        <input name="confirm-password" type="password" autocomplete="new-password" />
       </form>
     `;
     controller = createController();
     controller.start();
-    expect(controller.overlayCount).toBe(0);
+    const primary = document.querySelector<HTMLInputElement>('[name="new-password"]')!;
+    const confirmation = document.querySelector<HTMLInputElement>('[name="confirm-password"]')!;
+    expect(controller.overlayCount).toBe(1);
+    expect(controller.getOverlayHost(primary)).not.toBeNull();
+    expect(controller.getOverlayHost(confirmation)).toBeNull();
   });
 
   it('offers a login on a username-only step but not a verification-code step', () => {

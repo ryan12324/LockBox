@@ -312,6 +312,8 @@ function ScenarioForm({
             name="new-password"
             type="password"
             autoComplete="new-password"
+            minLength={12}
+            maxLength={64}
             required
           />
           <LabField
@@ -319,6 +321,8 @@ function ScenarioForm({
             name="confirm-password"
             type="password"
             autoComplete="new-password"
+            minLength={12}
+            maxLength={64}
             required
           />
         </TestForm>

@@ -6,12 +6,24 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { detectFieldType, detectForms, detectOtpFields, getPasswordPurpose, urlMatchesUri, detectIdentityForms, isIdentityForm, isIdentityFieldType } from '../../lib/form-detector.js';
+import {
+  detectFieldType,
+  detectForms,
+  detectOtpFields,
+  detectPasswordCreationForms,
+  getPasswordPurpose,
+  urlMatchesUri,
+  detectIdentityForms,
+  isIdentityForm,
+  isIdentityFieldType,
+} from '../../lib/form-detector.js';
 
 // ─── detectFieldType ──────────────────────────────────────────────────────────
 
 describe('detectFieldType', () => {
-  function makeInput(attrs: Partial<HTMLInputElement> & { 'aria-label'?: string } = {}): HTMLInputElement {
+  function makeInput(
+    attrs: Partial<HTMLInputElement> & { 'aria-label'?: string } = {}
+  ): HTMLInputElement {
     const input = document.createElement('input');
     if (attrs.type) input.type = attrs.type;
     if (attrs.name) input.name = attrs.name;
@@ -95,7 +107,11 @@ describe('detectFieldType', () => {
   });
 
   it('does not mistake a payment-card security code for TOTP', () => {
-    const input = makeInput({ type: 'text', autocomplete: 'cc-csc', 'aria-label': 'Security code' });
+    const input = makeInput({
+      type: 'text',
+      autocomplete: 'cc-csc',
+      'aria-label': 'Security code',
+    });
     expect(detectFieldType(input)).toBe('unknown');
   });
 });
@@ -335,6 +351,27 @@ describe('detectForms', () => {
   });
 });
 
+describe('detectPasswordCreationForms', () => {
+  it('groups the primary and confirmation fields without including the current password', () => {
+    document.body.innerHTML = `
+      <form>
+        <input name="username" autocomplete="username" />
+        <input name="current-password" type="password" autocomplete="current-password" />
+        <input name="confirm-password" type="password" autocomplete="new-password" />
+        <input name="new-password" type="password" autocomplete="new-password" />
+      </form>
+    `;
+
+    const forms = detectPasswordCreationForms(document);
+    expect(forms).toHaveLength(1);
+    expect(forms[0].usernameField?.name).toBe('username');
+    expect(forms[0].passwordFields.map((field) => field.name)).toEqual([
+      'new-password',
+      'confirm-password',
+    ]);
+  });
+});
+
 // ─── urlMatchesUri ────────────────────────────────────────────────────────────
 
 describe('urlMatchesUri', () => {
@@ -363,8 +400,8 @@ describe('urlMatchesUri', () => {
     expect(
       urlMatchesUri(
         'https://android.octopusenergy.octopus.energy/',
-        'androidapp://android.octopusenergy.octopus.energy',
-      ),
+        'androidapp://android.octopusenergy.octopus.energy'
+      )
     ).toBe(false);
   });
 
@@ -377,7 +414,9 @@ describe('urlMatchesUri', () => {
 // ─── Identity field detection ──────────────────────────────────────────────────
 
 describe('detectFieldType (identity fields)', () => {
-  function makeInput(attrs: Partial<HTMLInputElement> & { 'aria-label'?: string } = {}): HTMLInputElement {
+  function makeInput(
+    attrs: Partial<HTMLInputElement> & { 'aria-label'?: string } = {}
+  ): HTMLInputElement {
     const input = document.createElement('input');
     if (attrs.type) input.type = attrs.type;
     if (attrs.name) input.name = attrs.name;

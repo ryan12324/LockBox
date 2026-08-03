@@ -13,6 +13,13 @@ export interface DetectedForm {
   passwordPurpose: 'current' | 'new' | 'unknown';
 }
 
+export interface DetectedPasswordCreationForm {
+  formElement: HTMLElement | null;
+  usernameField: HTMLInputElement | null;
+  /** The first field is the primary password field; the rest are confirmations. */
+  passwordFields: HTMLInputElement[];
+}
+
 const knownPasswordFields = new WeakSet<HTMLInputElement>();
 
 export type FormSearchRoot = Document | Element | ShadowRoot;
@@ -402,6 +409,48 @@ export function detectForms(root: FormSearchRoot): DetectedForm[] {
   }
 
   return forms;
+}
+
+function isPasswordConfirmationField(input: HTMLInputElement): boolean {
+  const hint = `${input.name} ${input.id} ${input.getAttribute('aria-label') ?? ''} ${
+    input.placeholder
+  }`.toLowerCase();
+  return /\b(confirm|confirmation|repeat|verify|verification|retype)[-_ ]?(password|pass|pwd)\b/.test(
+    hint
+  );
+}
+
+/**
+ * Group signup and password-change fields into one logical generation target.
+ * Current-password fields are deliberately excluded so a generated secret can
+ * never overwrite the credential needed to authorize a password change.
+ */
+export function detectPasswordCreationForms(root: FormSearchRoot): DetectedPasswordCreationForm[] {
+  const groups = new Map<HTMLElement, DetectedForm[]>();
+
+  for (const form of detectForms(root)) {
+    if (form.passwordPurpose !== 'new') continue;
+    const groupKey = form.formElement ?? form.passwordField;
+    const entries = groups.get(groupKey) ?? [];
+    entries.push(form);
+    groups.set(groupKey, entries);
+  }
+
+  return Array.from(groups.values()).map((entries) => {
+    const passwordFields = entries
+      .map((entry) => entry.passwordField)
+      .sort((left, right) => {
+        const leftConfirmation = isPasswordConfirmationField(left);
+        const rightConfirmation = isPasswordConfirmationField(right);
+        if (leftConfirmation === rightConfirmation) return 0;
+        return leftConfirmation ? 1 : -1;
+      });
+    return {
+      formElement: entries[0]?.formElement ?? null,
+      usernameField: entries.find((entry) => entry.usernameField)?.usernameField ?? null,
+      passwordFields,
+    };
+  });
 }
 
 /** Detect visible one-time-code fields, including form-less verification steps. */

@@ -1,12 +1,14 @@
 import {
   detectForms,
   detectIdentityForms,
+  detectPasswordCreationForms,
   detectOtpFields,
   detectStandaloneUsernameFields,
   getOpenShadowRoots,
   isEligibleField,
   type DetectedForm,
   type DetectedIdentityForm,
+  type DetectedPasswordCreationForm,
 } from './form-detector.js';
 import { createLockIconOverlay, type LockIconOverlayHandle } from './autofill.js';
 
@@ -15,6 +17,7 @@ export interface AutofillOverlayCallbacks {
   onUsername: (field: HTMLInputElement) => void | Promise<void>;
   onIdentity: (form: DetectedIdentityForm) => void | Promise<void>;
   onOtp: (field: HTMLInputElement) => void | Promise<void>;
+  onGeneratePassword: (form: DetectedPasswordCreationForm) => void | Promise<void>;
 }
 
 export interface AutofillOverlayControllerOptions {
@@ -119,11 +122,20 @@ export class AutofillOverlayController {
     this.refreshObservedRoots();
 
     const desiredFields = new Set<HTMLInputElement>();
+    const generationFields = new Set<HTMLInputElement>();
 
     for (const form of detectForms(this.ownerDocument)) {
       if (form.passwordPurpose === 'new') continue;
       desiredFields.add(form.passwordField);
       if (form.usernameField) desiredFields.add(form.usernameField);
+    }
+
+    for (const form of detectPasswordCreationForms(this.ownerDocument)) {
+      const primaryPasswordField = form.passwordFields[0];
+      if (primaryPasswordField) {
+        desiredFields.add(primaryPasswordField);
+        generationFields.add(primaryPasswordField);
+      }
     }
 
     for (const field of detectStandaloneUsernameFields(this.ownerDocument)) {
@@ -149,13 +161,18 @@ export class AutofillOverlayController {
       if (!field.isConnected || !isEligibleField(field)) continue;
       const current = this.overlays.get(field);
       if (current) {
+        current.setAction(generationFields.has(field) ? 'generate' : 'autofill');
         current.reposition();
         continue;
       }
 
-      const overlay = createLockIconOverlay(field, () => {
-        void this.activate(field).catch(() => {});
-      });
+      const overlay = createLockIconOverlay(
+        field,
+        () => {
+          void this.activate(field).catch(() => {});
+        },
+        generationFields.has(field) ? 'generate' : 'autofill'
+      );
       this.overlays.set(field, overlay);
       this.resizeObserver?.observe(field);
     }
@@ -191,6 +208,14 @@ export class AutofillOverlayController {
   private async activate(field: HTMLInputElement): Promise<void> {
     if (!field.isConnected || !isEligibleField(field)) {
       this.scheduleReconcile();
+      return;
+    }
+
+    const passwordCreationForm = detectPasswordCreationForms(this.ownerDocument).find(
+      (form) => form.passwordFields[0] === field
+    );
+    if (passwordCreationForm) {
+      await this.callbacks.onGeneratePassword(passwordCreationForm);
       return;
     }
 

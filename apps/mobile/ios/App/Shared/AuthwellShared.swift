@@ -18,6 +18,205 @@ enum AuthwellError: LocalizedError {
     }
 }
 
+enum NativeGeneratedPasswordKind {
+    case strong
+    case alphanumeric
+}
+
+struct NativeGeneratedPasswordChoice {
+    let kind: NativeGeneratedPasswordKind
+    let value: String
+}
+
+/**
+ * In-memory password generation for AuthenticationServices signup requests.
+ * It honors the common Password Rules constraints supplied by the target form
+ * and never writes generated values to defaults, Keychain, logs, or the vault.
+ */
+enum NativePasswordGenerator {
+    private static let uppercase = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    private static let lowercase = Array("abcdefghijklmnopqrstuvwxyz")
+    private static let digits = Array("0123456789")
+    private static let symbols = Array("!@#$%^&*()-_=+[]{};:,.?")
+    private static let printable = Set(uppercase + lowercase + digits + symbols)
+
+    static func choices(rules: [String?]) -> [NativeGeneratedPasswordChoice] {
+        let policy = PasswordRulePolicy.parse(rules.compactMap { $0 })
+        return [NativeGeneratedPasswordKind.strong, .alphanumeric].compactMap { kind in
+            guard let value = generate(kind: kind, policy: policy) else { return nil }
+            return NativeGeneratedPasswordChoice(kind: kind, value: value)
+        }
+    }
+
+    private static func generate(
+        kind: NativeGeneratedPasswordKind,
+        policy: PasswordRulePolicy
+    ) -> String? {
+        var allowed = kind == .strong
+            ? printable
+            : Set(uppercase + lowercase + digits)
+        if let ruleAllowed = policy.allowed {
+            allowed.formIntersection(ruleAllowed)
+        }
+        guard !allowed.isEmpty else { return nil }
+
+        var required = policy.required.map { $0.intersection(allowed) }
+        guard required.allSatisfy({ !$0.isEmpty }) else { return nil }
+
+        let securityPools = [Set(uppercase), Set(lowercase), Set(digits)]
+        for pool in securityPools {
+            let available = pool.intersection(allowed)
+            if !available.isEmpty && !required.contains(where: { !$0.isDisjoint(with: available) }) {
+                required.append(available)
+            }
+        }
+        if kind == .strong {
+            let availableSymbols = Set(symbols).intersection(allowed)
+            guard !availableSymbols.isEmpty else { return nil }
+            if !required.contains(where: { !$0.isDisjoint(with: availableSymbols) }) {
+                required.append(availableSymbols)
+            }
+        }
+
+        let minimum = max(policy.minimumLength, required.count, 8)
+        let maximum = min(policy.maximumLength, 128)
+        guard minimum <= maximum else { return nil }
+        let length = min(max(20, minimum), maximum)
+        let available = Array(allowed)
+
+        for _ in 0..<64 {
+            var random = SystemRandomNumberGenerator()
+            var characters = required.compactMap { pool in
+                Array(pool).randomElement(using: &random)
+            }
+            while characters.count < length {
+                guard let next = available.randomElement(using: &random) else { return nil }
+                characters.append(next)
+            }
+            characters.shuffle(using: &random)
+            if respectsMaximumConsecutive(characters, maximum: policy.maximumConsecutive) {
+                return String(characters)
+            }
+        }
+        return nil
+    }
+
+    private static func respectsMaximumConsecutive(
+        _ characters: [Character],
+        maximum: Int?
+    ) -> Bool {
+        guard let maximum, maximum > 0 else { return true }
+        var previous: Character?
+        var count = 0
+        for character in characters {
+            if character == previous {
+                count += 1
+                if count > maximum { return false }
+            } else {
+                previous = character
+                count = 1
+            }
+        }
+        return true
+    }
+
+    private struct PasswordRulePolicy {
+        var allowed: Set<Character>?
+        var required: [Set<Character>]
+        var minimumLength: Int
+        var maximumLength: Int
+        var maximumConsecutive: Int?
+
+        static func parse(_ descriptors: [String]) -> PasswordRulePolicy {
+            var policy = PasswordRulePolicy(
+                allowed: nil,
+                required: [],
+                minimumLength: 0,
+                maximumLength: 128,
+                maximumConsecutive: nil
+            )
+
+            for descriptor in descriptors {
+                var descriptorAllowed: Set<Character>?
+                for clause in descriptor.split(separator: ";") {
+                    let parts = clause.split(separator: ":", maxSplits: 1).map(String.init)
+                    guard parts.count == 2 else { continue }
+                    let name = parts[0].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                    let value = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                    switch name {
+                    case "allowed":
+                        if let characters = parseCharacterClasses(value), !characters.isEmpty {
+                            descriptorAllowed = (descriptorAllowed ?? []).union(characters)
+                        }
+                    case "required":
+                        if let characters = parseCharacterClasses(value), !characters.isEmpty {
+                            policy.required.append(characters)
+                        }
+                    case "minlength":
+                        if let length = Int(value), length > 0 {
+                            policy.minimumLength = max(policy.minimumLength, length)
+                        }
+                    case "maxlength":
+                        if let length = Int(value), length > 0 {
+                            policy.maximumLength = min(policy.maximumLength, length)
+                        }
+                    case "max-consecutive":
+                        if let count = Int(value), count > 0 {
+                            policy.maximumConsecutive = min(policy.maximumConsecutive ?? count, count)
+                        }
+                    default:
+                        continue
+                    }
+                }
+                if let descriptorAllowed {
+                    policy.allowed = policy.allowed.map { $0.intersection(descriptorAllowed) }
+                        ?? descriptorAllowed
+                }
+            }
+            if policy.allowed != nil {
+                policy.required.forEach { policy.allowed?.formUnion($0) }
+            }
+            return policy
+        }
+
+        private static func parseCharacterClasses(_ value: String) -> Set<Character>? {
+            var tokens: [String] = []
+            var current = ""
+            var bracketDepth = 0
+            for character in value {
+                if character == "[" { bracketDepth += 1 }
+                if character == "]" { bracketDepth = max(0, bracketDepth - 1) }
+                if character == "," && bracketDepth == 0 {
+                    tokens.append(current)
+                    current = ""
+                } else {
+                    current.append(character)
+                }
+            }
+            tokens.append(current)
+
+            var characters = Set<Character>()
+            var recognized = false
+            for rawToken in tokens {
+                let token = rawToken.trimmingCharacters(in: .whitespacesAndNewlines)
+                switch token.lowercased() {
+                case "upper": characters.formUnion(uppercase); recognized = true
+                case "lower": characters.formUnion(lowercase); recognized = true
+                case "digit", "digits": characters.formUnion(digits); recognized = true
+                case "special": characters.formUnion(symbols); recognized = true
+                case "ascii-printable", "unicode": characters.formUnion(printable); recognized = true
+                default:
+                    if token.first == "[", token.last == "]", token.count >= 2 {
+                        characters.formUnion(token.dropFirst().dropLast())
+                        recognized = true
+                    }
+                }
+            }
+            return recognized ? characters : nil
+        }
+    }
+}
+
 enum AuthwellAppGroup {
     static let identifier = "group.dev.lockbox.app"
     static let accountKey = "authwell.activeAccountId"

@@ -19,6 +19,7 @@ private enum AuthwellNativeTests {
         try testIOSAutofillDomainMatching()
         try testAutofillUsernamePresentation()
         try testLegacyAutofillRecordCompatibility()
+        try testNativePasswordGeneration()
         try testTotpGenerationAndValidation()
         try testAndroidPrivateKeyCompatibility()
         try testPasskeyEncodingRoundTrip()
@@ -96,6 +97,31 @@ private enum AuthwellNativeTests {
         try require(
             record.displayUsername.isEmpty,
             "A legacy iOS AutoFill record could not fall back without a display username"
+        )
+    }
+
+    private static func testNativePasswordGeneration() throws {
+        let choices = NativePasswordGenerator.choices(rules: [
+            "allowed: upper, lower, digits; required: upper; required: lower; required: digit; required: [!@#]; minlength: 16; maxlength: 24; max-consecutive: 2;",
+            nil,
+        ])
+        try require(choices.count == 1, "An incompatible alphanumeric choice was offered")
+        guard let password = choices.first?.value else {
+            throw TestFailure.failed("The iOS provider did not generate a strong password")
+        }
+        try require((16...24).contains(password.count), "The generated password ignored length rules")
+        try require(password.contains(where: \Character.isUppercase), "The password has no uppercase letter")
+        try require(password.contains(where: \Character.isLowercase), "The password has no lowercase letter")
+        try require(password.contains(where: \Character.isNumber), "The password has no digit")
+        try require(password.contains(where: { "!@#".contains($0) }), "The password has no required symbol")
+
+        let alphanumeric = NativePasswordGenerator.choices(rules: [
+            "allowed: upper, lower, digits; minlength: 12; maxlength: 12;"
+        ])
+        try require(alphanumeric.count == 1, "A symbol password ignored an alphanumeric-only rule")
+        try require(
+            alphanumeric[0].kind == .alphanumeric && alphanumeric[0].value.count == 12,
+            "The compatible iOS password choice is invalid"
         )
     }
 

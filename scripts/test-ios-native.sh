@@ -45,6 +45,23 @@ grep -q 'NativeCredentialCapture.savePassword' "$provider_source" || {
   echo "iOS provider save callbacks are not connected to secure native capture" >&2
   exit 1
 }
+grep -q 'generatePasswordsRequest: ASGeneratePasswordsRequest' "$provider_source" || {
+  echo "iOS provider is missing the AuthenticationServices password generation callback" >&2
+  exit 1
+}
+grep -q 'completeGeneratePasswordRequest' "$provider_source" || {
+  echo "iOS provider does not return generated-password choices to AuthenticationServices" >&2
+  exit 1
+}
+grep -q 'generatedPasswordFilled' "$provider_source" || {
+  echo "iOS provider does not capture selected generated passwords" >&2
+  exit 1
+}
+grep -q 'SupportsGeneratePasswordCredentials' \
+  "$repository_root/apps/mobile/ios/App/CredentialProvider/Info.plist" || {
+  echo "iOS provider does not advertise generated-password support" >&2
+  exit 1
+}
 
 mkdir -p "$test_root/module-cache"
 xcrun --sdk macosx swiftc \

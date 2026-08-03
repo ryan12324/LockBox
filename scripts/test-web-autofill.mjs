@@ -130,6 +130,7 @@ async function runScenario(page, origin, id, fixture) {
   await waitForSelector(page, '[aria-current="page"]');
 
   if (id === 'signup') return runSignup(page, id);
+  if (id === 'password-change') return runPasswordChange(page, id, fixture);
   if (id === 'multi-step') return runMultiStep(page, id, fixture);
   if (id === 'dynamic') {
     await click(page, '.autofill-test__empty-form button');
@@ -159,19 +160,6 @@ async function runScenario(page, origin, id, fixture) {
       focus: 'input[name="email"]',
       expected: { email: fixture.username, password: fixture.password },
       mutate: { password: 'UpdatedE2EEmail4827x' },
-    },
-    'password-change': {
-      focus: 'input[name="current-password"]',
-      expected: {
-        username: fixture.username,
-        'current-password': fixture.password,
-        'new-password': '',
-        'confirm-password': '',
-      },
-      mutate: {
-        'new-password': 'UpdatedE2EChange4827x',
-        'confirm-password': 'UpdatedE2EChange4827x',
-      },
     },
     'password-only': {
       focus: 'input[name="password"]',
@@ -219,14 +207,52 @@ async function runSignup(page, id) {
   const controlCount = await page.evaluate(
     `document.querySelectorAll('[data-authwell-ui="field-control"]').length`
   );
-  if (controlCount !== 0)
-    fail(`${id}: Authwell offered an existing credential on new-password fields`);
-  await setInputs(page, {
-    username: 'new.account@example.test',
-    'new-password': 'NewE2ESignup4827x',
-    'confirm-password': 'NewE2ESignup4827x',
-  });
+  if (controlCount !== 1)
+    fail(`${id}: expected one generated-password control, found ${controlCount}`);
+  await chooseGeneratedPassword(page, id);
+  await setInputs(page, { username: 'new.account@example.test' });
   await submitAndExpectBanner(page, id);
+}
+
+async function runPasswordChange(page, id, fixture) {
+  await clickAutofillControl(page, 'input[name="current-password"]');
+  await waitFor(
+    async () => (await readInputs(page))['current-password'] === fixture.password,
+    `${id}: current credential values`
+  );
+  assertInputs(
+    await readInputs(page),
+    {
+      username: fixture.username,
+      'current-password': fixture.password,
+      'new-password': '',
+      'confirm-password': '',
+    },
+    id
+  );
+  await chooseGeneratedPassword(page, id);
+  await submitAndExpectBanner(page, id);
+}
+
+async function chooseGeneratedPassword(page, id) {
+  await clickAutofillControl(page, 'input[name="new-password"]');
+  await waitFor(
+    async () =>
+      await page.evaluate(
+        `Boolean(document.querySelector('[data-authwell-ui="generation-menu"]')?.shadowRoot?.querySelector('[data-generation-choice="strong"]'))`
+      ),
+    `${id}: generated-password choices`
+  );
+  await page.evaluate(`document
+    .querySelector('[data-authwell-ui="generation-menu"]')
+    .shadowRoot
+    .querySelector('[data-generation-choice="strong"]')
+    .click()`);
+  const generated = await readInputs(page);
+  if (!generated['new-password'] || generated['new-password'] !== generated['confirm-password']) {
+    fail(`${id}: generated password was not filled into both new-password fields`);
+  }
+  return generated['new-password'];
 }
 
 async function runMultiStep(page, id, fixture) {

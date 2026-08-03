@@ -4,7 +4,12 @@
  */
 
 import { isEligibleField } from './form-detector.js';
-import type { DetectedForm, DetectedIdentityForm, IdentityFieldType } from './form-detector.js';
+import type {
+  DetectedForm,
+  DetectedIdentityForm,
+  DetectedPasswordCreationForm,
+  IdentityFieldType,
+} from './form-detector.js';
 import type { IdentityItem } from '@lockbox/types';
 import {
   getCachedSiteIconUrls,
@@ -77,7 +82,7 @@ const INJECTED_THEME_STYLES = `
 function removeExistingFloatingUi(ownerDocument: Document): void {
   ownerDocument
     .querySelectorAll<HTMLElement>(
-      '[data-authwell-ui="login-menu"], [data-authwell-ui="identity-menu"], [data-authwell-ui="status-menu"]',
+      '[data-authwell-ui="login-menu"], [data-authwell-ui="identity-menu"], [data-authwell-ui="status-menu"], [data-authwell-ui="generation-menu"]'
     )
     .forEach((existing) => existing.remove());
 }
@@ -85,7 +90,7 @@ function removeExistingFloatingUi(ownerDocument: Document): void {
 function positionFloatingHost(
   host: HTMLElement,
   anchorField: HTMLInputElement,
-  minimumWidth = 240,
+  minimumWidth = 240
 ): void {
   if (!anchorField.isConnected || !isEligibleField(anchorField)) {
     host.remove();
@@ -97,7 +102,10 @@ function positionFloatingHost(
   const viewportWidth = view.innerWidth || anchorField.ownerDocument.documentElement.clientWidth;
   const viewportHeight = view.innerHeight || anchorField.ownerDocument.documentElement.clientHeight;
   const gutter = 8;
-  const width = Math.min(Math.max(rect.width, minimumWidth), Math.max(0, viewportWidth - gutter * 2));
+  const width = Math.min(
+    Math.max(rect.width, minimumWidth),
+    Math.max(0, viewportWidth - gutter * 2)
+  );
 
   host.style.width = `${width}px`;
   host.style.maxWidth = `calc(100vw - ${gutter * 2}px)`;
@@ -111,7 +119,7 @@ function positionFloatingHost(
     : Math.min(rect.bottom + 2, Math.max(gutter, viewportHeight - estimatedHeight - gutter));
   const left = Math.min(
     Math.max(rect.left, gutter),
-    Math.max(gutter, viewportWidth - width - gutter),
+    Math.max(gutter, viewportWidth - width - gutter)
   );
 
   host.style.position = 'fixed';
@@ -124,7 +132,7 @@ function installFloatingLifecycle(
   host: HTMLElement,
   anchorField: HTMLInputElement,
   shadow: ShadowRoot,
-  focusSelector: string,
+  focusSelector: string
 ): void {
   const ownerDocument = anchorField.ownerDocument;
   const view = ownerDocument.defaultView ?? window;
@@ -265,12 +273,29 @@ export function fillForm(form: DetectedForm, username: string, password: string)
   return simulateFill(form.passwordField, password);
 }
 
+/** Fill the primary and every confirmation field with the same new password. */
+export function fillPasswordCreationForm(
+  form: DetectedPasswordCreationForm,
+  password: string
+): boolean {
+  if (
+    form.passwordFields.length === 0 ||
+    form.passwordFields.some((field) => !field.isConnected || !isEligibleField(field))
+  ) {
+    return false;
+  }
+  return form.passwordFields.every((field) => simulateFill(field, password));
+}
+
 export interface LockIconOverlayHandle {
   host: HTMLElement;
   field: HTMLInputElement;
+  setAction: (action: FieldControlAction) => void;
   reposition: () => void;
   destroy: () => void;
 }
+
+export type FieldControlAction = 'autofill' | 'generate';
 
 function getFieldAccessibleName(field: HTMLInputElement): string {
   const explicitLabel = field.labels?.[0]?.textContent?.trim();
@@ -286,7 +311,7 @@ function findEndAddonInset(field: HTMLInputElement, rect: DOMRect): number {
   const direction = (field.ownerDocument.defaultView ?? window).getComputedStyle(field).direction;
   let inset = 0;
   const controls = container.querySelectorAll<HTMLElement>(
-    'button, [role="button"], input[type="button"], input[type="checkbox"]',
+    'button, [role="button"], input[type="button"], input[type="checkbox"]'
   );
 
   for (const control of controls) {
@@ -299,9 +324,7 @@ function findEndAddonInset(field: HTMLInputElement, rect: DOMRect): number {
     if (!overlapsVertically || !overlapsField) continue;
 
     const candidate =
-      direction === 'rtl'
-        ? controlRect.right - rect.left + 6
-        : rect.right - controlRect.left + 6;
+      direction === 'rtl' ? controlRect.right - rect.left + 6 : rect.right - controlRect.left + 6;
     inset = Math.max(inset, candidate);
   }
 
@@ -316,6 +339,7 @@ function findEndAddonInset(field: HTMLInputElement, rect: DOMRect): number {
 export function createLockIconOverlay(
   field: HTMLInputElement,
   onClick: () => void,
+  initialAction: FieldControlAction = 'autofill'
 ): LockIconOverlayHandle {
   const ownerDocument = field.ownerDocument;
   const view = ownerDocument.defaultView ?? window;
@@ -343,24 +367,22 @@ export function createLockIconOverlay(
     const viewportWidth = view.innerWidth || ownerDocument.documentElement.clientWidth;
     const viewportHeight = view.innerHeight || ownerDocument.documentElement.clientHeight;
     let left =
-      direction === 'rtl'
-        ? rect.left + 4 + addonInset
-        : rect.right - size - 4 - addonInset;
+      direction === 'rtl' ? rect.left + 4 + addonInset : rect.right - size - 4 - addonInset;
 
     if (left < rect.left || left + size > rect.right) {
       const outsideEnd = direction === 'rtl' ? rect.left - size - 4 : rect.right + 4;
       const outsideStart = direction === 'rtl' ? rect.right + 4 : rect.left - size - 4;
-      left =
-        outsideEnd >= 4 && outsideEnd + size <= viewportWidth - 4 ? outsideEnd : outsideStart;
+      left = outsideEnd >= 4 && outsideEnd + size <= viewportWidth - 4 ? outsideEnd : outsideStart;
     }
 
     left = Math.min(Math.max(left, 4), Math.max(4, viewportWidth - size - 4));
     const top = Math.min(
       Math.max(rect.top + (rect.height - size) / 2, 4),
-      Math.max(4, viewportHeight - size - 4),
+      Math.max(4, viewportHeight - size - 4)
     );
 
-    const outsideViewport = rect.bottom < 0 || rect.top > viewportHeight || rect.right < 0 || rect.left > viewportWidth;
+    const outsideViewport =
+      rect.bottom < 0 || rect.top > viewportHeight || rect.right < 0 || rect.left > viewportWidth;
     host.style.display = outsideViewport ? 'none' : 'flex';
     btn.tabIndex = outsideViewport ? -1 : 0;
     host.style.cssText = `
@@ -434,9 +456,20 @@ export function createLockIconOverlay(
 
   const btn = ownerDocument.createElement('button');
   btn.type = 'button';
-  btn.title = 'Autofill with Authwell';
-  btn.setAttribute('aria-label', `Autofill ${getFieldAccessibleName(field)} with Authwell`);
   btn.innerHTML = iconifySvg('lock', { size: 18 });
+  const setAction = (action: FieldControlAction) => {
+    if (action === 'generate') {
+      btn.title = 'Generate a password with Authwell';
+      btn.setAttribute(
+        'aria-label',
+        `Generate a password for ${getFieldAccessibleName(field)} with Authwell`
+      );
+    } else {
+      btn.title = 'Autofill with Authwell';
+      btn.setAttribute('aria-label', `Autofill ${getFieldAccessibleName(field)} with Authwell`);
+    }
+  };
+  setAction(initialAction);
 
   shadow.appendChild(style);
   shadow.appendChild(btn);
@@ -454,6 +487,7 @@ export function createLockIconOverlay(
   return {
     host,
     field,
+    setAction,
     reposition: positionIcon,
     destroy: () => host.remove(),
   };
@@ -604,6 +638,128 @@ export function createSuggestionDropdown(
   positionFloatingHost(host, anchorField);
   installFloatingLifecycle(host, anchorField, shadow, '.item');
 
+  return host;
+}
+
+export interface GeneratedPasswordSuggestion {
+  id: string;
+  label: string;
+  description: string;
+  password: string;
+}
+
+/** Show generated choices without exposing their plaintext in the page DOM. */
+export function createGeneratedPasswordDropdown(
+  anchorField: HTMLInputElement,
+  items: GeneratedPasswordSuggestion[],
+  onSelect: (item: GeneratedPasswordSuggestion) => void
+): HTMLElement {
+  const ownerDocument = anchorField.ownerDocument;
+  removeExistingFloatingUi(ownerDocument);
+  const host = ownerDocument.createElement('div');
+  host.dataset.authwellUi = 'generation-menu';
+
+  const shadow = host.attachShadow({ mode: 'open' });
+  shadow.innerHTML = `
+    <style>
+      ${INJECTED_THEME_STYLES}
+      ${INJECTED_BRAND_STYLES}
+      .dropdown {
+        overflow: hidden;
+        background: var(--aw-surface);
+        border: 1px solid var(--aw-line);
+        border-radius: 10px;
+        box-shadow: var(--aw-shadow);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 13px;
+      }
+      .header {
+        min-height: 34px;
+        padding: 7px 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: var(--aw-bg-subtle);
+        border-bottom: 1px solid var(--aw-line);
+      }
+      .header .lockbox-brand__logo { width: 84px; }
+      .header-copy { color: var(--aw-text-secondary); font-size: 12px; }
+      .item {
+        width: 100%;
+        padding: 10px 12px;
+        cursor: pointer;
+        display: grid;
+        grid-template-columns: 30px minmax(0, 1fr);
+        align-items: center;
+        gap: 9px;
+        color: var(--aw-text);
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid var(--aw-line);
+        font: inherit;
+        text-align: left;
+      }
+      .item:hover, .item:focus-visible { background: var(--aw-bg-subtle); }
+      .item:focus-visible { outline: 3px solid var(--aw-primary); outline-offset: -3px; }
+      .item-icon {
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--aw-primary);
+        background: var(--aw-bg-subtle);
+        border: 1px solid var(--aw-line);
+        border-radius: 7px;
+      }
+      .item-copy { min-width: 0; display: grid; gap: 2px; }
+      .item-label { color: var(--aw-text); font-weight: 600; }
+      .item-description { color: var(--aw-text-secondary); font-size: 12px; }
+      .note { margin: 0; padding: 9px 12px; color: var(--aw-text-secondary); font-size: 11px; }
+    </style>
+    <div class="dropdown" role="menu" aria-label="Authwell generated password choices">
+      <div class="header">
+        ${lockboxBrandMarkup()}
+        <span class="header-copy">Create a password</span>
+      </div>
+      <div class="items"></div>
+      <p class="note">Authwell fills both password fields and offers to save after signup.</p>
+    </div>
+  `;
+
+  const container = shadow.querySelector<HTMLElement>('.items')!;
+  for (const item of items) {
+    const button = ownerDocument.createElement('button');
+    button.type = 'button';
+    button.className = 'item';
+    button.dataset.generationChoice = item.id;
+    button.setAttribute('role', 'menuitem');
+
+    const icon = ownerDocument.createElement('span');
+    icon.className = 'item-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML = iconifySvg('key', { size: 16 });
+    const copy = ownerDocument.createElement('span');
+    copy.className = 'item-copy';
+    const label = ownerDocument.createElement('span');
+    label.className = 'item-label';
+    label.textContent = item.label;
+    const description = ownerDocument.createElement('span');
+    description.className = 'item-description';
+    description.textContent = item.description;
+    copy.append(label, description);
+    button.append(icon, copy);
+    button.addEventListener('click', () => {
+      onSelect(item);
+      host.remove();
+    });
+    container.appendChild(button);
+  }
+
+  ownerDocument.body.appendChild(host);
+  positionFloatingHost(host, anchorField, 280);
+  installFloatingLifecycle(host, anchorField, shadow, '.item');
   return host;
 }
 

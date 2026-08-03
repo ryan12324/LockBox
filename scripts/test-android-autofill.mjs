@@ -55,20 +55,7 @@ try {
     mutate: { password: 'UpdatedE2EEmail4827x' },
   });
   if (shouldRun('signup')) await runSignupCase();
-  if (shouldRun('password-change')) await runFillCase({
-    id: 'password-change',
-    focus: 'input[name="username"]',
-    expected: {
-      username: 'autofill.e2e@example.test',
-      'current-password': DEFAULT_PASSWORD,
-      'new-password': '',
-      'confirm-password': '',
-    },
-    mutate: {
-      'confirm-password': 'UpdatedE2EChange4827x',
-      'new-password': 'UpdatedE2EChange4827x',
-    },
-  });
+  if (shouldRun('password-change')) await runPasswordChangeCase();
   if (shouldRun('password-only')) await runFillCase({
     id: 'password-only',
     focus: 'input[name="password"]',
@@ -151,21 +138,54 @@ async function runSignupCase() {
   const id = 'signup';
   const cdp = await startScenario(id);
   try {
-    await tapDom(cdp, 'input[name="new-password"]');
-    await assertCredentialPickerAbsent();
-    assertInputs(await readInputs(cdp), {
-      username: '', 'new-password': '', 'confirm-password': '',
-    }, id);
-    await setInputs(cdp, {
-      username: 'new.account@example.test',
-      'new-password': 'NewE2ESignup4827x',
-      'confirm-password': 'NewE2ESignup4827x',
-    });
+    await chooseGeneratedPassword(cdp, id);
+    await setInputs(cdp, { username: 'new.account@example.test' });
     await submitAndExpectSave(cdp, id);
     pass(id);
   } finally {
     cdp.close();
   }
+}
+
+async function runPasswordChangeCase() {
+  const id = 'password-change';
+  const cdp = await startScenario(id);
+  try {
+    await chooseCredential(
+      cdp,
+      'input[name="username"]',
+      'autofill.e2e@example.test',
+      DEFAULT_PASSWORD
+    );
+    assertInputs(await readInputs(cdp), {
+      username: 'autofill.e2e@example.test',
+      'current-password': DEFAULT_PASSWORD,
+      'new-password': '',
+      'confirm-password': '',
+    }, id);
+    await chooseGeneratedPassword(cdp, id);
+    await submitAndExpectSave(cdp, id);
+    pass(id);
+  } finally {
+    cdp.close();
+  }
+}
+
+async function chooseGeneratedPassword(cdp, id) {
+  await tapDom(cdp, 'input[name="new-password"]');
+  const hierarchy = await waitFor(async () => {
+    const xml = dumpUi();
+    return findNode(xml, (node) => node.text === 'Use a strong password') ? xml : null;
+  }, `${id}: generated-password picker`, 8_000);
+  const suggestion = findNode(hierarchy, (node) => node.text === 'Use a strong password');
+  tapBounds(suggestion.bounds);
+  const generated = await waitFor(async () => {
+    const values = await readInputs(cdp);
+    return values['new-password'] &&
+      values['new-password'] === values['confirm-password'] ? values : null;
+  }, `${id}: generated password in both new-password fields`, 5_000);
+  if (!generated['new-password']) fail(`${id}: generated password is empty`);
+  return generated['new-password'];
 }
 
 async function runMultiStepCase() {

@@ -7,15 +7,17 @@
 
 import { act, createElement, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { clearSiteIconCache } from '@lockbox/design';
 import {
   createLockIconOverlay,
   createSuggestionDropdown,
   simulateFill,
   fillForm,
+  fillPasswordCreationForm,
+  createGeneratedPasswordDropdown,
 } from '../../lib/autofill.js';
-import type { DetectedForm } from '../../lib/form-detector.js';
+import type { DetectedForm, DetectedPasswordCreationForm } from '../../lib/form-detector.js';
 
 // ─── simulateFill ─────────────────────────────────────────────────────────────
 
@@ -211,6 +213,80 @@ describe('fillForm', () => {
   });
 });
 
+describe('fillPasswordCreationForm', () => {
+  it('fills the new and confirmation fields with one generated password', () => {
+    const formElement = document.createElement('form');
+    const currentPassword = document.createElement('input');
+    currentPassword.type = 'password';
+    currentPassword.value = 'existing-password';
+    const newPassword = document.createElement('input');
+    newPassword.type = 'password';
+    const confirmation = document.createElement('input');
+    confirmation.type = 'password';
+    formElement.append(currentPassword, newPassword, confirmation);
+    document.body.appendChild(formElement);
+
+    const form: DetectedPasswordCreationForm = {
+      formElement,
+      usernameField: null,
+      passwordFields: [newPassword, confirmation],
+    };
+    expect(fillPasswordCreationForm(form, 'Generated-4827!')).toBe(true);
+    expect(newPassword.value).toBe('Generated-4827!');
+    expect(confirmation.value).toBe('Generated-4827!');
+    expect(currentPassword.value).toBe('existing-password');
+  });
+
+  it('does not partially fill when a confirmation field is unavailable', () => {
+    const formElement = document.createElement('form');
+    const newPassword = document.createElement('input');
+    const detachedConfirmation = document.createElement('input');
+    formElement.appendChild(newPassword);
+    document.body.appendChild(formElement);
+
+    expect(
+      fillPasswordCreationForm(
+        {
+          formElement,
+          usernameField: null,
+          passwordFields: [newPassword, detachedConfirmation],
+        },
+        'Generated-4827!'
+      )
+    ).toBe(false);
+    expect(newPassword.value).toBe('');
+  });
+});
+
+describe('createGeneratedPasswordDropdown', () => {
+  it('keeps generated plaintext out of the injected DOM until selection', () => {
+    const field = document.createElement('input');
+    field.getBoundingClientRect = () => ({
+      x: 20,
+      y: 40,
+      left: 20,
+      top: 40,
+      right: 220,
+      bottom: 72,
+      width: 200,
+      height: 32,
+      toJSON: () => ({}),
+    });
+    document.body.appendChild(field);
+    const onSelect = vi.fn();
+    const password = 'Secret-generated-4827!';
+    const host = createGeneratedPasswordDropdown(
+      field,
+      [{ id: 'strong', label: 'Use strong', description: '20 characters', password }],
+      onSelect
+    );
+
+    expect(host.shadowRoot?.textContent).not.toContain(password);
+    host.shadowRoot?.querySelector<HTMLButtonElement>('[data-generation-choice="strong"]')?.click();
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ password }));
+  });
+});
+
 // ─── createSuggestionDropdown ────────────────────────────────────────────────
 
 describe('createSuggestionDropdown', () => {
@@ -236,7 +312,14 @@ describe('createSuggestionDropdown', () => {
 
     const host = createSuggestionDropdown(
       field,
-      [{ id: 'entry-1', name: 'Example', username: 'user@example.com', uris: ['https://example.com/login'] }],
+      [
+        {
+          id: 'entry-1',
+          name: 'Example',
+          username: 'user@example.com',
+          uris: ['https://example.com/login'],
+        },
+      ],
       () => undefined
     );
     const icon = host.shadowRoot!.querySelector<HTMLElement>('.item-icon')!;
@@ -253,7 +336,14 @@ describe('createSuggestionDropdown', () => {
 
     const cachedHost = createSuggestionDropdown(
       field,
-      [{ id: 'entry-1', name: 'Example', username: 'user@example.com', uris: ['https://example.com/login'] }],
+      [
+        {
+          id: 'entry-1',
+          name: 'Example',
+          username: 'user@example.com',
+          uris: ['https://example.com/login'],
+        },
+      ],
       () => undefined
     );
     const cachedIcon = cachedHost.shadowRoot!.querySelector<HTMLElement>('.item-icon')!;
@@ -266,7 +356,14 @@ describe('createSuggestionDropdown', () => {
 
     const failedHost = createSuggestionDropdown(
       field,
-      [{ id: 'entry-1', name: 'Example', username: 'user@example.com', uris: ['https://example.com/login'] }],
+      [
+        {
+          id: 'entry-1',
+          name: 'Example',
+          username: 'user@example.com',
+          uris: ['https://example.com/login'],
+        },
+      ],
       () => undefined
     );
     const failedIcon = failedHost.shadowRoot!.querySelector<HTMLElement>('.item-icon')!;
@@ -295,19 +392,19 @@ describe('createSuggestionDropdown', () => {
         { id: 'one', name: 'First', username: 'first@example.com' },
         { id: 'two', name: 'Second', username: 'second@example.com' },
       ],
-      () => undefined,
+      () => undefined
     );
     const buttons = host.shadowRoot!.querySelectorAll<HTMLButtonElement>('.item');
     await Promise.resolve();
     expect(host.shadowRoot!.activeElement).toBe(buttons[0]);
 
     buttons[0].dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, composed: true }),
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, composed: true })
     );
     expect(host.shadowRoot!.activeElement).toBe(buttons[1]);
 
     buttons[1].dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true }),
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true })
     );
     expect(host.isConnected).toBe(false);
     expect(document.activeElement).toBe(field);
@@ -330,7 +427,7 @@ describe('createSuggestionDropdown', () => {
     const host = createSuggestionDropdown(
       field,
       [{ id: 'one', name: 'First', username: 'first@example.com' }],
-      () => undefined,
+      () => undefined
     );
 
     field.remove();

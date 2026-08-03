@@ -179,6 +179,27 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         present(alert, animated: true)
     }
 
+    @available(iOS 26.2, *)
+    override func performWithoutUserInteraction(
+        generatePasswordsRequest: ASGeneratePasswordsRequest
+    ) {
+        let choices = NativePasswordGenerator.choices(rules: [
+            generatePasswordsRequest.passwordFieldPasswordRules,
+            generatePasswordsRequest.confirmPasswordFieldPasswordRules,
+            generatePasswordsRequest.passwordRulesFromQuirks,
+        ]).map { choice in
+            ASGeneratedPassword(
+                kind: choice.kind == .strong ? .strong : .alphanumeric,
+                value: choice.value
+            )
+        }
+        guard !choices.isEmpty else {
+            cancel(.failed, message: "Authwell could not satisfy this site's password rules")
+            return
+        }
+        extensionContext.completeGeneratePasswordRequest(results: choices, completionHandler: nil)
+    }
+
     override func prepareInterface(forPasskeyRegistration registrationRequest: ASCredentialRequest) {
         authenticate(reason: "Create a passkey with Authwell") { context in
             do {

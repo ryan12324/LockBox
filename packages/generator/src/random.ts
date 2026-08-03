@@ -23,9 +23,13 @@ const SYMBOLS = '!@#$%^&*()_+-=[]{}|;:,.<>?';
 const AMBIGUOUS = '0O1lI|';
 
 function getRandomIndex(max: number): number {
-  const randomBytes = new Uint8Array(1);
-  crypto.getRandomValues(randomBytes);
-  return randomBytes[0] % max;
+  const range = 0x1_0000_0000;
+  const rejectionLimit = Math.floor(range / max) * max;
+  const randomValues = new Uint32Array(1);
+  do {
+    crypto.getRandomValues(randomValues);
+  } while (randomValues[0] >= rejectionLimit);
+  return randomValues[0] % max;
 }
 export function generatePassword(opts?: Partial<PasswordOptions>): string {
   const options = { ...DEFAULT_OPTIONS, ...opts };
@@ -45,7 +49,9 @@ export function generatePassword(opts?: Partial<PasswordOptions>): string {
 
   if (options.uppercase) {
     const chars = options.excludeAmbiguous
-      ? UPPERCASE.split('').filter((c) => !AMBIGUOUS.includes(c)).join('')
+      ? UPPERCASE.split('')
+          .filter((c) => !AMBIGUOUS.includes(c))
+          .join('')
       : UPPERCASE;
     pool += chars;
     requiredChars.push(chars[getRandomIndex(chars.length)]);
@@ -53,7 +59,9 @@ export function generatePassword(opts?: Partial<PasswordOptions>): string {
 
   if (options.lowercase) {
     const chars = options.excludeAmbiguous
-      ? LOWERCASE.split('').filter((c) => !AMBIGUOUS.includes(c)).join('')
+      ? LOWERCASE.split('')
+          .filter((c) => !AMBIGUOUS.includes(c))
+          .join('')
       : LOWERCASE;
     pool += chars;
     requiredChars.push(chars[getRandomIndex(chars.length)]);
@@ -61,7 +69,9 @@ export function generatePassword(opts?: Partial<PasswordOptions>): string {
 
   if (options.digits) {
     const chars = options.excludeAmbiguous
-      ? DIGITS.split('').filter((c) => !AMBIGUOUS.includes(c)).join('')
+      ? DIGITS.split('')
+          .filter((c) => !AMBIGUOUS.includes(c))
+          .join('')
       : DIGITS;
     pool += chars;
     requiredChars.push(chars[getRandomIndex(chars.length)]);
@@ -69,20 +79,17 @@ export function generatePassword(opts?: Partial<PasswordOptions>): string {
 
   if (options.symbols) {
     const chars = options.excludeAmbiguous
-      ? SYMBOLS.split('').filter((c) => !AMBIGUOUS.includes(c)).join('')
+      ? SYMBOLS.split('')
+          .filter((c) => !AMBIGUOUS.includes(c))
+          .join('')
       : SYMBOLS;
     pool += chars;
     requiredChars.push(chars[getRandomIndex(chars.length)]);
   }
 
-  // Generate password using crypto.getRandomValues()
-  const randomBytes = new Uint8Array(options.length);
-  crypto.getRandomValues(randomBytes);
-
   let password = '';
   for (let i = 0; i < options.length; i++) {
-    const index = randomBytes[i] % pool.length;
-    password += pool[index];
+    password += pool[getRandomIndex(pool.length)];
   }
 
   // Ensure at least one character from each enabled set

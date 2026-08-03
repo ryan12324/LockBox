@@ -73,9 +73,13 @@ const DEFAULT_RULES: PasswordRules = {
 
 /** Return a cryptographically random index in `[0, max)`. */
 function getRandomIndex(max: number): number {
-  const buf = new Uint32Array(1);
-  crypto.getRandomValues(buf);
-  return buf[0] % max;
+  const range = 0x1_0000_0000;
+  const rejectionLimit = Math.floor(range / max) * max;
+  const values = new Uint32Array(1);
+  do {
+    crypto.getRandomValues(values);
+  } while (values[0] >= rejectionLimit);
+  return values[0] % max;
 }
 
 /** Fisher-Yates shuffle (in-place) using crypto randomness. */

@@ -14,6 +14,7 @@ import android.service.autofill.SaveCallback
 import android.service.autofill.SaveInfo
 import android.service.autofill.SaveRequest
 import android.view.autofill.AutofillId
+import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
 import androidx.room.withTransaction
 import dev.lockbox.app.R
@@ -48,12 +49,12 @@ class LockboxAutofillService : AutofillService() {
             return
         }
         val fields = parseStructure(structure)
-        if (fields.usernameId == null && fields.passwordId == null && fields.newPasswordId == null) {
+        if (fields.usernameId == null && fields.passwordId == null && fields.newPasswordIds.isEmpty()) {
             AutofillDiagnostics.recordRequest(applicationContext, 0)
             callback.onSuccess(null)
             return
         }
-        if (fields.hasOneTimeCode && fields.passwordId == null && fields.newPasswordId == null) {
+        if (fields.hasOneTimeCode && fields.passwordId == null && fields.newPasswordIds.isEmpty()) {
             AutofillDiagnostics.recordRequest(applicationContext, 0)
             callback.onSuccess(null)
             return
@@ -83,16 +84,30 @@ class LockboxAutofillService : AutofillService() {
                 }
 
                 val response = FillResponse.Builder()
-                credentials.forEachIndexed { index, credential ->
-                    response.addDataset(buildAuthenticationDataset(credential, fields, index))
+                val canSave = PasskeyAccountState.get(applicationContext) != null
+                var datasetCount = 0
+                if (fields.newPasswordIds.isEmpty() || fields.passwordId != null) {
+                    credentials.forEachIndexed { index, credential ->
+                        response.addDataset(buildAuthenticationDataset(credential, fields, index))
+                        datasetCount++
+                    }
                 }
-                val saveInfo = if (PasskeyAccountState.get(applicationContext) != null) {
+                if (canSave && fields.newPasswordIds.isNotEmpty()) {
+                    AutofillPasswordGenerator.suggestions(
+                        minLength = fields.newPasswordMinLength,
+                        maxLength = fields.newPasswordMaxLength
+                    ).forEachIndexed { index, suggestion ->
+                        response.addDataset(buildGeneratedPasswordDataset(suggestion, fields, index))
+                        datasetCount++
+                    }
+                }
+                val saveInfo = if (canSave) {
                     buildSaveInfo(fields)
                 } else null
                 saveInfo?.let(response::setSaveInfo)
-                AutofillDiagnostics.recordRequest(applicationContext, credentials.size)
+                AutofillDiagnostics.recordRequest(applicationContext, datasetCount)
                 callback.onSuccess(
-                    if (credentials.isNotEmpty() || saveInfo != null) response.build()
+                    if (datasetCount > 0 || saveInfo != null) response.build()
                     else null
                 )
             } catch (error: Exception) {
@@ -225,8 +240,29 @@ class LockboxAutofillService : AutofillService() {
         }.build()
     }
 
+    private fun buildGeneratedPasswordDataset(
+        suggestion: GeneratedPasswordSuggestion,
+        fields: ParsedAutofillFields,
+        index: Int
+    ): Dataset {
+        val presentation = RemoteViews(packageName, R.layout.autofill_item).apply {
+            setTextViewText(R.id.autofill_item_label, suggestion.label)
+            setTextViewText(
+                R.id.autofill_item_sublabel,
+                "${suggestion.description} · save to Authwell after signup"
+            )
+        }
+        return Dataset.Builder(presentation).apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                setId("authwell-generated-${suggestion.id}-$index")
+            }
+            val value = AutofillValue.forText(suggestion.password)
+            fields.newPasswordIds.forEach { setValue(it, value, presentation) }
+        }.build()
+    }
+
     private fun buildSaveInfo(fields: ParsedAutofillFields): SaveInfo? {
-        val passwordId = fields.newPasswordId ?: fields.passwordId
+        val passwordId = fields.newPasswordIds.firstOrNull() ?: fields.passwordId
         if (passwordId == null) {
             if (fields.hasOneTimeCode) return null
             val usernameId = fields.usernameId ?: return null
@@ -245,8 +281,8 @@ class LockboxAutofillService : AutofillService() {
         return SaveInfo.Builder(saveType, arrayOf(passwordId)).apply {
             val optionalIds = listOfNotNull(
                 fields.usernameId,
-                fields.passwordId?.takeIf { fields.newPasswordId != null && it != passwordId }
-            ).toTypedArray()
+                fields.passwordId?.takeIf { fields.newPasswordIds.isNotEmpty() && it != passwordId }
+            ).plus(fields.newPasswordIds.drop(1)).toTypedArray()
             if (optionalIds.isNotEmpty()) setOptionalIds(optionalIds)
             setDescription("Save this login to Authwell")
         }.build()
@@ -312,9 +348,31 @@ class LockboxAutofillService : AutofillService() {
                     result.passwordId = autofillId
                     result.passwordValue = node.textValue()
                 }
-                AutofillFieldKind.NEW_PASSWORD -> if (result.newPasswordId == null) {
-                    result.newPasswordId = autofillId
-                    result.newPasswordValue = node.textValue()
+                AutofillFieldKind.NEW_PASSWORD -> {
+                    if (!result.newPasswordIds.contains(autofillId)) {
+                        result.newPasswordIds += autofillId
+                    }
+                    if (result.newPasswordValue.isNullOrEmpty()) {
+                        result.newPasswordValue = node.textValue()
+                    }
+                    attributes
+                        ?.find { it.first.equals("minlength", true) }
+                        ?.second
+                        ?.toIntOrNull()
+                        ?.takeIf { it > 0 }
+                        ?.let { result.newPasswordMinLength = maxOf(result.newPasswordMinLength, it) }
+                    attributes
+                        ?.find { it.first.equals("maxlength", true) }
+                        ?.second
+                        ?.toIntOrNull()
+                        ?.takeIf { it > 0 }
+                        ?.let {
+                            result.newPasswordMaxLength = if (result.newPasswordMaxLength == 0) {
+                                it
+                            } else {
+                                minOf(result.newPasswordMaxLength, it)
+                            }
+                        }
                 }
                 AutofillFieldKind.ONE_TIME_CODE -> result.hasOneTimeCode = true
                 null -> Unit
@@ -343,10 +401,12 @@ class LockboxAutofillService : AutofillService() {
 data class ParsedAutofillFields(
     var usernameId: AutofillId? = null,
     var passwordId: AutofillId? = null,
-    var newPasswordId: AutofillId? = null,
+    val newPasswordIds: MutableList<AutofillId> = mutableListOf(),
     var usernameValue: String = "",
     var passwordValue: String? = null,
     var newPasswordValue: String? = null,
+    var newPasswordMinLength: Int = 0,
+    var newPasswordMaxLength: Int = 0,
     var hasOneTimeCode: Boolean = false,
     var webDomain: String? = null,
     var packageName: String? = null

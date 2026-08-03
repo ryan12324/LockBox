@@ -34,6 +34,10 @@
 				<true/>
 				<key>SupportsSavePasswordCredentials</key>
 				<true/>
+				<key>SupportsGeneratePasswordCredentials</key>
+				<true/>
+				<key>SupportsGeneratePasswordCredentialsWithUI</key>
+				<false/>
 				<key>ShowsConfigurationUI</key>
 				<true/>
 			</dict>

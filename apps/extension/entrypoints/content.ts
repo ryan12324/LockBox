@@ -7,15 +7,17 @@
  * Proxies crypto operations through the background service worker.
  */
 
-import { detectForms } from '../lib/form-detector.js';
-import type { DetectedForm } from '../lib/form-detector.js';
+import { detectForms, detectPasswordCreationForms } from '../lib/form-detector.js';
+import type { DetectedForm, DetectedPasswordCreationForm } from '../lib/form-detector.js';
 import {
   fillForm,
   fillIdentityForm,
+  fillPasswordCreationForm,
   simulateFill,
   createSuggestionDropdown,
   createIdentitySuggestionDropdown,
   createStatusDropdown,
+  createGeneratedPasswordDropdown,
 } from '../lib/autofill.js';
 import { AutofillOverlayController } from '../lib/autofill-controller.js';
 import { initSaveDetector } from '../lib/save-detector.js';
@@ -123,6 +125,108 @@ function resolveLiveLoginForm(passwordField: HTMLInputElement): DetectedForm | n
       (form) => form.passwordField === passwordField && form.passwordPurpose !== 'new'
     ) ?? null
   );
+}
+
+function resolveLivePasswordCreationForm(
+  passwordField: HTMLInputElement
+): DetectedPasswordCreationForm | null {
+  return (
+    detectPasswordCreationForms(document).find(
+      (form) => form.passwordFields[0] === passwordField
+    ) ?? null
+  );
+}
+
+function generatedPasswordLength(form: DetectedPasswordCreationForm): number | null {
+  const minimum = Math.max(
+    8,
+    ...form.passwordFields.map((field) => field.minLength).filter((n) => n > 0)
+  );
+  const declaredMaximums = form.passwordFields.map((field) => field.maxLength).filter((n) => n > 0);
+  const maximum = declaredMaximums.length > 0 ? Math.min(...declaredMaximums) : 128;
+  if (minimum > maximum || maximum < 8) return null;
+  return Math.min(Math.max(20, minimum), maximum, 128);
+}
+
+async function handlePasswordGeneration(form: DetectedPasswordCreationForm): Promise<void> {
+  const anchorField = form.passwordFields[0];
+  if (!anchorField || !resolveLivePasswordCreationForm(anchorField)) return;
+
+  if (!(await isVaultUnlocked())) {
+    createStatusDropdown(anchorField, 'locked', [
+      { label: 'Open Authwell', onClick: () => openExtensionPopup() },
+    ]);
+    return;
+  }
+
+  const length = generatedPasswordLength(form);
+  if (length === null) {
+    createStatusDropdown(anchorField, 'error', []);
+    return;
+  }
+
+  try {
+    const [strong, compatible, long] = await Promise.all([
+      sendMessage<{ password: string }>({
+        type: 'generate-password',
+        opts: { length, uppercase: true, lowercase: true, digits: true, symbols: true },
+      }),
+      sendMessage<{ password: string }>({
+        type: 'generate-password',
+        opts: { length, uppercase: true, lowercase: true, digits: true, symbols: false },
+      }),
+      sendMessage<{ password: string }>({
+        type: 'generate-password',
+        opts: {
+          length: Math.min(Math.max(32, length), 128),
+          uppercase: true,
+          lowercase: true,
+          digits: true,
+          symbols: true,
+        },
+      }),
+    ]);
+    if (!resolveLivePasswordCreationForm(anchorField)) return;
+
+    createGeneratedPasswordDropdown(
+      anchorField,
+      [
+        {
+          id: 'strong',
+          label: 'Use a strong password',
+          description: `${strong.password.length} characters with symbols`,
+          password: strong.password,
+        },
+        {
+          id: 'compatible',
+          label: 'Use letters and numbers',
+          description: `${compatible.password.length} characters without symbols`,
+          password: compatible.password,
+        },
+        {
+          id: 'long',
+          label: 'Use a longer password',
+          description: `${long.password.length} characters with symbols`,
+          password: long.password,
+        },
+      ].filter(
+        (choice, index, choices) =>
+          choice.password.length <=
+            Math.min(
+              ...form.passwordFields.map((field) => field.maxLength).filter((value) => value > 0),
+              128
+            ) && choices.findIndex((candidate) => candidate.password === choice.password) === index
+      ),
+      (choice) => {
+        const liveForm = resolveLivePasswordCreationForm(anchorField);
+        if (liveForm) fillPasswordCreationForm(liveForm, choice.password);
+      }
+    );
+  } catch {
+    createStatusDropdown(anchorField, 'error', [
+      { label: 'Retry', onClick: () => void handlePasswordGeneration(form) },
+    ]);
+  }
 }
 
 async function handleAutofill(form: DetectedForm): Promise<void> {
@@ -771,6 +875,7 @@ export default defineContentScript({
           onUsername: (field) => handleUsernameAutofill(field),
           onIdentity: (form) => handleIdentityAutofill(form),
           onOtp: (field) => handleTotpAutofill(field),
+          onGeneratePassword: (form) => handlePasswordGeneration(form),
         },
         { enabled: false }
       );
