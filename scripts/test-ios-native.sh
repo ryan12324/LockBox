@@ -57,6 +57,14 @@ grep -q 'generatedPasswordFilled' "$provider_source" || {
   echo "iOS provider does not capture selected generated passwords" >&2
   exit 1
 }
+grep -q 'NativeCredentialCapture.prepareForPasswordGeneration' "$provider_source" || {
+  echo "iOS provider offers generated passwords without preflighting secure save" >&2
+  exit 1
+}
+grep -q 'Saved password; identity refresh failed' "$provider_source" || {
+  echo "iOS provider can incorrectly fail a durable save after identity refresh" >&2
+  exit 1
+}
 grep -q 'SupportsGeneratePasswordCredentials' \
   "$repository_root/apps/mobile/ios/App/CredentialProvider/Info.plist" || {
   echo "iOS provider does not advertise generated-password support" >&2

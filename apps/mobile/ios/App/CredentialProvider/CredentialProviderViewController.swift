@@ -156,6 +156,7 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
             }
             try savePassword(savePasswordRequest)
         } catch {
+            try? AutofillDiagnostics.recordFailure(error.localizedDescription)
             cancel(.failed, message: error.localizedDescription)
         }
     }
@@ -174,7 +175,10 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         })
         alert.addAction(UIAlertAction(title: "Save", style: .default) { _ in
             do { try self.savePassword(savePasswordRequest) }
-            catch { self.cancel(.failed, message: error.localizedDescription) }
+            catch {
+                try? AutofillDiagnostics.recordFailure(error.localizedDescription)
+                self.cancel(.failed, message: error.localizedDescription)
+            }
         })
         present(alert, animated: true)
     }
@@ -183,21 +187,28 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     override func performWithoutUserInteraction(
         generatePasswordsRequest: ASGeneratePasswordsRequest
     ) {
-        let choices = NativePasswordGenerator.choices(rules: [
-            generatePasswordsRequest.passwordFieldPasswordRules,
-            generatePasswordsRequest.confirmPasswordFieldPasswordRules,
-            generatePasswordsRequest.passwordRulesFromQuirks,
-        ]).map { choice in
-            ASGeneratedPassword(
-                kind: choice.kind == .strong ? .strong : .alphanumeric,
-                value: choice.value
-            )
+        do {
+            try NativeCredentialCapture.prepareForPasswordGeneration()
+            let choices = NativePasswordGenerator.choices(rules: [
+                generatePasswordsRequest.passwordFieldPasswordRules,
+                generatePasswordsRequest.confirmPasswordFieldPasswordRules,
+                generatePasswordsRequest.passwordRulesFromQuirks,
+            ]).map { choice in
+                ASGeneratedPassword(
+                    kind: choice.kind == .strong ? .strong : .alphanumeric,
+                    value: choice.value
+                )
+            }
+            guard !choices.isEmpty else {
+                throw AuthwellError.invalidArgument(
+                    "Authwell could not satisfy this site's password rules"
+                )
+            }
+            extensionContext.completeGeneratePasswordRequest(results: choices, completionHandler: nil)
+        } catch {
+            try? AutofillDiagnostics.recordFailure(error.localizedDescription)
+            cancel(.failed, message: error.localizedDescription)
         }
-        guard !choices.isEmpty else {
-            cancel(.failed, message: "Authwell could not satisfy this site's password rules")
-            return
-        }
-        extensionContext.completeGeneratePasswordRequest(results: choices, completionHandler: nil)
     }
 
     override func prepareInterface(forPasskeyRegistration registrationRequest: ASCredentialRequest) {
@@ -394,8 +405,14 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         )
         AuthwellCredentialIdentityStore.refresh { error in
             if let error {
-                self.cancel(.failed, message: error.localizedDescription)
-            } else {
+                // The credential is already encrypted in the durable pending
+                // outbox. Identity-store refresh is an optimization for the
+                // next fill and must not make Apple report that saving failed.
+                try? AutofillDiagnostics.recordFailure(
+                    "Saved password; identity refresh failed: \(error.localizedDescription)"
+                )
+            }
+            DispatchQueue.main.async {
                 self.extensionContext.completeSavePasswordRequest(completionHandler: nil)
             }
         }

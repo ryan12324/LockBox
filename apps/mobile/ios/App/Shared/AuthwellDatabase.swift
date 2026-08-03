@@ -568,6 +568,19 @@ final class AuthwellDatabase: @unchecked Sendable {
 }
 
 enum NativeCredentialCapture {
+    static func prepareForPasswordGeneration() throws {
+        guard let accountId = try AuthwellAppGroup.sharedDefaults().string(
+            forKey: AuthwellAppGroup.accountKey
+        ), !accountId.isEmpty else {
+            throw AuthwellError.authentication(
+                "Unlock Authwell once before generating a password"
+            )
+        }
+        try DeviceOutboxCrypto.prepareForEncryption()
+        try DeviceIndexCrypto.prepareForEncryption()
+        _ = try AuthwellDatabase.shared.allAutofill()
+    }
+
     static func hasMatchingPassword(username: String, serviceIdentifier: String) throws -> Bool {
         guard let domain = DomainIdentifier.normalize(serviceIdentifier) else { return false }
         let hash = try DomainIdentifier.hash(domain)
