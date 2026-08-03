@@ -2,6 +2,7 @@ import {
   detectForms,
   detectIdentityForms,
   detectOtpFields,
+  detectStandaloneUsernameFields,
   getOpenShadowRoots,
   isEligibleField,
   type DetectedForm,
@@ -11,6 +12,7 @@ import { createLockIconOverlay, type LockIconOverlayHandle } from './autofill.js
 
 export interface AutofillOverlayCallbacks {
   onLogin: (form: DetectedForm) => void | Promise<void>;
+  onUsername: (field: HTMLInputElement) => void | Promise<void>;
   onIdentity: (form: DetectedIdentityForm) => void | Promise<void>;
   onOtp: (field: HTMLInputElement) => void | Promise<void>;
 }
@@ -21,9 +23,7 @@ export interface AutofillOverlayControllerOptions {
 
 function isAuthwellUiNode(node: Node): boolean {
   const element = node instanceof Element ? node : node.parentElement;
-  return Boolean(
-    element?.matches('[data-authwell-ui]') || element?.closest('[data-authwell-ui]'),
-  );
+  return Boolean(element?.matches('[data-authwell-ui]') || element?.closest('[data-authwell-ui]'));
 }
 
 function onlyAuthwellUiMutations(records: MutationRecord[]): boolean {
@@ -56,7 +56,7 @@ export class AutofillOverlayController {
   constructor(
     ownerDocument: Document,
     callbacks: AutofillOverlayCallbacks,
-    options: AutofillOverlayControllerOptions = {},
+    options: AutofillOverlayControllerOptions = {}
   ) {
     this.ownerDocument = ownerDocument;
     this.ownerWindow = ownerDocument.defaultView ?? window;
@@ -126,6 +126,10 @@ export class AutofillOverlayController {
       if (form.usernameField) desiredFields.add(form.usernameField);
     }
 
+    for (const field of detectStandaloneUsernameFields(this.ownerDocument)) {
+      desiredFields.add(field);
+    }
+
     for (const form of detectIdentityForms(this.ownerDocument)) {
       const firstField = Object.values(form.fields)[0];
       if (firstField) desiredFields.add(firstField);
@@ -193,7 +197,7 @@ export class AutofillOverlayController {
     const loginForm = detectForms(this.ownerDocument).find(
       (form) =>
         form.passwordPurpose !== 'new' &&
-        (form.passwordField === field || form.usernameField === field),
+        (form.passwordField === field || form.usernameField === field)
     );
     if (loginForm) {
       await this.callbacks.onLogin(loginForm);
@@ -205,8 +209,13 @@ export class AutofillOverlayController {
       return;
     }
 
+    if (detectStandaloneUsernameFields(this.ownerDocument).includes(field)) {
+      await this.callbacks.onUsername(field);
+      return;
+    }
+
     const identityForm = detectIdentityForms(this.ownerDocument).find((form) =>
-      Object.values(form.fields).includes(field),
+      Object.values(form.fields).includes(field)
     );
     if (identityForm) await this.callbacks.onIdentity(identityForm);
   }

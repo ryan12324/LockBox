@@ -2,15 +2,15 @@
 
 `apps/mobile` exposes one TypeScript contract to the Authwell web vault and implements it with native Android and iOS integrations.
 
-| Integration | Android | iOS |
-| ----------- | ------- | --- |
-| Offline encrypted-vault cache | Room | SQLite in an App Group container |
-| Biometric unlock | BiometricPrompt + AES-GCM Keystore key | LocalAuthentication + Secure Enclave ECIES key |
-| Password autofill | AutofillService | AutoFill Credential Provider extension |
-| Passkeys | Android Credential Provider | iOS 17 AutoFill Credential Provider |
-| Native HTTP/connectivity | Capacitor | Capacitor |
+| Integration                   | Android                                | iOS                                            |
+| ----------------------------- | -------------------------------------- | ---------------------------------------------- |
+| Offline encrypted-vault cache | Room                                   | SQLite in an App Group container               |
+| Biometric unlock              | BiometricPrompt + AES-GCM Keystore key | LocalAuthentication + Secure Enclave ECIES key |
+| Password autofill             | AutofillService                        | AutoFill Credential Provider extension         |
+| Passkeys                      | Android Credential Provider            | iOS 17 AutoFill Credential Provider            |
+| Native HTTP/connectivity      | Capacitor                              | Capacitor                                      |
 
-Native credential indexes contain encrypted credential material. Password and passkey private-key plaintext is accepted only while the vault is unlocked, immediately encrypted to a biometric-bound device key, and decrypted by the provider after biometric authorization. Newly created provider passkeys remain in a durable pending outbox until the web vault encrypts and uploads them.
+Native credential indexes contain encrypted credential material. Password and passkey private-key plaintext is accepted only while the vault is unlocked, immediately encrypted to a biometric-bound device key, and decrypted by the provider after biometric authorization. A bounded display username is retained as device-local metadata so the system picker can distinguish accounts before authentication; passwords, item names, and raw targets remain encrypted. Newly created provider passkeys remain in a durable pending outbox until the web vault encrypts and uploads them.
 
 ## iOS development
 
@@ -36,6 +36,20 @@ bun run ios:simulator
 ```
 
 The command prefers a booted simulator, or selects an iPhone from the newest installed iOS runtime. Use `bun run ios:simulator -- --list` to list targets, or pass a simulator UDID after `--` to choose one explicitly.
+
+Run the 12-case AutoFill form matrix through the real iOS app shell with:
+
+```bash
+bun run ios:test:autofill
+```
+
+Use `-- --case password-change` for one case, `-- --udid <id>` to choose a
+Simulator, or `--skip-build` after the web assets and iOS project are current.
+The XCUITest target is debug-only in effect: its launch environment can route a
+debug build to `/test`, while Release builds compile out that route hook. Apple
+does not expose a supported command-line switch for enabling a third-party
+credential provider, so enable Authwell once in the Simulator's Password
+AutoFill settings before doing manual provider-selection checks.
 
 The provider must be enabled on a device under **Settings → General → AutoFill & Passwords**. Unlock Authwell once to seed its encrypted local indexes. Test both password and passkey flows on physical hardware because the Simulator uses a Data Protection Keychain fallback in place of Secure Enclave.
 
@@ -83,4 +97,4 @@ Android exposes two complementary password-manager paths. The Autofill Framework
 
 Vault unlock uses `BiometricPrompt` with a per-use AES-256-GCM `CryptoObject`. The non-exportable Android Keystore key is invalidated by biometric enrollment changes, and the server/account scope is authenticated as AES-GCM additional data. SharedPreferences contains only the IV, scope, and wrapped vault key. Missing or invalidated Keystore material forces master-password unlock.
 
-Website URLs match browser origins. Native Android apps match an explicit `androidapp://package.name` target on the login item. Authwell keeps usernames, passwords, item names, and raw targets out of the native index; Credential Manager shows a generic entry until strong biometric authentication decrypts the selected login.
+Website URLs match browser origins. Native Android apps match an explicit `androidapp://package.name` target on the login item. Authwell retains only a bounded display username outside the encrypted credential payload so Credential Manager and biometric prompts identify the selected account. Passwords, item names, and raw targets remain encrypted until strong biometric authentication decrypts the login.

@@ -43,14 +43,14 @@ There is no master-password recovery in v1. Losing the master password means los
 
 ## Architecture
 
-| Component | Path             | Runtime                                 |
-| --------- | ---------------- | --------------------------------------- |
-| Marketing | `apps/marketing` | vinext on Cloudflare                    |
-| API       | `apps/api`       | Cloudflare Workers, Hono, D1, and R2    |
-| Web vault | `apps/web`       | React, Vite, Cloudflare Pages           |
-| Extension | `apps/extension` | WXT, React, Chrome/Firefox              |
+| Component | Path             | Runtime                                     |
+| --------- | ---------------- | ------------------------------------------- |
+| Marketing | `apps/marketing` | vinext on Cloudflare                        |
+| API       | `apps/api`       | Cloudflare Workers, Hono, D1, and R2        |
+| Web vault | `apps/web`       | React, Vite, Cloudflare Pages               |
+| Extension | `apps/extension` | WXT, React, Chrome/Firefox                  |
 | Mobile    | `apps/mobile`    | Capacitor plus native Kotlin/Swift services |
-| CLI       | `apps/cli`       | Bun/Node-compatible command line client |
+| CLI       | `apps/cli`       | Bun/Node-compatible command line client     |
 
 Shared packages under `packages/` provide cryptography, types, TOTP, password generation, local security analysis, and design components.
 
@@ -128,10 +128,19 @@ Run individual clients:
 bun run --filter @lockbox/web dev
 bun run --filter @lockbox/extension dev
 bun run --filter @lockbox/cli dev -- --help
+bun run web:test:autofill
 bun run android:run
 bun run android:test:autofill
 bun run ios:simulator
+bun run ios:test:autofill
 ```
+
+The AutoFill matrix lives at `/test` and covers 12 login shapes. The web command
+builds a loopback-only Chrome-for-Testing extension and drives its actual content
+script, fill controls, and save banner. The Android command drives the native
+picker on an emulator. The iOS command launches the real Capacitor app in a
+Simulator and verifies the same form contracts through XCUITest. Use
+`-- --case multi-step` with any matrix command while iterating on one scenario.
 
 Build release clients:
 

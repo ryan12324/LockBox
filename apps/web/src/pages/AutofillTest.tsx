@@ -501,6 +501,7 @@ export default function AutofillTest() {
     [requestedId]
   );
   const completed = searchParams.get('completed') === active.id;
+  const automationDelay = searchParams.get('automation') === 'autofill' ? 1_000 : 180;
 
   useEffect(() => setSubmitting(false), [active.id]);
 
@@ -520,7 +521,7 @@ export default function AutofillTest() {
       .finally(() => {
         window.setTimeout(() => {
           window.location.assign(buildAutofillCompletionUrl(active.id));
-        }, 180);
+        }, automationDelay);
       });
   }
 

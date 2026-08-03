@@ -1,5 +1,15 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
+import { fileURLToPath } from 'node:url';
+
+const autofillE2eModule = fileURLToPath(
+  new URL(
+    process.env.VITE_AUTHWELL_AUTOFILL_E2E === '1'
+      ? './lib/autofill-e2e-enabled.ts'
+      : './lib/autofill-e2e.ts',
+    import.meta.url
+  )
+);
 
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
@@ -49,7 +59,7 @@ export default defineConfig({
     plugins: [tailwindcss()],
     resolve: {
       alias: {
-        // Ensure workspace packages resolve correctly
+        '~/lib/autofill-e2e.js': autofillE2eModule,
       },
     },
   }),

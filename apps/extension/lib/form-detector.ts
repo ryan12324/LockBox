@@ -24,7 +24,7 @@ function isShadowRoot(value: unknown): value is ShadowRoot {
 /** Query a document, element, and every reachable open shadow root. */
 export function querySelectorAllDeep<T extends Element>(
   root: FormSearchRoot,
-  selector: string,
+  selector: string
 ): T[] {
   const matches = new Set<T>();
   const visited = new Set<ParentNode>();
@@ -63,10 +63,7 @@ export function getOpenShadowRoots(root: FormSearchRoot): ShadowRoot[] {
 }
 
 function autocompleteTokens(input: HTMLInputElement): string[] {
-  return (input.getAttribute('autocomplete') ?? '')
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
+  return (input.getAttribute('autocomplete') ?? '').toLowerCase().split(/\s+/).filter(Boolean);
 }
 
 function composedParent(element: Element): Element | null {
@@ -90,7 +87,11 @@ export function isEligibleField(input: HTMLInputElement): boolean {
     }
 
     const style = getComputedStyle(current);
-    if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') {
+    if (
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      style.visibility === 'collapse'
+    ) {
       return false;
     }
     current = composedParent(current);
@@ -129,11 +130,13 @@ function isPasswordLikeField(input: HTMLInputElement): boolean {
   const parent = input.parentElement;
   const siblingInputCount = parent?.querySelectorAll('input').length ?? 0;
   const hasRevealControl = Array.from(
-    parent?.querySelectorAll<HTMLElement>('button, [role="button"]') ?? [],
+    parent?.querySelectorAll<HTMLElement>('button, [role="button"]') ?? []
   ).some((control) => {
     const label = `${control.getAttribute('aria-label') ?? ''} ${control.title} ${control.textContent ?? ''}`;
     const describesReveal =
-      /(show|hide|reveal).*(password|passcode)|(password|passcode).*(show|hide|reveal)/i.test(label);
+      /(show|hide|reveal).*(password|passcode)|(password|passcode).*(show|hide|reveal)/i.test(
+        label
+      );
     const explicitlyTargetsField =
       Boolean(input.id) && control.getAttribute('aria-controls') === input.id;
     const isAdjacent =
@@ -168,19 +171,28 @@ export type FieldType =
   | 'unknown';
 
 /** Identity-specific field types. */
-export type IdentityFieldType = Exclude<FieldType, 'username' | 'password' | 'email' | 'otp' | 'unknown'>;
+export type IdentityFieldType = Exclude<
+  FieldType,
+  'username' | 'password' | 'email' | 'otp' | 'unknown'
+>;
 
 /** All identity field types for iteration. */
 const IDENTITY_FIELD_TYPES: ReadonlySet<string> = new Set<string>([
-  'first-name', 'last-name', 'name', 'phone',
-  'address-line1', 'address-line2', 'city', 'state',
-  'postal-code', 'country', 'organization',
+  'first-name',
+  'last-name',
+  'name',
+  'phone',
+  'address-line1',
+  'address-line2',
+  'city',
+  'state',
+  'postal-code',
+  'country',
+  'organization',
 ]);
 
 /** Detect the semantic type of an input field. */
-export function detectFieldType(
-  input: HTMLInputElement,
-): FieldType {
+export function detectFieldType(input: HTMLInputElement): FieldType {
   const type = input.type?.toLowerCase();
   const name = (input.name ?? '').toLowerCase();
   const id = (input.id ?? '').toLowerCase();
@@ -206,8 +218,8 @@ export function detectFieldType(
   const autocompleteMap: Record<string, FieldType> = {
     'given-name': 'first-name',
     'family-name': 'last-name',
-    'name': 'name',
-    'tel': 'phone',
+    name: 'name',
+    tel: 'phone',
     'tel-national': 'phone',
     'street-address': 'address-line1',
     'address-line1': 'address-line1',
@@ -216,10 +228,10 @@ export function detectFieldType(
     'address-level1': 'state',
     'postal-code': 'postal-code',
     'country-name': 'country',
-    'country': 'country',
-    'organization': 'organization',
-    'username': 'username',
-    'email': 'email',
+    country: 'country',
+    organization: 'organization',
+    username: 'username',
+    email: 'email',
   };
 
   for (const value of autocompleteValues) {
@@ -245,14 +257,37 @@ export function detectFieldType(
 
   // Identity field patterns (check before username to avoid false positives)
   const identityPatterns: Array<{ patterns: string[]; fieldType: FieldType }> = [
-    { patterns: ['firstname', 'first-name', 'first_name', 'fname', 'given-name', 'givenname'], fieldType: 'first-name' },
-    { patterns: ['lastname', 'last-name', 'last_name', 'lname', 'family-name', 'familyname', 'surname'], fieldType: 'last-name' },
+    {
+      patterns: ['firstname', 'first-name', 'first_name', 'fname', 'given-name', 'givenname'],
+      fieldType: 'first-name',
+    },
+    {
+      patterns: [
+        'lastname',
+        'last-name',
+        'last_name',
+        'lname',
+        'family-name',
+        'familyname',
+        'surname',
+      ],
+      fieldType: 'last-name',
+    },
     { patterns: ['phone', 'tel', 'mobile', 'cell'], fieldType: 'phone' },
-    { patterns: ['address-line2', 'address2', 'addr2', 'address_2', 'apt', 'suite', 'unit'], fieldType: 'address-line2' },
-    { patterns: ['address', 'street', 'address-line1', 'address1', 'addr1', 'address_1'], fieldType: 'address-line1' },
+    {
+      patterns: ['address-line2', 'address2', 'addr2', 'address_2', 'apt', 'suite', 'unit'],
+      fieldType: 'address-line2',
+    },
+    {
+      patterns: ['address', 'street', 'address-line1', 'address1', 'addr1', 'address_1'],
+      fieldType: 'address-line1',
+    },
     { patterns: ['city', 'locality', 'town'], fieldType: 'city' },
     { patterns: ['state', 'province', 'region'], fieldType: 'state' },
-    { patterns: ['zip', 'postal', 'postcode', 'postalcode', 'postal-code', 'zipcode'], fieldType: 'postal-code' },
+    {
+      patterns: ['zip', 'postal', 'postcode', 'postalcode', 'postal-code', 'zipcode'],
+      fieldType: 'postal-code',
+    },
     { patterns: ['country'], fieldType: 'country' },
     { patterns: ['company', 'organization', 'org', 'employer'], fieldType: 'organization' },
   ];
@@ -275,7 +310,7 @@ export function detectFieldType(
 function findSubmitButton(container: HTMLElement): HTMLButtonElement | null {
   // Look for submit button within the form
   const submitBtn = container.querySelector<HTMLButtonElement>(
-    'button[type="submit"], input[type="submit"]',
+    'button[type="submit"], input[type="submit"]'
   );
   if (submitBtn) return submitBtn as HTMLButtonElement;
 
@@ -298,7 +333,7 @@ function findSubmitButton(container: HTMLElement): HTMLButtonElement | null {
 /** Find the username/email field adjacent to a password field. */
 function findUsernameField(
   passwordField: HTMLInputElement,
-  container: HTMLElement,
+  container: HTMLElement
 ): HTMLInputElement | null {
   // Limit candidates to text-like fields. Checkboxes and buttons otherwise
   // become "unknown" candidates and can steal the username association.
@@ -338,7 +373,7 @@ export function detectForms(root: FormSearchRoot): DetectedForm[] {
   // Include password fields that a site's show-password control temporarily
   // changes to text while retaining password semantics.
   const passwordFields = querySelectorAllDeep<HTMLInputElement>(root, 'input').filter(
-    (input) => isPasswordLikeField(input) && isEligibleField(input),
+    (input) => isPasswordLikeField(input) && isEligibleField(input)
   );
 
   for (const passwordField of passwordFields) {
@@ -352,7 +387,7 @@ export function detectForms(root: FormSearchRoot): DetectedForm[] {
       shadowHost?.parentElement ??
       (passwordField.parentElement as HTMLElement | null);
 
-    const container = formElement ?? (root instanceof Document ? root.body : root as HTMLElement);
+    const container = formElement ?? (root instanceof Document ? root.body : (root as HTMLElement));
 
     const usernameField = findUsernameField(passwordField, container as HTMLElement);
     const submitButton = findSubmitButton(container as HTMLElement);
@@ -372,8 +407,36 @@ export function detectForms(root: FormSearchRoot): DetectedForm[] {
 /** Detect visible one-time-code fields, including form-less verification steps. */
 export function detectOtpFields(root: FormSearchRoot): HTMLInputElement[] {
   return querySelectorAllDeep<HTMLInputElement>(root, 'input').filter(
-    (input) => isEligibleField(input) && detectFieldType(input) === 'otp',
+    (input) => isEligibleField(input) && detectFieldType(input) === 'otp'
   );
+}
+
+/**
+ * Detect username-only sign-in steps without confusing account-creation,
+ * verification-code, or identity forms for a password-login step.
+ */
+export function detectStandaloneUsernameFields(root: FormSearchRoot): HTMLInputElement[] {
+  const loginUsernames = new Set(
+    detectForms(root).flatMap((form) => (form.usernameField ? [form.usernameField] : []))
+  );
+  const identityFields = new Set(
+    detectIdentityForms(root).flatMap((form) => Object.values(form.fields))
+  );
+  const otpFields = new Set(detectOtpFields(root));
+
+  return querySelectorAllDeep<HTMLInputElement>(root, 'input').filter((input) => {
+    if (!isEligibleField(input) || loginUsernames.has(input) || identityFields.has(input)) {
+      return false;
+    }
+    const fieldType = detectFieldType(input);
+    if (fieldType !== 'username' && fieldType !== 'email') return false;
+
+    const container = input.form ?? input.closest('form') ?? input.parentElement;
+    if (!container) return false;
+    return !querySelectorAllDeep<HTMLInputElement>(container, 'input').some((candidate) =>
+      otpFields.has(candidate)
+    );
+  });
 }
 
 /** Check if a URL domain matches a vault item URI. */
@@ -456,7 +519,9 @@ export function detectIdentityForms(root: FormSearchRoot): DetectedIdentityForm[
 
     processedForms.add(container);
 
-    const inputs = querySelectorAllDeep<HTMLInputElement>(container, 'input').filter(isEligibleField);
+    const inputs = querySelectorAllDeep<HTMLInputElement>(container, 'input').filter(
+      isEligibleField
+    );
 
     const fields: DetectedIdentityForm['fields'] = {};
 

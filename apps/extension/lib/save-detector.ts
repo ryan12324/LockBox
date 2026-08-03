@@ -17,6 +17,11 @@ export interface ExtractedCredentials {
 /** Response from the background script credential check. */
 export type CredentialCheckResult = 'new' | 'update' | 'match';
 
+export interface SaveDetectorOptions {
+  /** Resolve a username retained from an earlier step in the same sign-in. */
+  resolveUsername?: () => string | Promise<string>;
+}
+
 /** Banner dismiss timeout in milliseconds. */
 const BANNER_DISMISS_MS = 30_000;
 
@@ -31,11 +36,21 @@ export function extractCredentials(form: HTMLFormElement): ExtractedCredentials 
   const forms = detectForms(form);
   if (forms.length === 0) return null;
 
-  const detected = forms[0];
+  const detected =
+    forms.find(
+      (candidate) => candidate.passwordPurpose === 'new' && Boolean(candidate.passwordField.value)
+    ) ??
+    forms.find(
+      (candidate) => candidate.passwordPurpose !== 'new' && Boolean(candidate.passwordField.value)
+    ) ??
+    forms[0];
   const password = detected.passwordField?.value;
   if (!password) return null;
 
-  const username = detected.usernameField?.value ?? '';
+  const username =
+    detected.usernameField?.value ??
+    forms.find((candidate) => Boolean(candidate.usernameField?.value))?.usernameField?.value ??
+    '';
 
   return {
     url: window.location.href,
@@ -251,13 +266,20 @@ export function injectSaveBanner(
 /**
  * Handle detected credentials by checking against vault and showing banner.
  */
-async function handleDetectedCredentials(creds: ExtractedCredentials): Promise<void> {
+async function handleDetectedCredentials(
+  creds: ExtractedCredentials,
+  options: SaveDetectorOptions
+): Promise<void> {
   if (!chrome.runtime?.id) return;
   try {
+    const resolvedUsername =
+      creds.username ||
+      (await Promise.resolve(options.resolveUsername?.() ?? '').catch(() => '')) ||
+      '';
     const response = (await chrome.runtime.sendMessage({
       type: 'check-credentials',
       url: creds.url,
-      username: creds.username,
+      username: resolvedUsername,
       password: creds.password,
     })) as { result?: CredentialCheckResult; itemId?: string; error?: string };
 
@@ -277,7 +299,7 @@ async function handleDetectedCredentials(creds: ExtractedCredentials): Promise<v
           .sendMessage({
             type: msgType,
             url: creds.url,
-            username: creds.username,
+            username: resolvedUsername,
             password: creds.password,
             itemId: response.itemId,
           })
@@ -296,7 +318,7 @@ async function handleDetectedCredentials(creds: ExtractedCredentials): Promise<v
  * Initialize the save-on-submit detector.
  * Monitors form submissions and intercepts AJAX requests with credentials.
  */
-export function initSaveDetector(signal?: AbortSignal): void {
+export function initSaveDetector(signal?: AbortSignal, options: SaveDetectorOptions = {}): void {
   // 1. Monitor form submit events
   document.addEventListener(
     'submit',
@@ -306,7 +328,7 @@ export function initSaveDetector(signal?: AbortSignal): void {
 
       const creds = extractCredentials(form);
       if (creds) {
-        handleDetectedCredentials(creds).catch(() => {});
+        handleDetectedCredentials(creds, options).catch(() => {});
       }
     },
     { capture: true, signal }
@@ -327,7 +349,7 @@ export function initSaveDetector(signal?: AbortSignal): void {
         if (creds) {
           // Use page URL as the credential URL, not the API endpoint
           creds.url = window.location.href;
-          handleDetectedCredentials(creds).catch(() => {});
+          handleDetectedCredentials(creds, options).catch(() => {});
         }
       }
     } catch {
@@ -361,7 +383,7 @@ export function initSaveDetector(signal?: AbortSignal): void {
       if (method === 'POST' && typeof body === 'string') {
         const creds = extractCredentialsFromPayload(window.location.href, body);
         if (creds) {
-          handleDetectedCredentials(creds).catch(() => {});
+          handleDetectedCredentials(creds, options).catch(() => {});
         }
       }
     } catch {

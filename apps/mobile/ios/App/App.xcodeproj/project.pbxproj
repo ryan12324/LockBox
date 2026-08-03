@@ -34,16 +34,25 @@
 		AE02407F02EBD3B06819DF60 /* CredentialIdentityStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0236FE565DC3F4F6451A69BA /* CredentialIdentityStore.swift */; };
 		B05CF607D7540E255398A7CC /* AuthwellDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 395B04024644F25D44699C3F /* AuthwellDatabase.swift */; };
 		B268832566F45EDB24D36F97 /* AuthenticationServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 42FE99E089EACACD589512F5 /* AuthenticationServices.framework */; };
+		C640B2AB6BD51870B47B6CE5 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 14B71BE0721B13A2AFC85117 /* Foundation.framework */; };
 		CE11CE6BEAD9E737AF431C08 /* BiometricPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15E8C95CDC4E865C2937C29A /* BiometricPlugin.swift */; };
 		CEC7E52BB62EF33A449BBC24 /* CryptoKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 48AFDD4D914E1B09D0BD2CD1 /* CryptoKit.framework */; };
 		CEE6663BEDC992B34777E046 /* AutofillPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EEFC2BAC052E2C8F9F96A57 /* AutofillPlugin.swift */; };
 		D5DA4263891DB5B6A4E93626 /* StoragePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B6FDEFFBA6CDEEC3FAE632E /* StoragePlugin.swift */; };
 		D8A4286CE0F4B0D6782A7EB7 /* AuthwellShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = F407506079146FF5B409344A /* AuthwellShared.swift */; };
+		E9BC0569EC37167F8F420566 /* AutofillMatrixUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 395FF378AFAB8720B1D67B5C /* AutofillMatrixUITests.swift */; };
 		F2ADF9650B90128A3F97AD75 /* LocalAuthentication.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 637BC99CC1AFE7D64960E9F6 /* LocalAuthentication.framework */; };
 		F3F70749F3051F6501D59418 /* CredentialIdentityStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0236FE565DC3F4F6451A69BA /* CredentialIdentityStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		5D4464DB99025A68DEE90D4E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 504EC3031FED79650016851F;
+			remoteInfo = App;
+		};
 		C317F2A90A119E4CB61BCE1D /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
@@ -75,7 +84,9 @@
 		250E09F2FCA83AC407CA888D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		26E596C3A5DFF27BA516BE10 /* libsqlite3.tbd */ = {isa = PBXFileReference; includeInIndex = 1; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		331E5A83388C40374655F42D /* AuthwellUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AuthwellUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		395B04024644F25D44699C3F /* AuthwellDatabase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthwellDatabase.swift; sourceTree = "<group>"; };
+		395FF378AFAB8720B1D67B5C /* AutofillMatrixUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutofillMatrixUITests.swift; sourceTree = "<group>"; };
 		3EF0F3C4EC77156AE4AE6652 /* CredentialProviderViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CredentialProviderViewController.swift; sourceTree = "<group>"; };
 		42FE99E089EACACD589512F5 /* AuthenticationServices.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AuthenticationServices.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/AuthenticationServices.framework; sourceTree = DEVELOPER_DIR; };
 		47485C2C432A23113E670F48 /* CredentialProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CredentialProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -118,6 +129,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B58370840EF8A426113BCD64 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C640B2AB6BD51870B47B6CE5 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C99C6012D676BBF6362B41E4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -156,6 +175,15 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		3A59994FF14C7CB549A476B1 /* AuthwellUITests */ = {
+			isa = PBXGroup;
+			children = (
+				395FF378AFAB8720B1D67B5C /* AutofillMatrixUITests.swift */,
+			);
+			name = AuthwellUITests;
+			path = UITests;
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
@@ -165,6 +193,7 @@
 				27E2DDA53C4D2A4D1A88CE4A /* Frameworks */,
 				DB39F471735F83842370A198 /* Shared */,
 				D26B7838C104AEAED06506F2 /* CredentialProvider */,
+				3A59994FF14C7CB549A476B1 /* AuthwellUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -173,6 +202,7 @@
 			children = (
 				504EC3041FED79650016851F /* App.app */,
 				47485C2C432A23113E670F48 /* CredentialProvider.appex */,
+				331E5A83388C40374655F42D /* AuthwellUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -282,6 +312,24 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		821E88EE27BF5C17DCEB587B /* AuthwellUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EEB87A6A0D2340ADC08F374C /* Build configuration list for PBXNativeTarget "AuthwellUITests" */;
+			buildPhases = (
+				EE174B48962B897A649326FB /* Sources */,
+				B58370840EF8A426113BCD64 /* Frameworks */,
+				9D87A1F6C0C10AEAB144AA63 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				71599EB003465BB7BD9ECB7A /* PBXTargetDependency */,
+			);
+			name = AuthwellUITests;
+			productName = AuthwellUITests;
+			productReference = 331E5A83388C40374655F42D /* AuthwellUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -313,6 +361,7 @@
 			targets = (
 				504EC3031FED79650016851F /* App */,
 				1F8935891D544BE7FEAF19F0 /* CredentialProvider */,
+				821E88EE27BF5C17DCEB587B /* AuthwellUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -335,6 +384,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				56AA05FE72BC004DE2E7B72A /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		9D87A1F6C0C10AEAB144AA63 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -406,6 +462,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		EE174B48962B897A649326FB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E9BC0569EC37167F8F420566 /* AutofillMatrixUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -414,6 +478,12 @@
 			name = CredentialProvider;
 			target = 1F8935891D544BE7FEAF19F0 /* CredentialProvider */;
 			targetProxy = C317F2A90A119E4CB61BCE1D /* PBXContainerItemProxy */;
+		};
+		71599EB003465BB7BD9ECB7A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = App;
+			target = 504EC3031FED79650016851F /* App */;
+			targetProxy = 5D4464DB99025A68DEE90D4E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -608,6 +678,22 @@
 			};
 			name = Release;
 		};
+		9BCCA938B0A82776A56D2788 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.lockbox.app.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = App;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		A212E8985D540680D48F3B5A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -627,6 +713,21 @@
 				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AB8A00C1663F9881833C555C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.lockbox.app.uitests;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = App;
 			};
 			name = Debug;
 		};
@@ -656,6 +757,15 @@
 			buildConfigurations = (
 				6E071DEC774D8A82E9E56B76 /* Release */,
 				A212E8985D540680D48F3B5A /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EEB87A6A0D2340ADC08F374C /* Build configuration list for PBXNativeTarget "AuthwellUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9BCCA938B0A82776A56D2788 /* Release */,
+				AB8A00C1663F9881833C555C /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

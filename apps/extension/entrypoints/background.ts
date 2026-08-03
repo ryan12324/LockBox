@@ -71,8 +71,15 @@ import {
   setInlineAutofillForHost,
 } from '../lib/storage.js';
 import { urlMatchesUri } from '../lib/form-detector.js';
+import {
+  getAutofillE2eItem,
+  handleAutofillE2eControl,
+  resetAutofillE2e,
+  updateAutofillE2ePassword,
+} from '~/lib/autofill-e2e.js';
 
 const ALIAS_API_KEY_AAD = toUtf8('lockbox:alias-api-key:v1');
+const REMEMBERED_LOGIN_TTL_MS = 10 * 60 * 1000;
 
 async function decryptAliasApiKey(encryptedApiKey: string, key: Uint8Array): Promise<string> {
   try {
@@ -114,6 +121,10 @@ let cachedBreachStatus: {
 };
 const phishingDetector = new PhishingDetector();
 let searchEngine: SemanticSearch | null = null;
+const rememberedLoginSelections = new Map<
+  number,
+  { origin: string; itemId: string; username: string; rememberedAt: number }
+>();
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
 
 async function decryptVaultItem(
@@ -295,6 +306,8 @@ function lock() {
   teams = [];
   sharedFoldersList = [];
   hasKeyPairFlag = false;
+  resetAutofillE2e();
+  rememberedLoginSelections.clear();
   chrome.alarms.clear(LOCK_ALARM);
 }
 
@@ -464,6 +477,20 @@ const refreshVaultItem = createItemRefreshCoordinator<VaultItem>({
   },
 });
 
+async function refreshVaultItemForUse(itemId: string): Promise<VaultItem> {
+  const e2eItem = getAutofillE2eItem();
+  if (e2eItem?.id === itemId) return e2eItem;
+  return refreshVaultItem(itemId);
+}
+
+function senderOrigin(senderUrl?: string): string | null {
+  try {
+    return senderUrl ? new URL(senderUrl).origin : null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Message handlers ─────────────────────────────────────────────────────────
 
 type Message =
@@ -538,7 +565,17 @@ type Message =
   | { type: 'set-lock-timeout'; minutes: number }
   | { type: 'get-inline-autofill-settings'; url?: string }
   | { type: 'set-inline-autofill-enabled'; enabled: boolean }
-  | { type: 'set-site-inline-autofill'; url: string; enabled: boolean };
+  | { type: 'set-site-inline-autofill'; url: string; enabled: boolean }
+  | { type: 'remember-login-selection'; itemId: string; username: string }
+  | { type: 'get-remembered-login-selection' }
+  | {
+      type: 'e2e-seed-autofill';
+      origin: string;
+      username: string;
+      password: string;
+      totp?: string;
+    }
+  | { type: 'e2e-reset-autofill' };
 
 /** Sign a passkey assertion for a specific credentialId. Shared by WEBAUTHN_GET and WEBAUTHN_GET_SELECTED. */
 async function signPasskeyAssertion(
@@ -639,7 +676,16 @@ async function handleMessage(
   message: Message,
   senderUrl?: string,
   senderTabUrl?: string,
+  senderTabId?: number
 ): Promise<unknown> {
+  const e2eControl = handleAutofillE2eControl(message);
+  if (e2eControl.handled) {
+    if (e2eControl.enableInlineAutofill) {
+      await setInlineAutofillEnabled(true);
+    }
+    return e2eControl.response;
+  }
+
   switch (message.type) {
     case 'unlock': {
       const { email, password } = message;
@@ -713,6 +759,12 @@ async function handleMessage(
     }
 
     case 'get-matches': {
+      const e2eItem = getAutofillE2eItem();
+      if (e2eItem) {
+        return {
+          items: e2eItem.uris.some((uri) => urlMatchesUri(message.url, uri)) ? [e2eItem] : [],
+        };
+      }
       if (!userKey) return { items: [] };
       try {
         const token = await getSessionToken();
@@ -728,6 +780,8 @@ async function handleMessage(
     }
 
     case 'get-vault': {
+      const e2eItem = getAutofillE2eItem();
+      if (e2eItem) return { items: [e2eItem], folders: [], locked: false };
       if (!userKey) return { items: [], locked: true };
       try {
         const token = await getSessionToken();
@@ -758,7 +812,7 @@ async function handleMessage(
 
     case 'get-item-totp': {
       try {
-        const item = await refreshVaultItem(message.itemId);
+        const item = await refreshVaultItemForUse(message.itemId);
         if (item.type !== 'login' || !(item as LoginItem).totp) {
           return { code: null, remaining: 0, error: 'This item has no authenticator key.' };
         }
@@ -774,7 +828,7 @@ async function handleMessage(
 
     case 'refresh-item': {
       try {
-        return { success: true, item: await refreshVaultItem(message.itemId) };
+        return { success: true, item: await refreshVaultItemForUse(message.itemId) };
       } catch (error) {
         return {
           success: false,
@@ -786,7 +840,7 @@ async function handleMessage(
     case 'refresh-matching-login': {
       if (!senderUrl) return { success: false, error: 'The requesting page is unavailable.' };
       try {
-        const item = await refreshVaultItem(message.itemId);
+        const item = await refreshVaultItemForUse(message.itemId);
         if (
           item.type !== 'login' ||
           !(item as LoginItem).uris.some((uri) => urlMatchesUri(senderUrl, uri))
@@ -820,7 +874,7 @@ async function handleMessage(
     }
 
     case 'is-unlocked': {
-      return { unlocked: userKey !== null };
+      return { unlocked: userKey !== null || getAutofillE2eItem() !== null };
     }
 
     case 'open-popup': {
@@ -873,6 +927,40 @@ async function handleMessage(
       if (!host) return { success: false, error: 'A valid web page is required.' };
       await setInlineAutofillForHost(host, message.enabled);
       return { success: true, enabled: message.enabled, host };
+    }
+
+    case 'remember-login-selection': {
+      const origin = senderOrigin(senderUrl);
+      if (
+        senderTabId === undefined ||
+        !origin ||
+        message.itemId.length > 128 ||
+        message.username.length > 10_000
+      ) {
+        return { success: false };
+      }
+      rememberedLoginSelections.set(senderTabId, {
+        origin,
+        itemId: message.itemId,
+        username: message.username,
+        rememberedAt: Date.now(),
+      });
+      return { success: true };
+    }
+
+    case 'get-remembered-login-selection': {
+      const origin = senderOrigin(senderUrl);
+      if (senderTabId === undefined || !origin) return {};
+      const remembered = rememberedLoginSelections.get(senderTabId);
+      if (
+        !remembered ||
+        remembered.origin !== origin ||
+        Date.now() - remembered.rememberedAt > REMEMBERED_LOGIN_TTL_MS
+      ) {
+        rememberedLoginSelections.delete(senderTabId);
+        return {};
+      }
+      return { itemId: remembered.itemId, username: remembered.username };
     }
 
     // ─── Vault item CRUD ───────────────────────────────────────────────────
@@ -1173,11 +1261,12 @@ async function handleMessage(
     // ─── Credential save/update detection ──────────────────────────────
 
     case 'check-credentials': {
-      if (!userKey) return { result: 'new' as const };
+      const e2eItem = getAutofillE2eItem();
+      if (!userKey && !e2eItem) return { result: 'new' as const };
       const { url, username, password } = message;
       try {
         new URL(url);
-        const candidates: VaultItem[] = [...vaultItems.values()];
+        const candidates: VaultItem[] = [...vaultItems.values(), ...(e2eItem ? [e2eItem] : [])];
         for (const folderItems of sharedItems.values()) {
           candidates.push(...folderItems);
         }
@@ -1189,7 +1278,7 @@ async function handleMessage(
           ) {
             continue;
           }
-          const refreshed = await refreshVaultItem(candidate.id);
+          const refreshed = await refreshVaultItemForUse(candidate.id);
           if (refreshed.type !== 'login') continue;
           const login = refreshed as LoginItem;
           if (!(login.uris ?? []).some((uri) => urlMatchesUri(url, uri))) continue;
@@ -1209,6 +1298,7 @@ async function handleMessage(
     }
 
     case 'save-credentials': {
+      if (getAutofillE2eItem()) return { success: true };
       if (!userKey) return { success: false, error: 'Vault is locked' };
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
@@ -1258,6 +1348,11 @@ async function handleMessage(
     }
 
     case 'update-credentials': {
+      if (getAutofillE2eItem()) {
+        return updateAutofillE2ePassword(message.itemId, message.password)
+          ? { success: true }
+          : { success: false, error: 'Item not found' };
+      }
       if (!userKey) return { success: false, error: 'Vault is locked' };
       const token = await getSessionToken();
       if (!token) return { success: false, error: 'Not authenticated' };
@@ -1425,7 +1520,7 @@ async function handleMessage(
           const encryptedApiKey = await encryptString(
             apiKey,
             userKey.slice(0, 32),
-            ALIAS_API_KEY_AAD,
+            ALIAS_API_KEY_AAD
           );
           await api.aliases.saveConfig({ provider, encryptedApiKey, baseUrl }, token);
         }
@@ -1466,7 +1561,7 @@ async function handleMessage(
             apiKey,
             baseUrl: config.baseUrl ?? undefined,
           },
-          token,
+          token
         );
         return { success: true, alias: res.alias.email };
       } catch (err) {
@@ -1491,7 +1586,9 @@ async function handleMessage(
         if (
           !isValidBase64url(createOpts.challenge, 16, 1024) ||
           !isValidBase64url(createOpts.user.id, 1, 64) ||
-          !createOpts.pubKeyCredParams.some((param) => param.type === 'public-key' && param.alg === -7) ||
+          !createOpts.pubKeyCredParams.some(
+            (param) => param.type === 'public-key' && param.alg === -7
+          ) ||
           createOpts.authenticatorSelection?.userVerification === 'required' ||
           createOpts.authenticatorSelection?.authenticatorAttachment === 'cross-platform'
         ) {
@@ -1502,18 +1599,15 @@ async function handleMessage(
           (createOpts.excludeCredentials ?? [])
             .filter(
               (credential) =>
-                credential.type === 'public-key' &&
-                isValidBase64url(credential.id, 1, 1024)
+                credential.type === 'public-key' && isValidBase64url(credential.id, 1, 1024)
             )
             .map((credential) => credential.id)
         );
-        const alreadyRegistered = Array.from(vaultItems.values()).some(
-          (item) => {
-            if (item.type !== 'passkey') return false;
-            const passkey = item as PasskeyItem;
-            return passkey.rpId === rpId && excludedIds.has(passkey.credentialId);
-          }
-        );
+        const alreadyRegistered = Array.from(vaultItems.values()).some((item) => {
+          if (item.type !== 'passkey') return false;
+          const passkey = item as PasskeyItem;
+          return passkey.rpId === rpId && excludedIds.has(passkey.credentialId);
+        });
         if (alreadyRegistered) {
           return {
             error: 'A passkey is already registered for this account.',
@@ -1623,8 +1717,7 @@ async function handleMessage(
           getOpts.userVerification === 'required' ||
           (getOpts.allowCredentials ?? []).some(
             (credential) =>
-              credential.type !== 'public-key' ||
-              !isValidBase64url(credential.id, 1, 1024)
+              credential.type !== 'public-key' || !isValidBase64url(credential.id, 1, 1024)
           )
         ) {
           return { fallback: true };
@@ -1925,10 +2018,14 @@ async function handleMessage(
 
 export default defineBackground(() => {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    handleMessage(message as Message, sender.url, sender.tab?.url)
+    handleMessage(message as Message, sender.url, sender.tab?.url, sender.tab?.id)
       .then(sendResponse)
       .catch((err) => sendResponse({ error: err.message }));
     return true; // Keep message channel open for async response
+  });
+
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    rememberedLoginSelections.delete(tabId);
   });
 
   // WebNavigation phishing check

@@ -88,6 +88,23 @@ describe('extractCredentials', () => {
 
     document.body.removeChild(form);
   });
+
+  it('prefers the first new password when a password-change form is submitted', () => {
+    const form = document.createElement('form');
+    form.innerHTML = `
+      <input name="username" autocomplete="username" value="person@example.com" />
+      <input type="password" autocomplete="current-password" value="old-password" />
+      <input type="password" autocomplete="new-password" value="new-password" />
+      <input type="password" autocomplete="new-password" value="new-password" />
+    `;
+    document.body.appendChild(form);
+
+    expect(extractCredentials(form)).toMatchObject({
+      username: 'person@example.com',
+      password: 'new-password',
+    });
+    form.remove();
+  });
 });
 
 // ─── extractCredentialsFromPayload ─────────────────────────────────────────────

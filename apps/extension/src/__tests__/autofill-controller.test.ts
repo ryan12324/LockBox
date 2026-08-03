@@ -8,10 +8,11 @@ function createController(enabled = true): AutofillOverlayController {
     document,
     {
       onLogin: vi.fn(),
+      onUsername: vi.fn(),
       onIdentity: vi.fn(),
       onOtp: vi.fn(),
     },
-    { enabled },
+    { enabled }
   );
 }
 
@@ -64,7 +65,7 @@ describe('AutofillOverlayController', () => {
     const secret = document.querySelector<HTMLInputElement>('[name="secret"]')!;
     controller = createController();
     controller.start();
-    expect(controller.overlayCount).toBe(0);
+    expect(controller.overlayCount).toBe(1);
 
     secret.type = 'password';
     await settleMutations();
@@ -72,7 +73,7 @@ describe('AutofillOverlayController', () => {
 
     secret.disabled = true;
     await settleMutations();
-    expect(controller.overlayCount).toBe(0);
+    expect(controller.overlayCount).toBe(1);
 
     secret.disabled = false;
     await settleMutations();
@@ -138,6 +139,29 @@ describe('AutofillOverlayController', () => {
     controller = createController();
     controller.start();
     expect(controller.overlayCount).toBe(0);
+  });
+
+  it('offers a login on a username-only step but not a verification-code step', () => {
+    document.body.innerHTML = `
+      <form id="username-step">
+        <input name="username" autocomplete="username" />
+      </form>
+      <form id="verification-step">
+        <input name="verification-user" autocomplete="username" />
+        <input name="code" autocomplete="one-time-code" />
+      </form>
+    `;
+    controller = createController();
+    controller.start();
+
+    const username = document.querySelector<HTMLInputElement>('#username-step input')!;
+    const verificationUser = document.querySelector<HTMLInputElement>(
+      '#verification-step [name="verification-user"]'
+    )!;
+    const code = document.querySelector<HTMLInputElement>('[name="code"]')!;
+    expect(controller.getOverlayHost(username)).not.toBeNull();
+    expect(controller.getOverlayHost(verificationUser)).toBeNull();
+    expect(controller.getOverlayHost(code)).not.toBeNull();
   });
 
   it('can be disabled and re-enabled without leaving orphaned controls', async () => {

@@ -29,10 +29,7 @@ import {
 import type { VaultItem, LoginItem, IdentityItem } from '@lockbox/types';
 import { iconifySvg } from '../lib/iconify.js';
 import { createLockboxBrand, INJECTED_BRAND_STYLES } from '../lib/injected-brand.js';
-import {
-  INLINE_AUTOFILL_DISABLED_HOSTS_KEY,
-  INLINE_AUTOFILL_ENABLED_KEY,
-} from '../lib/storage.js';
+import { INLINE_AUTOFILL_DISABLED_HOSTS_KEY, INLINE_AUTOFILL_ENABLED_KEY } from '../lib/storage.js';
 
 /** Send a message to the background service worker. */
 async function sendMessage<T>(message: object): Promise<T> {
@@ -111,11 +108,19 @@ async function refreshMatchingLoginForUse(itemId: string): Promise<LoginItem> {
   return result.item as LoginItem;
 }
 
+async function rememberLoginSelection(item: LoginItem): Promise<void> {
+  await sendMessage({
+    type: 'remember-login-selection',
+    itemId: item.id,
+    username: item.username,
+  }).catch(() => {});
+}
+
 /** Handle autofill for a detected form. */
 function resolveLiveLoginForm(passwordField: HTMLInputElement): DetectedForm | null {
   return (
     detectForms(document).find(
-      (form) => form.passwordField === passwordField && form.passwordPurpose !== 'new',
+      (form) => form.passwordField === passwordField && form.passwordPurpose !== 'new'
     ) ?? null
   );
 }
@@ -178,6 +183,7 @@ async function handleAutofill(form: DetectedForm): Promise<void> {
       const freshItem = await refreshItemForUse(loginItems[0].id, 'login');
       const liveForm = resolveLiveLoginForm(passwordField);
       if (!liveForm || !fillForm(liveForm, freshItem.username, freshItem.password)) return;
+      void rememberLoginSelection(freshItem);
       filledItem = freshItem;
     } catch {
       createStatusDropdown(passwordField, 'error', [
@@ -203,6 +209,7 @@ async function handleAutofill(form: DetectedForm): Promise<void> {
               const freshItem = await refreshItemForUse(item.id, 'login');
               const liveForm = resolveLiveLoginForm(passwordField);
               if (!liveForm || !fillForm(liveForm, freshItem.username, freshItem.password)) return;
+              void rememberLoginSelection(freshItem);
               checkTwoFaAfterAutofill(freshItem).catch(() => {});
             } catch {
               createStatusDropdown(passwordField, 'error', [
@@ -232,9 +239,8 @@ async function fillLoginFromPopup(itemId: string): Promise<{ success: boolean; e
 
   const focused = document.activeElement;
   const preferred =
-    forms.find(
-      (form) => form.passwordField === focused || form.usernameField === focused,
-    ) ?? forms[0];
+    forms.find((form) => form.passwordField === focused || form.usernameField === focused) ??
+    forms[0];
 
   try {
     const item = await refreshMatchingLoginForUse(itemId);
@@ -242,6 +248,7 @@ async function fillLoginFromPopup(itemId: string): Promise<{ success: boolean; e
     if (!liveForm || !fillForm(liveForm, item.username, item.password)) {
       return { success: false, error: 'The login form changed before Authwell could fill it.' };
     }
+    void rememberLoginSelection(item);
     checkTwoFaAfterAutofill(item).catch(() => {});
     return { success: true };
   } catch (error) {
@@ -249,6 +256,63 @@ async function fillLoginFromPopup(itemId: string): Promise<{ success: boolean; e
       success: false,
       error: error instanceof Error ? error.message : 'Authwell could not fill this login.',
     };
+  }
+}
+
+/** Fill a username-only first step while retaining only its item id and username. */
+async function handleUsernameAutofill(field: HTMLInputElement): Promise<void> {
+  if (!field.isConnected) return;
+  if (!(await isVaultUnlocked())) {
+    if (field.isConnected) {
+      createStatusDropdown(field, 'locked', [
+        { label: 'Open Authwell', onClick: () => openExtensionPopup() },
+      ]);
+    }
+    return;
+  }
+
+  let items: LoginItem[];
+  try {
+    items = (await getMatchingItems()).filter((item): item is LoginItem => item.type === 'login');
+  } catch {
+    if (field.isConnected) {
+      createStatusDropdown(field, 'error', [
+        { label: 'Retry', onClick: () => void handleUsernameAutofill(field) },
+      ]);
+    }
+    return;
+  }
+  if (!field.isConnected) return;
+
+  const fillUsername = async (itemId: string) => {
+    const item = await refreshItemForUse(itemId, 'login');
+    if (!field.isConnected || !simulateFill(field, item.username)) return;
+    await rememberLoginSelection(item);
+  };
+
+  if (items.length === 0) {
+    createStatusDropdown(field, 'no-matches', [
+      { label: 'Open Authwell', onClick: () => openExtensionPopup() },
+    ]);
+  } else if (items.length === 1) {
+    await fillUsername(items[0].id).catch(() => {
+      if (field.isConnected) {
+        createStatusDropdown(field, 'error', [
+          { label: 'Retry', onClick: () => void handleUsernameAutofill(field) },
+        ]);
+      }
+    });
+  } else {
+    createSuggestionDropdown(
+      field,
+      items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        username: item.username,
+        uris: item.uris,
+      })),
+      (selected) => void fillUsername(selected.id)
+    );
   }
 }
 
@@ -687,7 +751,7 @@ export default defineContentScript({
 
     const storageChangeListener = (
       changes: Record<string, chrome.storage.StorageChange>,
-      areaName: string,
+      areaName: string
     ) => {
       if (
         areaName === 'local' &&
@@ -704,15 +768,23 @@ export default defineContentScript({
         document,
         {
           onLogin: (form) => handleAutofill(form),
+          onUsername: (field) => handleUsernameAutofill(field),
           onIdentity: (form) => handleIdentityAutofill(form),
           onOtp: (field) => handleTotpAutofill(field),
         },
-        { enabled: false },
+        { enabled: false }
       );
       overlayController.start();
       void applyInlineAutofillPreferences();
       // Initialize save-on-submit detection
-      initSaveDetector(ctx.signal);
+      initSaveDetector(ctx.signal, {
+        resolveUsername: async () => {
+          const result: { username?: string } = await sendMessage<{ username?: string }>({
+            type: 'get-remembered-login-selection',
+          }).catch((): { username?: string } => ({}));
+          return result.username ?? '';
+        },
+      });
     }
 
     if (document.readyState === 'loading') {
@@ -989,7 +1061,7 @@ export default defineContentScript({
         fillLoginFromPopup(message.itemId)
           .then(sendResponse)
           .catch(() =>
-            sendResponse({ success: false, error: 'Authwell could not fill this login.' }),
+            sendResponse({ success: false, error: 'Authwell could not fill this login.' })
           );
         return true;
       } else if (message.type === 'get-password-field-metadata') {

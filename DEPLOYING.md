@@ -256,13 +256,23 @@ Open the CocoaPods workspace and select an Apple development team for both `App`
 open apps/mobile/ios/App/App.xcworkspace
 ```
 
+Run the iOS Simulator AutoFill form matrix before archiving:
+
+```bash
+bun run ios:test:autofill
+```
+
+The suite covers all 12 `/test` form contracts in the real Capacitor app. The
+AuthenticationServices provider still uses the Simulator's normal Password
+AutoFill enablement setting; no release code or test bypass enables it silently.
+
 The committed targets use these identifiers:
 
-| Target or capability | Identifier |
-| -------------------- | ---------- |
-| App | `dev.lockbox.app` |
-| AutoFill extension | `dev.lockbox.app.autofill` |
-| Shared App Group | `group.dev.lockbox.app` |
+| Target or capability | Identifier                 |
+| -------------------- | -------------------------- |
+| App                  | `dev.lockbox.app`          |
+| AutoFill extension   | `dev.lockbox.app.autofill` |
+| Shared App Group     | `group.dev.lockbox.app`    |
 
 Enable the AutoFill Credential Provider capability and App Group for both App IDs in the Apple Developer portal. The shared Keychain group in the committed entitlements is expanded with your team prefix at signing time. If these identifiers belong to another team, replace them consistently in the Xcode project, both entitlement files, both Info plists, `AuthwellShared.swift`, and `scripts/configure-ios-project.rb`.
 
@@ -282,20 +292,20 @@ Authwell implements and uses encryption, so the App Store Connect account owner 
 
 The required Cloudflare repository secrets are:
 
-| Secret                         | Purpose                                      |
-| ------------------------------ | -------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`         | Worker, D1, R2, and Pages deployment         |
-| `CLOUDFLARE_ACCOUNT_ID`        | Target Cloudflare account                    |
-| `TOTP_ENCRYPTION_KEY`          | Stable 32-byte Base64 account TOTP key       |
+| Secret                         | Purpose                                       |
+| ------------------------------ | --------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`         | Worker, D1, R2, and Pages deployment          |
+| `CLOUDFLARE_ACCOUNT_ID`        | Target Cloudflare account                     |
+| `TOTP_ENCRYPTION_KEY`          | Stable 32-byte Base64 account TOTP key        |
 | `TOTP_ENCRYPTION_KEY_PREVIOUS` | Optional old key during a controlled rotation |
 
 The API deployment also requires these repository variables:
 
-| Variable                    | Required    | Purpose                                  |
-| --------------------------- | ----------- | ---------------------------------------- |
-| `CLOUDFLARE_D1_DATABASE_ID` | Yes         | Real UUID for `lockbox-vault`            |
-| `CORS_ORIGINS`              | Recommended | Exact comma-separated web/mobile origins |
-| `EXTENSION_IDS`             | Optional    | Comma-separated extension origin IDs     |
+| Variable                    | Required    | Purpose                                       |
+| --------------------------- | ----------- | --------------------------------------------- |
+| `CLOUDFLARE_D1_DATABASE_ID` | Yes         | Real UUID for `lockbox-vault`                 |
+| `CORS_ORIGINS`              | Recommended | Exact comma-separated web/mobile origins      |
+| `EXTENSION_IDS`             | Optional    | Comma-separated extension origin IDs          |
 | `REGISTRATION_ENABLED`      | Optional    | Set `false` to pause creation of new accounts |
 
 Web and mobile workflows require:
