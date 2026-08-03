@@ -61,6 +61,7 @@ describe('autofill test lab', () => {
     expect(
       screen.getByRole('textbox', { name: 'One-time code' }).getAttribute('autocomplete')
     ).toBe('one-time-code');
+    expect(screen.getByText('Expect verification code only')).toBeInTheDocument();
     expect(screen.queryByRole('textbox', { name: 'Password' })).toBeNull();
   });
 

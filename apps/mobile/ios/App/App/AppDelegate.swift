@@ -30,6 +30,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        if let scheme = url.scheme?.lowercased(),
+           scheme == "otpauth" || scheme == "otpauth-migration" {
+            do {
+                _ = try NativeCredentialCapture.captureTotpSetup(url: url)
+            } catch {
+                // Capacitor still receives the URL so the unlocked app can show
+                // a useful validation or sign-in message without persisting it.
+            }
+        }
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 

@@ -20,12 +20,24 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>dev.lockbox.app.verification-codes</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>otpauth</string>
+				<string>otpauth-migration</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Authwell uses Face ID to unlock your encrypted vault, passwords, and passkeys.</string>
+	<string>Authwell uses Face ID to unlock your encrypted vault, passwords, passkeys, and verification codes.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

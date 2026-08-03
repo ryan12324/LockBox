@@ -8,11 +8,13 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     private enum Choice {
         case password(AutofillRecord, name: String, username: String, password: String)
         case passkey(PasskeyRecord)
+        case oneTimeCode(TotpRecord)
 
         var title: String {
             switch self {
             case .password(_, let name, _, _): return name
             case .passkey(let record): return record.userName
+            case .oneTimeCode(let record): return record.displayLabel
             }
         }
 
@@ -20,6 +22,7 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
             switch self {
             case .password(_, _, let username, _): return username
             case .passkey(let record): return "Passkey · \(record.rpName)"
+            case .oneTimeCode: return "Verification code"
             }
         }
     }
@@ -81,6 +84,14 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         unlockAndLoad(serviceIdentifiers: serviceIdentifiers, passkeyParameters: requestParameters)
     }
 
+    @available(iOS 18.0, *)
+    override func prepareOneTimeCodeCredentialList(
+        for serviceIdentifiers: [ASCredentialServiceIdentifier]
+    ) {
+        passkeyParameters = nil
+        unlockAndLoadOneTimeCodes(serviceIdentifiers: serviceIdentifiers)
+    }
+
     override func provideCredentialWithoutUserInteraction(
         for credentialRequest: ASCredentialRequest
     ) {
@@ -95,6 +106,10 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         } else if let passkeyRequest = credentialRequest as? ASPasskeyCredentialRequest,
                   let identity = passkeyRequest.credentialIdentity as? ASPasskeyCredentialIdentity {
             displayUsername = identity.userName
+        } else if #available(iOS 18.0, *),
+                  let codeRequest = credentialRequest as? ASOneTimeCodeCredentialRequest,
+                  let identity = codeRequest.credentialIdentity as? ASOneTimeCodeCredentialIdentity {
+            displayUsername = identity.label
         } else {
             displayUsername = ""
         }
@@ -110,6 +125,9 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
                     )
                 } else if let passkeyRequest = credentialRequest as? ASPasskeyCredentialRequest {
                     try self.completePasskey(request: passkeyRequest, context: context)
+                } else if #available(iOS 18.0, *),
+                          let codeRequest = credentialRequest as? ASOneTimeCodeCredentialRequest {
+                    try self.completeOneTimeCode(request: codeRequest, context: context)
                 } else {
                     throw AuthwellError.invalidArgument("Unsupported credential request")
                 }
@@ -119,6 +137,46 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
                 self.cancel(.credentialIdentityNotFound, message: error.localizedDescription)
             }
         }
+    }
+
+    @available(iOS 26.2, *)
+    override func performWithoutUserInteractionIfPossible(
+        savePasswordRequest: ASSavePasswordRequest
+    ) {
+        do {
+            let hasMatchingPassword = try NativeCredentialCapture.hasMatchingPassword(
+                username: savePasswordRequest.credential.user,
+                serviceIdentifier: savePasswordRequest.serviceIdentifier.identifier
+            )
+            let shouldConfirmOverwrite = savePasswordRequest.event == .formDidDisappear
+                && hasMatchingPassword
+            guard !shouldConfirmOverwrite else {
+                cancel(.userInteractionRequired, message: "Confirm the password update")
+                return
+            }
+            try savePassword(savePasswordRequest)
+        } catch {
+            cancel(.failed, message: error.localizedDescription)
+        }
+    }
+
+    @available(iOS 26.2, *)
+    override func prepareInterface(for savePasswordRequest: ASSavePasswordRequest) {
+        let username = AutofillPresentation.username(savePasswordRequest.credential.user)
+        let service = DomainIdentifier.normalize(savePasswordRequest.serviceIdentifier.identifier)
+            ?? savePasswordRequest.serviceIdentifier.identifier
+        let message = username.isEmpty
+            ? "Save this password for \(service) in your encrypted Authwell vault?"
+            : "Save or update the password for \(username) on \(service)?"
+        let alert = UIAlertController(title: "Save in Authwell", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel) { _ in
+            self.cancel(.userCanceled, message: "Password save cancelled")
+        })
+        alert.addAction(UIAlertAction(title: "Save", style: .default) { _ in
+            do { try self.savePassword(savePasswordRequest) }
+            catch { self.cancel(.failed, message: error.localizedDescription) }
+        })
+        present(alert, animated: true)
     }
 
     override func prepareInterface(forPasskeyRegistration registrationRequest: ASCredentialRequest) {
@@ -157,6 +215,43 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
                 DispatchQueue.main.async {
                     self.messageLabel.text = self.choices.isEmpty
                         ? "No matching credentials are stored in Authwell."
+                        : nil
+                    self.messageLabel.isHidden = !self.choices.isEmpty
+                    self.tableView.isHidden = self.choices.isEmpty
+                    self.tableView.reloadData()
+                }
+            } catch {
+                try? AutofillDiagnostics.recordFailure(error.localizedDescription)
+                self.cancel(.failed, message: error.localizedDescription)
+            }
+        }
+    }
+
+    @available(iOS 18.0, *)
+    private func unlockAndLoadOneTimeCodes(
+        serviceIdentifiers: [ASCredentialServiceIdentifier]
+    ) {
+        authenticate(reason: "Show your Authwell verification codes") { context in
+            do {
+                self.unlockedContext = context
+                let domains = Set(serviceIdentifiers.compactMap {
+                    DomainIdentifier.normalize($0.identifier)
+                })
+                var records: [String: TotpRecord] = [:]
+                for domain in domains {
+                    for record in try AuthwellDatabase.shared.matchingTotp(
+                        domainHash: DomainIdentifier.hash(domain)
+                    ) {
+                        records[record.id] = record
+                    }
+                }
+                self.choices = records.values.map(Choice.oneTimeCode).sorted {
+                    $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+                }
+                try? AutofillDiagnostics.recordRequest(matchCount: self.choices.count)
+                DispatchQueue.main.async {
+                    self.messageLabel.text = self.choices.isEmpty
+                        ? "No matching verification codes are stored in Authwell."
                         : nil
                     self.messageLabel.isHidden = !self.choices.isEmpty
                     self.tableView.isHidden = self.choices.isEmpty
@@ -237,6 +332,62 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
             withSelectedCredential: ASPasswordCredential(user: username, password: password),
             completionHandler: nil
         )
+    }
+
+    @available(iOS 18.0, *)
+    private func completeOneTimeCode(
+        request: ASOneTimeCodeCredentialRequest,
+        context: LAContext
+    ) throws {
+        guard let identity = request.credentialIdentity as? ASOneTimeCodeCredentialIdentity,
+              let id = identity.recordIdentifier,
+              let record = try AuthwellDatabase.shared.totp(id: id) else {
+            throw AuthwellError.invalidArgument("Verification code not found")
+        }
+        try completeOneTimeCode(record: record, context: context)
+    }
+
+    @available(iOS 18.0, *)
+    private func completeOneTimeCode(record: TotpRecord, context: LAContext) throws {
+        let plaintext = try DeviceIndexCrypto.decrypt(record.encryptedData, context: context)
+        guard let payload = try JSONSerialization.jsonObject(with: plaintext) as? [String: String],
+              let value = payload["totp"] else {
+            throw AuthwellError.storage("The verification code is malformed")
+        }
+        let code = try NativeTotpConfiguration.parse(value).code()
+        extensionContext.completeOneTimeCodeRequest(
+            using: ASOneTimeCodeCredential(code: code),
+            completionHandler: nil
+        )
+    }
+
+    @available(iOS 26.2, *)
+    private func savePassword(_ request: ASSavePasswordRequest) throws {
+        _ = try NativeCredentialCapture.savePassword(
+            username: request.credential.user,
+            password: request.credential.password,
+            serviceIdentifier: request.serviceIdentifier.identifier,
+            title: request.title,
+            sessionId: request.sessionID,
+            event: saveEventName(request.event)
+        )
+        AuthwellCredentialIdentityStore.refresh { error in
+            if let error {
+                self.cancel(.failed, message: error.localizedDescription)
+            } else {
+                self.extensionContext.completeSavePasswordRequest(completionHandler: nil)
+            }
+        }
+    }
+
+    @available(iOS 26.2, *)
+    private func saveEventName(_ event: ASSavePasswordRequest.Event) -> String {
+        switch event {
+        case .userInitiated: return "userInitiated"
+        case .formDidDisappear: return "formDidDisappear"
+        case .generatedPasswordFilled: return "generatedPasswordFilled"
+        @unknown default: return "unknown"
+        }
     }
 
     private func completePasskey(request: ASPasskeyCredentialRequest, context: LAContext) throws {
@@ -371,8 +522,8 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
         from request: ASPasskeyCredentialRequest
     ) -> Set<String> {
         // excludedCredentials was added to this request in the iOS 18 SDK.
-        // Runtime lookup preserves iOS 18 behavior while keeping the project
-        // buildable with the Xcode 15 / iOS 17 SDK used by the minimum target.
+        // Runtime lookup keeps this optional property gated independently from
+        // the iOS 17 deployment target.
         let selector = NSSelectorFromString("excludedCredentials")
         guard request.responds(to: selector),
               let descriptors = request.value(forKey: "excludedCredentials")
@@ -426,6 +577,9 @@ extension CredentialProviderViewController: UITableViewDataSource, UITableViewDe
         content.secondaryText = choices[indexPath.row].subtitle
         content.image = UIImage(systemName: {
             if case .passkey = choices[indexPath.row] { return "person.badge.key" }
+            if #available(iOS 18.0, *), case .oneTimeCode = choices[indexPath.row] {
+                return "number.square"
+            }
             return "key"
         }())
         cell.contentConfiguration = content
@@ -452,6 +606,13 @@ extension CredentialProviderViewController: UITableViewDataSource, UITableViewDe
             } catch {
                 cancel(.failed, message: error.localizedDescription)
             }
+        case .oneTimeCode(let record):
+            guard #available(iOS 18.0, *), let context = unlockedContext else {
+                cancel(.failed, message: "The verification-code request expired")
+                return
+            }
+            do { try completeOneTimeCode(record: record, context: context) }
+            catch { cancel(.failed, message: error.localizedDescription) }
         }
     }
 }

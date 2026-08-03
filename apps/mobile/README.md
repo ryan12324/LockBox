@@ -7,6 +7,8 @@
 | Offline encrypted-vault cache | Room                                   | SQLite in an App Group container               |
 | Biometric unlock              | BiometricPrompt + AES-GCM Keystore key | LocalAuthentication + Secure Enclave ECIES key |
 | Password autofill             | AutofillService                        | AutoFill Credential Provider extension         |
+| Password save/update          | Autofill Framework save UI             | iOS 26.2 save requests; manual fallback earlier|
+| Verification-code AutoFill    | Vault/browser integration              | iOS 18 one-time-code credential identities     |
 | Passkeys                      | Android Credential Provider            | iOS 17 AutoFill Credential Provider            |
 | Native HTTP/connectivity      | Capacitor                              | Capacitor                                      |
 
@@ -14,7 +16,7 @@ Native credential indexes contain encrypted credential material. Password and pa
 
 ## iOS development
 
-Requirements: macOS, Xcode 15 or newer, CocoaPods, and iOS 17+ for the credential-provider APIs.
+Requirements: macOS, Xcode 26.2 or newer, CocoaPods, and iOS 17+ for the credential-provider APIs. The 26.2 SDK is required to compile Apple's password-save request hooks; the built app still runs on iOS 17 and gates newer capabilities at runtime.
 
 ```bash
 cd apps/web
@@ -52,6 +54,20 @@ credential provider, so enable Authwell once in the Simulator's Password
 AutoFill settings before doing manual provider-selection checks.
 
 The provider must be enabled on a device under **Settings → General → AutoFill & Passwords**. Unlock Authwell once to seed its encrypted local indexes. Test both password and passkey flows on physical hardware because the Simulator uses a Data Protection Keychain fallback in place of Secure Enclave.
+
+### iOS credential capability matrix
+
+| Runtime | Password fill | Password save/update | TOTP AutoFill | Setup-code links |
+| ------- | ------------- | -------------------- | ------------- | ---------------- |
+| iOS 17.x | Credential Provider | Manual **Add login** in Authwell | Not exposed by AuthenticationServices | Encrypted `otpauth`/migration inbox with confirmation |
+| iOS 18–26.1 | Credential Provider | Manual **Add login** in Authwell | `ASOneTimeCodeCredentialIdentity` after Face ID/Touch ID | Encrypted `otpauth`/migration inbox with confirmation |
+| iOS 26.2+ | Credential Provider | `ASSavePasswordRequest`; updates from disappearing forms require confirmation | `ASOneTimeCodeCredentialIdentity` after Face ID/Touch ID | Encrypted `otpauth`/migration inbox with confirmation |
+
+iOS does not provide submitted credentials to third-party password managers before iOS 26.2, so Authwell deliberately does not simulate background capture on older releases. The setup checklist opens the existing encrypted Add Login flow instead. On iOS 26.2+, expressly initiated and new-login saves enter an account-scoped device outbox immediately; an apparent overwrite from a disappearing form requires Authwell confirmation. The outbox uses a second non-exportable, device-only Secure Enclave ECIES key, separate from both the vault-unlock and biometric AutoFill keys. The next unlocked vault session proves possession of the in-memory vault key, writes the normal end-to-end encrypted vault item without a redundant biometric prompt, and only then removes the outbox row.
+
+From iOS 18, login items with a TOTP key and website URI are indexed as one-time-code identities. The TOTP secret is stored only inside the device-encrypted record; the system identity contains a bounded issuer/account label and domain. Selecting a code requires Face ID or Touch ID, and the code is generated at selection time. Authwell registers both `otpauth` and `otpauth-migration` setup schemes. Incoming values are size-bounded, device-encrypted before persistence, parsed after biometric approval, shown for explicit confirmation, deduplicated, and uploaded only as part of the encrypted vault item. HOTP, invalid Base32, unsupported algorithms, malformed protobuf, and oversized migrations are rejected.
+
+The native SQLite database never stores the master password, vault key, password plaintext, or TOTP plaintext. Pending save/setup rows contain a stable identifier, account identifier, timestamp, minimal scheme/domain metadata, and ECIES ciphertext. Export additionally requires an HMAC proof derived from the live vault key; only its SHA-256 verifier is retained device-locally. Signing out clears the indexes, pending outboxes, active account, verifier, and outbox key. Changing enrolled biometrics invalidates the `biometryCurrentSet` AutoFill/vault-unlock keys and forces the normal master-password recovery path; a successful password unlock rebuilds those indexes, while the separately protected pending outbox can still complete its encrypted-vault import.
 
 Biometric vault unlock is opt-in under **Authwell Settings → Biometric unlock**. Enrollment stores only an account-scoped wrapped 64-byte vault key: iOS keeps ECIES ciphertext in App Group preferences while the unwrap private key is protected by Secure Enclave/Keychain `biometryCurrentSet`. Face ID or Touch ID changes invalidate that private key and force the master-password fallback. Switching accounts or servers cannot reuse the prior envelope. Signing out clears the native AutoFill index, biometric enrollment, and offline database before ending the local session.
 

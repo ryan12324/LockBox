@@ -151,7 +151,7 @@ bun run --filter @lockbox/mobile build:android
 bun run --filter @lockbox/mobile build:ios
 ```
 
-The Android build additionally requires JDK 17 and Android SDK 36. Release signing uses the `LOCKBOX_KEYSTORE_FILE`, `LOCKBOX_KEYSTORE_PASSWORD`, `LOCKBOX_KEY_ALIAS`, and `LOCKBOX_KEY_PASSWORD` environment variables. The iOS build requires macOS, Xcode 15 or newer, CocoaPods, and an Apple development team configured for the app and AutoFill extension targets.
+The Android build additionally requires JDK 17 and Android SDK 36. Release signing uses the `LOCKBOX_KEYSTORE_FILE`, `LOCKBOX_KEYSTORE_PASSWORD`, `LOCKBOX_KEY_ALIAS`, and `LOCKBOX_KEY_PASSWORD` environment variables. The iOS build requires macOS, Xcode 26.2 or newer, CocoaPods, and an Apple development team configured for the app and AutoFill extension targets; iOS 17 remains the deployment target.
 
 ## Deployment configuration
 

@@ -100,6 +100,28 @@
 .native-autofill-setup__checks li[data-complete='false'] .lb-icon { color: var(--color-warning); }
 .native-autofill-setup__error { margin: 7px 0 0; color: var(--color-error); font-size: var(--font-size-xs); }
 .native-autofill-setup__actions { display: flex; align-items: center; gap: 4px; }
+.native-totp-review {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 32%, var(--color-border));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.native-totp-review__accounts {
+  margin: var(--space-2) 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+.native-totp-review__accounts li { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.native-totp-review__accounts small,
+.native-totp-review p { color: var(--color-text-secondary); }
+.native-totp-review p { margin: 0; font-size: var(--font-size-sm); }
+.native-totp-review .native-autofill-setup__actions { margin-left: auto; }
 
 .vault-workspace {
   min-height: 0;

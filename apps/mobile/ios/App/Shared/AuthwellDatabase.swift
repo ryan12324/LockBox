@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import SQLite3
 
@@ -59,6 +60,37 @@ final class AuthwellDatabase: @unchecked Sendable {
             )
             try executeDirect(
                 "CREATE INDEX IF NOT EXISTS passkey_rp_account ON passkey_metadata(rp_id, account_id)"
+            )
+            try executeDirect(
+                """
+                CREATE TABLE IF NOT EXISTS totp_credentials (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    record TEXT NOT NULL
+                )
+                """
+            )
+            try executeDirect(
+                """
+                CREATE TABLE IF NOT EXISTS pending_credential_saves (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    account_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    record TEXT NOT NULL
+                )
+                """
+            )
+            try executeDirect(
+                "CREATE INDEX IF NOT EXISTS pending_save_account ON pending_credential_saves(account_id, created_at)"
+            )
+            try executeDirect(
+                """
+                CREATE TABLE IF NOT EXISTS pending_totp_setups (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    account_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    record TEXT NOT NULL
+                )
+                """
             )
         } catch {
             setupError = error
@@ -141,6 +173,15 @@ final class AuthwellDatabase: @unchecked Sendable {
         }
     }
 
+    func upsertAutofill(_ record: AutofillRecord) throws {
+        try queue.sync {
+            try run(
+                "INSERT OR REPLACE INTO autofill_credentials(id, record) VALUES(?, ?)",
+                bindings: [.text(record.id), .text(try encode(record))]
+            )
+        }
+    }
+
     func allAutofill() throws -> [AutofillRecord] {
         try queue.sync {
             try queryRecords("SELECT record FROM autofill_credentials", as: AutofillRecord.self)
@@ -163,6 +204,144 @@ final class AuthwellDatabase: @unchecked Sendable {
 
     func clearAutofill() throws {
         try queue.sync { try run("DELETE FROM autofill_credentials") }
+    }
+
+    @available(iOS 18.0, *)
+    func replaceTotp(_ records: [TotpRecord]) throws {
+        try queue.sync {
+            try transaction {
+                try run("DELETE FROM totp_credentials")
+                for record in records {
+                    try run(
+                        "INSERT INTO totp_credentials(id, record) VALUES(?, ?)",
+                        bindings: [.text(record.id), .text(try encode(record))]
+                    )
+                }
+            }
+        }
+    }
+
+    @available(iOS 18.0, *)
+    func allTotp() throws -> [TotpRecord] {
+        try queue.sync { try queryRecords("SELECT record FROM totp_credentials", as: TotpRecord.self) }
+    }
+
+    @available(iOS 18.0, *)
+    func totp(id: String) throws -> TotpRecord? {
+        try queue.sync {
+            try queryRecords(
+                "SELECT record FROM totp_credentials WHERE id = ? LIMIT 1",
+                bindings: [.text(id)],
+                as: TotpRecord.self
+            ).first
+        }
+    }
+
+    @available(iOS 18.0, *)
+    func matchingTotp(domainHash: String) throws -> [TotpRecord] {
+        try allTotp().filter { $0.domainHashes.contains(domainHash) }
+    }
+
+    func clearTotp() throws {
+        try queue.sync { try run("DELETE FROM totp_credentials") }
+    }
+
+    func upsertPendingCredentialSave(_ record: PendingCredentialSaveRecord) throws {
+        try queue.sync {
+            try run(
+                """
+                INSERT OR REPLACE INTO pending_credential_saves(id, account_id, created_at, record)
+                VALUES(?, ?, ?, ?)
+                """,
+                bindings: [
+                    .text(record.id), .text(record.accountId), .text(record.createdAt),
+                    .text(try encode(record)),
+                ]
+            )
+        }
+    }
+
+    func pendingCredentialSaves(accountId: String) throws -> [PendingCredentialSaveRecord] {
+        try queue.sync {
+            try queryRecords(
+                "SELECT record FROM pending_credential_saves WHERE account_id = ? ORDER BY created_at",
+                bindings: [.text(accountId)],
+                as: PendingCredentialSaveRecord.self
+            )
+        }
+    }
+
+    func pendingCredentialSave(id: String, accountId: String) throws -> PendingCredentialSaveRecord? {
+        try queue.sync {
+            try queryRecords(
+                "SELECT record FROM pending_credential_saves WHERE id = ? AND account_id = ? LIMIT 1",
+                bindings: [.text(id), .text(accountId)],
+                as: PendingCredentialSaveRecord.self
+            ).first
+        }
+    }
+
+    func deletePendingCredentialSave(id: String, accountId: String) throws -> Bool {
+        try queue.sync {
+            try run(
+                "DELETE FROM pending_credential_saves WHERE id = ? AND account_id = ?",
+                bindings: [.text(id), .text(accountId)]
+            )
+            return sqlite3_changes(try ensureReady()) == 1
+        }
+    }
+
+    func clearPendingCredentialSaves() throws {
+        try queue.sync { try run("DELETE FROM pending_credential_saves") }
+    }
+
+    func upsertPendingTotpSetup(_ record: PendingTotpSetupRecord) throws {
+        try queue.sync {
+            try run(
+                """
+                INSERT OR REPLACE INTO pending_totp_setups(id, account_id, created_at, record)
+                VALUES(?, ?, ?, ?)
+                """,
+                bindings: [
+                    .text(record.id), .text(record.accountId), .text(record.createdAt),
+                    .text(try encode(record)),
+                ]
+            )
+        }
+    }
+
+    func pendingTotpSetups(accountId: String) throws -> [PendingTotpSetupRecord] {
+        try queue.sync {
+            try queryRecords(
+                "SELECT record FROM pending_totp_setups WHERE account_id = ? ORDER BY created_at",
+                bindings: [.text(accountId)],
+                as: PendingTotpSetupRecord.self
+            )
+        }
+    }
+
+    func pendingTotpSetup(id: String, accountId: String) throws -> PendingTotpSetupRecord? {
+        try queue.sync {
+            try queryRecords(
+                "SELECT record FROM pending_totp_setups WHERE id = ? AND account_id = ? LIMIT 1",
+                bindings: [.text(id), .text(accountId)],
+                as: PendingTotpSetupRecord.self
+            ).first
+        }
+    }
+
+    func deletePendingTotpSetup(id: String, accountId: String) throws -> Bool {
+        try queue.sync {
+            try run(
+                "DELETE FROM pending_totp_setups WHERE id = ? AND account_id = ?",
+                bindings: [.text(id), .text(accountId)]
+            )
+            return sqlite3_changes(try ensureReady()) == 1
+        }
+    }
+
+    func clearPendingTotpSetups() throws {
+        try queue.sync { try run("DELETE FROM pending_totp_setups") }
     }
 
     func replaceSyncedPasskeys(_ records: [PasskeyRecord]) throws {
@@ -385,5 +564,107 @@ final class AuthwellDatabase: @unchecked Sendable {
     private func sqliteError() -> Error {
         let message = connection.map { String(cString: sqlite3_errmsg($0)) } ?? "SQLite error"
         return AuthwellError.storage(message)
+    }
+}
+
+enum NativeCredentialCapture {
+    static func hasMatchingPassword(username: String, serviceIdentifier: String) throws -> Bool {
+        guard let domain = DomainIdentifier.normalize(serviceIdentifier) else { return false }
+        let hash = try DomainIdentifier.hash(domain)
+        let displayUsername = AutofillPresentation.username(username)
+        return try AuthwellDatabase.shared.matchingAutofill(domainHash: hash).contains {
+            $0.displayUsername == displayUsername
+        }
+    }
+
+    static func savePassword(
+        username: String,
+        password: String,
+        serviceIdentifier: String,
+        title: String?,
+        sessionId: String,
+        event: String
+    ) throws -> PendingCredentialSaveRecord {
+        guard username.count <= 10_000, !password.isEmpty, password.count <= 100_000,
+              sessionId.count <= 2_048,
+              let domain = DomainIdentifier.normalize(serviceIdentifier),
+              let accountId = try AuthwellAppGroup.sharedDefaults().string(
+                  forKey: AuthwellAppGroup.accountKey
+              ) else {
+            throw AuthwellError.invalidArgument("The password save request is invalid")
+        }
+        let id = stableId(
+            "password\u{0}\(accountId)\u{0}\(domain)\u{0}\(username)\u{0}\(sessionId)"
+        )
+        let candidateTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let nameSource = candidateTitle.flatMap { $0.isEmpty ? nil : $0 } ?? domain
+        let name = String(nameSource.prefix(500))
+        let uri = "https://\(domain)"
+        let createdAt = ISO8601DateFormatter().string(from: Date())
+        var payload = try JSONSerialization.data(withJSONObject: [
+            "name": name,
+            "username": username,
+            "password": password,
+            "uri": uri,
+            "event": event,
+        ])
+        defer { payload.resetBytes(in: 0..<payload.count) }
+        let protectedOutboxPayload = try DeviceOutboxCrypto.encrypt(payload)
+        let protectedAutofillPayload = try DeviceIndexCrypto.encrypt(payload)
+        let autofill = AutofillRecord(
+            id: id,
+            domainHashes: [try DomainIdentifier.hash(domain)],
+            displayUsername: username,
+            encryptedData: protectedAutofillPayload,
+            updatedAt: createdAt,
+            serviceIdentifiers: [domain]
+        )
+        let record = PendingCredentialSaveRecord(
+            id: id,
+            accountId: accountId,
+            createdAt: createdAt,
+            encryptedData: protectedOutboxPayload,
+            domainHashes: autofill.domainHashes,
+            autofillRecord: autofill
+        )
+        try AuthwellDatabase.shared.upsertPendingCredentialSave(record)
+        try AuthwellDatabase.shared.upsertAutofill(autofill)
+        return record
+    }
+
+    static func captureTotpSetup(url: URL) throws -> PendingTotpSetupRecord {
+        let value = url.absoluteString
+        guard value.count <= 131_072,
+              let scheme = url.scheme?.lowercased(),
+              scheme == "otpauth" || scheme == "otpauth-migration",
+              let accountId = try AuthwellAppGroup.sharedDefaults().string(
+                  forKey: AuthwellAppGroup.accountKey
+              ) else {
+            throw AuthwellError.invalidArgument("Unlock Authwell before setting up a verification code")
+        }
+        if scheme == "otpauth" {
+            _ = try NativeTotpConfiguration.parse(value)
+        } else {
+            guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  components.host?.lowercased() == "offline",
+                  let encoded = components.queryItems?.first(where: { $0.name == "data" })?.value,
+                  !encoded.isEmpty, encoded.count <= 100_000,
+                  Data(base64Encoded: encoded) != nil else {
+                throw AuthwellError.invalidArgument("Invalid authenticator migration link")
+            }
+        }
+        let record = PendingTotpSetupRecord(
+            id: stableId("totp\u{0}\(accountId)\u{0}\(value)"),
+            accountId: accountId,
+            createdAt: ISO8601DateFormatter().string(from: Date()),
+            scheme: scheme,
+            encryptedData: try DeviceOutboxCrypto.encrypt(Data(value.utf8))
+        )
+        try AuthwellDatabase.shared.upsertPendingTotpSetup(record)
+        return record
+    }
+
+    private static func stableId(_ value: String) -> String {
+        Data(SHA256.hash(data: Data(value.utf8))).base64URLEncodedString
     }
 }

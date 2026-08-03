@@ -10,9 +10,16 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "isEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestEnable", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "replaceCredentialIndex", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "replaceTotpIndex", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "replacePasskeyIndex", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearCredentialIndex", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPasskeysForUri", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPendingCredentialSaves", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "exportPendingCredentialSave", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "markCredentialSaveSynced", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getPendingTotpSetups", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "exportPendingTotpSetup", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "markTotpSetupHandled", returnType: CAPPluginReturnPromise),
     ]
 
     @objc func isEnabled(_ call: CAPPluginCall) {
@@ -21,6 +28,14 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
                 var status = try AutofillDiagnostics.snapshot().bridgeValue
                 status["supported"] = true
                 status["enabled"] = enabled
+                status["passwordSaveSupported"] = {
+                    if #available(iOS 26.2, *) { return true }
+                    return false
+                }()
+                status["oneTimeCodeSupported"] = {
+                    if #available(iOS 18.0, *) { return true }
+                    return false
+                }()
                 call.resolve(status)
             } catch {
                 call.reject(error.localizedDescription, nil, error)
@@ -46,6 +61,8 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
             guard credentials.count <= 5_000 else {
                 throw AuthwellError.invalidArgument("Too many credentials")
             }
+            let accountId = try self.accountId(call)
+            let authorization = try self.authorization(call, key: "saveAuthorization")
             var records: [AutofillRecord] = []
             for credential in credentials {
                 let id = try InputValidation.boundedString(
@@ -83,12 +100,58 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
                     )
                 )
             }
-            try AuthwellDatabase.shared.replaceAutofill(records)
+            let pending = try AuthwellDatabase.shared.pendingCredentialSaves(accountId: accountId)
+            let vaultIds = Set(records.map(\.id))
+            let combined = records + pending
+                .filter { !vaultIds.contains($0.id) }
+                .map(\.autofillRecord)
+            try AuthwellDatabase.shared.replaceAutofill(combined)
+            try PendingSaveAuthorization.configure(accountId: accountId, proof: authorization)
+            try AuthwellAppGroup.sharedDefaults().set(accountId, forKey: AuthwellAppGroup.accountKey)
             self.refreshIdentities(
                 call,
-                result: ["indexed": records.count],
-                indexedCredentials: records.count
+                result: ["indexed": combined.count],
+                indexedCredentials: combined.count
             )
+        }
+    }
+
+    @objc func replaceTotpIndex(_ call: CAPPluginCall) {
+        guard #available(iOS 18.0, *) else {
+            call.resolve(["indexed": 0])
+            return
+        }
+        perform(call) {
+            guard let entries = call.options["totps"] as? [[String: Any]] else {
+                throw AuthwellError.invalidArgument("totps is required")
+            }
+            guard entries.count <= 5_000 else {
+                throw AuthwellError.invalidArgument("Too many verification codes")
+            }
+            let records = try entries.compactMap { entry -> TotpRecord? in
+                let id = try InputValidation.boundedString(entry, key: "id", maximum: 100)
+                let name = try InputValidation.boundedString(entry, key: "name", maximum: 500)
+                let username = entry["username"] as? String ?? ""
+                let totp = try InputValidation.boundedString(entry, key: "totp", maximum: 16_384)
+                guard (try? NativeTotpConfiguration.parse(totp)) != nil else { return nil }
+                let identifiers = Array(Set(
+                    Array((entry["uris"] as? [String] ?? []).prefix(50))
+                        .compactMap(DomainIdentifier.normalize)
+                )).sorted()
+                if identifiers.isEmpty { return nil }
+                let payload = try JSONSerialization.data(withJSONObject: ["totp": totp])
+                let label = username.isEmpty ? name : "\(name) · \(username)"
+                return TotpRecord(
+                    id: id,
+                    domainHashes: try identifiers.map(DomainIdentifier.hash),
+                    displayLabel: label,
+                    encryptedData: try DeviceIndexCrypto.encrypt(payload),
+                    updatedAt: ISO8601DateFormatter().string(from: Date()),
+                    serviceIdentifiers: identifiers
+                )
+            }
+            try AuthwellDatabase.shared.replaceTotp(records)
+            self.refreshIdentities(call, result: ["indexed": records.count])
         }
     }
 
@@ -172,7 +235,12 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func clearCredentialIndex(_ call: CAPPluginCall) {
         perform(call) {
             try AuthwellDatabase.shared.clearAutofill()
+            try AuthwellDatabase.shared.clearTotp()
+            try AuthwellDatabase.shared.clearPendingCredentialSaves()
+            try AuthwellDatabase.shared.clearPendingTotpSetups()
+            try DeviceOutboxCrypto.removeKey()
             try AuthwellDatabase.shared.clearSyncedPasskeys()
+            try PendingSaveAuthorization.clear()
             try AuthwellAppGroup.sharedDefaults().removeObject(
                 forKey: AuthwellAppGroup.accountKey
             )
@@ -200,6 +268,146 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
                     .map(\.metadataBridgeValue),
             ])
         }
+    }
+
+    @objc func getPendingCredentialSaves(_ call: CAPPluginCall) {
+        perform(call) {
+            guard let accountId = try AuthwellAppGroup.sharedDefaults().string(
+                forKey: AuthwellAppGroup.accountKey
+            ) else {
+                call.resolve(["saves": []])
+                return
+            }
+            call.resolve([
+                "saves": try AuthwellDatabase.shared.pendingCredentialSaves(accountId: accountId)
+                    .map(\.metadataBridgeValue),
+            ])
+        }
+    }
+
+    @objc func exportPendingCredentialSave(_ call: CAPPluginCall) {
+        perform(call) {
+            let id = try self.recordId(call)
+            let accountId = try self.requireAuthorizedAccount(
+                proof: try self.authorization(call, key: "authorization")
+            )
+            guard let record = try AuthwellDatabase.shared.pendingCredentialSave(
+                id: id,
+                accountId: accountId
+            ) else {
+                throw AuthwellError.invalidArgument("Saved login no longer exists")
+            }
+            let plaintext = try DeviceOutboxCrypto.decrypt(record.encryptedData)
+            guard let payload = try JSONSerialization.jsonObject(with: plaintext) as? [String: String],
+                  let name = payload["name"], let username = payload["username"],
+                  let password = payload["password"], let uri = payload["uri"],
+                  !name.isEmpty, !password.isEmpty, DomainIdentifier.normalize(uri) != nil else {
+                throw AuthwellError.storage("The saved login is malformed")
+            }
+            call.resolve([
+                "id": record.id, "name": name, "username": username,
+                "password": password, "uri": uri, "createdAt": record.createdAt,
+            ])
+        }
+    }
+
+    @objc func markCredentialSaveSynced(_ call: CAPPluginCall) {
+        perform(call) {
+            let id = try self.recordId(call)
+            let accountId = try self.requireAuthorizedAccount(
+                proof: try self.authorization(call, key: "authorization")
+            )
+            guard try AuthwellDatabase.shared.deletePendingCredentialSave(id: id, accountId: accountId) else {
+                throw AuthwellError.invalidArgument("Saved login no longer exists")
+            }
+            call.resolve()
+        }
+    }
+
+    @objc func getPendingTotpSetups(_ call: CAPPluginCall) {
+        perform(call) {
+            guard let accountId = try AuthwellAppGroup.sharedDefaults().string(
+                forKey: AuthwellAppGroup.accountKey
+            ) else {
+                call.resolve(["setups": []])
+                return
+            }
+            call.resolve([
+                "setups": try AuthwellDatabase.shared.pendingTotpSetups(accountId: accountId)
+                    .map(\.metadataBridgeValue),
+            ])
+        }
+    }
+
+    @objc func exportPendingTotpSetup(_ call: CAPPluginCall) {
+        perform(call) {
+            let id = try self.recordId(call)
+            let accountId = try self.requireAuthorizedAccount(
+                proof: try self.authorization(call, key: "authorization")
+            )
+            guard let record = try AuthwellDatabase.shared.pendingTotpSetup(
+                id: id,
+                accountId: accountId
+            ) else {
+                throw AuthwellError.invalidArgument("Verification-code setup no longer exists")
+            }
+            let plaintext = try DeviceOutboxCrypto.decrypt(record.encryptedData)
+            guard let uri = String(data: plaintext, encoding: .utf8) else {
+                throw AuthwellError.storage("Verification-code setup is malformed")
+            }
+            call.resolve([
+                "id": record.id, "uri": uri, "scheme": record.scheme,
+                "createdAt": record.createdAt,
+            ])
+        }
+    }
+
+    @objc func markTotpSetupHandled(_ call: CAPPluginCall) {
+        perform(call) {
+            let id = try self.recordId(call)
+            let accountId = try self.requireAuthorizedAccount(
+                proof: try self.authorization(call, key: "authorization")
+            )
+            guard try AuthwellDatabase.shared.deletePendingTotpSetup(id: id, accountId: accountId) else {
+                throw AuthwellError.invalidArgument("Verification-code setup no longer exists")
+            }
+            call.resolve()
+        }
+    }
+
+    private func accountId(_ call: CAPPluginCall) throws -> String {
+        guard let value = call.getString("accountId"),
+              value.range(of: "^[A-Za-z0-9_-]{1,100}$", options: .regularExpression) != nil else {
+            throw AuthwellError.invalidArgument("accountId is required")
+        }
+        return value
+    }
+
+    private func recordId(_ call: CAPPluginCall) throws -> String {
+        guard let value = call.getString("id"),
+              value.range(of: "^[A-Za-z0-9_-]{1,100}$", options: .regularExpression) != nil else {
+            throw AuthwellError.invalidArgument("Valid id is required")
+        }
+        return value
+    }
+
+    private func authorization(_ call: CAPPluginCall, key: String) throws -> Data {
+        guard let value = call.getString(key), value.count == 43,
+              value.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil,
+              let proof = Data(base64URLEncoded: value), proof.count == 32,
+              proof.base64URLEncodedString == value else {
+            throw AuthwellError.invalidArgument("\(key) is required")
+        }
+        return proof
+    }
+
+    private func requireAuthorizedAccount(proof: Data) throws -> String {
+        guard let accountId = try AuthwellAppGroup.sharedDefaults().string(
+            forKey: AuthwellAppGroup.accountKey
+        ), try PendingSaveAuthorization.verify(accountId: accountId, proof: proof) else {
+            throw AuthwellError.authentication("Unlock Authwell before importing device credentials")
+        }
+        return accountId
     }
 
     private func perform(_ call: CAPPluginCall, operation: @escaping () throws -> Void) {

@@ -148,6 +148,160 @@ enum DeviceIndexCrypto {
     }
 }
 
+/// Non-exportable device-only protection for saves waiting on an unlocked vault.
+/// Unlike the AutoFill index key, this key does not trigger another biometric
+/// prompt: release is gated by the HMAC proof derived from the live vault key.
+enum DeviceOutboxCrypto {
+    private static let keyTag = Data("dev.lockbox.app.pending-outbox-ecies-v1".utf8)
+    private static let algorithm: SecKeyAlgorithm = .eciesEncryptionCofactorX963SHA256AESGCM
+
+    static func encrypt(_ plaintext: Data) throws -> String {
+        let publicKey = try encryptionPublicKey()
+        guard SecKeyIsAlgorithmSupported(publicKey, .encrypt, algorithm) else {
+            throw AuthwellError.unavailable("This device cannot protect pending credentials")
+        }
+        var error: Unmanaged<CFError>?
+        guard let ciphertext = SecKeyCreateEncryptedData(
+            publicKey,
+            algorithm,
+            plaintext as CFData,
+            &error
+        ) as Data? else {
+            throw (error?.takeRetainedValue() as Error?)
+                ?? AuthwellError.storage("Could not encrypt the pending credential")
+        }
+        return ciphertext.base64EncodedString()
+    }
+
+    static func decrypt(_ encoded: String) throws -> Data {
+        guard let ciphertext = Data(base64Encoded: encoded) else {
+            throw AuthwellError.storage("The pending credential is malformed")
+        }
+        let privateKey = try decryptionPrivateKey()
+        var error: Unmanaged<CFError>?
+        guard let plaintext = SecKeyCreateDecryptedData(
+            privateKey,
+            algorithm,
+            ciphertext as CFData,
+            &error
+        ) as Data? else {
+            throw (error?.takeRetainedValue() as Error?)
+                ?? AuthwellError.authentication("The pending credential cannot be unlocked")
+        }
+        return plaintext
+    }
+
+    static func removeKey() throws {
+        let accessGroup = try AuthwellAppGroup.keychainAccessGroup()
+        let status = SecItemDelete([
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationTag: keyTag,
+            kSecAttrAccessGroup: accessGroup,
+        ] as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw AuthwellError.storage("Could not remove the pending-credential key")
+        }
+        try AuthwellAppGroup.sharedDefaults().removeObject(
+            forKey: AuthwellAppGroup.outboxPublicEncryptionKey
+        )
+    }
+
+    private static func encryptionPublicKey() throws -> SecKey {
+        let defaults = try AuthwellAppGroup.sharedDefaults()
+        if let representation = defaults.data(forKey: AuthwellAppGroup.outboxPublicEncryptionKey),
+           let key = SecKeyCreateWithData(
+               representation as CFData,
+               [
+                   kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+                   kSecAttrKeyClass: kSecAttrKeyClassPublic,
+                   kSecAttrKeySizeInBits: 256,
+               ] as CFDictionary,
+               nil
+           ) {
+            return key
+        }
+        return try createKeyPair()
+    }
+
+    private static func createKeyPair() throws -> SecKey {
+        let accessGroup = try AuthwellAppGroup.keychainAccessGroup()
+        var accessError: Unmanaged<CFError>?
+        guard let access = SecAccessControlCreateWithFlags(
+            nil,
+            kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly,
+            [.privateKeyUsage],
+            &accessError
+        ) else {
+            throw (accessError?.takeRetainedValue() as Error?)
+                ?? AuthwellError.unavailable("Device-only credential protection is unavailable")
+        }
+        _ = SecItemDelete([
+            kSecClass: kSecClassKey,
+            kSecAttrApplicationTag: keyTag,
+            kSecAttrAccessGroup: accessGroup,
+        ] as CFDictionary)
+        let privateAttributes: [CFString: Any] = [
+            kSecAttrIsPermanent: true,
+            kSecAttrApplicationTag: keyTag,
+            kSecAttrAccessGroup: accessGroup,
+            kSecAttrAccessControl: access,
+        ]
+        var attributes: [CFString: Any] = [
+            kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrKeySizeInBits: 256,
+            kSecPrivateKeyAttrs: privateAttributes,
+            kSecAttrTokenID: kSecAttrTokenIDSecureEnclave,
+        ]
+        var error: Unmanaged<CFError>?
+        var privateKey = SecKeyCreateRandomKey(attributes as CFDictionary, &error)
+#if targetEnvironment(simulator)
+        if privateKey == nil {
+            attributes.removeValue(forKey: kSecAttrTokenID)
+            error = nil
+            privateKey = SecKeyCreateRandomKey(attributes as CFDictionary, &error)
+        }
+#endif
+        guard let privateKey, let publicKey = SecKeyCopyPublicKey(privateKey) else {
+            throw (error?.takeRetainedValue() as Error?)
+                ?? AuthwellError.unavailable("Could not create device-only credential protection")
+        }
+        var representationError: Unmanaged<CFError>?
+        guard let representation = SecKeyCopyExternalRepresentation(
+            publicKey,
+            &representationError
+        ) as Data? else {
+            throw (representationError?.takeRetainedValue() as Error?)
+                ?? AuthwellError.storage("Could not store credential protection")
+        }
+        try defaultsSetPublicKey(representation)
+        return publicKey
+    }
+
+    private static func defaultsSetPublicKey(_ representation: Data) throws {
+        try AuthwellAppGroup.sharedDefaults().set(
+            representation,
+            forKey: AuthwellAppGroup.outboxPublicEncryptionKey
+        )
+    }
+
+    private static func decryptionPrivateKey() throws -> SecKey {
+        let accessGroup = try AuthwellAppGroup.keychainAccessGroup()
+        let query: [CFString: Any] = [
+            kSecClass: kSecClassKey,
+            kSecAttrKeyType: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecAttrApplicationTag: keyTag,
+            kSecAttrAccessGroup: accessGroup,
+            kSecReturnRef: true,
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess, let key = item as! SecKey? else {
+            throw AuthwellError.authentication("The device-only credential key is unavailable")
+        }
+        return key
+    }
+}
+
 enum BiometricVault {
     private static let keyTag = Data("dev.lockbox.app.biometric-unlock-ecies-v2".utf8)
     private static let algorithm: SecKeyAlgorithm = .eciesEncryptionCofactorX963SHA256AESGCM

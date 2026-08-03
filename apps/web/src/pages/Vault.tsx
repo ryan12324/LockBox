@@ -32,6 +32,7 @@ import { syncPendingNativePasskeys } from '../lib/native-passkey-sync.js';
 import { fetchFreshVaultItem } from '../lib/vault-freshness.js';
 import ItemPanel from '../components/ItemPanel.js';
 import NativeAutofillSetup from '../components/NativeAutofillSetup.js';
+import NativeTotpSetupPrompt from '../components/NativeTotpSetupPrompt.js';
 
 const typeLabels: Record<string, string> = {
   login: 'Login',
@@ -188,15 +189,15 @@ export default function Vault() {
           }
           if (saveResult.syncedCount > 0) {
             toast(
-              `${saveResult.syncedCount} Android ${saveResult.syncedCount === 1 ? 'login was' : 'logins were'} saved to your encrypted vault.`,
+              `${saveResult.syncedCount} device ${saveResult.syncedCount === 1 ? 'login was' : 'logins were'} saved to your encrypted vault.`,
               'success'
             );
           }
           if (saveResult.remainingCount > 0) {
-            toast('An Android-saved login is still protected on this device and will retry.', 'warning');
+            toast('A device-saved login is still protected here and will retry.', 'warning');
           }
         } catch {
-          toast('Android-saved login import will retry the next time you unlock.', 'warning');
+          toast('Device-saved login import will retry the next time you unlock.', 'warning');
         }
 
         try {
@@ -247,11 +248,11 @@ export default function Vault() {
   }, [loadVault, lastUpdated]);
 
   useEffect(() => {
-    const refreshPendingAndroidSaves = () => {
+    const refreshPendingDeviceChanges = () => {
       if (document.visibilityState === 'visible') void loadVault();
     };
-    document.addEventListener('visibilitychange', refreshPendingAndroidSaves);
-    return () => document.removeEventListener('visibilitychange', refreshPendingAndroidSaves);
+    document.addEventListener('visibilitychange', refreshPendingDeviceChanges);
+    return () => document.removeEventListener('visibilitychange', refreshPendingDeviceChanges);
   }, [loadVault]);
 
   useEffect(() => {
@@ -425,9 +426,24 @@ export default function Vault() {
           {indexed ? 'Local search ready' : 'Name search'}
         </span>
         {session && userKey && !loading && (
-          <NativeAutofillSetup accountId={session.userId} items={items} userKey={userKey} />
+          <NativeAutofillSetup
+            accountId={session.userId}
+            items={items}
+            userKey={userKey}
+            onManualAdd={() => setPanelState({ mode: 'add', item: null })}
+          />
         )}
       </div>
+
+      {session && userKey && !loading && (
+        <NativeTotpSetupPrompt
+          accountId={session.userId}
+          token={session.token}
+          userKey={userKey}
+          items={items}
+          onComplete={() => void loadVault()}
+        />
+      )}
 
       <div className="vault-workspace">
         <section className="vault-list-pane" aria-label="Vault items">

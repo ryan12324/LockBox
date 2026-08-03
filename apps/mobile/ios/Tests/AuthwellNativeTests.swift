@@ -19,6 +19,7 @@ private enum AuthwellNativeTests {
         try testIOSAutofillDomainMatching()
         try testAutofillUsernamePresentation()
         try testLegacyAutofillRecordCompatibility()
+        try testTotpGenerationAndValidation()
         try testAndroidPrivateKeyCompatibility()
         try testPasskeyEncodingRoundTrip()
         try testMalformedAttestationsAreRejected()
@@ -96,6 +97,35 @@ private enum AuthwellNativeTests {
             record.displayUsername.isEmpty,
             "A legacy iOS AutoFill record could not fall back without a display username"
         )
+    }
+
+    private static func testTotpGenerationAndValidation() throws {
+        let configuration = try NativeTotpConfiguration.parse(
+            "otpauth://totp/RFC:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&algorithm=SHA1&digits=8&period=30"
+        )
+        let code = try configuration.code(at: Date(timeIntervalSince1970: 59))
+        try require(
+            code == "94287082",
+            "The native iOS TOTP generator failed the RFC 6238 vector"
+        )
+        try requireThrows("A short authenticator key was accepted") {
+            _ = try NativeTotpConfiguration.parse("ABCDEF")
+        }
+        try requireThrows("An HOTP setup link was accepted for AutoFill") {
+            _ = try NativeTotpConfiguration.parse(
+                "otpauth://hotp/Example:alice?secret=JBSWY3DPEHPK3PXP&counter=1"
+            )
+        }
+        try requireThrows("An unsupported authenticator algorithm was accepted") {
+            _ = try NativeTotpConfiguration.parse(
+                "otpauth://totp/Example:alice?secret=JBSWY3DPEHPK3PXP&algorithm=MD5"
+            )
+        }
+        try requireThrows("Duplicate authenticator parameters were accepted") {
+            _ = try NativeTotpConfiguration.parse(
+                "otpauth://totp/Example:alice?secret=JBSWY3DPEHPK3PXP&secret=JBSWY3DPEHPK3PXP"
+            )
+        }
     }
 
     private static func testAndroidPrivateKeyCompatibility() throws {

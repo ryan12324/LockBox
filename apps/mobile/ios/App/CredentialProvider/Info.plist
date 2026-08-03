@@ -30,6 +30,10 @@
 				<true/>
 				<key>ProvidesPasswords</key>
 				<true/>
+				<key>ProvidesOneTimeCodes</key>
+				<true/>
+				<key>SupportsSavePasswordCredentials</key>
+				<true/>
 				<key>ShowsConfigurationUI</key>
 				<true/>
 			</dict>
@@ -42,6 +46,6 @@
 		<string>$(PRODUCT_MODULE_NAME).CredentialProviderViewController</string>
 	</dict>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Authwell uses Face ID to unlock passwords and passkeys for AutoFill.</string>
+	<string>Authwell uses Face ID to unlock passwords, passkeys, and verification codes for AutoFill.</string>
 </dict>
 </plist>

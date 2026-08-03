@@ -235,6 +235,10 @@
   color: var(--color-info);
   background: var(--color-info-subtle);
 }
+.autofill-test__expectation--code-only {
+  color: var(--color-info);
+  background: var(--color-info-subtle);
+}
 .autofill-test__expectation--ignore {
   color: var(--color-success);
   background: var(--color-success-subtle);

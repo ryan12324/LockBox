@@ -116,6 +116,8 @@ assert_plist_value "$app_plist" CFBundleDisplayName Authwell
 assert_plist_value "$app_plist" CFBundleIdentifier dev.lockbox.app
 assert_plist_value "$app_plist" CFBundleShortVersionString "$package_version"
 assert_plist_value "$app_plist" MinimumOSVersion 17.0
+assert_plist_value "$app_plist" CFBundleURLTypes:0:CFBundleURLSchemes:0 otpauth
+assert_plist_value "$app_plist" CFBundleURLTypes:0:CFBundleURLSchemes:1 otpauth-migration
 assert_plist_value "$extension_plist" CFBundleIdentifier dev.lockbox.app.autofill
 assert_plist_value "$extension_plist" CFBundleShortVersionString "$package_version"
 assert_plist_value "$extension_plist" MinimumOSVersion 17.0
@@ -125,6 +127,10 @@ assert_plist_value "$extension_plist" \
   NSExtension:NSExtensionAttributes:ASCredentialProviderExtensionCapabilities:ProvidesPasswords true
 assert_plist_value "$extension_plist" \
   NSExtension:NSExtensionAttributes:ASCredentialProviderExtensionCapabilities:ProvidesPasskeys true
+assert_plist_value "$extension_plist" \
+  NSExtension:NSExtensionAttributes:ASCredentialProviderExtensionCapabilities:ProvidesOneTimeCodes true
+assert_plist_value "$extension_plist" \
+  NSExtension:NSExtensionAttributes:ASCredentialProviderExtensionCapabilities:SupportsSavePasswordCredentials true
 assert_plist_value "$extension_plist" \
   NSExtension:NSExtensionAttributes:ASCredentialProviderExtensionCapabilities:ShowsConfigurationUI true
 

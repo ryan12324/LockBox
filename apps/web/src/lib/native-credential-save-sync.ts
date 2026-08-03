@@ -28,7 +28,7 @@ interface NativeCredentialSaveSyncOptions {
 }
 
 /**
- * Drain Android AutoFill saves into the encrypted vault after a normal vault unlock.
+ * Drain native AutoFill saves into the encrypted vault after a normal vault unlock.
  * A stable native ID makes new-login retries idempotent; password changes update
  * an existing login only when both its target and username match.
  */

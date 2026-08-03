@@ -39,6 +39,8 @@ export interface NativeAutofillStatus {
   lastRequestAt?: number;
   lastMatchCount?: number;
   lastError?: string;
+  passwordSaveSupported?: boolean;
+  oneTimeCodeSupported?: boolean;
 }
 
 export interface NativePasskeyStatus {
@@ -88,6 +90,10 @@ export async function getNativeAutofillStatus(): Promise<NativeAutofillStatus> {
     lastRequestAt: optionalNumber(result.lastRequestAt),
     lastMatchCount: optionalNumber(result.lastMatchCount),
     lastError: typeof result.lastError === 'string' ? result.lastError : undefined,
+    passwordSaveSupported:
+      typeof result.passwordSaveSupported === 'boolean' ? result.passwordSaveSupported : undefined,
+    oneTimeCodeSupported:
+      typeof result.oneTimeCodeSupported === 'boolean' ? result.oneTimeCodeSupported : undefined,
   };
 }
 
@@ -126,6 +132,7 @@ export async function openNativePasskeySettings(): Promise<void> {
 export interface NativeAutofillIndexResult {
   passwords: number;
   passkeys: number;
+  oneTimeCodes?: number;
 }
 
 export async function syncNativeAutofillIndex(
@@ -163,9 +170,20 @@ export async function syncNativeAutofillIndex(
       createdAt: item.createdAt,
     }));
 
+  const totps = items
+    .filter((item): item is LoginItem => item.type === 'login')
+    .filter((item) => Boolean(item.totp) && (item.uris?.length ?? 0) > 0)
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      username: item.username ?? '',
+      totp: item.totp,
+      uris: item.uris ?? [],
+    }));
+
   const saveAuthorization = await deriveNativeCredentialSaveAuthorization(userKey, accountId);
 
-  // Both indexes share one biometric-bound Keystore key. Serialize their first
+  // Both indexes share one biometric-bound device key. Serialize their first
   // refresh so concurrent calls cannot race while creating that key.
   const passwordResult = await bridge.nativePromise(
     'Autofill',
@@ -177,9 +195,14 @@ export async function syncNativeAutofillIndex(
     'replacePasskeyIndex',
     { passkeys, accountId }
   );
+  const ios = bridge.getPlatform?.() === 'ios';
+  const totpResult = ios
+    ? await bridge.nativePromise('Autofill', 'replaceTotpIndex', { totps, accountId })
+    : null;
   const result = {
     passwords: optionalNumber(passwordResult.indexed) ?? 0,
     passkeys: optionalNumber(passkeyResult.indexed) ?? 0,
+    ...(ios ? { oneTimeCodes: optionalNumber(totpResult?.indexed) ?? 0 } : {}),
   };
   window.dispatchEvent(new CustomEvent('authwell:native-autofill-updated', { detail: result }));
   return result;
@@ -215,7 +238,7 @@ export async function markNativePasskeySynced(
 }
 
 export async function getPendingNativeCredentialSaves(): Promise<PendingNativeCredentialSave[]> {
-  const bridge = getAndroidAutofill();
+  const bridge = getCapacitor();
   if (!bridge) return [];
   const result = await bridge.nativePromise('Autofill', 'getPendingCredentialSaves', {});
   return Array.isArray(result.saves) ? (result.saves as PendingNativeCredentialSave[]) : [];
@@ -225,7 +248,7 @@ export async function exportPendingNativeCredentialSave(
   id: string,
   authorization: string
 ): Promise<ExportedNativeCredentialSave> {
-  const bridge = getAndroidAutofill();
+  const bridge = getCapacitor();
   if (!bridge) throw new Error('Native saved-login import is not available on this device');
   return bridge.nativePromise('Autofill', 'exportPendingCredentialSave', {
     id,
@@ -237,9 +260,49 @@ export async function markNativeCredentialSaveSynced(
   id: string,
   authorization: string
 ): Promise<void> {
-  const bridge = getAndroidAutofill();
+  const bridge = getCapacitor();
   if (!bridge) return;
   await bridge.nativePromise('Autofill', 'markCredentialSaveSynced', { id, authorization });
+}
+
+export interface PendingNativeTotpSetup {
+  id: string;
+  createdAt: string;
+  scheme: 'otpauth' | 'otpauth-migration';
+}
+
+export interface ExportedNativeTotpSetup extends PendingNativeTotpSetup {
+  uri: string;
+}
+
+export async function getPendingNativeTotpSetups(): Promise<PendingNativeTotpSetup[]> {
+  const bridge = getCapacitor();
+  if (!bridge || bridge.getPlatform?.() !== 'ios') return [];
+  const result = await bridge.nativePromise('Autofill', 'getPendingTotpSetups', {});
+  return Array.isArray(result.setups) ? result.setups as PendingNativeTotpSetup[] : [];
+}
+
+export async function exportPendingNativeTotpSetup(
+  id: string,
+  authorization: string
+): Promise<ExportedNativeTotpSetup> {
+  const bridge = getCapacitor();
+  if (!bridge || bridge.getPlatform?.() !== 'ios') {
+    throw new Error('Verification-code setup is not available on this device');
+  }
+  return bridge.nativePromise('Autofill', 'exportPendingTotpSetup', {
+    id,
+    authorization,
+  }) as unknown as Promise<ExportedNativeTotpSetup>;
+}
+
+export async function markNativeTotpSetupHandled(
+  id: string,
+  authorization: string
+): Promise<void> {
+  const bridge = getCapacitor();
+  if (!bridge || bridge.getPlatform?.() !== 'ios') return;
+  await bridge.nativePromise('Autofill', 'markTotpSetupHandled', { id, authorization });
 }
 
 /** Derive an account-scoped proof without exposing or persisting the vault key. */

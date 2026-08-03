@@ -69,6 +69,7 @@ final class AutofillMatrixUITests: XCTestCase {
         launch("one-time-code")
         requireText("Account")
         requireText("One-time code")
+        XCTAssertTrue(app.staticTexts["Expect verification code only"].exists)
         XCTAssertEqual(app.secureTextFields.count, 0)
     }
 

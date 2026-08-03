@@ -7,7 +7,7 @@ This guide covers a self-hosted production deployment of the API, web vault, bro
 - Bun 1.3.10 or newer
 - A Cloudflare account with Wrangler authenticated
 - JDK 17 and Android SDK 36 for Android builds
-- macOS, Xcode 15 or newer, and CocoaPods for iOS builds
+- macOS, Xcode 26.2 or newer, and CocoaPods for iOS builds (iOS 17 remains the deployment target)
 - Chrome/Firefox developer accounts only if publishing to their stores
 - A Google Play developer account and signing key only if publishing Android
 - An Apple Developer account only if installing on devices or publishing iOS

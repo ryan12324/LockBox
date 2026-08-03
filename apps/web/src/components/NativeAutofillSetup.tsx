@@ -16,12 +16,18 @@ interface NativeAutofillSetupProps {
   accountId: string;
   items: VaultItem[];
   userKey: Uint8Array;
+  onManualAdd?(): void;
 }
 
 const EMPTY_AUTOFILL: NativeAutofillStatus = { supported: false, enabled: false };
 const EMPTY_PASSKEYS: NativePasskeyStatus = { supported: false, enabled: false };
 
-export default function NativeAutofillSetup({ accountId, items, userKey }: NativeAutofillSetupProps) {
+export default function NativeAutofillSetup({
+  accountId,
+  items,
+  userKey,
+  onManualAdd,
+}: NativeAutofillSetupProps) {
   const [autofill, setAutofill] = useState<NativeAutofillStatus>(EMPTY_AUTOFILL);
   const [passkeys, setPasskeys] = useState<NativePasskeyStatus>(EMPTY_PASSKEYS);
   const [indexReadyThisSession, setIndexReadyThisSession] = useState(false);
@@ -70,7 +76,9 @@ export default function NativeAutofillSetup({ accountId, items, userKey }: Nativ
   const indexReady = indexReadyThisSession || autofill.indexedAt !== undefined;
   const biometricsReady = autofill.biometricsReady !== false;
   const passkeyReady = !passkeys.supported || passkeys.enabled;
-  const complete = autofill.enabled && biometricsReady && passkeyReady && indexReady;
+  const manualPasswordSave = autofill.passwordSaveSupported === false;
+  const complete = autofill.enabled && biometricsReady && passkeyReady && indexReady
+    && !manualPasswordSave;
 
   if (checking || hidden || (!autofill.supported && !passkeys.supported) || complete) return null;
 
@@ -84,6 +92,8 @@ export default function NativeAutofillSetup({ accountId, items, userKey }: Nativ
         await openNativeBiometricEnrollment();
       } else if (!passkeyReady) {
         await openNativePasskeySettings();
+      } else if (manualPasswordSave && onManualAdd) {
+        onManualAdd();
       } else {
         await syncNativeAutofillIndex(items, accountId, userKey);
         setIndexReadyThisSession(true);
@@ -107,6 +117,8 @@ export default function NativeAutofillSetup({ accountId, items, userKey }: Nativ
       ? 'Set up device biometrics'
       : !passkeyReady
         ? 'Enable Authwell passkeys'
+        : manualPasswordSave
+          ? 'Add a login manually'
         : 'Refresh encrypted index';
 
   return (
@@ -125,6 +137,18 @@ export default function NativeAutofillSetup({ accountId, items, userKey }: Nativ
             <SetupCheck complete={biometricsReady} label="Device biometrics" />
           )}
           {passkeys.supported && <SetupCheck complete={passkeys.enabled} label="Passkey provider" />}
+          {autofill.passwordSaveSupported !== undefined && (
+            <SetupCheck
+              complete
+              label={autofill.passwordSaveSupported
+                ? 'Automatic password saving'
+                : 'Manual password saving on this iOS version'}
+              status={autofill.passwordSaveSupported ? 'ready' : 'available in Authwell'}
+            />
+          )}
+          {autofill.oneTimeCodeSupported && (
+            <SetupCheck complete label="Verification-code AutoFill" />
+          )}
           <SetupCheck
             complete={indexReady}
             label={indexReady
@@ -146,11 +170,19 @@ export default function NativeAutofillSetup({ accountId, items, userKey }: Nativ
   );
 }
 
-function SetupCheck({ complete, label }: { complete: boolean; label: string }) {
+function SetupCheck({
+  complete,
+  label,
+  status,
+}: {
+  complete: boolean;
+  label: string;
+  status?: string;
+}) {
   return (
     <li data-complete={complete ? 'true' : 'false'}>
       <Icon name={complete ? 'circle-check' : 'alert-circle'} size={16} />
-      <span>{label}: {complete ? 'ready' : 'needs setup'}</span>
+      <span>{label}: {status ?? (complete ? 'ready' : 'needs setup')}</span>
     </li>
   );
 }

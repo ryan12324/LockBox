@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Icon } from '@lockbox/design';
 import { commitNativeAutofillSession } from '../lib/native-autofill.js';
 
-export type AutofillTestExpectation = 'fill-and-save' | 'save-only' | 'ignore';
+export type AutofillTestExpectation = 'fill-and-save' | 'save-only' | 'code-only' | 'ignore';
 
 export interface AutofillTestScenario {
   id: string;
@@ -119,9 +119,12 @@ export const AUTOFILL_TEST_SCENARIOS: readonly AutofillTestScenario[] = [
     id: 'one-time-code',
     number: '11',
     title: 'One-time code',
-    summary: 'A verification challenge that must not be stored as a password.',
-    expectation: 'ignore',
-    expected: ['Do not offer password fill for the code', 'Do not offer to save the code'],
+    summary: 'A verification challenge that accepts a current TOTP but must never be stored as a password.',
+    expectation: 'code-only',
+    expected: [
+      'Offer the matching current verification code',
+      'Do not offer to save the submitted code as a password',
+    ],
     contract: ['username', 'one-time-code'],
   },
   {
@@ -480,9 +483,17 @@ function ExpectationBadge({ expectation }: { expectation: AutofillTestExpectatio
       ? 'Expect fill + save'
       : expectation === 'save-only'
         ? 'Expect save only'
-        : 'Expect no password action';
+        : expectation === 'code-only'
+          ? 'Expect verification code only'
+          : 'Expect no password action';
   const icon =
-    expectation === 'ignore' ? 'circle-check' : expectation === 'save-only' ? 'plus' : 'password';
+    expectation === 'ignore'
+      ? 'circle-check'
+      : expectation === 'save-only'
+        ? 'plus'
+        : expectation === 'code-only'
+          ? 'shield-lock'
+          : 'password';
   return (
     <span className={`autofill-test__expectation autofill-test__expectation--${expectation}`}>
       <Icon name={icon} size={15} />

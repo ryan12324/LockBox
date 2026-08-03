@@ -23,9 +23,12 @@ enum AuthwellAppGroup {
     static let accountKey = "authwell.activeAccountId"
     static let indexSaltKey = "authwell.autofillIndexSalt"
     static let publicEncryptionKey = "authwell.publicEncryptionKey"
+    static let outboxPublicEncryptionKey = "authwell.outboxPublicEncryptionKey.v1"
     static let biometricEnrolledKey = "authwell.biometricEnrolled"
     static let biometricWrappedVaultKey = "authwell.biometricWrappedVaultKey.v2"
     static let biometricScopeKey = "authwell.biometricScope.v2"
+    static let pendingSaveAccountKey = "authwell.pendingSave.account.v1"
+    static let pendingSaveProofHashKey = "authwell.pendingSave.proofHash.v1"
 
     static func sharedDefaults() throws -> UserDefaults {
         guard let defaults = UserDefaults(suiteName: identifier) else {
@@ -340,6 +343,213 @@ struct AutofillRecord: Codable {
         encryptedData = try container.decode(String.self, forKey: .encryptedData)
         updatedAt = try container.decode(String.self, forKey: .updatedAt)
         serviceIdentifiers = try container.decode([String].self, forKey: .serviceIdentifiers)
+    }
+}
+
+struct TotpRecord: Codable {
+    let id: String
+    let domainHashes: [String]
+    let displayLabel: String
+    let encryptedData: String
+    let updatedAt: String
+    let serviceIdentifiers: [String]
+
+    init(
+        id: String,
+        domainHashes: [String],
+        displayLabel: String,
+        encryptedData: String,
+        updatedAt: String,
+        serviceIdentifiers: [String]
+    ) {
+        self.id = id
+        self.domainHashes = domainHashes
+        self.displayLabel = AutofillPresentation.username(displayLabel)
+        self.encryptedData = encryptedData
+        self.updatedAt = updatedAt
+        self.serviceIdentifiers = serviceIdentifiers
+    }
+}
+
+struct PendingCredentialSaveRecord: Codable {
+    let id: String
+    let accountId: String
+    let createdAt: String
+    let encryptedData: String
+    let domainHashes: [String]
+    let autofillRecord: AutofillRecord
+
+    var metadataBridgeValue: [String: Any] {
+        ["id": id, "createdAt": createdAt]
+    }
+}
+
+struct PendingTotpSetupRecord: Codable {
+    let id: String
+    let accountId: String
+    let createdAt: String
+    let scheme: String
+    let encryptedData: String
+
+    var metadataBridgeValue: [String: Any] {
+        ["id": id, "createdAt": createdAt, "scheme": scheme]
+    }
+}
+
+enum PendingSaveAuthorization {
+    static func configure(accountId: String, proof: Data) throws {
+        guard proof.count == 32 else {
+            throw AuthwellError.invalidArgument("Invalid saved-login authorization")
+        }
+        let defaults = try AuthwellAppGroup.sharedDefaults()
+        defaults.set(accountId, forKey: AuthwellAppGroup.pendingSaveAccountKey)
+        defaults.set(
+            Data(SHA256.hash(data: proof)),
+            forKey: AuthwellAppGroup.pendingSaveProofHashKey
+        )
+    }
+
+    static func verify(accountId: String, proof: Data) throws -> Bool {
+        guard proof.count == 32 else { return false }
+        let defaults = try AuthwellAppGroup.sharedDefaults()
+        guard defaults.string(forKey: AuthwellAppGroup.pendingSaveAccountKey) == accountId,
+              let expected = defaults.data(forKey: AuthwellAppGroup.pendingSaveProofHashKey) else {
+            return false
+        }
+        return constantTimeEqual(expected, Data(SHA256.hash(data: proof)))
+    }
+
+    static func clear() throws {
+        let defaults = try AuthwellAppGroup.sharedDefaults()
+        defaults.removeObject(forKey: AuthwellAppGroup.pendingSaveAccountKey)
+        defaults.removeObject(forKey: AuthwellAppGroup.pendingSaveProofHashKey)
+    }
+
+    private static func constantTimeEqual(_ left: Data, _ right: Data) -> Bool {
+        guard left.count == right.count else { return false }
+        var difference: UInt8 = 0
+        for index in left.indices { difference |= left[index] ^ right[index] }
+        return difference == 0
+    }
+}
+
+struct NativeTotpConfiguration: Codable {
+    let secret: Data
+    let period: Int
+    let digits: Int
+    let algorithm: String
+
+    static func parse(_ value: String) throws -> NativeTotpConfiguration {
+        let input = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty, input.count <= 16_384 else {
+            throw AuthwellError.invalidArgument("Invalid authenticator key")
+        }
+        if input.lowercased().hasPrefix("otpauth://") {
+            guard let components = URLComponents(string: input),
+                  components.scheme?.lowercased() == "otpauth",
+                  components.host?.lowercased() == "totp" else {
+                throw AuthwellError.invalidArgument("Only TOTP setup links are supported")
+            }
+            var values: [String: String] = [:]
+            for item in components.queryItems ?? [] {
+                let key = item.name.lowercased()
+                guard values[key] == nil else {
+                    throw AuthwellError.invalidArgument("Duplicate authenticator parameter")
+                }
+                values[key] = item.value ?? ""
+            }
+            guard let encodedSecret = values["secret"] else {
+                throw AuthwellError.invalidArgument("The authenticator key is missing")
+            }
+            return try NativeTotpConfiguration(
+                secret: decodeBase32(encodedSecret),
+                period: parseInteger(values["period"], defaultValue: 30, range: 1...86_400),
+                digits: parseInteger(values["digits"], defaultValue: 6, range: 6...8),
+                algorithm: normalizeAlgorithm(values["algorithm"])
+            )
+        }
+        return try NativeTotpConfiguration(
+            secret: decodeBase32(input),
+            period: 30,
+            digits: 6,
+            algorithm: "SHA1"
+        )
+    }
+
+    func code(at date: Date = Date()) throws -> String {
+        let counter = UInt64(floor(date.timeIntervalSince1970 / Double(period)))
+        var bigEndian = counter.bigEndian
+        let message = withUnsafeBytes(of: &bigEndian) { Data($0) }
+        let digest: Data
+        switch algorithm {
+        case "SHA1":
+            digest = Data(HMAC<Insecure.SHA1>.authenticationCode(for: message, using: SymmetricKey(data: secret)))
+        case "SHA256":
+            digest = Data(HMAC<SHA256>.authenticationCode(for: message, using: SymmetricKey(data: secret)))
+        case "SHA512":
+            digest = Data(HMAC<SHA512>.authenticationCode(for: message, using: SymmetricKey(data: secret)))
+        default:
+            throw AuthwellError.storage("Unsupported authenticator algorithm")
+        }
+        let offset = Int(digest[digest.count - 1] & 0x0f)
+        guard offset + 3 < digest.count else {
+            throw AuthwellError.storage("The authenticator result is malformed")
+        }
+        let binary = (UInt32(digest[offset] & 0x7f) << 24)
+            | (UInt32(digest[offset + 1]) << 16)
+            | (UInt32(digest[offset + 2]) << 8)
+            | UInt32(digest[offset + 3])
+        return String(format: "%0*u", digits, binary % UInt32(pow(10.0, Double(digits))))
+    }
+
+    private static func parseInteger(
+        _ value: String?,
+        defaultValue: Int,
+        range: ClosedRange<Int>
+    ) throws -> Int {
+        guard let value else { return defaultValue }
+        guard value.range(of: "^[0-9]+$", options: .regularExpression) != nil,
+              let parsed = Int(value), range.contains(parsed) else {
+            throw AuthwellError.invalidArgument("Invalid authenticator parameter")
+        }
+        return parsed
+    }
+
+    private static func normalizeAlgorithm(_ value: String?) throws -> String {
+        switch (value ?? "SHA1").uppercased().replacingOccurrences(of: "-", with: "") {
+        case "SHA1": return "SHA1"
+        case "SHA256": return "SHA256"
+        case "SHA512": return "SHA512"
+        default: throw AuthwellError.invalidArgument("Unsupported authenticator algorithm")
+        }
+    }
+
+    private static func decodeBase32(_ value: String) throws -> Data {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
+        let lookup = Dictionary(uniqueKeysWithValues: alphabet.enumerated().map { ($0.element, $0.offset) })
+        let normalized = value.uppercased().filter { !$0.isWhitespace && $0 != "-" && $0 != "=" }
+        guard normalized.count >= 16, normalized.count <= 4_096 else {
+            throw AuthwellError.invalidArgument("Invalid authenticator key")
+        }
+        var buffer = 0
+        var bits = 0
+        var bytes: [UInt8] = []
+        for character in normalized {
+            guard let digit = lookup[character] else {
+                throw AuthwellError.invalidArgument("Invalid authenticator key")
+            }
+            buffer = (buffer << 5) | digit
+            bits += 5
+            if bits >= 8 {
+                bits -= 8
+                bytes.append(UInt8((buffer >> bits) & 0xff))
+                buffer &= (1 << bits) - 1
+            }
+        }
+        guard bytes.count >= 10, bytes.count <= 256 else {
+            throw AuthwellError.invalidArgument("Invalid authenticator key")
+        }
+        return Data(bytes)
     }
 }
 

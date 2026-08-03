@@ -50,6 +50,23 @@ enum AuthwellCredentialIdentityStore {
             }
         }
 
+        if #available(iOS 18.0, *) {
+            for record in try AuthwellDatabase.shared.allTotp() {
+                for identifier in record.serviceIdentifiers {
+                    identities.append(
+                        ASOneTimeCodeCredentialIdentity(
+                            serviceIdentifier: ASCredentialServiceIdentifier(
+                                identifier: identifier,
+                                type: .domain
+                            ),
+                            label: record.displayLabel,
+                            recordIdentifier: record.id
+                        )
+                    )
+                }
+            }
+        }
+
         if let accountId = try AuthwellAppGroup.sharedDefaults().string(
             forKey: AuthwellAppGroup.accountKey
         ) {

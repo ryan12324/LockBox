@@ -63,7 +63,7 @@ JAVA_HOME="/private/tmp/lockbox-jdk17/jdk-17.0.20+8/Contents/Home" \
 
 - Build `apps/web` before Capacitor sync; iOS packages `apps/web/dist`.
 - iOS 17 is the minimum deployment target because third-party passkey providers require the iOS 17 AuthenticationServices APIs.
-- Install Xcode 15 or newer and CocoaPods. Open `apps/mobile/ios/App/App.xcworkspace`, not the `.xcodeproj`, for signed device and archive builds.
+- Install Xcode 26.2 or newer and CocoaPods. The newer SDK compiles password-save requests while the deployment target remains iOS 17. Open `apps/mobile/ios/App/App.xcworkspace`, not the `.xcodeproj`, for signed device and archive builds.
 - Both the `App` and `CredentialProvider` targets require the AutoFill Credential Provider capability, the `group.dev.lockbox.app` App Group, and the shared Keychain group from their committed entitlements.
 - `scripts/configure-ios-project.rb` idempotently restores native source membership and the embedded credential-provider target after recreating the Capacitor project.
 
