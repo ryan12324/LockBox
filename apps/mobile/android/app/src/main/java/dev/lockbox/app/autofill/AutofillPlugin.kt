@@ -99,6 +99,28 @@ class AutofillPlugin : Plugin() {
         resolveStatus(call)
     }
 
+    /** Prepare secure pending saves immediately after a successful vault unlock. */
+    @PluginMethod
+    fun prepareCredentialSaving(call: PluginCall) {
+        val accountId = call.getString("accountId")?.takeIf { it.isNotBlank() && it.length <= 100 }
+            ?: return call.reject("accountId is required")
+        val saveAuthorization = call.getString("saveAuthorization")
+            ?.let(::decodeSaveAuthorization)
+            ?: return call.reject("saveAuthorization is required")
+        pluginScope.launch {
+            try {
+                PendingSaveCrypto.prepare()
+                PasskeyAccountState.set(context, accountId)
+                PendingSaveAuthorization.configure(context, accountId, saveAuthorization)
+                call.resolve()
+            } catch (error: Exception) {
+                call.reject(error.message ?: "Device password saving could not be prepared", error)
+            } finally {
+                saveAuthorization.fill(0)
+            }
+        }
+    }
+
     /** Replace the complete local index after a successful vault decryption. */
     @PluginMethod
     fun replaceCredentialIndex(call: PluginCall) {
@@ -115,6 +137,8 @@ class AutofillPlugin : Plugin() {
 
         pluginScope.launch {
             try {
+                PasskeyAccountState.set(context, accountId)
+                PendingSaveAuthorization.configure(context, accountId, saveAuthorization)
                 val publicKey = AutofillCrypto.ensureKeyPair(context).public
                 val entities = mutableListOf<AutofillCredentialEntity>()
 
@@ -178,8 +202,6 @@ class AutofillPlugin : Plugin() {
                     database.autofillCredentialDao().replaceAll(combined)
                     combined.size
                 }
-                PasskeyAccountState.set(context, accountId)
-                PendingSaveAuthorization.configure(context, accountId, saveAuthorization)
                 AutofillDiagnostics.recordIndex(context, indexedCount)
                 call.resolve(JSObject().put("indexed", indexedCount))
             } catch (error: Exception) {

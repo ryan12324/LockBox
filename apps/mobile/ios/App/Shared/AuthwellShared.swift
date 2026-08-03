@@ -576,7 +576,10 @@ struct PendingCredentialSaveRecord: Codable {
     let createdAt: String
     let encryptedData: String
     let domainHashes: [String]
-    let autofillRecord: AutofillRecord
+    /// Present when the biometric AutoFill index was available at capture
+    /// time. The encrypted pending save remains durable without it and is
+    /// imported into the vault after the next unlock.
+    let autofillRecord: AutofillRecord?
 
     var metadataBridgeValue: [String: Any] {
         ["id": id, "createdAt": createdAt]

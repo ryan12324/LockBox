@@ -13,6 +13,7 @@ import type { KdfConfig } from '@lockbox/types';
 import AuthShell from '../components/AuthShell.js';
 import { api } from '../lib/api.js';
 import { isNativeLockboxApp } from '../lib/server-connection.js';
+import { prepareNativeCredentialSaving } from '../lib/native-autofill.js';
 import { useAuthStore } from '../store/auth.js';
 import { useToast } from '../providers/ToastProvider.js';
 
@@ -94,6 +95,9 @@ export default function Register() {
         salt: saltB64,
       });
       setKeys(masterKey, userKey);
+      await prepareNativeCredentialSaving(userKey, response.user.id).catch(() => {
+        toast('Vault created, but device password saving will retry after it loads.', 'warning');
+      });
       navigate('/vault');
     } catch (error) {
       toast(error instanceof Error ? error.message : 'Your vault could not be created.', 'error');

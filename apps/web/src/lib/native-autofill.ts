@@ -135,6 +135,24 @@ export interface NativeAutofillIndexResult {
   oneTimeCodes?: number;
 }
 
+/**
+ * Publish only the opaque account ID and an HMAC verifier after a successful
+ * vault unlock. This makes native password capture ready before the larger
+ * biometric AutoFill index has finished rebuilding.
+ */
+export async function prepareNativeCredentialSaving(
+  userKey: Uint8Array,
+  accountId: string
+): Promise<void> {
+  const bridge = getCapacitor();
+  if (!bridge) return;
+  const saveAuthorization = await deriveNativeCredentialSaveAuthorization(userKey, accountId);
+  await bridge.nativePromise('Autofill', 'prepareCredentialSaving', {
+    accountId,
+    saveAuthorization,
+  });
+}
+
 export interface IOSAutofillAcceptanceSubmission {
   scenarioId: string;
   username?: string;
@@ -365,10 +383,12 @@ export async function deriveNativeCredentialSaveAuthorization(
     )
   );
   message.fill(0);
-  return toBase64(proof)
+  const encoded = toBase64(proof)
     .replaceAll('+', '-')
     .replaceAll('/', '_')
     .replace(/=+$/, '');
+  proof.fill(0);
+  return encoded;
 }
 
 export async function clearNativeAutofillIndex(): Promise<void> {

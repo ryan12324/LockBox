@@ -75,7 +75,8 @@ export interface ExportedAutofillCredentialSave extends PendingAutofillCredentia
  * Methods:
  * - isEnabled: Checks if Authwell is enabled as a platform autofill provider
  * - requestEnable: Opens the platform credential-provider settings
- * - requestBiometricEnrollment: Opens Android's biometric enrollment settings
+ * - requestBiometricEnrollment: Opens the platform's biometric settings
+ * - prepareCredentialSaving: Registers the unlocked account before index refresh
  * - replaceCredentialIndex: Atomically rebuilds the biometric-gated local index
  * - clearCredentialIndex: Clears account data on logout
  */
@@ -86,11 +87,17 @@ export interface AutofillPlugin {
   /** Open platform settings so the user can enable Authwell AutoFill */
   requestEnable(): Promise<void>;
 
-  /** Open device settings so Android can enroll a strong biometric. */
+  /** Open device settings so the user can enroll a supported biometric. */
   requestBiometricEnrollment(): Promise<void>;
 
   /** End an app-owned WebView autofill context after its form is complete. */
   commitActiveSession(): Promise<void>;
+
+  /** Prepare device-bound pending saves immediately after vault unlock. */
+  prepareCredentialSaving(options: {
+    accountId: string;
+    saveAuthorization: string;
+  }): Promise<void>;
 
   /** Rebuild the native index. Native code encrypts every credential immediately. */
   replaceCredentialIndex(options: {

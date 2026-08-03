@@ -577,7 +577,6 @@ enum NativeCredentialCapture {
             )
         }
         try DeviceOutboxCrypto.prepareForEncryption()
-        try DeviceIndexCrypto.prepareForEncryption()
         _ = try AuthwellDatabase.shared.allAutofill()
     }
 
@@ -623,25 +622,38 @@ enum NativeCredentialCapture {
         ])
         defer { payload.resetBytes(in: 0..<payload.count) }
         let protectedOutboxPayload = try DeviceOutboxCrypto.encrypt(payload)
-        let protectedAutofillPayload = try DeviceIndexCrypto.encrypt(payload)
-        let autofill = AutofillRecord(
-            id: id,
-            domainHashes: [try DomainIdentifier.hash(domain)],
-            displayUsername: username,
-            encryptedData: protectedAutofillPayload,
-            updatedAt: createdAt,
-            serviceIdentifiers: [domain]
-        )
+        let domainHashes = [try DomainIdentifier.hash(domain)]
+        let autofill: AutofillRecord?
+        do {
+            autofill = AutofillRecord(
+                id: id,
+                domainHashes: domainHashes,
+                displayUsername: username,
+                encryptedData: try DeviceIndexCrypto.encrypt(payload),
+                updatedAt: createdAt,
+                serviceIdentifiers: [domain]
+            )
+        } catch {
+            // Saving to the device-protected outbox is the durability boundary.
+            // A missing/changed biometric index must not lose a newly created
+            // password; the main app rebuilds the index after the next unlock.
+            autofill = nil
+            try? AutofillDiagnostics.recordFailure(
+                "Password saved pending unlock; AutoFill index unavailable: \(error.localizedDescription)"
+            )
+        }
         let record = PendingCredentialSaveRecord(
             id: id,
             accountId: accountId,
             createdAt: createdAt,
             encryptedData: protectedOutboxPayload,
-            domainHashes: autofill.domainHashes,
+            domainHashes: domainHashes,
             autofillRecord: autofill
         )
         try AuthwellDatabase.shared.upsertPendingCredentialSave(record)
-        try AuthwellDatabase.shared.upsertAutofill(autofill)
+        if let autofill {
+            try AuthwellDatabase.shared.upsertAutofill(autofill)
+        }
         return record
     }
 

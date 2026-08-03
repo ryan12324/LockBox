@@ -1,6 +1,8 @@
 import AuthenticationServices
 import Capacitor
 import Foundation
+import LocalAuthentication
+import UIKit
 
 @objc(AutofillPlugin)
 final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -10,6 +12,8 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
         var methods: [CAPPluginMethod] = [
             CAPPluginMethod(name: "isEnabled", returnType: CAPPluginReturnPromise),
             CAPPluginMethod(name: "requestEnable", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "requestBiometricEnrollment", returnType: CAPPluginReturnPromise),
+            CAPPluginMethod(name: "prepareCredentialSaving", returnType: CAPPluginReturnPromise),
             CAPPluginMethod(name: "replaceCredentialIndex", returnType: CAPPluginReturnPromise),
             CAPPluginMethod(name: "replaceTotpIndex", returnType: CAPPluginReturnPromise),
             CAPPluginMethod(name: "replacePasskeyIndex", returnType: CAPPluginReturnPromise),
@@ -36,6 +40,12 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
                 var status = try AutofillDiagnostics.snapshot().bridgeValue
                 status["supported"] = true
                 status["enabled"] = enabled
+                let context = LAContext()
+                var authenticationError: NSError?
+                status["biometricsReady"] = context.canEvaluatePolicy(
+                    .deviceOwnerAuthenticationWithBiometrics,
+                    error: &authenticationError
+                )
                 status["passwordSaveSupported"] = {
                     if #available(iOS 26.2, *) { return true }
                     return false
@@ -61,6 +71,33 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func requestBiometricEnrollment(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let settings = URL(string: UIApplication.openSettingsURLString) else {
+                call.reject("Failed to open biometric settings")
+                return
+            }
+            UIApplication.shared.open(settings) { opened in
+                if opened {
+                    call.resolve()
+                } else {
+                    call.reject("Failed to open biometric settings")
+                }
+            }
+        }
+    }
+
+    @objc func prepareCredentialSaving(_ call: CAPPluginCall) {
+        perform(call) {
+            let accountId = try self.accountId(call)
+            let authorization = try self.authorization(call, key: "saveAuthorization")
+            try DeviceOutboxCrypto.prepareForEncryption()
+            try PendingSaveAuthorization.configure(accountId: accountId, proof: authorization)
+            try AuthwellAppGroup.sharedDefaults().set(accountId, forKey: AuthwellAppGroup.accountKey)
+            call.resolve()
+        }
+    }
+
     @objc func replaceCredentialIndex(_ call: CAPPluginCall) {
         perform(call) {
             guard let credentials = call.options["credentials"] as? [[String: Any]] else {
@@ -71,6 +108,11 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             let accountId = try self.accountId(call)
             let authorization = try self.authorization(call, key: "saveAuthorization")
+            // Publish the authenticated account before building the optional
+            // biometric index. This keeps secure password capture available
+            // when biometrics are not enrolled or have changed.
+            try PendingSaveAuthorization.configure(accountId: accountId, proof: authorization)
+            try AuthwellAppGroup.sharedDefaults().set(accountId, forKey: AuthwellAppGroup.accountKey)
             var records: [AutofillRecord] = []
             for credential in credentials {
                 let id = try InputValidation.boundedString(
@@ -112,10 +154,8 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
             let vaultIds = Set(records.map(\.id))
             let combined = records + pending
                 .filter { !vaultIds.contains($0.id) }
-                .map(\.autofillRecord)
+                .compactMap(\.autofillRecord)
             try AuthwellDatabase.shared.replaceAutofill(combined)
-            try PendingSaveAuthorization.configure(accountId: accountId, proof: authorization)
-            try AuthwellAppGroup.sharedDefaults().set(accountId, forKey: AuthwellAppGroup.accountKey)
             self.refreshIdentities(
                 call,
                 result: ["indexed": combined.count],
@@ -458,7 +498,8 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
                 id: record.id,
                 accountId: accountId
             ), let storedIndex = try AuthwellDatabase.shared.autofill(id: record.id),
-                  storedIndex.serviceIdentifiers == record.autofillRecord.serviceIdentifiers else {
+                  let capturedIndex = record.autofillRecord,
+                  storedIndex.serviceIdentifiers == capturedIndex.serviceIdentifiers else {
                 throw AuthwellError.storage("The iOS test login was not indexed")
             }
 

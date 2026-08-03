@@ -6,6 +6,7 @@ import type { KdfConfig } from '@lockbox/types';
 import AuthShell from '../components/AuthShell.js';
 import { api, ApiError } from '../lib/api.js';
 import { isNativeLockboxApp } from '../lib/server-connection.js';
+import { prepareNativeCredentialSaving } from '../lib/native-autofill.js';
 import { useToast } from '../providers/ToastProvider.js';
 import { useAuthStore } from '../store/auth.js';
 
@@ -39,6 +40,9 @@ export default function Login() {
       salt: response.user.salt,
     });
     setKeys(masterKey, userKey);
+    await prepareNativeCredentialSaving(userKey, response.user.id).catch(() => {
+      toast('Signed in, but device password saving will retry after the vault loads.', 'warning');
+    });
     navigate('/vault');
   }
 

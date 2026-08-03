@@ -24,6 +24,7 @@ import {
   validateDeviceUnlockSession,
 } from '../lib/device-unlock-session.js';
 import { isNativeLockboxApp } from '../lib/server-connection.js';
+import { prepareNativeCredentialSaving } from '../lib/native-autofill.js';
 
 const EMPTY_BIOMETRIC_STATUS: NativeBiometricStatus = {
   supported: false,
@@ -81,6 +82,9 @@ export default function Unlock() {
       const masterKey = await deriveKey(password, fromBase64(session.salt), session.kdfConfig);
       const userKey = await decryptUserKey(session.encryptedUserKey, masterKey);
       setKeys(masterKey, userKey);
+      await prepareNativeCredentialSaving(userKey, session.userId).catch(() => {
+        toast('Vault unlocked, but device password saving is not ready yet.', 'warning');
+      });
       navigate('/vault');
     } catch {
       toast('That master password did not unlock this vault.', 'error');
@@ -106,6 +110,9 @@ export default function Unlock() {
         return;
       }
       unlockWithUserKey(userKey);
+      await prepareNativeCredentialSaving(userKey, session.userId).catch(() => {
+        toast('Vault unlocked, but device password saving is not ready yet.', 'warning');
+      });
       navigate('/vault');
     } catch (reason) {
       if (reason instanceof DeviceUnlockSessionError && reason.revoked) {

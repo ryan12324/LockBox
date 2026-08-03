@@ -19,6 +19,7 @@ private enum AuthwellNativeTests {
         try testIOSAutofillDomainMatching()
         try testAutofillUsernamePresentation()
         try testLegacyAutofillRecordCompatibility()
+        try testPendingSaveWithoutAutofillIndexCompatibility()
         try testNativePasswordGeneration()
         try testTotpGenerationAndValidation()
         try testAndroidPrivateKeyCompatibility()
@@ -97,6 +98,25 @@ private enum AuthwellNativeTests {
         try require(
             record.displayUsername.isEmpty,
             "A legacy iOS AutoFill record could not fall back without a display username"
+        )
+    }
+
+    private static func testPendingSaveWithoutAutofillIndexCompatibility() throws {
+        let pendingJSON = Data(
+            """
+            {
+              "id": "pending-login",
+              "accountId": "account-1",
+              "createdAt": "2026-08-03T00:00:00Z",
+              "encryptedData": "device-protected-ciphertext",
+              "domainHashes": ["hash"]
+            }
+            """.utf8
+        )
+        let record = try JSONDecoder().decode(PendingCredentialSaveRecord.self, from: pendingJSON)
+        try require(
+            record.autofillRecord == nil,
+            "A durable pending save incorrectly required a biometric AutoFill record"
         )
     }
 

@@ -26,6 +26,11 @@ internal object PendingSaveCrypto {
     private const val GCM_TAG_LENGTH = 128
 
     @Synchronized
+    fun prepare() {
+        getOrCreateKey()
+    }
+
+    @Synchronized
     fun encrypt(context: Context, plaintext: String): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateKey())

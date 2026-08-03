@@ -36,13 +36,6 @@ enum DeviceIndexCrypto {
         return ciphertext.base64EncodedString()
     }
 
-    /// Creates or reloads the public encryption key before Authwell offers a
-    /// generated password. This prevents AuthenticationServices from filling
-    /// a password that the subsequent save request cannot protect.
-    static func prepareForEncryption() throws {
-        _ = try encryptionPublicKey()
-    }
-
     static func decrypt(_ encoded: String, context: LAContext) throws -> Data {
         guard let ciphertext = Data(base64Encoded: encoded) else {
             throw AuthwellError.storage("The protected credential is malformed")

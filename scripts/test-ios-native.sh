@@ -61,6 +61,11 @@ grep -q 'NativeCredentialCapture.prepareForPasswordGeneration' "$provider_source
   echo "iOS provider offers generated passwords without preflighting secure save" >&2
   exit 1
 }
+grep -q 'let autofillRecord: AutofillRecord?' \
+  "$repository_root/apps/mobile/ios/App/Shared/AuthwellShared.swift" || {
+  echo "iOS pending saves still require the biometric AutoFill index" >&2
+  exit 1
+}
 grep -q 'Saved password; identity refresh failed' "$provider_source" || {
   echo "iOS provider can incorrectly fail a durable save after identity refresh" >&2
   exit 1

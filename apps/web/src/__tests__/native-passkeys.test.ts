@@ -6,6 +6,7 @@ import {
   getNativePasskeyStatus,
   openNativeBiometricEnrollment,
   openNativePasskeySettings,
+  prepareNativeCredentialSaving,
   syncNativeAutofillIndex,
 } from '../lib/native-autofill.js';
 import { syncPendingNativePasskeys } from '../lib/native-passkey-sync.js';
@@ -45,6 +46,20 @@ function installNativeBridge() {
 }
 
 describe('Android passkey bridge', () => {
+  it('prepares secure password capture immediately after vault unlock', async () => {
+    const nativePromise = installNativeBridge();
+    await prepareNativeCredentialSaving(new Uint8Array(64).fill(9), 'lockbox-user-1');
+
+    expect(nativePromise).toHaveBeenCalledWith(
+      'Autofill',
+      'prepareCredentialSaving',
+      {
+        accountId: 'lockbox-user-1',
+        saveAuthorization: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      }
+    );
+  });
+
   it('reports system selection and encrypted index health', async () => {
     installNativeBridge();
     await expect(getNativeAutofillStatus()).resolves.toEqual({
