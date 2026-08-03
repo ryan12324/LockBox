@@ -76,6 +76,7 @@ final class AutofillPlugin: CAPPlugin, CAPBridgedPlugin {
                     AutofillRecord(
                         id: id,
                         domainHashes: hashes,
+                        displayUsername: username,
                         encryptedData: try DeviceIndexCrypto.encrypt(payload),
                         updatedAt: ISO8601DateFormatter().string(from: Date()),
                         serviceIdentifiers: identifiers

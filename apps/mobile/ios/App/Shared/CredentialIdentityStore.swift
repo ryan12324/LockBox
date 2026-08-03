@@ -43,7 +43,7 @@ enum AuthwellCredentialIdentityStore {
                 )
                 let identity = ASPasswordCredentialIdentity(
                     serviceIdentifier: service,
-                    user: "Authwell credential",
+                    user: AutofillPresentation.credentialLabel(record.displayUsername),
                     recordIdentifier: record.id
                 )
                 identities.append(identity)

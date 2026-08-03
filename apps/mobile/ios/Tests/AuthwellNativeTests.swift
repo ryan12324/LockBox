@@ -17,6 +17,8 @@ private enum AuthwellNativeTests {
         try testBase64URLRoundTrip()
         try testRelyingPartyValidation()
         try testIOSAutofillDomainMatching()
+        try testAutofillUsernamePresentation()
+        try testLegacyAutofillRecordCompatibility()
         try testAndroidPrivateKeyCompatibility()
         try testPasskeyEncodingRoundTrip()
         try testMalformedAttestationsAreRejected()
@@ -53,6 +55,46 @@ private enum AuthwellNativeTests {
         try require(
             DomainIdentifier.normalize("iosapp://com.example.app") == nil,
             "An unsupported iOS bundle target was published as a domain identity"
+        )
+    }
+
+    private static func testAutofillUsernamePresentation() throws {
+        try require(
+            AutofillPresentation.credentialLabel(" person\n@example.com ")
+                == "person @example.com",
+            "The iOS credential label did not show a normalized username"
+        )
+        try require(
+            AutofillPresentation.authenticationReason("person@example.com")
+                == "Use person@example.com with Authwell",
+            "The iOS authentication reason did not identify the selected username"
+        )
+        try require(
+            AutofillPresentation.credentialLabel(" \n ") == "Authwell credential",
+            "The iOS credential label did not preserve the empty-username fallback"
+        )
+        try require(
+            AutofillPresentation.username(String(repeating: "x", count: 250)).count == 200,
+            "The iOS display username was not bounded"
+        )
+    }
+
+    private static func testLegacyAutofillRecordCompatibility() throws {
+        let legacyJSON = Data(
+            """
+            {
+              "id": "legacy-login",
+              "domainHashes": ["hash"],
+              "encryptedData": "ciphertext",
+              "updatedAt": "2026-08-03T00:00:00Z",
+              "serviceIdentifiers": ["example.com"]
+            }
+            """.utf8
+        )
+        let record = try JSONDecoder().decode(AutofillRecord.self, from: legacyJSON)
+        try require(
+            record.displayUsername.isEmpty,
+            "A legacy iOS AutoFill record could not fall back without a display username"
         )
     }
 

@@ -26,6 +26,7 @@ import androidx.credentials.exceptions.CreateCredentialUnknownException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.GetCredentialUnknownException
 import dev.lockbox.app.R
+import dev.lockbox.app.autofill.AutofillPresentation
 import dev.lockbox.app.autofill.AutofillDiagnostics
 import dev.lockbox.app.storage.VaultDatabase
 import kotlinx.coroutines.CoroutineScope
@@ -70,7 +71,9 @@ class LockboxCredentialProviderService : CredentialProviderService() {
                                 response.addCredentialEntry(
                                     PasswordCredentialEntry.Builder(
                                         applicationContext,
-                                        "Authwell credential",
+                                        AutofillPresentation.credentialLabel(
+                                            credential.displayUsername
+                                        ),
                                         buildPasswordPendingIntent(credential.id),
                                         option
                                     )

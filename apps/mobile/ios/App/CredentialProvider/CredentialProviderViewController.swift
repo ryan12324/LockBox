@@ -88,7 +88,17 @@ final class CredentialProviderViewController: ASCredentialProviderViewController
     }
 
     override func prepareInterfaceToProvideCredential(for credentialRequest: ASCredentialRequest) {
-        authenticate(reason: "Use an Authwell credential") { context in
+        let displayUsername: String
+        if let passwordRequest = credentialRequest as? ASPasswordCredentialRequest,
+           let identity = passwordRequest.credentialIdentity as? ASPasswordCredentialIdentity {
+            displayUsername = identity.user
+        } else if let passkeyRequest = credentialRequest as? ASPasskeyCredentialRequest,
+                  let identity = passkeyRequest.credentialIdentity as? ASPasskeyCredentialIdentity {
+            displayUsername = identity.userName
+        } else {
+            displayUsername = ""
+        }
+        authenticate(reason: AutofillPresentation.authenticationReason(displayUsername)) { context in
             do {
                 if let passwordRequest = credentialRequest as? ASPasswordCredentialRequest {
                     guard let identity = passwordRequest.credentialIdentity as? ASPasswordCredentialIdentity else {

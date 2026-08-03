@@ -272,12 +272,75 @@ struct VaultRecord: Codable {
     }
 }
 
+enum AutofillPresentation {
+    private static let maximumDisplayUsernameLength = 200
+
+    static func username(_ value: String) -> String {
+        String(
+            value
+                .split(whereSeparator: { $0.isWhitespace })
+                .joined(separator: " ")
+                .prefix(maximumDisplayUsernameLength)
+        )
+    }
+
+    static func credentialLabel(_ value: String) -> String {
+        let displayUsername = username(value)
+        return displayUsername.isEmpty ? "Authwell credential" : displayUsername
+    }
+
+    static func authenticationReason(_ value: String) -> String {
+        let displayUsername = username(value)
+        return displayUsername.isEmpty
+            ? "Use an Authwell credential"
+            : "Use \(displayUsername) with Authwell"
+    }
+}
+
 struct AutofillRecord: Codable {
     let id: String
     let domainHashes: [String]
+    let displayUsername: String
     let encryptedData: String
     let updatedAt: String
     let serviceIdentifiers: [String]
+
+    init(
+        id: String,
+        domainHashes: [String],
+        displayUsername: String,
+        encryptedData: String,
+        updatedAt: String,
+        serviceIdentifiers: [String]
+    ) {
+        self.id = id
+        self.domainHashes = domainHashes
+        self.displayUsername = AutofillPresentation.username(displayUsername)
+        self.encryptedData = encryptedData
+        self.updatedAt = updatedAt
+        self.serviceIdentifiers = serviceIdentifiers
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case domainHashes
+        case displayUsername
+        case encryptedData
+        case updatedAt
+        case serviceIdentifiers
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        domainHashes = try container.decode([String].self, forKey: .domainHashes)
+        displayUsername = AutofillPresentation.username(
+            try container.decodeIfPresent(String.self, forKey: .displayUsername) ?? ""
+        )
+        encryptedData = try container.decode(String.self, forKey: .encryptedData)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
+        serviceIdentifiers = try container.decode([String].self, forKey: .serviceIdentifiers)
+    }
 }
 
 struct PasskeyRecord: Codable {

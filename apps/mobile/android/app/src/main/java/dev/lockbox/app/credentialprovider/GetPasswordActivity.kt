@@ -17,6 +17,7 @@ import androidx.credentials.provider.ProviderGetCredentialRequest
 import androidx.fragment.app.FragmentActivity
 import dev.lockbox.app.autofill.AutofillCredentialEntity
 import dev.lockbox.app.autofill.AutofillCrypto
+import dev.lockbox.app.autofill.AutofillPresentation
 import dev.lockbox.app.storage.VaultDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -123,7 +124,7 @@ class GetPasswordActivity : FragmentActivity() {
         )
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Fill from Authwell")
-            .setSubtitle("Authenticate to use this password")
+            .setSubtitle(AutofillPresentation.promptSubtitle(credential.displayUsername))
             .setNegativeButtonText("Cancel")
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
             .build()
