@@ -27,6 +27,19 @@ require_directory() {
   [[ -d "$1" ]] || fail "missing $1"
 }
 
+require_xcode_version() {
+  local required_major=26
+  local required_minor=2
+  local version major minor
+  version="$(xcodebuild -version | awk 'NR == 1 { print $2 }')"
+  IFS=. read -r major minor _ <<< "$version"
+
+  [[ "$major" =~ ^[0-9]+$ && "$minor" =~ ^[0-9]+$ ]] ||
+    fail "could not parse Xcode version '$version'"
+  (( major > required_major || (major == required_major && minor >= required_minor) )) ||
+    fail "Xcode 26.2 or newer is required for AuthenticationServices password-save APIs; found $version"
+}
+
 assert_plist_value() {
   local plist_path="$1"
   local key_path="$2"
@@ -57,6 +70,7 @@ require_command pod
 require_command xcodebuild
 require_command xcrun
 require_command codesign
+require_xcode_version
 
 cd "$repository_root"
 bun run --cwd apps/web build
