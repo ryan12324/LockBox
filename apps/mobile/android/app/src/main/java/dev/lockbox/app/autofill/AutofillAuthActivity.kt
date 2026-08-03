@@ -41,6 +41,11 @@ class AutofillAuthActivity : FragmentActivity() {
                 val credential = VaultDatabase.getInstance(applicationContext)
                     .autofillCredentialDao()
                     .getById(credentialId) ?: return@launch withContext(Dispatchers.Main) { cancel() }
+                AutofillDebugHooks.payloadFor(applicationContext, credential.id)?.let { payload ->
+                    return@launch withContext(Dispatchers.Main) {
+                        returnDataset(payload.name, payload.username, payload.password)
+                    }
+                }
                 val privateKey = AutofillCrypto.getPrivateKey()
                     ?: return@launch withContext(Dispatchers.Main) { cancel() }
                 val envelope = AutofillCrypto.parseEnvelope(credential.encryptedData)

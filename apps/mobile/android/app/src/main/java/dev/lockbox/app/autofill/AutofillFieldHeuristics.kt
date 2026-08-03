@@ -2,7 +2,7 @@ package dev.lockbox.app.autofill
 
 import android.text.InputType
 
-internal enum class AutofillFieldKind { USERNAME, PASSWORD, NEW_PASSWORD }
+internal enum class AutofillFieldKind { USERNAME, PASSWORD, NEW_PASSWORD, ONE_TIME_CODE }
 
 /** Conservative fallback field detection for apps that omit Android AutoFill hints. */
 internal object AutofillFieldHeuristics {
@@ -28,7 +28,7 @@ internal object AutofillFieldHeuristics {
             declaredHints.any(::isOneTimeCodeToken) ||
             ONE_TIME_CODE_TOKENS.any(semanticText::contains)
         ) {
-            return null
+            return AutofillFieldKind.ONE_TIME_CODE
         }
 
         if (

@@ -69,6 +69,14 @@ bun run android:run
 
 The command prefers an authorized physical device connected over USB or Wi-Fi, then falls back to a running emulator or an AVD using the newest installed Android SDK. Use `bun run android:run -- --list` to list every target, or pass a device serial or AVD ID after `--` to choose one explicitly. `bun run android:device` and `bun run android:emulator` force one target type.
 
+Run the complete Android password AutoFill matrix on a running emulator:
+
+```bash
+bun run android:test:autofill
+```
+
+The command builds and installs the debug APK, enables Authwell's AutofillService, seeds disposable debug-only credentials, and drives all 12 `/test` cases through the real Android picker and save-session UI. It refuses physical-device serials so test data cannot replace a real device index. Use `-- --serial emulator-5554` to choose an emulator, `--case password-change` to run one case, or `--skip-build` while iterating after an APK build. The fixture receiver and plaintext test payload provider exist only in the debug source set and are absent from release builds.
+
 The encrypted AutoFill index requires a screen lock and an enrolled strong biometric. On a new emulator, use Authwell's **Set up device biometrics** action before refreshing the index, then complete fingerprint enrollment in Android Settings.
 
 Android exposes two complementary password-manager paths. The Autofill Framework service supports Android 8+ and apps with standard AutoFill fields, including Android's system **Save to Authwell?** prompt after a new or changed login is submitted. Accepted saves are immediately protected by a separate device-bound operations key and become locally fillable; the next normal Authwell unlock silently authorizes their import into the end-to-end encrypted vault with an account-scoped proof derived from the in-memory vault key. Neither the master password nor vault key is persisted or given to the AutofillService. On Android 14+, the Credential Manager provider advertises both password and public-key credential capabilities. After the first vault unlock, the in-app setup checklist reports whether each system provider is enabled, how many encrypted logins were indexed, and whether Android has queried Authwell.

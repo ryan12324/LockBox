@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button, Icon } from '@lockbox/design';
+import { commitNativeAutofillSession } from '../lib/native-autofill.js';
 
 export type AutofillTestExpectation = 'fill-and-save' | 'save-only' | 'ignore';
 
@@ -514,9 +515,13 @@ export default function AutofillTest() {
 
     // Keep values in the document until navigation so the platform can inspect
     // the completed form. Credentials are never serialized into the URL or sent.
-    window.setTimeout(() => {
-      window.location.assign(buildAutofillCompletionUrl(active.id));
-    }, 180);
+    void commitNativeAutofillSession()
+      .catch(() => undefined)
+      .finally(() => {
+        window.setTimeout(() => {
+          window.location.assign(buildAutofillCompletionUrl(active.id));
+        }, 180);
+      });
   }
 
   return (

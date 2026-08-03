@@ -129,6 +129,7 @@ bun run --filter @lockbox/web dev
 bun run --filter @lockbox/extension dev
 bun run --filter @lockbox/cli dev -- --help
 bun run android:run
+bun run android:test:autofill
 bun run ios:simulator
 ```
 

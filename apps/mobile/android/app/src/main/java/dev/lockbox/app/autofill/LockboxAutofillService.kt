@@ -53,6 +53,11 @@ class LockboxAutofillService : AutofillService() {
             callback.onSuccess(null)
             return
         }
+        if (fields.hasOneTimeCode && fields.passwordId == null && fields.newPasswordId == null) {
+            AutofillDiagnostics.recordRequest(applicationContext, 0)
+            callback.onSuccess(null)
+            return
+        }
 
         val identifier = fields.webDomain ?: fields.packageName ?: run {
             AutofillDiagnostics.recordRequest(applicationContext, 0)
@@ -223,6 +228,7 @@ class LockboxAutofillService : AutofillService() {
     private fun buildSaveInfo(fields: ParsedAutofillFields): SaveInfo? {
         val passwordId = fields.newPasswordId ?: fields.passwordId
         if (passwordId == null) {
+            if (fields.hasOneTimeCode) return null
             val usernameId = fields.usernameId ?: return null
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
             return SaveInfo.Builder(
@@ -236,11 +242,12 @@ class LockboxAutofillService : AutofillService() {
 
         val saveType = SaveInfo.SAVE_DATA_TYPE_PASSWORD or
             if (fields.usernameId != null) SaveInfo.SAVE_DATA_TYPE_USERNAME else 0
-        return SaveInfo.Builder(
-            saveType,
-            arrayOf(passwordId)
-        ).apply {
-            fields.usernameId?.let { setOptionalIds(arrayOf(it)) }
+        return SaveInfo.Builder(saveType, arrayOf(passwordId)).apply {
+            val optionalIds = listOfNotNull(
+                fields.usernameId,
+                fields.passwordId?.takeIf { fields.newPasswordId != null && it != passwordId }
+            ).toTypedArray()
+            if (optionalIds.isNotEmpty()) setOptionalIds(optionalIds)
             setDescription("Save this login to Authwell")
         }.build()
     }
@@ -309,6 +316,7 @@ class LockboxAutofillService : AutofillService() {
                     result.newPasswordId = autofillId
                     result.newPasswordValue = node.textValue()
                 }
+                AutofillFieldKind.ONE_TIME_CODE -> result.hasOneTimeCode = true
                 null -> Unit
             }
         }
@@ -339,6 +347,7 @@ data class ParsedAutofillFields(
     var usernameValue: String = "",
     var passwordValue: String? = null,
     var newPasswordValue: String? = null,
+    var hasOneTimeCode: Boolean = false,
     var webDomain: String? = null,
     var packageName: String? = null
 )

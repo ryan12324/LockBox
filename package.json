@@ -32,6 +32,7 @@
     "android:run": "./scripts/run-android.sh",
     "android:device": "./scripts/run-android.sh --device",
     "android:emulator": "./scripts/run-android.sh --emulator",
+    "android:test:autofill": "bun scripts/test-android-autofill.mjs",
     "ios:simulator": "./scripts/run-ios-simulator.sh",
     "build:ios:release": "./scripts/build-ios-release.sh",
     "brand:authwell": "node scripts/generate-authwell-assets.mjs",

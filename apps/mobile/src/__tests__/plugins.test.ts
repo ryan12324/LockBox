@@ -16,6 +16,7 @@ vi.mock('@capacitor/core', () => ({
       isEnabled: vi.fn().mockResolvedValue({ enabled: false }),
       requestEnable: vi.fn().mockResolvedValue(undefined),
       requestBiometricEnrollment: vi.fn().mockResolvedValue(undefined),
+      commitActiveSession: vi.fn().mockResolvedValue(undefined),
       replaceCredentialIndex: vi.fn().mockResolvedValue({ indexed: 0 }),
       replacePasskeyIndex: vi.fn().mockResolvedValue({ indexed: 0 }),
       clearCredentialIndex: vi.fn().mockResolvedValue(undefined),
@@ -65,6 +66,10 @@ describe('AutofillPlugin interface', () => {
 
   it('requestBiometricEnrollment resolves without error', async () => {
     await expect(Autofill.requestBiometricEnrollment()).resolves.toBeUndefined();
+  });
+
+  it('commitActiveSession resolves without error', async () => {
+    await expect(Autofill.commitActiveSession()).resolves.toBeUndefined();
   });
 
   it('replaceCredentialIndex accepts decrypted fields for immediate native encryption', async () => {

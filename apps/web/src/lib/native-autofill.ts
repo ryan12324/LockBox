@@ -103,6 +103,13 @@ export async function openNativeBiometricEnrollment(): Promise<void> {
   await bridge.nativePromise('Autofill', 'requestBiometricEnrollment', {});
 }
 
+/** Notify Android that an app-owned WebView form has completed so SaveInfo can be handled. */
+export async function commitNativeAutofillSession(): Promise<void> {
+  const bridge = getAndroidAutofill();
+  if (!bridge) return;
+  await bridge.nativePromise('Autofill', 'commitActiveSession', {});
+}
+
 export async function getNativePasskeyStatus(): Promise<NativePasskeyStatus> {
   const bridge = getCredentialManager();
   if (!bridge) return { supported: false, enabled: false };

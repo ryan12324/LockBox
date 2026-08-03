@@ -61,13 +61,17 @@ class AutofillFieldHeuristicsTest {
 
     @Test
     fun `never treats one time codes as saved passwords`() {
-        assertNull(
+        assertEquals(
+            AutofillFieldKind.ONE_TIME_CODE,
             classify(
                 htmlAutocomplete = "one-time-code",
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             )
         )
-        assertNull(classify(idEntry = "totpCode", hint = "Verification code"))
+        assertEquals(
+            AutofillFieldKind.ONE_TIME_CODE,
+            classify(idEntry = "totpCode", hint = "Verification code")
+        )
     }
 
     private fun classify(

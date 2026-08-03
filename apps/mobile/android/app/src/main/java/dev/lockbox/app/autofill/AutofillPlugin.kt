@@ -75,6 +75,20 @@ class AutofillPlugin : Plugin() {
         }
     }
 
+    /** End the current app-owned WebView autofill context after a completed form submission. */
+    @PluginMethod
+    fun commitActiveSession(call: PluginCall) {
+        val currentActivity = activity ?: return call.reject("Autofill activity is unavailable")
+        currentActivity.runOnUiThread {
+            try {
+                currentActivity.getSystemService(AutofillManager::class.java)?.commit()
+                call.resolve()
+            } catch (error: Exception) {
+                call.reject("Failed to commit autofill session", error)
+            }
+        }
+    }
+
     @ActivityCallback
     fun autofillSettingsResult(call: PluginCall, result: ActivityResult) {
         resolveStatus(call, selected = result.resultCode == Activity.RESULT_OK)

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="dev.lockbox.app.MainActivity"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true" />
+
+        <!-- Debug-only entrypoint used by the emulator AutoFill end-to-end suite. -->
+        <receiver
+            android:name="dev.lockbox.app.autofill.AutofillE2eSeedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="dev.lockbox.app.debug.SEED_AUTOFILL_E2E" />
+                <action android:name="dev.lockbox.app.debug.RESET_AUTOFILL_E2E" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

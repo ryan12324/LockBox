@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LoginItem, PasskeyItem, VaultItem } from '@lockbox/types';
 import {
+  commitNativeAutofillSession,
   getNativeAutofillStatus,
   getNativePasskeyStatus,
   openNativeBiometricEnrollment,
@@ -199,6 +200,12 @@ describe('Android passkey bridge', () => {
       'requestBiometricEnrollment',
       {}
     );
+  });
+
+  it('commits a completed app-owned WebView autofill context', async () => {
+    const nativePromise = installNativeBridge();
+    await commitNativeAutofillSession();
+    expect(nativePromise).toHaveBeenCalledWith('Autofill', 'commitActiveSession', {});
   });
 
   it('biometrically exports and uploads an Android-created passkey', async () => {

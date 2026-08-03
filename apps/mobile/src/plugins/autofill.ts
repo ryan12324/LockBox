@@ -89,6 +89,9 @@ export interface AutofillPlugin {
   /** Open device settings so Android can enroll a strong biometric. */
   requestBiometricEnrollment(): Promise<void>;
 
+  /** End an app-owned WebView autofill context after its form is complete. */
+  commitActiveSession(): Promise<void>;
+
   /** Rebuild the native index. Native code encrypts every credential immediately. */
   replaceCredentialIndex(options: {
     credentials: AutofillIndexCredential[];
